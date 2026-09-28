@@ -1,0 +1,17 @@
+.git
+.test-tools
+tests
+*.env
+**/.env
+**/.env.*
+!**/.env.example
+**/vendor
+**/node_modules
+**/database/database.sqlite
+**/storage/logs/*
+**/storage/app/private/*
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+madrassa-backend/docs
+ecole-filament/docs

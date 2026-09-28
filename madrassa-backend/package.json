@@ -1,0 +1,7 @@
+{
+  "name": "madrassa-backend-database-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node tests/database.mjs", "test:concurrency": "node tests/concurrency.mjs"},
+  "devDependencies": {"@electric-sql/pglite": "0.5.8", "pg": "8.16.3"}
+}

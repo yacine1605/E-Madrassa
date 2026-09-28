@@ -1,0 +1,90 @@
+name: ${COMPOSE_PROJECT_NAME:-madrassa}
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:80"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      SESSION_COOKIE: ${COMPOSE_PROJECT_NAME:-madrassa}_session
+      APP_TIMEZONE: Africa/Algiers
+      SCHOOL_DEMO: "false"
+      SCHOOL_BACKEND: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${DB_DATABASE:-madrassa}
+      DB_USERNAME: school_owner
+      DB_PASSWORD: ${DB_PASSWORD:-madrassa_local_only}
+      DB_SSLMODE: disable
+      SESSION_DRIVER: redis
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: sync
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-storage:/var/www/html/storage
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [cloudflare]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: [quick]
+    command: tunnel --no-autoupdate --url http://app:80
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-madrassa}
+      POSTGRES_USER: school_owner
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-madrassa_local_only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U school_owner -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./madrassa-backend/deploy/provision-tenant.sql:/opt/madrassa/provision-tenant.sql:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,25 @@
+.grading-create{margin:24px 0 36px}
+.grading-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.grading-form .wide{grid-column:1/-1}
+select{width:100%;min-width:0;font:inherit;color:#173d39;background:#fff;border:1px solid #c8d9cd;border-radius:9px;padding:12px}
+fieldset{margin:0;padding:0;border:0;min-width:0}
+.grades-table td:first-child{min-width:145px}
+.grades-table small{display:block;margin-top:6px}
+.grades-table select{min-width:118px}
+.grades-table input[type=number]{min-width:110px;max-width:145px}
+.grades-table input:disabled{background:#f2f4f2;color:#74847a}
+.correction{margin:25px 0;max-width:640px}
+.save-grades{display:flex;align-items:center;flex-wrap:wrap;gap:16px}
+.grades-table th{white-space:nowrap}
+select:focus-visible{outline:3px solid #deae43;outline-offset:3px}
+@media(max-width:640px){
+ .grading-form{grid-template-columns:1fr}
+ .grades-table,.grades-table tbody{display:block}
+ .grades-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .grades-table tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:18px 0;border-bottom:1px solid #e3eae5}
+ .grades-table td{display:block;padding:0;border:0}
+ .grades-table td:first-child{grid-column:1/-1;min-width:0}
+ .grades-table td:nth-child(2)::before{content:'Statut';display:block;font-size:12px;color:#708679;margin-bottom:8px}
+ .grades-table td:nth-child(3)::before{content:'Note';display:block;font-size:12px;color:#708679;margin-bottom:8px}
+ .grades-table select,.grades-table input[type=number]{min-width:0;max-width:none}
+}

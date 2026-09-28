@@ -1,0 +1,35 @@
+PASS capacity enforced
+PASS price snapshot frozen
+PASS overpayment rejected
+PASS payments immutable
+PASS over-refund rejected
+PASS net balance includes refunds
+PASS payment never reactivates suspended enrollment
+PASS schedule overlap rejected
+PASS adjacent sessions allowed
+PASS score cannot exceed maximum
+PASS missing is not zero
+PASS correction needs reason
+PASS published grades frozen
+PASS attendance uniqueness
+PASS expense payment capped
+PASS contracts cannot overlap
+PASS validated hours frozen
+PASS closed payroll rejects late hours
+PASS audit recorded without full PII snapshots
+PASS tenant B cannot read tenant A
+PASS RLS applies to balance view
+PASS tenant B cannot write tenant A
+PASS cross-tenant foreign key rejected
+PASS runtime cannot grant memberships
+PASS tenant context alone does not grant membership
+PASS missing tenant fails closed
+PASS non-member fails closed
+PASS transaction context resets on rollback
+PASS cancelled enrollment rejects payment
+PASS invoice cannot override enrollment price
+PASS student can enroll in multiple offerings
+PASS cross-program student timetable collision rejected
+PASS wrong group attendance rejected
+PASS RLS survives inactive membership
+34 checks passed. Engine: embedded PostgreSQL; concurrency not measured.

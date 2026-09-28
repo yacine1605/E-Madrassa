@@ -1,0 +1,1606 @@
+{
+  "dashboard": {
+    "title": "Tableau de bord",
+    "group": "Pilotage",
+    "icon": "squares-2x2",
+    "description": "Votre établissement, en un regard.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "dashboard"
+  },
+  "students": {
+    "title": "Élèves",
+    "group": "Scolarité",
+    "icon": "academic-cap",
+    "description": "Dossiers scolaires et responsables légaux.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom et prénom",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "name_ar",
+        "label": "Nom en arabe",
+        "type": "text",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "level",
+        "label": "Niveau",
+        "type": "select",
+        "options": [
+          "1AP",
+          "2AP",
+          "3AP",
+          "4AP",
+          "5AP",
+          "1AM",
+          "2AM",
+          "3AM",
+          "4AM",
+          "1AS",
+          "2AS",
+          "3AS"
+        ],
+        "required": true
+      },
+      {
+        "key": "birth",
+        "label": "Date de naissance",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "guardian",
+        "label": "Responsable légal",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "phone",
+        "label": "Téléphone",
+        "type": "tel",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "address",
+        "label": "Adresse",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Actif",
+          "Ancien",
+          "Bloqué"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Nouvel élève",
+    "kind": "list"
+  },
+  "admissions": {
+    "title": "Admissions",
+    "group": "Scolarité",
+    "icon": "user-plus",
+    "description": "De la première demande à la décision d’admission.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "level",
+        "label": "Niveau",
+        "type": "select",
+        "options": [
+          "1AP",
+          "2AP",
+          "3AP",
+          "4AP",
+          "5AP",
+          "1AM",
+          "2AM",
+          "3AM",
+          "4AM",
+          "1AS",
+          "2AS",
+          "3AS"
+        ],
+        "required": true
+      },
+      {
+        "key": "phone",
+        "label": "Téléphone",
+        "type": "tel",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Premier contact",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Nouveau contact",
+          "Dossier reçu",
+          "Entretien",
+          "Accepté",
+          "Liste d’attente"
+        ],
+        "required": true
+      },
+      {
+        "key": "notes",
+        "label": "Observations",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Nouvelle demande",
+    "kind": "list"
+  },
+  "enrollments": {
+    "title": "Inscriptions",
+    "group": "Scolarité",
+    "icon": "clipboard-document-check",
+    "description": "État pédagogique et règlement financier suivis séparément.",
+    "fields": [
+      {
+        "key": "student",
+        "label": "Élève",
+        "type": "relation",
+        "options": "students",
+        "required": true
+      },
+      {
+        "key": "formation",
+        "label": "Formation",
+        "type": "relation",
+        "options": "formations",
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Classe / groupe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "year",
+        "label": "Année scolaire",
+        "type": "select",
+        "options": [
+          "2026–2027",
+          "2025–2026"
+        ],
+        "required": true
+      },
+      {
+        "key": "amount",
+        "label": "Montant convenu (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "due",
+        "label": "Échéance",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "En attente",
+          "Validée",
+          "Suspendue",
+          "Annulée"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Inscrire un élève",
+    "kind": "list"
+  },
+  "groups": {
+    "title": "Classes et groupes",
+    "group": "Scolarité",
+    "icon": "user-group",
+    "description": "Classes principales et groupes de soutien.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "level",
+        "label": "Niveau",
+        "type": "select",
+        "options": [
+          "1AP",
+          "2AP",
+          "3AP",
+          "4AP",
+          "5AP",
+          "1AM",
+          "2AM",
+          "3AM",
+          "4AM",
+          "1AS",
+          "2AS",
+          "3AS"
+        ],
+        "required": true
+      },
+      {
+        "key": "formation",
+        "label": "Formation",
+        "type": "relation",
+        "options": "formations",
+        "required": true
+      },
+      {
+        "key": "capacity",
+        "label": "Capacité",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "teacher",
+        "label": "Enseignant principal",
+        "type": "relation",
+        "options": "teachers",
+        "required": true
+      },
+      {
+        "key": "room",
+        "label": "Salle",
+        "type": "relation",
+        "options": "rooms",
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Actif",
+          "Archivé"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Créer une classe",
+    "kind": "list"
+  },
+  "formations": {
+    "title": "Formations",
+    "group": "Scolarité",
+    "icon": "book-open",
+    "description": "Cursus, filières et cours de soutien.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "level",
+        "label": "Niveau",
+        "type": "select",
+        "options": [
+          "1AP",
+          "2AP",
+          "3AP",
+          "4AP",
+          "5AP",
+          "1AM",
+          "2AM",
+          "3AM",
+          "4AM",
+          "1AS",
+          "2AS",
+          "3AS"
+        ],
+        "required": true
+      },
+      {
+        "key": "track",
+        "label": "Filière / parcours",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "amount",
+        "label": "Tarif annuel (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Active",
+          "Inactive"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Nouvelle formation",
+    "kind": "list"
+  },
+  "subjects": {
+    "title": "Matières et compétences",
+    "group": "Pédagogie",
+    "icon": "bookmark-square",
+    "description": "Référentiel pédagogique configurable par niveau.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "level",
+        "label": "Niveau",
+        "type": "select",
+        "options": [
+          "1AP",
+          "2AP",
+          "3AP",
+          "4AP",
+          "5AP",
+          "1AM",
+          "2AM",
+          "3AM",
+          "4AM",
+          "1AS",
+          "2AS",
+          "3AS"
+        ],
+        "required": true
+      },
+      {
+        "key": "coefficient",
+        "label": "Coefficient",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "skills",
+        "label": "Compétences",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "hours",
+        "label": "Heures hebdomadaires",
+        "type": "number",
+        "options": null,
+        "required": true
+      }
+    ],
+    "create": "Ajouter",
+    "kind": "list"
+  },
+  "lessons": {
+    "title": "Leçons",
+    "group": "Pédagogie",
+    "icon": "document-text",
+    "description": "Cours, objectifs et publication par groupe.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Groupe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "subject",
+        "label": "Matière",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "chapter",
+        "label": "Chapitre",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "objectives",
+        "label": "Objectifs",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "content",
+        "label": "Contenu",
+        "type": "rich",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "duration",
+        "label": "Durée (min)",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "En relecture",
+          "Publiée",
+          "Archivée"
+        ],
+        "required": true
+      },
+      {
+        "key": "attachment",
+        "label": "Pièce jointe (PDF ou image)",
+        "type": "file",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Créer une leçon",
+    "kind": "list"
+  },
+  "assessments": {
+    "title": "Évaluations et devoirs",
+    "group": "Pédagogie",
+    "icon": "pencil-square",
+    "description": "Devoirs, quiz et examens avec échéances et barèmes.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Groupe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "subject",
+        "label": "Matière",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "type",
+        "label": "Type",
+        "type": "select",
+        "options": [
+          "Devoir",
+          "Quiz",
+          "Examen"
+        ],
+        "required": true
+      },
+      {
+        "key": "due",
+        "label": "Échéance",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "scale",
+        "label": "Barème",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "coefficient",
+        "label": "Coefficient",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "instructions",
+        "label": "Consignes / questions",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Publiée",
+          "À corriger",
+          "Terminée"
+        ],
+        "required": true
+      },
+      {
+        "key": "attachment",
+        "label": "Pièce jointe (PDF ou image)",
+        "type": "file",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Nouvelle évaluation",
+    "kind": "list"
+  },
+  "grades": {
+    "title": "Carnet de notes",
+    "group": "Pédagogie",
+    "icon": "table-cells",
+    "description": "Une note non saisie est distincte de zéro.",
+    "fields": [
+      {
+        "key": "student",
+        "label": "Élève",
+        "type": "relation",
+        "options": "students",
+        "required": true
+      },
+      {
+        "key": "assessment",
+        "label": "Évaluation",
+        "type": "relation",
+        "options": "assessments",
+        "required": true
+      },
+      {
+        "key": "subject",
+        "label": "Matière",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "term",
+        "label": "Période",
+        "type": "select",
+        "options": [
+          "Trimestre 1",
+          "Trimestre 2",
+          "Trimestre 3"
+        ],
+        "required": true
+      },
+      {
+        "key": "grade",
+        "label": "Note sur 20",
+        "type": "grade",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "coefficient",
+        "label": "Coefficient",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "comment",
+        "label": "Appréciation",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Validée",
+          "Publiée"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Saisir une note",
+    "kind": "list"
+  },
+  "attendance": {
+    "title": "Présences",
+    "group": "Pédagogie",
+    "icon": "check-circle",
+    "description": "Appel par séance, retards et justificatifs.",
+    "fields": [
+      {
+        "key": "student",
+        "label": "Élève",
+        "type": "relation",
+        "options": "students",
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Classe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date de séance",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "time",
+        "label": "Heure",
+        "type": "time",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Non saisi",
+          "Présent",
+          "Absent",
+          "Retard",
+          "Absence justifiée"
+        ],
+        "required": true
+      },
+      {
+        "key": "reason",
+        "label": "Justification",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "attachment",
+        "label": "Pièce jointe (PDF ou image)",
+        "type": "file",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Saisir une présence",
+    "kind": "list"
+  },
+  "interventions": {
+    "title": "Suivi pédagogique",
+    "group": "Pédagogie",
+    "icon": "chat-bubble-left-right",
+    "description": "Entretiens, soutien et interventions de l’équipe.",
+    "fields": [
+      {
+        "key": "student",
+        "label": "Élève",
+        "type": "relation",
+        "options": "students",
+        "required": true
+      },
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "owner",
+        "label": "Responsable",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Prochain point",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "action",
+        "label": "Action prévue",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "outcome",
+        "label": "Résultat observé",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "À examiner",
+          "En cours",
+          "Clôturé"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Ouvrir un suivi",
+    "kind": "list"
+  },
+  "schedule": {
+    "title": "Emploi du temps",
+    "group": "Organisation",
+    "icon": "calendar-days",
+    "description": "Semaine type • dimanche à jeudi • Africa/Algiers.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Matière",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Classe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "teacher",
+        "label": "Enseignant",
+        "type": "relation",
+        "options": "teachers",
+        "required": true
+      },
+      {
+        "key": "room",
+        "label": "Salle",
+        "type": "relation",
+        "options": "rooms",
+        "required": true
+      },
+      {
+        "key": "day",
+        "label": "Jour",
+        "type": "select",
+        "options": [
+          "Dimanche",
+          "Lundi",
+          "Mardi",
+          "Mercredi",
+          "Jeudi"
+        ],
+        "required": true
+      },
+      {
+        "key": "start",
+        "label": "Début",
+        "type": "time",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "end",
+        "label": "Fin",
+        "type": "time",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Publiée",
+          "Annulée"
+        ],
+        "required": true
+      },
+      {
+        "key": "locked",
+        "label": "Séance verrouillée",
+        "type": "toggle",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Ajouter une séance",
+    "kind": "schedule"
+  },
+  "rooms": {
+    "title": "Salles",
+    "group": "Organisation",
+    "icon": "building-office-2",
+    "description": "Capacités, équipements et disponibilités.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "capacity",
+        "label": "Capacité",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "equipment",
+        "label": "Équipements",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Disponible",
+          "Indisponible"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Ajouter",
+    "kind": "list"
+  },
+  "teachers": {
+    "title": "Enseignants",
+    "group": "Équipe",
+    "icon": "users",
+    "description": "Habilitations, disponibilités et groupes affectés.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom et prénom",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "subject",
+        "label": "Matières habilitées",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "cycle",
+        "label": "Cycle",
+        "type": "select",
+        "options": [
+          "Primaire",
+          "Moyen",
+          "Secondaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "phone",
+        "label": "Téléphone",
+        "type": "tel",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "availability",
+        "label": "Disponibilités",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "hours",
+        "label": "Maximum hebdomadaire",
+        "type": "number",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Interne",
+          "Externe",
+          "Ancien"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Nouvel enseignant",
+    "kind": "list"
+  },
+  "staff": {
+    "title": "Personnel",
+    "group": "Équipe",
+    "icon": "identification",
+    "description": "Personnel administratif et de service.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "role",
+        "label": "Fonction",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "phone",
+        "label": "Téléphone",
+        "type": "tel",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "start",
+        "label": "Date d’entrée",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "amount",
+        "label": "Base mensuelle (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Actif",
+          "Ancien"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Ajouter",
+    "kind": "list"
+  },
+  "hours": {
+    "title": "Heures assurées",
+    "group": "Équipe",
+    "icon": "clock",
+    "description": "Heures réellement assurées et validation.",
+    "fields": [
+      {
+        "key": "teacher",
+        "label": "Enseignant",
+        "type": "relation",
+        "options": "teachers",
+        "required": true
+      },
+      {
+        "key": "group",
+        "label": "Groupe",
+        "type": "relation",
+        "options": "groups",
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "hours",
+        "label": "Heures réalisées",
+        "type": "decimal",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "À valider",
+          "Validée",
+          "Annulée"
+        ],
+        "required": true
+      },
+      {
+        "key": "notes",
+        "label": "Commentaire",
+        "type": "textarea",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Ajouter",
+    "kind": "list"
+  },
+  "payments": {
+    "title": "Paiements",
+    "group": "Finances",
+    "icon": "banknotes",
+    "description": "Encaissements liés aux inscriptions, reçus et soldes.",
+    "fields": [
+      {
+        "key": "enrollment",
+        "label": "Inscription",
+        "type": "relation",
+        "options": "enrollments",
+        "required": true
+      },
+      {
+        "key": "amount",
+        "label": "Montant (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "method",
+        "label": "Moyen",
+        "type": "select",
+        "options": [
+          "Espèces",
+          "Virement",
+          "CCP",
+          "Chèque"
+        ],
+        "required": true
+      },
+      {
+        "key": "reference",
+        "label": "Référence externe",
+        "type": "text",
+        "options": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Validé"
+        ],
+        "required": true
+      },
+      {
+        "key": "attachment",
+        "label": "Pièce jointe (PDF ou image)",
+        "type": "file",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Enregistrer un paiement",
+    "kind": "list"
+  },
+  "expenses": {
+    "title": "Dépenses",
+    "group": "Finances",
+    "icon": "arrow-trending-down",
+    "description": "Charges engagées et paiements effectifs.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "category",
+        "label": "Catégorie",
+        "type": "select",
+        "options": [
+          "Loyer",
+          "Matériel",
+          "Publicité",
+          "Mission",
+          "Autre"
+        ],
+        "required": true
+      },
+      {
+        "key": "beneficiary",
+        "label": "Bénéficiaire",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "amount",
+        "label": "Montant engagé (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "paid",
+        "label": "Montant versé (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Validée"
+        ],
+        "required": true
+      },
+      {
+        "key": "notes",
+        "label": "Motif",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "attachment",
+        "label": "Pièce jointe (PDF ou image)",
+        "type": "file",
+        "options": null,
+        "required": false
+      }
+    ],
+    "create": "Nouvelle dépense",
+    "kind": "list"
+  },
+  "payroll": {
+    "title": "Rémunérations",
+    "group": "Finances",
+    "icon": "wallet",
+    "description": "Calcul détaillé et versements simulés.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Bénéficiaire",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "period",
+        "label": "Mois",
+        "type": "select",
+        "options": [
+          "Septembre 2026",
+          "Octobre 2026",
+          "Novembre 2026"
+        ],
+        "required": true
+      },
+      {
+        "key": "type",
+        "label": "Mode",
+        "type": "select",
+        "options": [
+          "Fixe",
+          "Horaire"
+        ],
+        "required": true
+      },
+      {
+        "key": "base",
+        "label": "Base fixe (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "hours",
+        "label": "Heures validées",
+        "type": "decimal",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "rate",
+        "label": "Taux horaire (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "bonus",
+        "label": "Primes (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "adjustment",
+        "label": "Ajustement signé (DA)",
+        "type": "signed",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "paid",
+        "label": "Montant versé (DA)",
+        "type": "money",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Validé"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Préparer une rémunération",
+    "kind": "list"
+  },
+  "finance": {
+    "title": "Synthèse financière",
+    "group": "Finances",
+    "icon": "chart-bar",
+    "description": "Montants dus, encaissements, charges et trésorerie.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "finance"
+  },
+  "announcements": {
+    "title": "Annonces",
+    "group": "Communication",
+    "icon": "megaphone",
+    "description": "Messages ciblés et notifications internes.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "audience",
+        "label": "Destinataires",
+        "type": "select",
+        "options": [
+          "Toute l’école",
+          "Primaire",
+          "Moyen",
+          "Secondaire",
+          "Enseignants"
+        ],
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date",
+        "type": "date",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "content",
+        "label": "Message",
+        "type": "textarea",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Brouillon",
+          "Publiée"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Nouvelle annonce",
+    "kind": "list"
+  },
+  "optimization": {
+    "title": "Affectations et optimisation",
+    "group": "Intelligence pédagogique",
+    "icon": "sparkles",
+    "description": "Contraintes, proposition et validation humaine.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "optimization"
+  },
+  "analytics": {
+    "title": "Analyses et alertes",
+    "group": "Intelligence pédagogique",
+    "icon": "presentation-chart-line",
+    "description": "Indicateurs descriptifs et exemples d’alertes.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "analytics"
+  },
+  "teacher-space": {
+    "title": "Espace enseignant",
+    "group": "Espaces de démonstration",
+    "icon": "briefcase",
+    "description": "Aperçu du parcours de Nadia Benali.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "teacher"
+  },
+  "student-space": {
+    "title": "Espace élève",
+    "group": "Espaces de démonstration",
+    "icon": "face-smile",
+    "description": "Aperçu du parcours de Lina Benali.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "student"
+  },
+  "imports": {
+    "title": "Import de données",
+    "group": "Administration",
+    "icon": "arrow-up-tray",
+    "description": "Aperçu, doublons et rejets avant confirmation.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "imports"
+  },
+  "users": {
+    "title": "Comptes et habilitations",
+    "group": "Administration",
+    "icon": "lock-closed",
+    "description": "Maquette des profils ; ne crée pas de comptes de connexion.",
+    "fields": [
+      {
+        "key": "name",
+        "label": "Nom / intitulé",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "role",
+        "label": "Profil",
+        "type": "select",
+        "options": [
+          "Secrétariat",
+          "Pédagogie",
+          "Finance",
+          "Direction",
+          "Enseignant",
+          "Élève",
+          "Technique"
+        ],
+        "required": true
+      },
+      {
+        "key": "scope",
+        "label": "Périmètre",
+        "type": "text",
+        "options": null,
+        "required": true
+      },
+      {
+        "key": "status",
+        "label": "État",
+        "type": "select",
+        "options": [
+          "Actif",
+          "Suspendu",
+          "Invitation en attente"
+        ],
+        "required": true
+      }
+    ],
+    "create": "Ajouter",
+    "kind": "list"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "group": "Administration",
+    "icon": "cog-6-tooth",
+    "description": "Établissement, année et règles internes.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "settings"
+  },
+  "audit": {
+    "title": "Journal des modifications",
+    "group": "Administration",
+    "icon": "queue-list",
+    "description": "Historique des actions de cette session.",
+    "fields": [],
+    "create": "Ajouter",
+    "kind": "audit"
+  }
+}

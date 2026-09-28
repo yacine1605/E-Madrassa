@@ -1,0 +1,2445 @@
+{
+  "dashboard": [],
+  "students": [
+    {
+      "id": "1",
+      "name": "Lina Benali",
+      "cycle": "Primaire",
+      "level": "1AP",
+      "birth": "2020-04-12",
+      "guardian": "Responsable Benali",
+      "phone": "0550 10 00 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "2",
+      "name": "Yacine Boudiaf",
+      "cycle": "Primaire",
+      "level": "2AP",
+      "birth": "2019-04-12",
+      "guardian": "Responsable Boudiaf",
+      "phone": "0550 10 01 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "3",
+      "name": "Inès Mansouri",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "birth": "2018-04-12",
+      "guardian": "Responsable Mansouri",
+      "phone": "0550 10 02 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "4",
+      "name": "Adam Khelifi",
+      "cycle": "Primaire",
+      "level": "4AP",
+      "birth": "2017-04-12",
+      "guardian": "Responsable Khelifi",
+      "phone": "0550 10 03 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "5",
+      "name": "Meriem Saïdi",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "birth": "2016-04-12",
+      "guardian": "Responsable Saïdi",
+      "phone": "0550 10 04 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "6",
+      "name": "Amine Belaïd",
+      "cycle": "Moyen",
+      "level": "1AM",
+      "birth": "2015-04-12",
+      "guardian": "Responsable Belaïd",
+      "phone": "0550 10 05 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "7",
+      "name": "Nour Aït Ali",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "birth": "2014-04-12",
+      "guardian": "Responsable Ali",
+      "phone": "0550 10 06 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "8",
+      "name": "Rayan Hamdi",
+      "cycle": "Moyen",
+      "level": "3AM",
+      "birth": "2013-04-12",
+      "guardian": "Responsable Hamdi",
+      "phone": "0550 10 07 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "9",
+      "name": "Sara Bouzid",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "birth": "2012-04-12",
+      "guardian": "Responsable Bouzid",
+      "phone": "0550 10 08 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "10",
+      "name": "Ilyes Rahmani",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "birth": "2011-04-12",
+      "guardian": "Responsable Rahmani",
+      "phone": "0550 10 09 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "11",
+      "name": "Yasmine Cherif",
+      "cycle": "Secondaire",
+      "level": "2AS",
+      "birth": "2010-04-12",
+      "guardian": "Responsable Cherif",
+      "phone": "0550 10 10 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "12",
+      "name": "Anis Haddad",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "birth": "2009-04-12",
+      "guardian": "Responsable Haddad",
+      "phone": "0550 10 11 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "13",
+      "name": "Aya Amrani",
+      "cycle": "Primaire",
+      "level": "1AP",
+      "birth": "2020-04-12",
+      "guardian": "Responsable Amrani",
+      "phone": "0550 10 12 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "14",
+      "name": "Sami Bensalem",
+      "cycle": "Primaire",
+      "level": "2AP",
+      "birth": "2019-04-12",
+      "guardian": "Responsable Bensalem",
+      "phone": "0550 10 13 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "15",
+      "name": "Lilia Meziane",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "birth": "2018-04-12",
+      "guardian": "Responsable Meziane",
+      "phone": "0550 10 14 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "16",
+      "name": "Mehdi Touati",
+      "cycle": "Primaire",
+      "level": "4AP",
+      "birth": "2017-04-12",
+      "guardian": "Responsable Touati",
+      "phone": "0550 10 15 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "17",
+      "name": "Nesrine Dahmani",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "birth": "2016-04-12",
+      "guardian": "Responsable Dahmani",
+      "phone": "0550 10 16 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "18",
+      "name": "Walid Ferhat",
+      "cycle": "Moyen",
+      "level": "1AM",
+      "birth": "2015-04-12",
+      "guardian": "Responsable Ferhat",
+      "phone": "0550 10 17 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "19",
+      "name": "Malak Ziani",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "birth": "2014-04-12",
+      "guardian": "Responsable Ziani",
+      "phone": "0550 10 18 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "20",
+      "name": "Sofiane Bekkouche",
+      "cycle": "Moyen",
+      "level": "3AM",
+      "birth": "2013-04-12",
+      "guardian": "Responsable Bekkouche",
+      "phone": "0550 10 19 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "21",
+      "name": "Dania Larbi",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "birth": "2012-04-12",
+      "guardian": "Responsable Larbi",
+      "phone": "0550 10 20 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "22",
+      "name": "Nassim Ouali",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "birth": "2011-04-12",
+      "guardian": "Responsable Ouali",
+      "phone": "0550 10 21 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "23",
+      "name": "Rania Belkacem",
+      "cycle": "Secondaire",
+      "level": "2AS",
+      "birth": "2010-04-12",
+      "guardian": "Responsable Belkacem",
+      "phone": "0550 10 22 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    },
+    {
+      "id": "24",
+      "name": "Youcef Djaâfar",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "birth": "2009-04-12",
+      "guardian": "Responsable Djaâfar",
+      "phone": "0550 10 23 00",
+      "address": "Batna, Algérie",
+      "status": "Actif",
+      "name_ar": ""
+    }
+  ],
+  "admissions": [
+    {
+      "id": "1",
+      "name": "Amina Saïdi",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Dossier reçu",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    },
+    {
+      "id": "2",
+      "name": "Omar Brahimi",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Entretien",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    },
+    {
+      "id": "3",
+      "name": "Hana Rezig",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Liste d’attente",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    },
+    {
+      "id": "4",
+      "name": "Ali Bouras",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Dossier reçu",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    },
+    {
+      "id": "5",
+      "name": "Sarah Touati",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Entretien",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    },
+    {
+      "id": "6",
+      "name": "Yanis Hamdi",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "phone": "0550 22 00 00",
+      "date": "2026-09-23",
+      "status": "Liste d’attente",
+      "notes": "Rendez-vous avec le responsable pédagogique."
+    }
+  ],
+  "enrollments": [
+    {
+      "id": "1",
+      "student": "1",
+      "formation": "1",
+      "group": "1",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 180000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "2",
+      "student": "2",
+      "formation": "2",
+      "group": "2",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 185000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "3",
+      "student": "3",
+      "formation": "3",
+      "group": "3",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 190000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "4",
+      "student": "4",
+      "formation": "4",
+      "group": "4",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 195000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "5",
+      "student": "5",
+      "formation": "5",
+      "group": "5",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 200000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "6",
+      "student": "6",
+      "formation": "6",
+      "group": "6",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 205000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "7",
+      "student": "7",
+      "formation": "7",
+      "group": "7",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 210000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "8",
+      "student": "8",
+      "formation": "8",
+      "group": "8",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 215000,
+      "due": "2026-09-15",
+      "status": "En attente"
+    },
+    {
+      "id": "9",
+      "student": "9",
+      "formation": "9",
+      "group": "9",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 220000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "10",
+      "student": "10",
+      "formation": "10",
+      "group": "10",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 225000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "11",
+      "student": "11",
+      "formation": "11",
+      "group": "11",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 230000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "12",
+      "student": "12",
+      "formation": "12",
+      "group": "12",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 235000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "13",
+      "student": "13",
+      "formation": "1",
+      "group": "1",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 180000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "14",
+      "student": "14",
+      "formation": "2",
+      "group": "2",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 185000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "15",
+      "student": "15",
+      "formation": "3",
+      "group": "3",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 190000,
+      "due": "2026-09-15",
+      "status": "En attente"
+    },
+    {
+      "id": "16",
+      "student": "16",
+      "formation": "4",
+      "group": "4",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 195000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "17",
+      "student": "17",
+      "formation": "5",
+      "group": "5",
+      "cycle": "Primaire",
+      "year": "2026–2027",
+      "amount": 200000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "18",
+      "student": "18",
+      "formation": "6",
+      "group": "6",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 205000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "19",
+      "student": "19",
+      "formation": "7",
+      "group": "7",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 210000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "20",
+      "student": "20",
+      "formation": "8",
+      "group": "8",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 215000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "21",
+      "student": "21",
+      "formation": "9",
+      "group": "9",
+      "cycle": "Moyen",
+      "year": "2026–2027",
+      "amount": 220000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "22",
+      "student": "22",
+      "formation": "10",
+      "group": "10",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 225000,
+      "due": "2026-09-15",
+      "status": "En attente"
+    },
+    {
+      "id": "23",
+      "student": "23",
+      "formation": "11",
+      "group": "11",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 230000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    },
+    {
+      "id": "24",
+      "student": "24",
+      "formation": "12",
+      "group": "12",
+      "cycle": "Secondaire",
+      "year": "2026–2027",
+      "amount": 235000,
+      "due": "2026-09-15",
+      "status": "Validée"
+    }
+  ],
+  "groups": [
+    {
+      "id": "1",
+      "name": "1AP · A",
+      "cycle": "Primaire",
+      "level": "1AP",
+      "formation": "1",
+      "capacity": 25,
+      "teacher": "1",
+      "room": "1",
+      "status": "Actif"
+    },
+    {
+      "id": "2",
+      "name": "2AP · A",
+      "cycle": "Primaire",
+      "level": "2AP",
+      "formation": "2",
+      "capacity": 25,
+      "teacher": "2",
+      "room": "2",
+      "status": "Actif"
+    },
+    {
+      "id": "3",
+      "name": "3AP · A",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "formation": "3",
+      "capacity": 25,
+      "teacher": "3",
+      "room": "3",
+      "status": "Actif"
+    },
+    {
+      "id": "4",
+      "name": "4AP · A",
+      "cycle": "Primaire",
+      "level": "4AP",
+      "formation": "4",
+      "capacity": 25,
+      "teacher": "4",
+      "room": "4",
+      "status": "Actif"
+    },
+    {
+      "id": "5",
+      "name": "5AP · A",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "formation": "5",
+      "capacity": 25,
+      "teacher": "5",
+      "room": "5",
+      "status": "Actif"
+    },
+    {
+      "id": "6",
+      "name": "1AM · A",
+      "cycle": "Moyen",
+      "level": "1AM",
+      "formation": "6",
+      "capacity": 25,
+      "teacher": "6",
+      "room": "6",
+      "status": "Actif"
+    },
+    {
+      "id": "7",
+      "name": "2AM · A",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "formation": "7",
+      "capacity": 25,
+      "teacher": "1",
+      "room": "7",
+      "status": "Actif"
+    },
+    {
+      "id": "8",
+      "name": "3AM · A",
+      "cycle": "Moyen",
+      "level": "3AM",
+      "formation": "8",
+      "capacity": 25,
+      "teacher": "2",
+      "room": "8",
+      "status": "Actif"
+    },
+    {
+      "id": "9",
+      "name": "4AM · A",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "formation": "9",
+      "capacity": 25,
+      "teacher": "3",
+      "room": "9",
+      "status": "Actif"
+    },
+    {
+      "id": "10",
+      "name": "1AS · A",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "formation": "10",
+      "capacity": 25,
+      "teacher": "4",
+      "room": "10",
+      "status": "Actif"
+    },
+    {
+      "id": "11",
+      "name": "2AS · A",
+      "cycle": "Secondaire",
+      "level": "2AS",
+      "formation": "11",
+      "capacity": 25,
+      "teacher": "5",
+      "room": "11",
+      "status": "Actif"
+    },
+    {
+      "id": "12",
+      "name": "3AS · A",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "formation": "12",
+      "capacity": 25,
+      "teacher": "6",
+      "room": "12",
+      "status": "Actif"
+    }
+  ],
+  "formations": [
+    {
+      "id": "1",
+      "name": "Cursus 1AP",
+      "cycle": "Primaire",
+      "level": "1AP",
+      "track": "Tronc commun",
+      "amount": 180000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "2",
+      "name": "Cursus 2AP",
+      "cycle": "Primaire",
+      "level": "2AP",
+      "track": "Tronc commun",
+      "amount": 185000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "3",
+      "name": "Cursus 3AP",
+      "cycle": "Primaire",
+      "level": "3AP",
+      "track": "Tronc commun",
+      "amount": 190000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "4",
+      "name": "Cursus 4AP",
+      "cycle": "Primaire",
+      "level": "4AP",
+      "track": "Tronc commun",
+      "amount": 195000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "5",
+      "name": "Cursus 5AP",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "track": "Tronc commun",
+      "amount": 200000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "6",
+      "name": "Cursus 1AM",
+      "cycle": "Moyen",
+      "level": "1AM",
+      "track": "Tronc commun",
+      "amount": 205000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "7",
+      "name": "Cursus 2AM",
+      "cycle": "Moyen",
+      "level": "2AM",
+      "track": "Tronc commun",
+      "amount": 210000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "8",
+      "name": "Cursus 3AM",
+      "cycle": "Moyen",
+      "level": "3AM",
+      "track": "Tronc commun",
+      "amount": 215000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "9",
+      "name": "Cursus 4AM",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "track": "Tronc commun",
+      "amount": 220000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "10",
+      "name": "Cursus 1AS",
+      "cycle": "Secondaire",
+      "level": "1AS",
+      "track": "Tronc commun",
+      "amount": 225000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "11",
+      "name": "Cursus 2AS",
+      "cycle": "Secondaire",
+      "level": "2AS",
+      "track": "Sciences expérimentales",
+      "amount": 230000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    },
+    {
+      "id": "12",
+      "name": "Cursus 3AS",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "track": "Sciences expérimentales",
+      "amount": 235000,
+      "description": "Cursus annuel • trois trimestres",
+      "status": "Active"
+    }
+  ],
+  "subjects": [
+    {
+      "id": "1",
+      "name": "Mathématiques",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    },
+    {
+      "id": "2",
+      "name": "Langue arabe",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    },
+    {
+      "id": "3",
+      "name": "Sciences naturelles",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    },
+    {
+      "id": "4",
+      "name": "Français",
+      "cycle": "Primaire",
+      "level": "5AP",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    },
+    {
+      "id": "5",
+      "name": "Anglais",
+      "cycle": "Moyen",
+      "level": "4AM",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    },
+    {
+      "id": "6",
+      "name": "Physique",
+      "cycle": "Secondaire",
+      "level": "3AS",
+      "coefficient": 2,
+      "hours": 4,
+      "skills": "Comprendre, appliquer et expliquer une démarche."
+    }
+  ],
+  "lessons": [
+    {
+      "id": "1",
+      "name": "Les fractions au quotidien",
+      "group": "1",
+      "subject": "Mathématiques",
+      "chapter": "Chapitre 1",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "2",
+      "name": "Compréhension de texte",
+      "group": "2",
+      "subject": "Langue arabe",
+      "chapter": "Chapitre 2",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "3",
+      "name": "Le vivant et son milieu",
+      "group": "3",
+      "subject": "Sciences naturelles",
+      "chapter": "Chapitre 3",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "4",
+      "name": "Raconter un souvenir",
+      "group": "4",
+      "subject": "Français",
+      "chapter": "Chapitre 4",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "5",
+      "name": "Introducing yourself",
+      "group": "5",
+      "subject": "Anglais",
+      "chapter": "Chapitre 5",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Brouillon",
+      "attachment": null
+    },
+    {
+      "id": "6",
+      "name": "Mouvement et vitesse",
+      "group": "6",
+      "subject": "Physique",
+      "chapter": "Chapitre 6",
+      "objectives": "Mobiliser ses connaissances dans une situation concrète.",
+      "content": "<p>Découvrir la notion, résoudre un exemple et réaliser un exercice guidé.</p><p>Activité : expliquer sa démarche à un camarade.</p>",
+      "duration": 60,
+      "status": "Brouillon",
+      "attachment": null
+    }
+  ],
+  "assessments": [
+    {
+      "id": "1",
+      "name": "Évaluation initiale · Mathématiques",
+      "group": "1",
+      "subject": "Mathématiques",
+      "type": "Devoir",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "2",
+      "name": "Évaluation initiale · Langue arabe",
+      "group": "2",
+      "subject": "Langue arabe",
+      "type": "Quiz",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "3",
+      "name": "Évaluation initiale · Sciences naturelles",
+      "group": "3",
+      "subject": "Sciences naturelles",
+      "type": "Devoir",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "4",
+      "name": "Évaluation initiale · Français",
+      "group": "4",
+      "subject": "Français",
+      "type": "Quiz",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "5",
+      "name": "Évaluation initiale · Anglais",
+      "group": "5",
+      "subject": "Anglais",
+      "type": "Devoir",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    },
+    {
+      "id": "6",
+      "name": "Évaluation initiale · Physique",
+      "group": "6",
+      "subject": "Physique",
+      "type": "Quiz",
+      "due": "2026-10-01",
+      "scale": 20,
+      "coefficient": 2,
+      "instructions": "Répondre aux questions du cours et justifier ses réponses.",
+      "status": "Publiée",
+      "attachment": null
+    }
+  ],
+  "grades": [
+    {
+      "id": "1",
+      "student": "1",
+      "assessment": "1",
+      "subject": "Mathématiques",
+      "term": "Trimestre 1",
+      "grade": 8,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "2",
+      "student": "2",
+      "assessment": "2",
+      "subject": "Langue arabe",
+      "term": "Trimestre 1",
+      "grade": 9,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "3",
+      "student": "3",
+      "assessment": "3",
+      "subject": "Sciences naturelles",
+      "term": "Trimestre 1",
+      "grade": 10,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "4",
+      "student": "4",
+      "assessment": "4",
+      "subject": "Français",
+      "term": "Trimestre 1",
+      "grade": null,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "5",
+      "student": "5",
+      "assessment": "5",
+      "subject": "Anglais",
+      "term": "Trimestre 1",
+      "grade": 12,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Brouillon"
+    },
+    {
+      "id": "6",
+      "student": "6",
+      "assessment": "6",
+      "subject": "Physique",
+      "term": "Trimestre 1",
+      "grade": 13,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "7",
+      "student": "7",
+      "assessment": "1",
+      "subject": "Mathématiques",
+      "term": "Trimestre 1",
+      "grade": 14,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "8",
+      "student": "8",
+      "assessment": "2",
+      "subject": "Langue arabe",
+      "term": "Trimestre 1",
+      "grade": 15,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "9",
+      "student": "9",
+      "assessment": "3",
+      "subject": "Sciences naturelles",
+      "term": "Trimestre 1",
+      "grade": 16,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Brouillon"
+    },
+    {
+      "id": "10",
+      "student": "10",
+      "assessment": "4",
+      "subject": "Français",
+      "term": "Trimestre 1",
+      "grade": 17,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "11",
+      "student": "11",
+      "assessment": "5",
+      "subject": "Anglais",
+      "term": "Trimestre 1",
+      "grade": 18,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "12",
+      "student": "12",
+      "assessment": "6",
+      "subject": "Physique",
+      "term": "Trimestre 1",
+      "grade": 8,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "13",
+      "student": "13",
+      "assessment": "1",
+      "subject": "Mathématiques",
+      "term": "Trimestre 1",
+      "grade": 9,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Brouillon"
+    },
+    {
+      "id": "14",
+      "student": "14",
+      "assessment": "2",
+      "subject": "Langue arabe",
+      "term": "Trimestre 1",
+      "grade": 10,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "15",
+      "student": "15",
+      "assessment": "3",
+      "subject": "Sciences naturelles",
+      "term": "Trimestre 1",
+      "grade": 11,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "16",
+      "student": "16",
+      "assessment": "4",
+      "subject": "Français",
+      "term": "Trimestre 1",
+      "grade": 12,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "17",
+      "student": "17",
+      "assessment": "5",
+      "subject": "Anglais",
+      "term": "Trimestre 1",
+      "grade": 13,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Brouillon"
+    },
+    {
+      "id": "18",
+      "student": "18",
+      "assessment": "6",
+      "subject": "Physique",
+      "term": "Trimestre 1",
+      "grade": 14,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "19",
+      "student": "19",
+      "assessment": "1",
+      "subject": "Mathématiques",
+      "term": "Trimestre 1",
+      "grade": 15,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "20",
+      "student": "20",
+      "assessment": "2",
+      "subject": "Langue arabe",
+      "term": "Trimestre 1",
+      "grade": 16,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "21",
+      "student": "21",
+      "assessment": "3",
+      "subject": "Sciences naturelles",
+      "term": "Trimestre 1",
+      "grade": 17,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Brouillon"
+    },
+    {
+      "id": "22",
+      "student": "22",
+      "assessment": "4",
+      "subject": "Français",
+      "term": "Trimestre 1",
+      "grade": 18,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "23",
+      "student": "23",
+      "assessment": "5",
+      "subject": "Anglais",
+      "term": "Trimestre 1",
+      "grade": 8,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    },
+    {
+      "id": "24",
+      "student": "24",
+      "assessment": "6",
+      "subject": "Physique",
+      "term": "Trimestre 1",
+      "grade": 9,
+      "coefficient": 2,
+      "comment": "Poursuivre les efforts.",
+      "status": "Publiée"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "1",
+      "student": "1",
+      "group": "1",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Absent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "2",
+      "student": "2",
+      "group": "2",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "3",
+      "student": "3",
+      "group": "3",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "4",
+      "student": "4",
+      "group": "4",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "5",
+      "student": "5",
+      "group": "5",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "6",
+      "student": "6",
+      "group": "6",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "7",
+      "student": "7",
+      "group": "7",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "8",
+      "student": "8",
+      "group": "8",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Retard",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "9",
+      "student": "9",
+      "group": "9",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "10",
+      "student": "10",
+      "group": "10",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "11",
+      "student": "11",
+      "group": "11",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "12",
+      "student": "12",
+      "group": "12",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Absent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "13",
+      "student": "13",
+      "group": "1",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "14",
+      "student": "14",
+      "group": "2",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "15",
+      "student": "15",
+      "group": "3",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Retard",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "16",
+      "student": "16",
+      "group": "4",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "17",
+      "student": "17",
+      "group": "5",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "18",
+      "student": "18",
+      "group": "6",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "19",
+      "student": "19",
+      "group": "7",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "20",
+      "student": "20",
+      "group": "8",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "21",
+      "student": "21",
+      "group": "9",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "22",
+      "student": "22",
+      "group": "10",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Retard",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "23",
+      "student": "23",
+      "group": "11",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Absent",
+      "reason": "",
+      "attachment": null
+    },
+    {
+      "id": "24",
+      "student": "24",
+      "group": "12",
+      "date": "2026-09-24",
+      "time": "08:00",
+      "status": "Présent",
+      "reason": "",
+      "attachment": null
+    }
+  ],
+  "interventions": [
+    {
+      "id": "1",
+      "student": "1",
+      "name": "Point sur l’assiduité",
+      "owner": "Nadia Benali",
+      "date": "2026-09-29",
+      "action": "Vérifier les absences et organiser un échange avec la famille.",
+      "outcome": "",
+      "status": "À examiner"
+    }
+  ],
+  "schedule": [
+    {
+      "id": "1",
+      "name": "Mathématiques",
+      "group": "1",
+      "teacher": "1",
+      "room": "1",
+      "day": "Dimanche",
+      "start": "08:00",
+      "end": "09:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "2",
+      "name": "Langue arabe",
+      "group": "1",
+      "teacher": "2",
+      "room": "1",
+      "day": "Dimanche",
+      "start": "10:00",
+      "end": "11:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "3",
+      "name": "Sciences naturelles",
+      "group": "1",
+      "teacher": "3",
+      "room": "1",
+      "day": "Dimanche",
+      "start": "12:00",
+      "end": "13:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "4",
+      "name": "Langue arabe",
+      "group": "1",
+      "teacher": "2",
+      "room": "1",
+      "day": "Lundi",
+      "start": "08:00",
+      "end": "09:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "5",
+      "name": "Sciences naturelles",
+      "group": "1",
+      "teacher": "3",
+      "room": "1",
+      "day": "Lundi",
+      "start": "10:00",
+      "end": "11:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "6",
+      "name": "Mathématiques",
+      "group": "1",
+      "teacher": "1",
+      "room": "1",
+      "day": "Lundi",
+      "start": "12:00",
+      "end": "13:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "7",
+      "name": "Sciences naturelles",
+      "group": "1",
+      "teacher": "3",
+      "room": "1",
+      "day": "Mardi",
+      "start": "08:00",
+      "end": "09:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "8",
+      "name": "Mathématiques",
+      "group": "1",
+      "teacher": "1",
+      "room": "1",
+      "day": "Mardi",
+      "start": "10:00",
+      "end": "11:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "9",
+      "name": "Langue arabe",
+      "group": "1",
+      "teacher": "2",
+      "room": "1",
+      "day": "Mardi",
+      "start": "12:00",
+      "end": "13:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "10",
+      "name": "Mathématiques",
+      "group": "1",
+      "teacher": "1",
+      "room": "1",
+      "day": "Mercredi",
+      "start": "08:00",
+      "end": "09:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "11",
+      "name": "Langue arabe",
+      "group": "1",
+      "teacher": "2",
+      "room": "1",
+      "day": "Mercredi",
+      "start": "10:00",
+      "end": "11:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "12",
+      "name": "Sciences naturelles",
+      "group": "1",
+      "teacher": "3",
+      "room": "1",
+      "day": "Mercredi",
+      "start": "12:00",
+      "end": "13:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "13",
+      "name": "Langue arabe",
+      "group": "1",
+      "teacher": "2",
+      "room": "1",
+      "day": "Jeudi",
+      "start": "08:00",
+      "end": "09:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "14",
+      "name": "Sciences naturelles",
+      "group": "1",
+      "teacher": "3",
+      "room": "1",
+      "day": "Jeudi",
+      "start": "10:00",
+      "end": "11:00",
+      "status": "Publiée",
+      "locked": false
+    },
+    {
+      "id": "15",
+      "name": "Mathématiques",
+      "group": "1",
+      "teacher": "1",
+      "room": "1",
+      "day": "Jeudi",
+      "start": "12:00",
+      "end": "13:00",
+      "status": "Publiée",
+      "locked": false
+    }
+  ],
+  "rooms": [
+    {
+      "id": "1",
+      "name": "Salle 01",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "2",
+      "name": "Salle 02",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "3",
+      "name": "Salle 03",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "4",
+      "name": "Salle 04",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "5",
+      "name": "Salle 05",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "6",
+      "name": "Salle 06",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "7",
+      "name": "Salle 07",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "8",
+      "name": "Salle 08",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "9",
+      "name": "Salle 09",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "10",
+      "name": "Salle 10",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "11",
+      "name": "Salle 11",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    },
+    {
+      "id": "12",
+      "name": "Salle 12",
+      "capacity": 25,
+      "equipment": "Tableau • vidéoprojecteur",
+      "status": "Disponible"
+    }
+  ],
+  "teachers": [
+    {
+      "id": "1",
+      "name": "Nadia Benali",
+      "subject": "Mathématiques",
+      "cycle": "Primaire",
+      "email": "enseignant0@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    },
+    {
+      "id": "2",
+      "name": "Karim Amrani",
+      "subject": "Langue arabe",
+      "cycle": "Moyen",
+      "email": "enseignant1@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    },
+    {
+      "id": "3",
+      "name": "Sonia Haddad",
+      "subject": "Sciences naturelles",
+      "cycle": "Secondaire",
+      "email": "enseignant2@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    },
+    {
+      "id": "4",
+      "name": "Farid Mansouri",
+      "subject": "Français",
+      "cycle": "Primaire",
+      "email": "enseignant3@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    },
+    {
+      "id": "5",
+      "name": "Samira Khelifi",
+      "subject": "Anglais",
+      "cycle": "Moyen",
+      "email": "enseignant4@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    },
+    {
+      "id": "6",
+      "name": "Rachid Bouzid",
+      "subject": "Physique",
+      "cycle": "Secondaire",
+      "email": "enseignant5@example.test",
+      "phone": "0550 00 00 10",
+      "availability": "Dimanche à jeudi, 08:00 à 16:00",
+      "hours": 24,
+      "status": "Interne"
+    }
+  ],
+  "staff": [
+    {
+      "id": "1",
+      "name": "Amina Boudiaf",
+      "role": "Secrétariat",
+      "email": "staff0@example.test",
+      "phone": "0550 00 10 10",
+      "start": "2024-09-01",
+      "amount": 55000,
+      "status": "Actif"
+    },
+    {
+      "id": "2",
+      "name": "Sofiane Saïdi",
+      "role": "Comptabilité",
+      "email": "staff1@example.test",
+      "phone": "0550 00 10 10",
+      "start": "2024-09-01",
+      "amount": 65000,
+      "status": "Actif"
+    }
+  ],
+  "hours": [
+    {
+      "id": "1",
+      "teacher": "1",
+      "group": "1",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "Validée",
+      "notes": "Séances assurées."
+    },
+    {
+      "id": "2",
+      "teacher": "2",
+      "group": "2",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "Validée",
+      "notes": "Séances assurées."
+    },
+    {
+      "id": "3",
+      "teacher": "3",
+      "group": "3",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "Validée",
+      "notes": "Séances assurées."
+    },
+    {
+      "id": "4",
+      "teacher": "4",
+      "group": "4",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "Validée",
+      "notes": "Séances assurées."
+    },
+    {
+      "id": "5",
+      "teacher": "5",
+      "group": "5",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "À valider",
+      "notes": "Séances assurées."
+    },
+    {
+      "id": "6",
+      "teacher": "6",
+      "group": "6",
+      "date": "2026-09-24",
+      "hours": 3,
+      "status": "À valider",
+      "notes": "Séances assurées."
+    }
+  ],
+  "payments": [
+    {
+      "id": "1",
+      "enrollment": "1",
+      "amount": 180000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0001",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "2",
+      "enrollment": "2",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0002",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "3",
+      "enrollment": "3",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0003",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "4",
+      "enrollment": "4",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0004",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "5",
+      "enrollment": "5",
+      "amount": 200000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0005",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "6",
+      "enrollment": "6",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0006",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "7",
+      "enrollment": "7",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0007",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "8",
+      "enrollment": "8",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0008",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "9",
+      "enrollment": "9",
+      "amount": 220000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0009",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "10",
+      "enrollment": "10",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0010",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "11",
+      "enrollment": "11",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0011",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "12",
+      "enrollment": "12",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0012",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "13",
+      "enrollment": "13",
+      "amount": 180000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0013",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "14",
+      "enrollment": "14",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0014",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "15",
+      "enrollment": "15",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0015",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "16",
+      "enrollment": "16",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0016",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "17",
+      "enrollment": "17",
+      "amount": 200000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0017",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "18",
+      "enrollment": "18",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0018",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "19",
+      "enrollment": "19",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0019",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "20",
+      "enrollment": "20",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0020",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "21",
+      "enrollment": "21",
+      "amount": 220000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0021",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "22",
+      "enrollment": "22",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Espèces",
+      "reference": "DEMO-2026-0022",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "23",
+      "enrollment": "23",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "Virement",
+      "reference": "DEMO-2026-0023",
+      "status": "Validé",
+      "attachment": null
+    },
+    {
+      "id": "24",
+      "enrollment": "24",
+      "amount": 60000,
+      "date": "2026-09-10",
+      "method": "CCP",
+      "reference": "DEMO-2026-0024",
+      "status": "Validé",
+      "attachment": null
+    }
+  ],
+  "expenses": [
+    {
+      "id": "1",
+      "name": "Loyer septembre",
+      "category": "Loyer",
+      "beneficiary": "Bailleur fictif",
+      "amount": 150000,
+      "paid": 150000,
+      "date": "2026-09-01",
+      "status": "Validée",
+      "notes": "Charge mensuelle.",
+      "attachment": null
+    },
+    {
+      "id": "2",
+      "name": "Fournitures de rentrée",
+      "category": "Matériel",
+      "beneficiary": "Fournisseur fictif",
+      "amount": 85000,
+      "paid": 40000,
+      "date": "2026-09-12",
+      "status": "Validée",
+      "notes": "Cahiers et matériel de classe.",
+      "attachment": null
+    }
+  ],
+  "payroll": [
+    {
+      "id": "1",
+      "name": "Nadia Benali",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 40000,
+      "status": "Validé"
+    },
+    {
+      "id": "2",
+      "name": "Karim Amrani",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 40000,
+      "status": "Validé"
+    },
+    {
+      "id": "3",
+      "name": "Sonia Haddad",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 40000,
+      "status": "Validé"
+    },
+    {
+      "id": "4",
+      "name": "Farid Mansouri",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 0,
+      "status": "Brouillon"
+    },
+    {
+      "id": "5",
+      "name": "Samira Khelifi",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 0,
+      "status": "Brouillon"
+    },
+    {
+      "id": "6",
+      "name": "Rachid Bouzid",
+      "period": "Septembre 2026",
+      "type": "Horaire",
+      "base": 0,
+      "hours": 48,
+      "rate": 1500,
+      "bonus": 5000,
+      "adjustment": 0,
+      "paid": 0,
+      "status": "Brouillon"
+    }
+  ],
+  "finance": [],
+  "announcements": [
+    {
+      "id": "1",
+      "name": "Réunion de rentrée",
+      "audience": "Toute l’école",
+      "date": "2026-09-28",
+      "content": "La rencontre de rentrée aura lieu le lundi à 16 h. Les responsables légaux sont invités.",
+      "status": "Publiée"
+    },
+    {
+      "id": "2",
+      "name": "Conseil pédagogique",
+      "audience": "Enseignants",
+      "date": "2026-09-29",
+      "content": "Préparer les objectifs du premier trimestre.",
+      "status": "Brouillon"
+    }
+  ],
+  "optimization": [],
+  "analytics": [],
+  "teacher-space": [],
+  "student-space": [],
+  "imports": [],
+  "users": [
+    {
+      "id": "1",
+      "name": "Direction",
+      "email": "profil0@example.test",
+      "role": "Direction",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    },
+    {
+      "id": "2",
+      "name": "Amina Boudiaf",
+      "email": "profil1@example.test",
+      "role": "Secrétariat",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    },
+    {
+      "id": "3",
+      "name": "Sofiane Saïdi",
+      "email": "profil2@example.test",
+      "role": "Finance",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    },
+    {
+      "id": "4",
+      "name": "Nadia Benali",
+      "email": "profil3@example.test",
+      "role": "Enseignant",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    },
+    {
+      "id": "5",
+      "name": "Lina Benali",
+      "email": "profil4@example.test",
+      "role": "Élève",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    },
+    {
+      "id": "6",
+      "name": "Administration technique",
+      "email": "profil5@example.test",
+      "role": "Technique",
+      "scope": "Démonstration du profil",
+      "status": "Actif"
+    }
+  ],
+  "settings": [],
+  "audit": []
+}
