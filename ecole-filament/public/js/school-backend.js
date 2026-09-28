@@ -1,6 +1,6 @@
 window.schoolBackend = function (config) {
     return {
-        config, school: null, tenant: '', resource: '', rows: [], next: null, after: null, history: [], search: '', loadSerial: 0,
+        config, school: null, tenant: '', resource: '', rows: [], next: null, after: null, history: [], search: '', loadSerial: 0, sortDirection: 'asc', sortKey: null,
         busy: false, error: '', message: '', editing: false, editingId: null, form: {}, choices: {}, token: '', key: '',
         importPreview: [], importErrors: [], importTotal: 0,
         transitionRow: null, transitionReason: '', transitionStatus: '',
@@ -41,6 +41,10 @@ window.schoolBackend = function (config) {
         readPermission(resource) { return config.catalog[resource] ? config.catalog[resource].permission + '.read' : config.read[resource]; },
         available() { return config.resources.filter(r => this.permitted(this.readPermission(r))); },
         label(resource) { return resource === 'staff' ? (config.module === 'teachers' ? 'Enseignants' : 'Personnel') : config.labels[resource] || resource; },
+        sortField() { const preferred=['name','last_name','first_name','title','label','code','number','matricule']; const cols=this.columns(); return this.sortKey && cols.includes(this.sortKey) ? this.sortKey : (preferred.find(field=>cols.includes(field)) || cols[0] || 'id'); },
+        sortedRows() { const field=this.sortField(); const direction=this.sortDirection === 'desc' ? -1 : 1; return [...this.rows].sort((a,b)=>String(this.display(a[field],field) ?? '').localeCompare(String(this.display(b[field],field) ?? ''),'fr',{numeric:true,sensitivity:'base'})*direction); },
+        sortBy(field) { if (this.sortKey === field) this.sortDirection=this.sortDirection === 'asc' ? 'desc' : 'asc'; else { this.sortKey=field; this.sortDirection='asc'; } this.rows=this.sortedRows(); this.decorateHeaders(); },
+        decorateHeaders() { this.$nextTick(() => document.querySelectorAll('.backend-table thead th:not(.backend-actions-heading)').forEach((th,index) => { const field=this.columns()[index]; if (!field) return; th.dataset.sortField=field; th.setAttribute('aria-sort',this.sortField()===field ? (this.sortDirection==='asc'?'ascending':'descending') : 'none'); const button=th.querySelector('button') || document.createElement('button'); button.type='button'; button.className='backend-column-sort'; button.style.cssText='border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:0;cursor:pointer;text-align:left'; button.textContent=this.fieldLabel(field)+' '+(this.sortField()===field ? (this.sortDirection==='asc'?'↑':'↓') : '↕'); button.setAttribute('aria-label','Trier par '+this.fieldLabel(field)); button.onclick=()=>this.sortBy(field); th.replaceChildren(button); })); },
         fieldLabel(key) { return window.schoolPresentation.labels[key] || key.replace(/_/g,' '); },
         valueLabel(value) { return window.schoolPresentation.values[value] || value; },
         createLabel() { return this.resource === 'staff' && config.module === 'teachers' ? 'Nouvel enseignant' : window.schoolPresentation.create[this.resource] || 'Ajouter / enregistrer'; },
@@ -65,7 +69,7 @@ window.schoolBackend = function (config) {
         async resetResource() {
             this.rows = []; this.history = []; this.after = null; this.next = null;
             this.total=0; this.detailRow=null; this.references={};
-            this.search = '';
+            this.search = ''; this.sortDirection = 'asc'; this.sortKey = null;
             this.editing = false; this.editingId = null; this.transitionRow = null; this.form = {}; this.choices = {}; this.message = ''; this.error = '';
             if (this.resource) await this.load();
         },
@@ -80,7 +84,7 @@ window.schoolBackend = function (config) {
                 const result = await this.request(this.base() + '/' + this.resource + '?' + params);
                 const references={};
                 await this.hydrate(result.data, Object.keys(result.data[0] || {}), references);
-                if (serial === this.loadSerial) { this.rows = result.data; this.next = result.next; this.total=result.total ?? result.data.length; this.references=references; }
+                if (serial === this.loadSerial) { this.rows = result.data; this.next = result.next; this.total=result.total ?? result.data.length; this.references=references; this.rows=this.sortedRows(); this.decorateHeaders(); }
             } catch (e) { if (serial === this.loadSerial) { this.rows = []; this.next = null; this.error = e.message; } }
             finally { if (serial === this.loadSerial) this.busy = false; }
         },
