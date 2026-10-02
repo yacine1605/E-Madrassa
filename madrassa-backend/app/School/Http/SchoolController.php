@@ -25,11 +25,22 @@ final class SchoolController
         abort_unless($permission, 404);
         $this->school->authorize($permission);
         $data = $request->validate(['limit'=>'sometimes|integer|between:1,100','after'=>'sometimes|uuid','q'=>'sometimes|string|max:100',
-            'ids'=>'sometimes|array|max:100','ids.*'=>'required|uuid','is_teacher'=>'sometimes|boolean']);
+            'ids'=>'sometimes|array|max:100','ids.*'=>'required|uuid','is_teacher'=>'sometimes|boolean',
+            'level_id'=>'sometimes|uuid','cohort_id'=>'sometimes|uuid','subject_id'=>'sometimes|uuid']);
         // Stable keyset pagination; the filtered total drives the record count in the UI.
         $q = $this->school->query($resource)->orderBy('id');
         if (isset($data['ids'])) $q->whereIn('id', $data['ids']);
+        if (in_array($resource, ['subjects', 'curriculum'], true) && (isset($data['level_id']) || isset($data['cohort_id']))) {
+            $level = $data['level_id'] ?? \App\School\Services\Curriculum::levelForCohort($this->school->tenant(), $data['cohort_id']);
+            if ($resource === 'curriculum') $q->where('level_id', $level);
+            else $q->whereIn('id', $this->school->query('curriculum')->where('level_id', $level)->select('subject_id'));
+        }
         if ($resource === 'staff' && isset($data['is_teacher'])) $q->where('is_teacher', $request->boolean('is_teacher'));
+        if ($resource === 'staff' && (isset($data['cohort_id']) || isset($data['subject_id']))) {
+            $scope = $request->validate(['cohort_id'=>'required|uuid','subject_id'=>'required|uuid']);
+            $level = \App\School\Services\Curriculum::levelForCohort($this->school->tenant(), $scope['cohort_id']);
+            $q->whereIn('id', \App\School\Services\TeacherEligibility::teachers($this->school->tenant(), $level, $scope['subject_id'])->select('id'));
+        }
         $search = trim($data['q'] ?? '');
         if ($search !== '') {
             $fields = $entry
@@ -110,18 +121,14 @@ final class SchoolController
         $entry = $this->catalog($resource);
         $this->school->authorize($entry['permission'].'.write');
         $data = $request->validate($entry['rules']);
-        if ($resource === 'teacher_assignments') {
-            $cohort = DB::table('school.cohorts as c')->where('c.tenant_id', $this->school->tenant())
-                ->join('school.offerings as o', 'o.id', '=', 'c.offering_id')
-                ->where('c.id', $data['cohort_id'])->first(['o.level_id']);
-            if (!$cohort || !$this->school->query('curriculum')->where('level_id', $cohort->level_id)
-                ->where('subject_id', $data['subject_id'])->exists()) {
-                throw ValidationException::withMessages(['subject_id'=>'La matière doit appartenir au niveau de cette classe.']);
-            }
-            if (!$this->school->query('staff')->where('id', $data['teacher_id'])
-                ->where('is_teacher', true)->where('active', true)->exists()) {
-                throw ValidationException::withMessages(['teacher_id'=>'Choisissez un enseignant actif.']);
-            }
+        if ($resource === 'teacher_qualifications' && !$this->school->query('staff')->where('id', $data['teacher_id'])->where('is_teacher', true)->where('active', true)->exists()) {
+            throw ValidationException::withMessages(['teacher_id'=>'Choisissez un enseignant actif.']);
+        }
+        if (in_array($resource, ['sessions', 'assessments', 'teacher_assignments'], true)) {
+            \App\School\Services\Curriculum::validateSubject($this->school->tenant(), $data['cohort_id'], $data['subject_id']);
+        }
+        if (in_array($resource, ['sessions', 'teacher_assignments'], true)) {
+            \App\School\Services\TeacherEligibility::validate($this->school->tenant(), $data);
         }
         return response()->json(['data'=>$this->school->insert($resource, $data)], 201);
     }
@@ -133,6 +140,9 @@ final class SchoolController
         $this->school->authorize($entry['permission'].'.write');
         $row = $this->school->row($resource, $id);
         $data = $request->validate($entry['rules']);
+        if ($resource === 'teacher_qualifications' && !$this->school->query('staff')->where('id', $data['teacher_id'])->where('is_teacher', true)->where('active', true)->exists()) {
+            throw ValidationException::withMessages(['teacher_id'=>'Choisissez un enseignant actif.']);
+        }
         if ($resource === 'offerings' && $this->school->query('enrollments')->where('offering_id', $id)->exists()) {
             abort_if($row->level_id !== $data['level_id'] || $row->period_id !== $data['period_id'] ||
                 $row->campus_id !== $data['campus_id'], 409, 'Une offre déjà utilisée ne peut pas être déplacée.');

@@ -5,12 +5,17 @@ window.schoolBackend = function (config) {
         importPreview: [], importErrors: [], importTotal: 0,
         transitionRow: null, transitionReason: '', transitionStatus: '',
         detailRow: null, references: {}, total: 0, overview: null,
+        subjectLevelFilter: '', filterLevels: [], subjectLoadSerial: 0, subjectsLoading: false,
+        teacherLoadSerial: 0, teachersLoading: false,
         async init() {
             this.busy = true;
             try {
                 this.token = (await this.request('/school-api/csrf')).csrf_token;
                 this.school = (await this.request('/school-api/school')).data;
                 this.tenant = this.school.id;
+                if (config.module === 'subjects' && this.permitted('catalog.read')) {
+                    this.filterLevels = await this.fetchChoices('levels');
+                }
             } catch (e) { this.error = e.message; }
             this.busy = false;
             if (this.tenant) {
@@ -45,7 +50,10 @@ window.schoolBackend = function (config) {
         sortedRows() { const field=this.sortField(); const direction=this.sortDirection === 'desc' ? -1 : 1; return [...this.rows].sort((a,b)=>String(this.display(a[field],field) ?? '').localeCompare(String(this.display(b[field],field) ?? ''),'fr',{numeric:true,sensitivity:'base'})*direction); },
         sortBy(field) { if (this.sortKey === field) this.sortDirection=this.sortDirection === 'asc' ? 'desc' : 'asc'; else { this.sortKey=field; this.sortDirection='asc'; } this.rows=this.sortedRows(); this.decorateHeaders(); },
         decorateHeaders() { this.$nextTick(() => document.querySelectorAll('.backend-table thead th:not(.backend-actions-heading)').forEach((th,index) => { const field=this.columns()[index]; if (!field) return; th.dataset.sortField=field; th.setAttribute('aria-sort',this.sortField()===field ? (this.sortDirection==='asc'?'ascending':'descending') : 'none'); const button=th.querySelector('button') || document.createElement('button'); button.type='button'; button.className='backend-column-sort'; button.style.cssText='border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:0;cursor:pointer;text-align:left'; button.textContent=this.fieldLabel(field)+' '+(this.sortField()===field ? (this.sortDirection==='asc'?'↑':'↓') : '↕'); button.setAttribute('aria-label','Trier par '+this.fieldLabel(field)); button.onclick=()=>this.sortBy(field); th.replaceChildren(button); })); },
-        fieldLabel(key) { return window.schoolPresentation.labels[key] || key.replace(/_/g,' '); },
+        fieldLabel(key) {
+            if (key === 'rate_minor' && ['contracts','payroll_runs'].includes(this.resource)) return 'Tarif horaire / montant mensuel';
+            return key === 'hours' && this.resource === 'curriculum' ? 'Heures par semaine' : window.schoolPresentation.labels[key] || key.replace(/_/g,' ');
+        },
         valueLabel(value) { return window.schoolPresentation.values[value] || value; },
         createLabel() { return this.resource === 'staff' && config.module === 'teachers' ? 'Nouvel enseignant' : window.schoolPresentation.create[this.resource] || 'Ajouter / enregistrer'; },
         async chooseResource(resource) { if (this.busy) return; this.resource=resource; await this.resetResource(); },
@@ -58,7 +66,7 @@ window.schoolBackend = function (config) {
         hasMetric(key) { return this.overview && Object.hasOwn(this.overview.counts,key); },
         cycleWidth(cycle) { const max=Math.max(1,...(this.overview?.cycles || []).map(c=>Number(c.students))); return Number(cycle.students)/max*100+'%'; },
         today() { return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Algiers'}); },
-        closeModal() { if(this.busy) return; this.editing=false;this.editingId=null;this.transitionRow=null;this.detailRow=null; },
+        closeModal() { if(this.busy) return; ++this.teacherLoadSerial; this.teachersLoading=false; ++this.subjectLoadSerial; this.subjectsLoading=false; this.editing=false;this.editingId=null;this.transitionRow=null;this.detailRow=null; },
         operation() {
             return config.operations[this.resource] || (config.catalog[this.resource] ? {
                 permission: config.catalog[this.resource].permission + '.write', path:this.resource, rules:config.catalog[this.resource].rules,
@@ -80,8 +88,10 @@ window.schoolBackend = function (config) {
                 const params = new URLSearchParams({limit:'25'});
                 if (this.after) params.set('after', this.after);
                 if (this.search.trim()) params.set('q', this.search.trim());
+                if (['subjects','curriculum'].includes(this.resource) && this.subjectLevelFilter) params.set('level_id',this.subjectLevelFilter);
                 if (this.resource === 'staff' && ['teachers','staff'].includes(config.module)) params.set('is_teacher',config.module === 'teachers' ? '1' : '0');
                 const result = await this.request(this.base() + '/' + this.resource + '?' + params);
+                for (const row of result.data) this.decoratePay(row);
                 const references={};
                 await this.hydrate(result.data, Object.keys(result.data[0] || {}), references);
                 if (serial === this.loadSerial) { this.rows = result.data; this.next = result.next; this.total=result.total ?? result.data.length; this.references=references; this.rows=this.sortedRows(); this.decorateHeaders(); }
@@ -170,6 +180,17 @@ window.schoolBackend = function (config) {
             } finally { this.busy = false; }
         },
         clearStudentCsv() { this.importPreview=[]; this.importErrors=[]; this.importTotal=0; },
+        decoratePay(row) {
+            if (this.resource === 'work_logs') row.worked_hours = Number(row.minutes) / 60;
+            if (this.resource !== 'payroll_runs') return;
+            let calculation = row.calculation;
+            if (typeof calculation === 'string') {
+                try { calculation = JSON.parse(calculation); } catch { calculation = null; }
+            }
+            row.basis = calculation?.basis ?? null;
+            row.rate_minor = calculation?.rate_minor ?? null;
+            row.worked_hours = calculation?.minutes == null ? null : Number(calculation.minutes) / 60;
+        },
         columns() { const row=this.rows[0] || {}; return (window.schoolPresentation.columns[this.resource] || Object.keys(row).filter(k=>!['id','tenant_id','idempotency_key','user_id','created_at'].includes(k))).filter(key=>Object.hasOwn(row,key)); },
         detailFields() { return Object.keys(this.detailRow || {}).filter(key=>!['id','tenant_id','idempotency_key'].includes(key)); },
         initials(row) { return (row.name || row.last_name || row.title || row.label || '').split(/\s+/).slice(0,2).map(s=>[...s][0]).join(''); },
@@ -207,6 +228,10 @@ window.schoolBackend = function (config) {
         },
         display(value, column) {
             if (value === null || value === undefined) return '—';
+            if (column === 'worked_hours') {
+                const minutes = Math.round(Number(value) * 60);
+                return Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2, '0') + ' min';
+            }
             if(column === 'user_id') return value ? 'Compte lié' : 'Aucun compte';
             if(config.relations[column]) return this.relationLabel(config.relations[column],value);
             if (column.endsWith('_minor')) return (Number(value)/100).toLocaleString('fr-DZ', {style:'currency',currency:'DZD'});
@@ -235,12 +260,81 @@ window.schoolBackend = function (config) {
                     step:money ? '0.01' : parts.includes('integer') ? '1' : 'any',
                     min:numeric ? ((parts.find(r=>r.startsWith('between:'))?.split(':')[1].split(',')[0] ?? parts.find(r=>r.startsWith('min:'))?.slice(4) ?? 0)/(money ? 100 : 1)) : undefined,
                     max:numeric && parts.some(r=>r.startsWith('between:')) ? Number(parts.find(r=>r.startsWith('between:')).split(',')[1])/(money ? 100 : 1) : undefined,
-                    options:enumeration ? enumeration.slice(3).split(',').map(v=>({value:v,label:this.valueLabel(v)})) : boolean ? [{value:'true',label:'Oui'},{value:'false',label:'Non'}] : this.choices[key],
+                    options:enumeration ? enumeration.slice(3).split(',').map(v=>({value:v,label:this.valueLabel(v)})) : boolean ? [{value:'true',label:'Oui'},{value:'false',label:'Non'}] : this.relationOptions(key),
                 };
             });
         },
+        relationOptions(key) {
+            const options = this.choices[key];
+            if (this.resource !== 'sessions' || key !== 'room_id' || !options) return options;
+            const cohort = this.references.cohorts?.[this.form.cohort_id];
+            const offering = this.references.offerings?.[cohort?.offering_id];
+            if (!cohort) return [];
+            // If the user cannot read offerings, keep the server authoritative.
+            return options.filter(option => {
+                const room = this.references.rooms?.[option.value];
+                return room && Number(room.capacity) >= Number(cohort.capacity) && (!offering || room.campus_id === offering.campus_id);
+            });
+        },
+        scopedSubjects() { return ['sessions','assessments','teacher_assignments'].includes(this.resource); },
+        scopedTeachers() { return ['sessions','teacher_assignments'].includes(this.resource); },
+        async refreshTeachers() {
+            const serial = ++this.teacherLoadSerial;
+            this.choices.teacher_id = []; this.teachersLoading = false;
+            if (!this.form.cohort_id || !this.form.subject_id || !this.permitted(this.readPermission('staff'))) return;
+            this.teachersLoading = true;
+            try {
+                const items = await this.fetchChoices('staff',{cohort_id:this.form.cohort_id,subject_id:this.form.subject_id});
+                if (serial !== this.teacherLoadSerial) return;
+                this.references.staff ||= {};
+                for (const item of items) this.references.staff[item.id] = item;
+                this.choices.teacher_id = items.map(item=>({value:item.id,label:item.name}));
+                if (!items.some(item=>item.id === this.form.teacher_id)) this.form.teacher_id = '';
+            } catch (error) { if (serial === this.teacherLoadSerial) this.error = error.message; }
+            finally { if (serial === this.teacherLoadSerial) this.teachersLoading = false; }
+        },
+        async fetchChoices(resource, extra = {}) {
+            let cursor = null; const items = [];
+            do {
+                const params = new URLSearchParams({limit:'100',...extra});
+                if (cursor) params.set('after',cursor);
+                const result = await this.request(this.base()+'/'+resource+'?'+params);
+                items.push(...result.data); cursor = result.next;
+            } while (cursor);
+            return items;
+        },
+        async refreshSubjects() {
+            const serial = ++this.subjectLoadSerial;
+            this.choices.subject_id = [];
+            this.subjectsLoading = false;
+            if (!this.form.cohort_id || !this.permitted(this.readPermission('subjects'))) return;
+            this.subjectsLoading = true;
+            try {
+                const items = await this.fetchChoices('subjects',{cohort_id:this.form.cohort_id});
+                if (serial !== this.subjectLoadSerial) return;
+                this.references.subjects ||= {};
+                for (const item of items) this.references.subjects[item.id] = item;
+                this.choices.subject_id = items.map(item=>({value:item.id,label:item.name}));
+                if (!items.some(item=>item.id === this.form.subject_id)) this.form.subject_id = '';
+            } catch (error) { if (serial === this.subjectLoadSerial) this.error = error.message; }
+            finally { if (serial === this.subjectLoadSerial) this.subjectsLoading = false; }
+        },
+        async formFieldChanged(key) {
+            if (this.scopedTeachers() && ['cohort_id','subject_id'].includes(key)) {
+                ++this.teacherLoadSerial; this.form.teacher_id = ''; this.choices.teacher_id = [];
+                this.teachersLoading = false;
+                if (key === 'subject_id') await this.refreshTeachers();
+            }
+            if (this.resource === 'sessions' && key === 'cohort_id') this.form.room_id = '';
+            if (this.scopedSubjects() && key === 'cohort_id') {
+                this.form.subject_id = ''; this.error = '';
+                await this.refreshSubjects();
+            }
+        },
         async openForm(row = null) {
             if (!this.canWrite()) return;
+            ++this.subjectLoadSerial; this.subjectsLoading = false;
+            ++this.teacherLoadSerial; this.teachersLoading = false;
             this.busy = true; this.error = ''; this.message = ''; this.transitionRow = null; this.choices = {};
             this.detailRow=null;
             this.form = {}; this.key = crypto.randomUUID(); this.editingId = row && this.canManageRow() ? row.id : null;
@@ -252,14 +346,18 @@ window.schoolBackend = function (config) {
             }
             try {
                 for (const field of this.fields()) {
+                    if (field.key === 'teacher_id' && this.scopedTeachers()) { this.choices.teacher_id = []; continue; }
+                    if (field.key === 'subject_id' && this.scopedSubjects()) { this.choices.subject_id = []; continue; }
                     const relation = config.relations[field.key];
                     if (!relation || !this.permitted(this.readPermission(relation))) continue;
                     let cursor = null; const options = []; const items=[];
                     do {
                         const result = await this.request(this.base() + '/' + relation + '?limit=100' + (cursor ? '&after=' + cursor : ''));
                         for (const item of result.data) {
-                            if (field.key === 'teacher_id' && !item.is_teacher) continue;
+                            if (field.key === 'teacher_id' && (!item.is_teacher || !item.active)) continue;
                             items.push(item);
+                            this.references[relation] ||= {};
+                            this.references[relation][item.id] = item;
                         }
                         cursor = result.next;
                     } while (cursor);
@@ -267,12 +365,14 @@ window.schoolBackend = function (config) {
                     for(const item of items) options.push({value:item.id,label:this.recordLabel(item,relation)+(item.matricule ? ' · '+item.matricule : '')});
                     this.choices[field.key] = options;
                 }
+                if (this.scopedSubjects()) await this.refreshSubjects();
+                if (this.scopedTeachers()) await this.refreshTeachers();
                 this.editing = true;
             } catch (e) { this.error = e.message; }
             finally { this.busy = false; }
         },
         async save() {
-            if (this.busy || !this.canWrite()) return;
+            if (this.busy || this.subjectsLoading || this.teachersLoading || !this.canWrite()) return;
             this.busy = true; this.error = ''; this.message = '';
             try {
                 const data = {};

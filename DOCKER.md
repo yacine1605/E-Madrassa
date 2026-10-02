@@ -47,6 +47,8 @@ The administrative dashboard uses live, permission-scoped counts, cycle enrollme
 
 For the local 2026/2027 school already configured with `school:setup-2026` and `school:subjects-2026`, run `docker-compose exec app php artisan school:teachers-2026`. It creates 29 teachers with Arabic names and their class/subject assignments: one in each preschool class and Arabic, French, and English in each primary class. The command is safe to rerun and keeps existing assignments. View the assignments under **Enseignants** or **Classes et groupes**.
 
+For primary levels, an Arabic qualification (`PRI-AR-LECT`) also qualifies the teacher for the other subjects in that level's curriculum, except French, English, Spanish and sport. These four subjects require an explicit qualification. The rule applies to teacher choices and validation when creating assignments or sessions; qualifications remain scoped to a level, and class assignments still control teacher portal access.
+
 Run `docker-compose exec app php artisan school:staff-2026` to add the nine initial staff members with Arabic names and visible roles: four kitchen chefs, two workers, and three secretaries. It is safe to rerun and refuses to overwrite an existing staff code with different details.
 
 Run `docker-compose exec app php artisan school:teacher-accounts` to create local login accounts for active teachers. Each account is linked to `school.staff.user_id` and has an active membership with no administrative permissions. Unique temporary passwords are written once to `storage/app/private/teacher-credentials-2026.csv` inside the application container; a private copy can be kept in the project's gitignored storage directory.

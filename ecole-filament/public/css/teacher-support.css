@@ -1,0 +1,5 @@
+.lesson.support-english{background:#dbeafe;border-left:4px solid #2563eb;color:#1e3a8a}
+.lesson.support-french{background:#fef3c7;border-left:4px solid #b45309;color:#78350f}
+.lesson.support-english,.lesson.support-french{padding:18px;margin:8px 0;border-radius:8px}
+.lesson.support-english .time,.lesson.support-french .time{color:inherit}
+@media print{.support-english,.support-french{print-color-adjust:exact;-webkit-print-color-adjust:exact}}

@@ -1,0 +1,2846 @@
+{
+  "schema_version": 1,
+  "seed": 2026,
+  "source": "Données fournies : annexe à la décision ministérielle du 27 juillet 2026",
+  "independent_variants": false,
+  "morning_pe": true,
+  "gym_rooms": [
+    "Gymnase"
+  ],
+  "computer_rooms": [
+    "Salle informatique"
+  ],
+  "days": [
+    "Dimanche",
+    "Lundi",
+    "Mardi",
+    "Mercredi",
+    "Jeudi"
+  ],
+  "morning": [
+    [
+      "08:00",
+      "09:00"
+    ],
+    [
+      "09:00",
+      "10:00"
+    ],
+    [
+      "10:00",
+      "11:00"
+    ],
+    [
+      "11:00",
+      "12:00"
+    ]
+  ],
+  "afternoon": [
+    [
+      "13:00",
+      "14:00"
+    ],
+    [
+      "14:00",
+      "15:00"
+    ]
+  ],
+  "afternoon_days": [
+    0,
+    1,
+    3,
+    4
+  ],
+  "lunch": [
+    "12:00",
+    "13:00"
+  ],
+  "source_subjects": {
+    "AR": [
+      [
+        5,
+        0.5,
+        2
+      ],
+      [
+        5,
+        0.5,
+        3
+      ],
+      [
+        4,
+        0.5,
+        3
+      ],
+      [
+        4,
+        1,
+        5
+      ]
+    ],
+    "FR": [
+      [
+        2,
+        0.5,
+        1
+      ],
+      [
+        2,
+        0.5,
+        2
+      ],
+      [
+        2,
+        0.5,
+        2
+      ],
+      [
+        2,
+        0.5,
+        2
+      ]
+    ],
+    "EN": [
+      [
+        3,
+        0.5,
+        1
+      ],
+      [
+        3,
+        0.5,
+        3
+      ],
+      [
+        3,
+        0.5,
+        3
+      ],
+      [
+        3,
+        0.5,
+        3
+      ]
+    ],
+    "MATH": [
+      [
+        4,
+        0.5,
+        2
+      ],
+      [
+        4,
+        0.5,
+        3
+      ],
+      [
+        4,
+        0.5,
+        3
+      ],
+      [
+        4,
+        1,
+        4
+      ]
+    ],
+    "NS": [
+      [
+        2,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        2
+      ],
+      [
+        2,
+        0,
+        2
+      ],
+      [
+        2,
+        0,
+        2
+      ]
+    ],
+    "PH": [
+      [
+        2,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        2
+      ],
+      [
+        2,
+        0,
+        2
+      ],
+      [
+        2,
+        0,
+        2
+      ]
+    ],
+    "HIST": [
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ]
+    ],
+    "GEO": [
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ],
+      [
+        1,
+        0,
+        null
+      ]
+    ],
+    "ISLAM": [
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "CIVIC": [
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "ART": [
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "PE": [
+      [
+        2,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        1
+      ]
+    ],
+    "CS": [
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ]
+    ]
+  },
+  "history_geography_coefficients": [
+    2,
+    2,
+    2,
+    3
+  ],
+  "timetables": [
+    {
+      "id": "1AM-A",
+      "level": 1,
+      "section": "A",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        }
+      ]
+    },
+    {
+      "id": "1AM-B",
+      "level": 1,
+      "section": "B",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        }
+      ]
+    },
+    {
+      "id": "2AM-A",
+      "level": 2,
+      "section": "A",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        }
+      ]
+    },
+    {
+      "id": "2AM-B",
+      "level": 2,
+      "section": "B",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        }
+      ]
+    },
+    {
+      "id": "3AM-A",
+      "level": 3,
+      "section": "A",
+      "resource_batch": "all",
+      "weekly_hours": 27,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FREE",
+          "kind": "free",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        }
+      ]
+    },
+    {
+      "id": "3AM-B",
+      "level": 3,
+      "section": "B",
+      "resource_batch": "all",
+      "weekly_hours": 27,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_AM",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FREE",
+          "kind": "free",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        }
+      ]
+    },
+    {
+      "id": "4AM-A",
+      "level": 4,
+      "section": "A",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_AM_1",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "AR",
+              "G2": "MATH"
+            }
+          }
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_AM_2",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "MATH",
+              "G2": "AR"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        }
+      ]
+    },
+    {
+      "id": "4AM-B",
+      "level": 4,
+      "section": "B",
+      "resource_batch": "all",
+      "weekly_hours": 28,
+      "sessions": [
+        {
+          "day": 0,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "TD_AM_1",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "AR",
+              "G2": "MATH"
+            },
+            "B": {
+              "G1": "AR",
+              "G2": "MATH"
+            }
+          }
+        },
+        {
+          "day": 0,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "NS",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 0,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "GEO",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PH",
+          "kind": "practical",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 1,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 1,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CS",
+          "kind": "course",
+          "room": "Salle informatique"
+        },
+        {
+          "day": 2,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "NS",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 2,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "TD_AM_2",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "MATH",
+              "G2": "AR"
+            },
+            "B": {
+              "G1": "MATH",
+              "G2": "AR"
+            }
+          }
+        },
+        {
+          "day": 2,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "EN",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "PH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "FR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "HIST",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 3,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "ISLAM",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "morning",
+          "start": "08:00",
+          "end": "09:00",
+          "subject": "MATH",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "morning",
+          "start": "09:00",
+          "end": "10:00",
+          "subject": "AR",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 2,
+          "block": "morning",
+          "start": "10:00",
+          "end": "11:00",
+          "subject": "PE",
+          "kind": "course",
+          "room": "Gymnase"
+        },
+        {
+          "day": 4,
+          "period": 3,
+          "block": "morning",
+          "start": "11:00",
+          "end": "12:00",
+          "subject": "TD_FE",
+          "kind": "td",
+          "room": null,
+          "groups": {
+            "A": {
+              "G1": "FR",
+              "G2": "EN"
+            },
+            "B": {
+              "G1": "EN",
+              "G2": "FR"
+            }
+          }
+        },
+        {
+          "day": 4,
+          "period": 0,
+          "block": "afternoon",
+          "start": "13:00",
+          "end": "14:00",
+          "subject": "ART",
+          "kind": "course",
+          "room": null
+        },
+        {
+          "day": 4,
+          "period": 1,
+          "block": "afternoon",
+          "start": "14:00",
+          "end": "15:00",
+          "subject": "CIVIC",
+          "kind": "course",
+          "room": null
+        }
+      ]
+    }
+  ]
+}

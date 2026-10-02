@@ -82,7 +82,7 @@ class TeacherPortalController
             ->join('school.rooms as r', 'r.id', '=', 'se.room_id')
             ->where('se.tenant_id', $teacher->tenant_id)->where('se.teacher_id', $teacher->id)
             ->where('se.status', '<>', 'cancelled')->where('se.starts_at', '>=', $start->toIso8601String())->where('se.starts_at', '<', $end->toIso8601String())
-            ->orderBy('se.starts_at')->select('se.starts_at', 'se.ends_at', 'se.status', 'c.name as classroom', 's.name as subject', 'r.name as room')->get();
+            ->orderBy('se.starts_at')->select('se.starts_at', 'se.ends_at', 'se.status', 'se.activity', 'c.name as classroom', 's.name as subject', 's.code as subject_code', 'r.name as room')->get();
         return view('teacher.schedule', compact('sessions', 'start', 'end'));
     }
 

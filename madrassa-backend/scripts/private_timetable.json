@@ -1,0 +1,4909 @@
+{
+  "schema_version": 2,
+  "timezone": "Africa/Algiers",
+  "time_unit_minutes": 15,
+  "weekly_minutes": 1800,
+  "recess": {
+    "time": "10:30",
+    "minutes": 0
+  },
+  "note": "Volumes par matière fournis par l’école, compléments privés distincts. Récréation à 10h30 : 0 minute, simple repère sans créneau réservé. Mardi : 8h30–12h30, après-midi libre. Les autres jours : déjeuner 12h–13h.",
+  "reference_totals_minutes": {
+    "1": 1260,
+    "2": 1260,
+    "3": 1260,
+    "4": 1350,
+    "5": 1395
+  },
+  "reference_notes": [
+    "Grade 4 detailed subjects sum to 1350 minutes (22.5h), not the reported 1530 (25.5h). Use detailed values.",
+    "The last list headed Grade 5 then Grade 4 is interpreted as Grade 5; total 1395 minutes (23.25h).",
+    "Early French/English and preschool volumes retain the preceding proposed private-school settings.",
+    "In primary and preschool, the former workshop time is language support: 120 minutes of English and all remaining minutes of French, in addition to the base language hours. Keep the Atelier / soutien label, distinguish the languages by colour, and place support next to the same language course.",
+    "Recess is a zero-minute marker at 10:30, without a reserved slot. Tuesday ends at 12:30. The school week contains 1800 programme minutes, excluding lunch."
+  ],
+  "classes": [
+    "PRE-A",
+    "PRE-B",
+    "1AP-A",
+    "1AP-B",
+    "2AP-A",
+    "2AP-B",
+    "3AP-A",
+    "3AP-B",
+    "4AP-A",
+    "4AP-B",
+    "5AP-A"
+  ],
+  "lessons": [
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "minutes": 360,
+      "hours": 6.0,
+      "support_minutes": 0,
+      "course_minutes": 360
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-A-AR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 0,
+      "course_minutes": 240
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-A-AR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 0,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-A-AR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 0,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 60,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 120,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "minutes": 360,
+      "hours": 6.0,
+      "support_minutes": 0,
+      "course_minutes": 360
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-B-AR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 0,
+      "course_minutes": 240
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-B-AR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 0,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-B-AR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 0,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 60,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 180,
+      "hours": 3.0,
+      "support_minutes": 120,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "minutes": 660,
+      "hours": 11.0,
+      "support_minutes": 0,
+      "course_minutes": 660
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 60,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "minutes": 660,
+      "hours": 11.0,
+      "support_minutes": 0,
+      "course_minutes": 660
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 60,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 660,
+      "hours": 11.0,
+      "support_minutes": 0,
+      "course_minutes": 660
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 60,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "minutes": 660,
+      "hours": 11.0,
+      "support_minutes": 0,
+      "course_minutes": 660
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 60,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 450,
+      "hours": 7.5,
+      "support_minutes": 0,
+      "course_minutes": 450
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-HIST",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 30,
+      "hours": 0.5,
+      "support_minutes": 0,
+      "course_minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "minutes": 360,
+      "hours": 6.0,
+      "support_minutes": 180,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 450,
+      "hours": 7.5,
+      "support_minutes": 0,
+      "course_minutes": 450
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 300,
+      "hours": 5.0,
+      "support_minutes": 0,
+      "course_minutes": 300
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-HIST",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 30,
+      "hours": 0.5,
+      "support_minutes": 0,
+      "course_minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "minutes": 360,
+      "hours": 6.0,
+      "support_minutes": 180,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 390,
+      "hours": 6.5,
+      "support_minutes": 0,
+      "course_minutes": 390
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "minutes": 390,
+      "hours": 6.5,
+      "support_minutes": 270,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 270,
+      "hours": 4.5,
+      "support_minutes": 0,
+      "course_minutes": 270
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "minutes": 390,
+      "hours": 6.5,
+      "support_minutes": 0,
+      "course_minutes": 390
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "minutes": 240,
+      "hours": 4.0,
+      "support_minutes": 120,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "minutes": 390,
+      "hours": 6.5,
+      "support_minutes": 270,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "minutes": 270,
+      "hours": 4.5,
+      "support_minutes": 0,
+      "course_minutes": 270
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "minutes": 120,
+      "hours": 2.0,
+      "support_minutes": 0,
+      "course_minutes": 120
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 390,
+      "hours": 6.5,
+      "support_minutes": 0,
+      "course_minutes": 390
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "minutes": 210,
+      "hours": 3.5,
+      "support_minutes": 120,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "minutes": 405,
+      "hours": 6.75,
+      "support_minutes": 225,
+      "course_minutes": 180
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 270,
+      "hours": 4.5,
+      "support_minutes": 0,
+      "course_minutes": 270
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 45,
+      "hours": 0.75,
+      "support_minutes": 0,
+      "course_minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 90,
+      "hours": 1.5,
+      "support_minutes": 0,
+      "course_minutes": 90
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "minutes": 45,
+      "hours": 0.75,
+      "support_minutes": 0,
+      "course_minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "minutes": 105,
+      "hours": 1.75,
+      "support_minutes": 0,
+      "course_minutes": 105
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "minutes": 60,
+      "hours": 1.0,
+      "support_minutes": 0,
+      "course_minutes": 60
+    }
+  ],
+  "sessions": [
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 0,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 1,
+      "start": "09:00",
+      "end": "10:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:30",
+      "end": "14:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:00",
+      "end": "09:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 4,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "1AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:30",
+      "end": "14:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 1,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 4,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 1,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "15:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "2AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 0,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:00",
+      "end": "09:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-HIST",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 3,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "15:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "support",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "12:00",
+      "end": "12:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-HIST",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-2AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:00",
+      "end": "09:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "3AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "15:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 1,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "09:00",
+      "end": "10:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-4AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "13:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:30",
+      "end": "14:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 1,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:30",
+      "end": "12:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-2AP-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-2AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-3AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-1AP-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-1AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "4AP-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "09:00",
+      "end": "10:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:00",
+      "end": "10:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ART",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "13:45",
+      "minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:45",
+      "end": "14:45",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:45",
+      "end": "15:15",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 0,
+      "start": "15:15",
+      "end": "16:00",
+      "minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "13:45",
+      "minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-CIV",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:45",
+      "end": "14:30",
+      "minutes": 45
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-HG",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 2,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "12:00",
+      "end": "12:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SCI-TECH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:30",
+      "end": "15:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-ISLAM",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-AR-LECT",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-MATH",
+      "teacher": "T-2026-PRI-5AP-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "support",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-4AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "14:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "support",
+      "day": 4,
+      "start": "14:30",
+      "end": "15:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "5AP-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-2AP-A-EN",
+      "activity": "course",
+      "day": 4,
+      "start": "15:30",
+      "end": "16:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 0,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "support",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 1,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "12:00",
+      "end": "12:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-A",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-A-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 0,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 0,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 0,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "support",
+      "day": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 0,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "10:30",
+      "end": "11:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 1,
+      "start": "11:30",
+      "end": "12:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 1,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-EVEIL",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "support",
+      "day": 2,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 2,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 2,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-EN",
+      "teacher": "T-2026-PRI-1AP-A-EN",
+      "activity": "course",
+      "day": 2,
+      "start": "12:00",
+      "end": "12:30",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-ES",
+      "teacher": "T-PLAN-ES-01",
+      "activity": "course",
+      "day": 3,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 3,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-SPORT",
+      "teacher": "T-PLAN-SPORT-01",
+      "activity": "course",
+      "day": 3,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 3,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "08:30",
+      "end": "09:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-ART",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "09:30",
+      "end": "10:30",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRI-FR",
+      "teacher": "T-2026-PRI-1AP-A-FR",
+      "activity": "course",
+      "day": 4,
+      "start": "10:30",
+      "end": "11:00",
+      "minutes": 30
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-MATH",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "11:00",
+      "end": "12:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-REPOS",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "13:00",
+      "end": "14:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "14:00",
+      "end": "15:00",
+      "minutes": 60
+    },
+    {
+      "class_code": "PRE-B",
+      "subject": "PRE-AR",
+      "teacher": "T-2026-PRE-B-AR",
+      "activity": "course",
+      "day": 4,
+      "start": "15:00",
+      "end": "16:00",
+      "minutes": 60
+    }
+  ]
+}

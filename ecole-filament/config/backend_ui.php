@@ -1,6 +1,7 @@
 <?php
 return [
     'labels'=>[
+        'teacher_qualifications'=>'Matières et niveaux des enseignants',
         'students'=>'Élèves','guardians'=>'Responsables légaux','student_guardians'=>'Liens élève / responsable',
         'programs'=>'Programmes','levels'=>'Niveaux','periods'=>'Périodes','offerings'=>'Offres de formation',
         'cohorts'=>'Groupes','teacher_assignments'=>'Affectations enseignants','subjects'=>'Matières','curriculum'=>'Programme pédagogique','campuses'=>'Campus','rooms'=>'Salles',

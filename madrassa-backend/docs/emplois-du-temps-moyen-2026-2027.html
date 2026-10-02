@@ -1,0 +1,2115 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>8 emplois du temps · Enseignement moyen</title>
+    <style>
+      :root {
+        font-family:
+          Segoe UI,
+          Arial,
+          sans-serif;
+        color: #172b40;
+        background: #edf2f6;
+        font-synthesis: none;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      .wrap {
+        max-width: 1480px;
+        margin: auto;
+        padding: 30px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+      h1 {
+        font-size: 30px;
+        letter-spacing: -0.7px;
+        margin-bottom: 10px;
+      }
+      .eyebrow {
+        color: #43667d;
+        letter-spacing: 2px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+      }
+      .intro,
+      .sheet,
+      .rooms {
+        background: #fff;
+        border: 1px solid #d6e0e8;
+        border-radius: 15px;
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+      .intro p {
+        max-width: 1080px;
+        line-height: 1.6;
+      }
+      .muted {
+        color: #566d80;
+      }
+      .pills,
+      .nav,
+      .legend {
+        display: flex;
+        gap: 9px;
+        flex-wrap: wrap;
+      }
+      .pills span {
+        background: #eaf2f8;
+        border: 1px solid #d4e1eb;
+        border-radius: 20px;
+        padding: 7px 12px;
+        font-size: 13px;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 20px 0;
+      }
+      .actions a,
+      button {
+        border: 0;
+        border-radius: 8px;
+        background: #183e59;
+        color: white;
+        padding: 11px 16px;
+        text-decoration: none;
+        font: 600 14px inherit;
+        cursor: pointer;
+      }
+      .nav {
+        margin-bottom: 20px;
+      }
+      .nav a {
+        padding: 9px 12px;
+        background: #f2f6fa;
+        color: #1f4966;
+        border-radius: 7px;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .sheet {
+        scroll-margin-top: 20px;
+      }
+      .sheet-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .sheet-head h2 {
+        font-size: 25px;
+        margin: 0;
+      }
+      .load {
+        text-align: right;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .load strong {
+        font-size: 22px;
+        color: #183e59;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      .grid {
+        min-width: 920px;
+      }
+      .grid th,
+      .grid td {
+        border: 1px solid #d3dfe8;
+        padding: 9px 10px;
+        vertical-align: top;
+      }
+      .grid thead th {
+        background: #1d405b;
+        color: #fff;
+        font-size: 14px;
+        padding: 12px;
+      }
+      .grid .time {
+        width: 115px;
+        background: #edf3f7;
+        text-align: left;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .grid thead .time {
+        background: #1d405b;
+        color: #fff;
+      }
+      .cell-title {
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.25;
+      }
+      .detail {
+        font-size: 11px;
+        line-height: 1.35;
+        margin-top: 4px;
+        color: #476074;
+      }
+      .td {
+        background: #eee7fa;
+      }
+      .td .cell-title {
+        color: #4b2e79;
+      }
+      .td .detail {
+        color: #4b3c65;
+      }
+      .pe {
+        background: #e1f3e8;
+      }
+      .pe .cell-title {
+        color: #20543a;
+      }
+      .lab {
+        background: #def2f7;
+      }
+      .lab .cell-title {
+        color: #075e73;
+      }
+      .practical {
+        background: #fff0d4;
+      }
+      .practical .cell-title {
+        color: #734a06;
+      }
+      .light {
+        background: #faf8f2;
+      }
+      .free,
+      .off,
+      .lunch {
+        background: #f0f3f6;
+        color: #687786;
+      }
+      .lunch td {
+        text-align: center;
+        padding: 6px;
+        font-size: 12px;
+      }
+      .legend {
+        font-size: 12px;
+        margin: 13px 0;
+      }
+      .legend span {
+        padding: 6px 9px;
+        border-radius: 5px;
+      }
+      .note {
+        font-size: 12px;
+        line-height: 1.45;
+        margin: 9px 0;
+      }
+      .reference {
+        margin-top: 12px;
+      }
+      .reference th,
+      .reference td {
+        border: 1px solid #dce4eb;
+        text-align: center;
+        padding: 6px 3px;
+        font-size: 10px;
+      }
+      .reference th {
+        background: #edf3f7;
+      }
+      .reference .row-title {
+        width: 95px;
+        text-align: left;
+      }
+      .reference caption {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        padding-bottom: 6px;
+      }
+      .footer {
+        font-size: 11px;
+        line-height: 1.5;
+        color: #586f80;
+        margin-top: 9px;
+      }
+      .rooms table th,
+      .rooms table td {
+        border: 1px solid #dce4eb;
+        padding: 8px;
+        font-size: 12px;
+      }
+      .rooms th {
+        background: #edf3f7;
+      }
+      .rooms h2 {
+        font-size: 22px;
+      }
+      .rooms .note {
+        margin-bottom: 14px;
+      }
+      .empty {
+        color: #8493a0;
+      }
+      @media (max-width: 700px) {
+        .wrap {
+          padding: 12px;
+        }
+        .intro,
+        .sheet,
+        .rooms {
+          padding: 15px;
+        }
+        .sheet-head {
+          align-items: flex-start;
+        }
+        .sheet-head h2 {
+          font-size: 21px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .load strong {
+          font-size: 19px;
+        }
+      }
+      @media print {
+        @page {
+          size: A4 landscape;
+          margin: 9mm;
+        }
+        * {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+        :root {
+          background: #fff;
+        }
+        body {
+          margin: 0;
+        }
+        .wrap {
+          padding: 0;
+          max-width: none;
+        }
+        .intro,
+        .nav,
+        .rooms {
+          display: none;
+        }
+        .sheet {
+          border: 0;
+          border-radius: 0;
+          padding: 0;
+          margin: 0;
+          break-after: page;
+          break-inside: avoid;
+        }
+        .sheet:last-of-type {
+          break-after: auto;
+        }
+        .sheet-head {
+          margin-bottom: 8px;
+        }
+        .sheet-head h2 {
+          font-size: 20px;
+        }
+        .eyebrow {
+          font-size: 9px;
+          margin-bottom: 4px;
+        }
+        .load {
+          font-size: 10px;
+        }
+        .load strong {
+          font-size: 17px;
+        }
+        .table-wrap {
+          overflow: visible;
+        }
+        .grid {
+          min-width: 0;
+        }
+        .grid .time {
+          width: 87px;
+          font-size: 10px;
+        }
+        .grid thead th {
+          padding: 8px;
+          font-size: 11px;
+        }
+        .grid th,
+        .grid td {
+          padding: 7px;
+        }
+        .cell-title {
+          font-size: 11px;
+        }
+        .detail {
+          font-size: 9px;
+          margin-top: 3px;
+        }
+        .lunch td {
+          padding: 4px;
+          font-size: 10px;
+        }
+        .legend {
+          font-size: 9px;
+          margin: 8px 0;
+        }
+        .legend span {
+          padding: 4px 7px;
+        }
+        .note {
+          font-size: 9px;
+          margin: 6px 0;
+        }
+        .reference {
+          margin-top: 8px;
+        }
+        .reference th,
+        .reference td {
+          padding: 4px 2px;
+          font-size: 8px;
+        }
+        .reference caption {
+          font-size: 9px;
+          padding-bottom: 4px;
+        }
+        .reference .row-title {
+          width: 78px;
+        }
+        .footer {
+          font-size: 8px;
+          margin-top: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="intro">
+        <div class="eyebrow">Année scolaire 2026 / 2027</div>
+        <h1>8 emplois du temps · Enseignement moyen</h1>
+        <p>
+          Deux classes par année, de la 1AM à la 4AM. Cours de 8 h à 12 h, puis
+          de 13 h à 15 h ; mardi après-midi libre. En 3AM, jeudi de 11 h à 12 h
+          : heure libre.
+        </p>
+        <p>
+          <b>Organisation avec un seul gymnase :</b> une heure d’EPS le matin et
+          une l’après-midi pour chaque classe, sur deux jours différents. En
+          échange, le TP de sciences naturelles est placé l’après-midi. Cette
+          adaptation permet de conserver tous les volumes demandés pour les huit
+          classes.
+        </p>
+        <div class="pills">
+          <span>1AM, 2AM, 4AM : 28 h</span><span>3AM : 27 h</span
+          ><span>TD en demi-groupes · cycle de 2 semaines</span
+          ><span>Gymnase et informatique sans conflit</span>
+        </div>
+        <p class="note">
+          Les contrôles portent sur les classes et les espaces partagés. Les
+          enseignants n’ont pas été fournis et ne sont pas affectés dans ces
+          grilles.
+        </p>
+        <div class="actions">
+          <button onclick="window.print()">Imprimer / PDF</button
+          ><a href="emplois-du-temps-moyen-2026-2027.pdf"
+            >Télécharger les 8 grilles en PDF</a
+          >
+        </div>
+      </header>
+      <nav class="nav" aria-label="Choisir une classe">
+        <a href="#1AM-A">1AM-A</a><a href="#1AM-B">1AM-B</a
+        ><a href="#2AM-A">2AM-A</a><a href="#2AM-B">2AM-B</a
+        ><a href="#3AM-A">3AM-A</a><a href="#3AM-B">3AM-B</a
+        ><a href="#4AM-A">4AM-A</a><a href="#4AM-B">4AM-B</a>
+      </nav>
+      <section class="sheet" id="1AM-A">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>1AM · Classe A</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />25 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>14</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="1AM-B">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>1AM · Classe B</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />25 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>14</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="2AM-A">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>2AM · Classe A</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />25 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>3</td>
+            <td>2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>2</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>21</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="2AM-B">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>2AM · Classe B</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />25 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>3</td>
+            <td>2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>2</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>21</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="3AM-A">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>3AM · Classe A</h2>
+          </div>
+          <div class="load">
+            <strong>27 h / semaine</strong><br />24 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class="free">
+                  <div class="cell-title">Heure libre</div>
+                  <div class="detail">27 h de cours et TD cette semaine</div>
+                </td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>4</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>3</td>
+            <td>2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>2</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>21</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="3AM-B">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>3AM · Classe B</h2>
+          </div>
+          <div class="load">
+            <strong>27 h / semaine</strong><br />24 h cours / TP + 2 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths</div>
+                  <div class="detail">Sem. 1 : G1 Arabe · G2 Mathématiques</div>
+                  <div class="detail">Sem. 2 : G1 Mathématiques · G2 Arabe</div>
+                </td>
+                <td class="free">
+                  <div class="cell-title">Heure libre</div>
+                  <div class="detail">27 h de cours et TD cette semaine</div>
+                </td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). L’arabe et les maths alternent
+          également sur deux semaines : 0,5 h/semaine de chaque matière par
+          groupe.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>4</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>3</td>
+            <td>2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>2</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>21</b>. Histoire / géographie :
+          2 partagé entre histoire et géographie, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="4AM-A">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>4AM · Classe A</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />24 h cours / TP + 3 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths · 2</div>
+                  <div class="detail">
+                    Chaque semaine : G1 Mathématiques · G2 Arabe
+                  </div>
+                </td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths · 1</div>
+                  <div class="detail">
+                    Chaque semaine : G1 Arabe · G2 Mathématiques
+                  </div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). Les deux TD arabe/mathématiques sont
+          inversés dans la même semaine : chaque groupe suit 1 h d’arabe et 1 h
+          de maths chaque semaine.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>4</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>3</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>25</b>. Histoire / géographie :
+          3 au total : histoire 1 + géographie 2, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <section class="sheet" id="4AM-B">
+        <header class="sheet-head">
+          <div>
+            <div class="eyebrow">Enseignement moyen · 2026 / 2027</div>
+            <h2>4AM · Classe B</h2>
+          </div>
+          <div class="load">
+            <strong>28 h / semaine</strong><br />24 h cours / TP + 3 h TD + 1 h
+            informatique
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="time">Horaire</th>
+                <th>Dimanche</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="time">08:00–09:00</th>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="">
+                  <div class="cell-title">Sciences naturelles</div>
+                </td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+              </tr>
+              <tr>
+                <th class="time">09:00–10:00</th>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths · 1</div>
+                  <div class="detail">
+                    Chaque semaine : G1 Arabe · G2 Mathématiques
+                  </div>
+                </td>
+                <td class="practical">
+                  <div class="cell-title">Physique et technologie · TP</div>
+                </td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="">
+                  <div class="cell-title">Physique et technologie</div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+              </tr>
+              <tr>
+                <th class="time">10:00–11:00</th>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class=""><div class="cell-title">Mathématiques</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Arabe ↔ Maths · 2</div>
+                  <div class="detail">
+                    Chaque semaine : G1 Mathématiques · G2 Arabe
+                  </div>
+                </td>
+                <td class=""><div class="cell-title">Arabe</div></td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">11:00–12:00</th>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Anglais</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class=""><div class="cell-title">Français</div></td>
+                <td class="td">
+                  <div class="cell-title">TD Français ↔ Anglais</div>
+                  <div class="detail">Sem. 1 : G1 Français · G2 Anglais</div>
+                  <div class="detail">Sem. 2 : G1 Anglais · G2 Français</div>
+                </td>
+              </tr>
+              <tr class="lunch">
+                <th class="time">12:00–13:00</th>
+                <td colspan="5">
+                  Pause déjeuner · le mardi, fin des cours à 12:00
+                </td>
+              </tr>
+              <tr>
+                <th class="time">13:00–14:00</th>
+                <td class="practical">
+                  <div class="cell-title">Sciences naturelles · TP</div>
+                </td>
+                <td class="pe">
+                  <div class="cell-title">EPS</div>
+                  <div class="detail">Gymnase</div>
+                </td>
+                <td class="off" rowspan="2">
+                  <div class="cell-title">Après-midi libre</div>
+                </td>
+                <td class="light"><div class="cell-title">Histoire</div></td>
+                <td class="light">
+                  <div class="cell-title">Arts / musique</div>
+                </td>
+              </tr>
+              <tr>
+                <th class="time">14:00–15:00</th>
+                <td class="light"><div class="cell-title">Géographie</div></td>
+                <td class="lab">
+                  <div class="cell-title">Informatique</div>
+                  <div class="detail">Salle informatique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation islamique</div>
+                </td>
+                <td class="light">
+                  <div class="cell-title">Éducation civique</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="td">TD / أ.م · demi-groupes</span
+          ><span class="pe">EPS · gymnase partagé</span
+          ><span class="lab">Salle informatique</span
+          ><span class="practical">Travaux pratiques</span>
+        </div>
+        <p class="note">
+          <b>TD :</b> les semaines 1 et 2 se répètent en alternance. Chaque
+          groupe reçoit 1 h de français et 1 h d’anglais sur deux semaines (0,5
+          h/semaine pour chaque langue). Les deux TD arabe/mathématiques sont
+          inversés dans la même semaine : chaque groupe suit 1 h d’arabe et 1 h
+          de maths chaque semaine.
+        </p>
+        <p class="note">
+          <b>Adaptation retenue :</b> 1 h d’EPS le matin et 1 h l’après-midi,
+          sur deux jours distincts ; le TP de sciences naturelles passe
+          l’après-midi. Un seul gymnase pour les huit classes.
+        </p>
+        <table class="reference">
+          <caption>
+            Volumes hebdomadaires hors TD et coefficients
+          </caption>
+          <tr>
+            <th class="row-title">Matière</th>
+            <th>Arabe</th>
+            <th>Français</th>
+            <th>Anglais</th>
+            <th>Maths</th>
+            <th>Sc. naturelles</th>
+            <th>Physique / techno</th>
+            <th>Histoire / géo</th>
+            <th>Éd. islamique</th>
+            <th>Éd. civique</th>
+            <th>Arts / musique</th>
+            <th>EPS</th>
+            <th>Informatique</th>
+          </tr>
+          <tr>
+            <th class="row-title">Cours / TP · h</th>
+            <td>4</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>1 + 1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <th class="row-title">Coefficient</th>
+            <td>5</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>2</td>
+            <td>2</td>
+            <td>3</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>(1)</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Somme des coefficients principaux : <b>25</b>. Histoire / géographie :
+          3 au total : histoire 1 + géographie 2, compté une seule fois.
+          Informatique : 1 h supplémentaire, coefficient (1) hors total
+          principal.<br />Sciences naturelles et physique/technologie : chacune
+          1 h de cours + 1 h de TP. Volumes et coefficients : données fournies,
+          annexe à la décision du 27 juillet 2026.
+        </div>
+      </section>
+      <aside class="rooms">
+        <h2>Occupation des espaces partagés</h2>
+        <p class="note">
+          Contrôle commun aux huit classes : aucune double réservation du
+          gymnase ou de la salle informatique.
+        </p>
+        <h3>Gymnase</h3>
+        <table>
+          <tr>
+            <th>Horaire</th>
+            <th>Dimanche</th>
+            <th>Lundi</th>
+            <th>Mardi</th>
+            <th>Mercredi</th>
+            <th>Jeudi</th>
+          </tr>
+          <tr>
+            <th>08:00–09:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>2AM-A</td>
+            <td>3AM-B</td>
+          </tr>
+          <tr>
+            <th>09:00–10:00</th>
+            <td>—</td>
+            <td>2AM-B</td>
+            <td>1AM-A</td>
+            <td>3AM-A</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>10:00–11:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>1AM-B</td>
+            <td>4AM-B</td>
+          </tr>
+          <tr>
+            <th>11:00–12:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>4AM-A</td>
+          </tr>
+          <tr>
+            <th>13:00–14:00</th>
+            <td>3AM-A</td>
+            <td>4AM-B</td>
+            <td>—</td>
+            <td>4AM-A</td>
+            <td>2AM-B</td>
+          </tr>
+          <tr>
+            <th>14:00–15:00</th>
+            <td>1AM-A</td>
+            <td>1AM-B</td>
+            <td>—</td>
+            <td>3AM-B</td>
+            <td>2AM-A</td>
+          </tr>
+        </table>
+        <h3>Salle informatique</h3>
+        <table>
+          <tr>
+            <th>Horaire</th>
+            <th>Dimanche</th>
+            <th>Lundi</th>
+            <th>Mardi</th>
+            <th>Mercredi</th>
+            <th>Jeudi</th>
+          </tr>
+          <tr>
+            <th>08:00–09:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>09:00–10:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>10:00–11:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>11:00–12:00</th>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th>13:00–14:00</th>
+            <td>3AM-B</td>
+            <td>3AM-A</td>
+            <td>—</td>
+            <td>2AM-A</td>
+            <td>1AM-B</td>
+          </tr>
+          <tr>
+            <th>14:00–15:00</th>
+            <td>2AM-B</td>
+            <td>4AM-B</td>
+            <td>—</td>
+            <td>1AM-A</td>
+            <td>4AM-A</td>
+          </tr>
+        </table>
+      </aside>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "source": "Subject-by-subject weekly volumes supplied by the school in this conversation; not independently certified.",
+  "reported_totals_minutes": {"1": 1260, "2": 1260, "3": 1260, "4": 1530},
+  "primary": {
+    "1": {"PRI-AR-LECT":660,"PRI-MATH":300,"PRI-ISLAM":90,"PRI-ART":90,"PRI-SPORT":120},
+    "2": {"PRI-AR-LECT":660,"PRI-MATH":300,"PRI-ISLAM":90,"PRI-ART":90,"PRI-SPORT":120},
+    "3": {"PRI-AR-LECT":450,"PRI-EN":120,"PRI-MATH":300,"PRI-SCI-TECH":60,"PRI-ISLAM":90,"PRI-HIST":30,"PRI-ART":90,"PRI-SPORT":120},
+    "4": {"PRI-AR-LECT":390,"PRI-EN":120,"PRI-FR":120,"PRI-MATH":270,"PRI-SCI-TECH":60,"PRI-ISLAM":120,"PRI-CIV":60,"PRI-HG":60,"PRI-ART":60,"PRI-SPORT":90},
+    "5": {"PRI-AR-LECT":390,"PRI-EN":90,"PRI-FR":180,"PRI-MATH":270,"PRI-SCI-TECH":90,"PRI-ISLAM":90,"PRI-CIV":45,"PRI-HG":90,"PRI-ART":45,"PRI-SPORT":105}
+  },
+  "private_supplements": {
+    "1":{"PRI-FR":180,"PRI-EN":120,"PRI-ES":60},
+    "2":{"PRI-FR":180,"PRI-EN":120,"PRI-ES":60},
+    "3":{"PRI-FR":180,"PRI-ES":60},
+    "4":{"PRI-ES":60},
+    "5":{"PRI-ES":60}
+  },
+  "preschool": {"PRE-AR":360,"PRE-MATH":240,"PRE-ART":180,"PRE-EVEIL":180,"PRE-REPOS":300,"PRE-ATELIER":180,"PRI-FR":120,"PRI-EN":60,"PRI-ES":60,"PRI-SPORT":120},
+  "school_week_minutes":1800,
+  "support_subject":"PRI-ATELIER",
+  "language_support": {"cycles":["PRIMAIRE","PRESCOLAIRE"],"english_minutes":120},
+  "notes":[
+    "Grade 4 detailed subjects sum to 1350 minutes (22.5h), not the reported 1530 (25.5h). Use detailed values.",
+    "The last list headed Grade 5 then Grade 4 is interpreted as Grade 5; total 1395 minutes (23.25h).",
+    "Early French/English and preschool volumes retain the preceding proposed private-school settings.",
+    "In primary and preschool, the former workshop time is language support: 120 minutes of English and all remaining minutes of French, in addition to the base language hours. Keep the Atelier / soutien label, distinguish the languages by colour, and place support next to the same language course.",
+    "Recess is a zero-minute marker at 10:30, without a reserved slot. Tuesday ends at 12:30. The school week contains 1800 programme minutes, excluding lunch."
+  ]
+}

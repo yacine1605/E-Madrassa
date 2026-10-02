@@ -27,10 +27,27 @@ final class TenantContext
                 DB::select("select set_config('app.tenant_id', ?, true)", [$tenant]);
                 DB::statement("SET LOCAL lock_timeout = '3s'");
                 DB::statement("SET LOCAL statement_timeout = '10s'");
-                return $next($request);
+                $response = $next($request);
+                // Laravel's routing pipeline renders controller exceptions before
+                // returning here. Re-throw so failed writes roll back and domain
+                // conflicts reach the handler below instead of becoming HTTP 500.
+                if ($response->exception ?? null) throw $response->exception;
+                return $response;
             }, 3);
         } catch (QueryException $e) {
             // Never return SQL, bindings or personal data in API errors.
+            if ((string) $e->getCode() === '23514') {
+                $messages = [
+                    'invalid_room' => 'Choisissez une salle du même campus que le groupe, avec une capacité au moins égale à celle du groupe.',
+                    'invalid_teacher' => 'Choisissez un enseignant actif.',
+                    'schedule_conflict' => 'Ce créneau est déjà occupé pour la salle, le groupe, l’enseignant ou un élève du groupe.',
+                ];
+                foreach ($messages as $code => $message) {
+                    if (preg_match('/ERROR:\\s+'.preg_quote($code, '/').'\\b/', $e->errorInfo[2] ?? '')) {
+                        return response()->json(['message' => $message, 'code' => $code], 409);
+                    }
+                }
+            }
             if (in_array($e->getCode(), ['23503','23505','23514','23P01','55P03','40001','40P01'])) {
                 return response()->json(['message' => 'Opération incompatible avec l’état actuel des données. Rechargez puis vérifiez les contraintes.', 'code' => 'domain_conflict'], 409);
             }

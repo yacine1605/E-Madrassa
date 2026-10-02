@@ -20,7 +20,7 @@ return [
         'hr' => ['hr.read','hr.write','payroll.read','payroll.write'],
         'technical' => [],
     ],
-    'mutable_catalog' => ['campuses','periods','programs','levels','subjects','curriculum','offerings','cohorts','rooms','students','guardians','student_guardians','staff'],
+    'mutable_catalog' => ['campuses','periods','programs','levels','subjects','curriculum','offerings','cohorts','rooms','students','guardians','student_guardians','staff','teacher_qualifications'],
     'search_fields' => [
         'enrollments'=>['status'], 'invoices'=>['number'], 'invoice_balances'=>['number'],
         'payments'=>['method','reference'], 'refunds'=>['reason'], 'disbursements'=>[],
@@ -41,6 +41,7 @@ return [
         'guardians' => ['permission'=>'students', 'rules'=>['name'=>'required|string|max:150','phone'=>'nullable|string|max:30','email'=>'nullable|email|max:200']],
         'student_guardians' => ['permission'=>'students', 'rules'=>['student_id'=>'required|uuid','guardian_id'=>'required|uuid','relationship'=>'required|string|max:50','can_collect'=>'sometimes|boolean']],
         'staff' => ['permission'=>'hr', 'rules'=>['code'=>'required|string|max:40','name'=>'required|string|max:150','role'=>'nullable|string|max:100','is_teacher'=>'sometimes|boolean','active'=>'sometimes|boolean']],
+        'teacher_qualifications' => ['permission'=>'hr', 'rules'=>['teacher_id'=>'required|uuid','level_id'=>'required|uuid','subject_id'=>'required|uuid']],
         'teacher_assignments' => ['permission'=>'hr', 'rules'=>['cohort_id'=>'required|uuid','subject_id'=>'required|uuid','teacher_id'=>'required|uuid']],
         'contracts' => ['permission'=>'hr', 'rules'=>['staff_id'=>'required|uuid','starts_on'=>'required|date_format:Y-m-d','ends_on'=>'nullable|date_format:Y-m-d|after_or_equal:starts_on','basis'=>'required|in:monthly,hourly','rate_minor'=>'required|integer|between:0,1000000000']],
         'work_logs' => ['permission'=>'hr', 'rules'=>['contract_id'=>'required|uuid','worked_on'=>'required|date_format:Y-m-d','minutes'=>'required|integer|between:1,1440']],

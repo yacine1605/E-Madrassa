@@ -54,6 +54,7 @@ class TeacherGradesController
         ]);
         $assignment = $this->assignments($request)->where('a.id', $data['assignment_id'])->first();
         abort_unless($assignment, 404);
+        \App\School\Services\Curriculum::validateSubject($assignment->tenant_id, $assignment->cohort_id, $assignment->subject_id);
         $id = (string) Str::uuid();
         DB::table('school.assessments')->insert([
             'id'=>$id, 'tenant_id'=>$assignment->tenant_id, 'cohort_id'=>$assignment->cohort_id,

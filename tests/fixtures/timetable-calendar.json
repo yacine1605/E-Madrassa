@@ -1,0 +1,8 @@
+{
+  "confirmed": false,
+  "purpose": "TEST ONLY: leave exactly one complete week open to verify inclusive closure filtering. Never use as the school calendar.",
+  "closures": [
+    {"start":"2026-09-21","end":"2026-10-03","name":"Test closure before week"},
+    {"start":"2026-10-09","end":"2027-06-08","name":"Test closure after week"}
+  ]
+}

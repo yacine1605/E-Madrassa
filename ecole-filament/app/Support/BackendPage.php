@@ -25,7 +25,7 @@ abstract class BackendPage extends Page
             'payments'=>['payments','refunds','invoice_balances'],
             'schedule'=>['sessions'], 'attendance'=>['attendance'],
             'grades'=>['grades'], 'assessments'=>['assessments'],
-            'teachers'=>['staff','teacher_assignments'], 'staff'=>['staff','contracts'],
+            'teachers'=>['staff','teacher_qualifications','teacher_assignments','contracts','work_logs','payroll_runs'], 'staff'=>['staff','contracts'],
             'hours'=>['work_logs','contracts'], 'payroll'=>['payroll_runs'],
             'expenses'=>['expenses','disbursements'], 'lessons'=>['lesson_versions'],
             'announcements'=>['announcements'], 'audit'=>['audit_events'],
