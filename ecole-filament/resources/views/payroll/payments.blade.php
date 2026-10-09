@@ -1,0 +1,4 @@
+@php use App\School\Services\TeacherPay as P; @endphp
+<h2>Versements enregistrés</h2><div class="table-scroll"><table><thead><tr><th>Date</th><th>Montant</th><th>Mode</th><th>Référence</th><th>Reçu</th></tr></thead><tbody>
+@forelse($ledger['payments'] as $payment)<tr><td>{{ $payment->paid_on }}</td><td>{{ P::money((int)$payment->amount_minor) }}</td><td>{{ ['cash'=>'Espèces','bank'=>'Virement','ccp'=>'CCP','card'=>'Carte'][$payment->method] }}</td><td>{{ $payment->reference ?: '—' }}</td><td><a href="{{ isset($staff) ? route('staff-pay.receipt',['tenant'=>request()->route('tenant'),'payment'=>$payment->id]) : route('teacher.pay.receipt',['payment'=>$payment->id]) }}">Imprimer le reçu</a></td></tr>@empty<tr><td colspan="5">Aucun versement pour ce mois.</td></tr>@endforelse
+</tbody></table></div>

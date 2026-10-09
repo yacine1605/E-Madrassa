@@ -8,6 +8,7 @@
         <div class="backend-notice backend-success" role="status" x-show="message" x-text="message"></div>
         @include('filament.pages.backend-dashboard')
         <div class="backend-workspace" x-show="config.module !== 'dashboard'">
+            <p x-show="config.teacherPaymentsAvailable && ['teachers','hours','payroll'].includes(config.module)"><a class="button secondary" :href="'/remunerations/'+encodeURIComponent(tenant)">Suivi complet des paiements enseignants →</a></p>
             <div class="backend-section-head"><p class="muted" x-text="config.description"></p><button class="button" data-create x-show="canWrite()" @click="openForm()" :disabled="busy"><x-filament::icon icon="heroicon-o-plus"/><span x-text="createLabel()"></span></button></div>
             <div class="backend-tabs" role="tablist" aria-label="Rubriques" x-show="available().length > 1"><template x-for="name in available()" :key="name"><button role="tab" :aria-selected="resource === name" :class="{'active':resource === name}" @click="chooseResource(name)" :disabled="busy" x-text="label(name)"></button></template></div>
             <p class="backend-notice" x-show="config.module === 'teachers'">Au primaire, un enseignant qualifié en arabe peut enseigner toutes les matières du programme des niveaux concernés, sauf le français, l’anglais, l’espagnol et le sport, qui nécessitent une qualification distincte.</p>

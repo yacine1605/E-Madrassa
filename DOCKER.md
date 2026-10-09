@@ -22,6 +22,8 @@ docker-compose exec app php artisan school:provision direction@example.test
 
 Compose enables `SCHOOL_BACKEND=true` and disables the session demo. Each deployment belongs to one school, with its own PostgreSQL database, user accounts, Redis sessions and file storage. There is no establishment selector: login opens the deployment's school directly. Create a user and provision its membership using the commands above before logging in. The standalone frontend image retains the optional session demo.
 
+Each school can choose its own feature package using `SCHOOL_PROFILE` or a custom `SCHOOL_MODULES` list in its environment file. See [school modules and deployment packages](MODULES.md) for profiles, dependencies, configuration commands and extension points.
+
 To publish the web application with a Cloudflare managed tunnel, set `APP_URL` to the public HTTPS hostname and add `CLOUDFLARE_TUNNEL_TOKEN` to the root `.env` file. In Cloudflare Zero Trust, create a tunnel public hostname whose service is `http://app:80`. Start the tunnel with:
 
 ```powershell
@@ -41,6 +43,8 @@ docker-compose --profile quick up -d cloudflared-quick
 docker-compose logs -f cloudflared-quick
 ```
 
+For a demonstration from a laptop at school, run `powershell -ExecutionPolicy Bypass -File .\Start-SchoolDemo.ps1` on the home PC. This creates a fresh temporary HTTPS link, updates `APP_URL`, enables secure session cookies, disables debug output and checks the public login page before printing the address. Sign in from the laptop with the existing school administrator account. Keep the home PC awake, connected to the internet, and Docker Desktop running throughout the visit. A tunnel restart can change the link; rerun the script to refresh it. Close internet access afterward with `docker-compose --profile quick stop cloudflared-quick`. The quick tunnel uses HTTP/2 to avoid the failed QUIC connection seen on this network.
+
 Forms display French labels and related record names. Monetary inputs and tables use DA; the interface converts amounts to integer centimes for the API. Create campuses, periods, programs, levels, offerings and groups before enrolling students. Enrolling creates the invoice automatically; payments select that invoice. Attendance and grades can be corrected through their dedicated forms. Publication, enrollment status and work-log validation use the row action with a required reason. Payroll takes the first day of a month and uses the staff contract and validated work logs.
 
 The administrative dashboard uses live, permission-scoped counts, cycle enrollment totals and upcoming sessions. Lists display readable relationships, status badges and paginated totals; on mobile, records appear as cards. `node tests/backend-design.cjs` runs CRUD and desktop/mobile presentation checks in a disposable Docker Compose project, and saves screenshots under `tests/artifacts`.
@@ -57,7 +61,9 @@ Teachers log in at <http://localhost:8000/enseignant/login>. The dedicated porta
 
 Under **Notes**, teachers create a **Devoir** or **Examen** for an assigned class/subject, choose a date and mark scale (20 by default), then enter scores for enrolled students. Blank scores mean ungraded; zero, absence and exemption are distinct. Grades are saved per page of 25 students. Corrections require a reason; stale forms cannot overwrite newer grades. Published evaluations are read-only. Every read and write checks the teacher's current class/subject assignment and the student's enrollment. New evaluations and marks also appear in the administrative assessment and grade screens. Attendance entry remains outside the teacher portal.
 
-Admissions, interventions, settings, user administration, optimization and the student portal do not yet have backend endpoints. Their pages explicitly report this and do not display demo data. General record editing/deletion is not offered where the backend has no corresponding operation.
+Admissions and annual progression are available under **Scolarité → Admissions** and **Passage annuel**. Applications are reviewed before conversion into a student/enrollment/invoice. Annual decisions create new enrollments for promotion or repetition, preserving prior years. See `madrassa-backend/docs/admissions-progression.md`.
+
+Interventions, settings, user administration, optimization and the student portal do not yet have backend endpoints. Their pages explicitly report this and do not display demo data. General record editing/deletion is not offered where the backend has no corresponding operation.
 
 The local `school:provision` command creates this deployment's school on the first run. Later runs add administrators to that same school, without creating another school. Existing memberships and permissions are retained (including disabled memberships). On the first run, you may customize the school name and type:
 
@@ -68,6 +74,10 @@ docker-compose exec app php artisan school:provision direction@example.test --na
 This Compose file deliberately uses the PostgreSQL owner account for convenient local integration testing. It must not be used as a production deployment configuration.
 
 Stop the services while retaining data with `docker-compose down`. To also delete the local PostgreSQL, Redis, and application-storage volumes, run `docker-compose down -v`.
+
+## Automatic backups and recovery
+
+Start with `docker-compose --profile backup up --build -d` to include daily backups at 03:00 Algeria time. The service retains 14 verified database/file backups in `backups/madrassa`, including the persistent application encryption key. It briefly puts the application in maintenance during each backup and catches up missed runs when Docker restarts. Restore into a new deployment, never over the existing school. See [backup and restoration instructions](madrassa-backend/docs/backups.md). Run `node tests/backups.cjs` for an isolated recovery test.
 
 ## Separate deployments for separate schools
 

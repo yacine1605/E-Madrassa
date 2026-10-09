@@ -17,9 +17,15 @@ GRANT INSERT ON school.campuses, school.periods, school.programs, school.levels,
 GRANT UPDATE(status) ON school.enrollments, school.sessions TO school_runtime;
 GRANT UPDATE(published_at) ON school.assessments, school.lesson_versions, school.announcements TO school_runtime;
 GRANT UPDATE(validated_at) ON school.work_logs TO school_runtime;
+GRANT UPDATE(minutes,rejected_at,review_reason) ON school.work_logs TO school_runtime;
 -- SELECT FOR UPDATE needs UPDATE privilege. Immutable triggers still reject changes.
 GRANT UPDATE(id) ON school.cohorts, school.invoices, school.payments, school.expenses TO school_runtime;
 GRANT UPDATE(session_id,enrollment_id,status,reason) ON school.attendance TO school_runtime;
 GRANT UPDATE(assessment_id,enrollment_id,status,score,reason) ON school.grades TO school_runtime;
 GRANT UPDATE(role) ON school.staff TO school_runtime;
+GRANT SELECT, INSERT ON school.report_card_terms TO school_runtime;
+GRANT SELECT, INSERT, UPDATE(observation) ON school.report_card_observations TO school_runtime;
+GRANT SELECT, INSERT, UPDATE(status,payload,content_hash,rendered,validated_by,validated_at,closed_by,closed_at) ON school.report_card_archives TO school_runtime;
+GRANT SELECT, INSERT ON school.admissions, school.annual_progressions TO school_runtime;
+GRANT UPDATE(status,documents_complete,review_reason,student_id,enrollment_id) ON school.admissions TO school_runtime;
 -- Do not grant DELETE, ownership, BYPASSRLS, membership writes or schema CREATE.

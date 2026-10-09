@@ -246,7 +246,8 @@ final class SchoolController
     public function disbursement(Request $request)
     {
         $data = $request->validate(['expense_id'=>'required|uuid','amount_minor'=>'required|integer|between:1,100000000000',
-            'paid_on'=>'required|date_format:Y-m-d','idempotency_key'=>'required|uuid']);
+            'paid_on'=>'required|date_format:Y-m-d','idempotency_key'=>'required|uuid',
+            'method'=>'sometimes|in:cash,bank,ccp,card','reference'=>'nullable|string|max:200']);
         return response()->json(['data'=>$this->school->financial('disbursements', $data)], 201);
     }
 

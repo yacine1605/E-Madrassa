@@ -6,6 +6,7 @@ use Filament\Pages\Page;
 /** Browser actions use the session-authenticated API and its per-request tenant checks. */
 abstract class BackendPage extends Page
 {
+    use \App\Support\Concerns\HasModuleAccess;
     public static string $module;
     protected string $view = 'filament.pages.backend';
 
@@ -16,24 +17,10 @@ abstract class BackendPage extends Page
 
     public function backendConfig(): array
     {
-        $map = [
-            'dashboard'=>['students','cohorts','offerings','enrollments'],
-            'students'=>['students','guardians','student_guardians'],
-            'formations'=>['programs','levels','periods','offerings'],
-            'groups'=>['cohorts','teacher_assignments'], 'subjects'=>['subjects','curriculum'],
-            'rooms'=>['campuses','rooms'], 'enrollments'=>['enrollments','invoices'],
-            'payments'=>['payments','refunds','invoice_balances'],
-            'schedule'=>['sessions'], 'attendance'=>['attendance'],
-            'grades'=>['grades'], 'assessments'=>['assessments'],
-            'teachers'=>['staff','teacher_qualifications','teacher_assignments','contracts','work_logs','payroll_runs'], 'staff'=>['staff','contracts'],
-            'hours'=>['work_logs','contracts'], 'payroll'=>['payroll_runs'],
-            'expenses'=>['expenses','disbursements'], 'lessons'=>['lesson_versions'],
-            'announcements'=>['announcements'], 'audit'=>['audit_events'],
-            'finance'=>['invoice_balances','invoices','payments','refunds','expenses','disbursements'],
-            'analytics'=>['invoice_balances'],
-        ];
+        $modules = app(\App\School\Modules\ModuleRegistry::class);
         return [
-            'resources'=>$map[static::$module] ?? [],
+            'resources'=>$modules->pageResources(static::$module),
+            'teacherPaymentsAvailable'=>$modules->canAccessPage('teacher-payments', request()->attributes->get('school.module.grants', [])),
             'catalog'=>config('school_backend.catalog', []),
             'mutable'=>config('school_backend.mutable_catalog', []),
             'read'=>config('school_backend.read', []),

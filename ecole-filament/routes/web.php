@@ -1,6 +1,8 @@
 <?php
 use Illuminate\Support\Facades\Route;
-require __DIR__.'/teacher.php';
+if (config('school.backend')) {
+ foreach (app(\App\School\Modules\ModuleRegistry::class)->routeFiles() as $file) require __DIR__.'/'.$file;
+}
 Route::redirect('/','/admin');
 Route::get('/demo/attachment/{module}/{id}',function(string $module,string $id){
  abort_unless(config('school.demo') && app()->environment('local'),403);

@@ -48,7 +48,7 @@ class TeacherGradesController
     public function create(Request $request)
     {
         $data = $request->validate([
-            'assignment_id'=>'required|uuid', 'kind'=>'required|in:devoir,examen',
+            'assignment_id'=>'required|uuid', 'kind'=>'required|in:continu,devoir,examen',
             'title'=>'required|string|max:200', 'held_on'=>'required|date_format:Y-m-d',
             'max_score'=>'required|numeric|between:1,1000|decimal:0,2',
         ]);

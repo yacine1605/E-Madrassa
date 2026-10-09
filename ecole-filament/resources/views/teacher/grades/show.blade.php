@@ -3,7 +3,7 @@
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/teacher-grades.css') }}">
 <a class="text-link" href="{{ route('teacher.grades.index', ['classe'=>$class->id]) }}">← Devoirs et examens</a>
-<p class="eyebrow">{{ match($assessment->kind) {'devoir'=>'Devoir','examen'=>'Examen',default=>'Évaluation'} }}</p><h1>{{ $assessment->title }}</h1><p class="muted">{{ $class->name }} · {{ $subject->name }} · {{ \Carbon\Carbon::parse($assessment->held_on)->format('d/m/Y') }}</p>
+<p class="eyebrow">{{ match($assessment->kind) {'continu'=>'Contrôle continu','devoir'=>'Devoir','examen'=>'Examen',default=>'Évaluation'} }}</p><h1>{{ $assessment->title }}</h1><p class="muted">{{ $class->name }} · {{ $subject->name }} · {{ \Carbon\Carbon::parse($assessment->held_on)->format('d/m/Y') }}</p>
 @if($assessment->published_at)<div class="notice">Notes publiées : consultation uniquement.</div>@endif
 <section class="card"><h2>Notes sur {{ (float)$assessment->max_score }} <span class="badge">{{ $students->total() }} élèves</span></h2>
 @if($students->isEmpty())<div class="empty"><h3>Aucun élève inscrit</h3><p>La saisie sera disponible dès que des élèves seront inscrits dans cette classe.</p></div>

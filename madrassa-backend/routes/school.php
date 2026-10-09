@@ -17,7 +17,10 @@ Route::middleware('web')->prefix('school-api')->group(function () {
             DB::select("select set_config('app.tenant_id', ?, true)", [$member->tenant_id]);
             $institution = DB::table('school.institutions')->where('id', $member->tenant_id)->first(['id','name','kind']);
             abort_unless($institution, 403);
-            return ['data'=>[...(array) $institution, 'permissions'=>json_decode($member->permissions, true)]];
+            $modules = app(\App\School\Modules\ModuleRegistry::class);
+            return ['data'=>[...(array) $institution,
+                'permissions'=>$modules->effectivePermissions(json_decode($member->permissions, true)),
+                'modules'=>$modules->enabledNames(), 'profile'=>config('school_modules.profile')]];
         });
     })->middleware('throttle:school-api');
     Route::post('login', function (Request $r) {

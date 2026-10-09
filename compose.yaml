@@ -9,12 +9,14 @@ services:
       - "127.0.0.1:${APP_PORT:-8000}:80"
     environment:
       APP_ENV: local
-      APP_DEBUG: "true"
+      APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL:-http://localhost:8000}
       SESSION_COOKIE: ${COMPOSE_PROJECT_NAME:-madrassa}_session
       APP_TIMEZONE: Africa/Algiers
       SCHOOL_DEMO: "false"
       SCHOOL_BACKEND: "true"
+      SCHOOL_PROFILE: ${SCHOOL_PROFILE:-full}
+      SCHOOL_MODULES: ${SCHOOL_MODULES-}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: "5432"
@@ -38,6 +40,35 @@ services:
       - app-storage:/var/www/html/storage
     restart: unless-stopped
 
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    profiles: [backup]
+    environment:
+      PGHOST: postgres
+      PGUSER: school_owner
+      PGPASSWORD: ${DB_PASSWORD:-madrassa_local_only}
+      PGDATABASE: ${DB_DATABASE:-madrassa}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      SCHOOL_PROJECT: ${COMPOSE_PROJECT_NAME:-madrassa}
+    volumes:
+      - app-storage:/school-storage
+      - ${BACKUP_DIR:-./backups/${COMPOSE_PROJECT_NAME:-madrassa}}:/backups
+    depends_on:
+      app:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "/opt/madrassa/backup.py", "health"]
+      interval: 60s
+      timeout: 120s
+      start_period: 120s
+      retries: 3
+    restart: unless-stopped
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     profiles: [cloudflare]
@@ -51,7 +82,7 @@ services:
   cloudflared-quick:
     image: cloudflare/cloudflared:latest
     profiles: [quick]
-    command: tunnel --no-autoupdate --url http://app:80
+    command: tunnel --no-autoupdate --protocol http2 --url http://app:80
     depends_on:
       - app
     restart: unless-stopped

@@ -52,11 +52,9 @@ const fixtureCommand = action => execFileSync('docker-compose', ['run','--rm','-
             return response.status;
         },{tenant:fixture.tenant,id:results.persisted.body.data[0].id});
         assert.equal(deniedEdit,200); // This account has students.write, including edit.
-        await page.goto(baseUrl+'/admin/payments');
-        await page.getByText('Vous n’avez pas de droit de lecture pour cette rubrique.').waitFor();
-        assert.equal(await page.locator('[data-create]').isVisible(),false);
-        await page.goto(baseUrl+'/admin/settings');
-        await page.getByText('Un espace en préparation',{exact:true}).waitFor();
+        assert.equal((await page.goto(baseUrl+'/admin/payments')).status(),403);
+        assert.equal(await page.locator('[data-create]').count(),0);
+        assert.equal((await page.goto(baseUrl+'/admin/settings')).status(),403);
         assert.equal(JSON.parse(fixtureCommand('grant')).granted,true);
         await page.goto(baseUrl+'/admin/students');
         await page.getByRole('cell',{name:'BROWSER-001',exact:true}).waitFor();

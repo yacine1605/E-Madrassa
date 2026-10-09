@@ -9,7 +9,7 @@ class RedirectTeacher
 {
     public function handle(Request $request, Closure $next)
     {
-        if (config('school.backend') && $request->user()) {
+        if (config('school.backend') && $request->user() && app(\App\School\Modules\ModuleRegistry::class)->enabled('teacher_portal')) {
             $isTeacher = DB::transaction(function () use ($request) {
                 $member = \App\School\Services\DeploymentSchool::membership($request->user()->id);
                 return $member && json_decode($member->permissions, true) === []

@@ -7,7 +7,11 @@ class User extends \Illuminate\Foundation\Auth\User implements \Filament\Models\
  public function canAccessPanel(\Filament\Panel $panel):bool {
   if (!config('school.backend')) return config('school.demo') && app()->environment('local');
   return \Illuminate\Support\Facades\DB::transaction(function () {
-   return \App\School\Services\DeploymentSchool::membership($this->id) !== null;
+   $member = \App\School\Services\DeploymentSchool::membership($this->id);
+   if (!$member) return false;
+   $modules = app(\App\School\Modules\ModuleRegistry::class);
+   return $modules->effectivePermissions(json_decode($member->permissions, true)) !== []
+    || ($modules->enabled('teacher_portal') && \App\Http\Middleware\TeacherPortal::teacher($this->id) !== null);
   });
  }
 }

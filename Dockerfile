@@ -25,6 +25,7 @@ RUN python3 /tmp/madrassa-backend/scripts/install.py /var/www/html \
 
 COPY ecole-filament/docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/entrypoint.sh /usr/local/bin/madrassa-entrypoint
+COPY docker/persist-key.php /usr/local/bin/madrassa-persist-key.php
 RUN chmod +x /usr/local/bin/madrassa-entrypoint
 
 EXPOSE 80

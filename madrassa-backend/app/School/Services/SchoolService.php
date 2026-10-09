@@ -57,6 +57,8 @@ final class SchoolService
     public function enroll(array $data): object
     {
         $this->authorize('enrollments.write');
+        // Use the same lock as the enrollment trigger before checking duplicates/capacity.
+        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))',[$this->tenant()]);
         // due_on participates in replay through the associated invoice.
         $due = $data['due_on']; unset($data['due_on']);
         if ($old = $this->replay('enrollments', $data)) {
@@ -65,6 +67,8 @@ final class SchoolService
             return $old;
         }
         $offering = $this->row('offerings', $data['offering_id']);
+        if ($this->query('enrollments')->where('student_id',$data['student_id'])->where('offering_id',$data['offering_id'])->where('status','<>','cancelled')->exists())
+            throw new ConflictHttpException('Cet élève possède déjà une inscription pour cette offre et cette année.');
         $row = $this->insert('enrollments', [...$data, 'price_minor' => $offering->price_minor]);
         $this->insert('invoices', ['enrollment_id' => $row->id, 'number' => 'INV-'.$row->id,
             'amount_minor' => $row->price_minor, 'due_on' => $due]);
@@ -106,8 +110,12 @@ final class SchoolService
         abort_unless($contracts->count() === 1, 422, 'Un contrat unique doit couvrir le mois.');
         $c = $contracts->first();
         abort_unless($c->starts_on <= $data['month'] && (!$c->ends_on || $c->ends_on >= $end), 422, 'Proratisation à traiter avant validation.');
+        $pending = $this->query('work_logs')->where('contract_id',$c->id)->whereBetween('worked_on',[$data['month'],$end])
+            ->whereNull('validated_at')->whereNull('rejected_at')->exists();
+        abort_if($pending,422,'Validez ou refusez toutes les heures déclarées avant de calculer la rémunération du mois.');
         $minutes = (int) $this->query('work_logs')->where('contract_id', $c->id)->whereNotNull('validated_at')
             ->whereBetween('worked_on', [$data['month'], $end])->sum('minutes');
+        abort_if($c->basis === 'hourly' && $minutes === 0,422,'Aucune heure validée pour cette rémunération horaire.');
         $amount = $c->basis === 'monthly' ? (int) $c->rate_minor : intdiv((int) $c->rate_minor * $minutes + 30, 60);
         $row = $this->insert('payroll_runs', [...$data, 'amount_minor' => $amount, 'validated_at' => now(),
             'calculation' => json_encode(['contract_id' => $c->id, 'basis' => $c->basis, 'rate_minor' => $c->rate_minor, 'minutes' => $minutes, 'rounding' => 'half_up_centime'], JSON_THROW_ON_ERROR)]);

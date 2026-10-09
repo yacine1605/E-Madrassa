@@ -24,7 +24,7 @@ window.schoolPresentation = {
         present:'Présent', absent:'Absent', late:'En retard', excused:'Excusé', marked:'Noté', exempt:'Dispensé', missing:'Non noté',
         cash:'Espèces', bank:'Virement bancaire', ccp:'CCP', card:'Carte bancaire', monthly:'Mensuelle', hourly:'Horaire',
         school:'Scolaire', vocational:'Professionnelle', language:'Langues', short_course:'Formation courte', other:'Autre',
-        devoir:'Devoir', examen:'Examen', INSERT:'Création', UPDATE:'Modification', DELETE:'Suppression',
+        continu:'Contrôle continu', devoir:'Devoir', examen:'Examen', INSERT:'Création', UPDATE:'Modification', DELETE:'Suppression',
     },
     columns: {
         students:['matricule','last_name','first_name','birth_date','phone','active'], guardians:['name','phone','email'],
@@ -37,7 +37,7 @@ window.schoolPresentation = {
         enrollments:['student_id','cohort_id','status','price_minor','enrolled_on'], invoices:['number','enrollment_id','amount_minor','due_on'],
         payments:['invoice_id','amount_minor','method','received_at'], refunds:['payment_id','amount_minor','reason'],
         invoice_balances:['number','amount_minor','balance_minor'], expenses:['label','amount_minor','incurred_on'],
-        disbursements:['expense_id','amount_minor','paid_on'], payroll_runs:['staff_id','month','basis','worked_hours','rate_minor','amount_minor','validated_at'],
+        disbursements:['expense_id','amount_minor','paid_on','method','reference'], payroll_runs:['staff_id','month','basis','worked_hours','rate_minor','amount_minor','validated_at'],
         sessions:['subject_id','cohort_id','teacher_id','room_id','starts_at','status'], attendance:['session_id','enrollment_id','status'],
         assessments:['title','cohort_id','subject_id','kind','max_score','held_on'], grades:['enrollment_id','assessment_id','score','status'],
         work_logs:['contract_id','worked_on','worked_hours','validated_at'], lesson_versions:['title','subject_id','version','published_at'],

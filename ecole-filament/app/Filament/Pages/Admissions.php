@@ -1,6 +1,7 @@
 <?php
 namespace App\Filament\Pages;
 class Admissions extends \App\Support\SchoolPage {
+ public function getView():string {return config('school.backend')?'filament.pages.admissions':parent::getView();}
  public static string $module='admissions';
  protected static ?string $slug='admissions';
  protected static ?string $navigationLabel='Admissions';

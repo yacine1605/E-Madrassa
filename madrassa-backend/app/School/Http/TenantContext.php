@@ -22,7 +22,14 @@ final class TenantContext
                 $member = DB::table('school.memberships')->where('tenant_id', $tenant)
                     ->where('user_id', $request->user()->id)->where('active', true)->first();
                 abort_unless($member, 403);
-                $request->attributes->set('school.permissions', json_decode($member->permissions, true));
+                $modules = app(\App\School\Modules\ModuleRegistry::class);
+                // Enforce feature switches at the API boundary as well as in navigation.
+                if ($request->is('school-api/*')) {
+                    $resource = $request->route('resource');
+                    if (is_string($resource)) abort_unless($modules->resourceEnabled($resource), 404);
+                    else abort_unless($modules->apiActionEnabled($request->route()->getActionMethod()), 404);
+                }
+                $request->attributes->set('school.permissions', $modules->effectivePermissions(json_decode($member->permissions, true)));
                 $request->attributes->set('school.tenant', $tenant);
                 DB::select("select set_config('app.tenant_id', ?, true)", [$tenant]);
                 DB::statement("SET LOCAL lock_timeout = '3s'");

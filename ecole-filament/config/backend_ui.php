@@ -26,7 +26,8 @@ return [
         'refunds'=>['permission'=>'finance.write','path'=>'refunds','rules'=>[
             'payment_id'=>'required|uuid','amount_minor'=>'required|integer|min:1','reason'=>'required|string|min:3']],
         'disbursements'=>['permission'=>'finance.write','path'=>'disbursements','rules'=>[
-            'expense_id'=>'required|uuid','amount_minor'=>'required|integer|min:1','paid_on'=>'required|date_format:Y-m-d']],
+            'expense_id'=>'required|uuid','amount_minor'=>'required|integer|min:1','paid_on'=>'required|date_format:Y-m-d',
+            'method'=>'required|in:cash,bank,ccp,card','reference'=>'nullable|string|max:200']],
         'attendance'=>['permission'=>'pedagogy.write','path'=>'attendance','method'=>'PUT','rules'=>[
             'session_id'=>'required|uuid','enrollment_id'=>'required|uuid','status'=>'required|in:present,absent,late,excused','reason'=>'nullable|string|min:3']],
         'grades'=>['permission'=>'pedagogy.write','path'=>'grades','method'=>'PUT','rules'=>[

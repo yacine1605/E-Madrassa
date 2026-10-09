@@ -2,3 +2,6 @@ services:
   app:
     image: madrassa-app:latest
     pull_policy: never
+  backup:
+    image: madrassa-backup:latest
+    pull_policy: never
