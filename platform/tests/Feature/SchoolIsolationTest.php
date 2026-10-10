@@ -22,8 +22,8 @@ final class SchoolIsolationTest extends TestCase
     {
         [$a, $b] = [$this->school(), $this->school()];
         [$userA, $userB] = [$this->account('a'), $this->account('b')];
-        $this->member($a, $userA);
-        $this->member($b, $userB);
+        $this->member($a, $userA, 'active', ['academic_hr']);
+        $this->member($b, $userB, 'active', ['academic_hr']);
         $this->signIn($userA);
         $siteA = $this->site()->assertCreated()->assertJsonPath('data.version', 1)->json('data.id');
         $this->getJson('/api/sites')->assertOk()->assertJsonCount(2, 'data');
@@ -39,7 +39,7 @@ final class SchoolIsolationTest extends TestCase
     {
         $school = $this->school('custom');
         $account = $this->account();
-        $this->member($school, $account);
+        $this->member($school, $account, 'active', ['academic_hr']);
         $this->signIn($account);
         $this->getJson('/api/sites')->assertForbidden()->assertJsonPath('code', 'module_disabled');
         $this->console("SELECT platform.enable_module(?, 'sites_rooms')", [$school->id]);
@@ -74,7 +74,7 @@ final class SchoolIsolationTest extends TestCase
     {
         $school = $this->school();
         $account = $this->account();
-        $this->member($school, $account);
+        $this->member($school, $account, 'active', ['academic_hr']);
         $this->console('SELECT platform.set_entitlement(?, ?::date, ?::date, 15, 500, 1024, 0)', [$school->id, '2025-01-01', '2025-06-30']);
         $this->signIn($account)->assertOk();
         $this->getJson('/api/school')->assertOk()->assertJsonPath('data.mode', 'read_only');
@@ -86,7 +86,7 @@ final class SchoolIsolationTest extends TestCase
     {
         $school = $this->school();
         $account = $this->account();
-        $this->member($school, $account);
+        $this->member($school, $account, 'active', ['academic_hr']);
         $this->signIn($account);
         $id = $this->site()->json('data.id');
         $this->putJson('/api/sites/'.$id, ['labels' => ['fr' => 'Annexe nord'], 'version' => 1])->assertOk()->assertJsonPath('data.version', 2);
@@ -97,7 +97,7 @@ final class SchoolIsolationTest extends TestCase
     {
         $school = $this->school();
         $account = $this->account();
-        $this->member($school, $account);
+        $this->member($school, $account, 'active', ['academic_hr']);
         $this->signIn($account);
         $annex = $this->site()->json('data.id');
         $main = collect($this->getJson('/api/sites')->json('data'))->firstWhere('code', 'MAIN')['id'];
@@ -110,7 +110,7 @@ final class SchoolIsolationTest extends TestCase
     {
         $school = $this->school();
         $account = $this->account();
-        $this->member($school, $account);
+        $this->member($school, $account, 'active', ['academic_hr']);
         $this->signIn($account);
         $id = $this->site()->json('data.id');
         $this->withHeaders(['X-Request-Id' => 'req-audit-0001'])
@@ -125,7 +125,7 @@ final class SchoolIsolationTest extends TestCase
     {
         [$a, $b] = [$this->school(), $this->school()];
         $account = $this->account();
-        $this->member($a, $account);
+        $this->member($a, $account, 'active', ['academic_hr']);
         $this->member($b, $account);
         $this->signIn($account);
         $this->putJson('/api/session/school', ['tenant_id' => $a->id]);

@@ -21,7 +21,7 @@ The project rule applies: in each lot, a rule's invariant and its test come befo
 | `platform_admin` | The publisher console | Platform data and functions only; **no privilege on the `school` schema**, so no school data without consent (FR-PLT-04) |
 | `platform_provisioner` | Nobody: owns the `SECURITY DEFINER` functions | Exactly the writes those functions need; cannot log in |
 
-The migration owner is used for migrations only.
+The migration owner is used for migrations only. It must be a superuser or a member of `platform_provisioner`: a later migration may replace a function the provisioner owns (006 replaces `platform.create_tenant`).
 
 ## Adding a school table
 
@@ -29,6 +29,7 @@ The migration owner is used for migrations only.
 2. `CALL school.protect('school.<table>')`: row-level security, read-only mode of an expired or archived school, §7.1 columns maintained by trigger, audit with old and new values.
 3. Grants in `deploy/roles.sql`: column-level `UPDATE`, never `DELETE` on a business record (BR-02), never a code column (BR-18).
 4. Its invariants in `tests/sql/database.mjs`, written before the screens; its API behaviour in `tests/Feature/`.
+5. Its routes declare an annex A permission (`permission:` middleware, checked by `PermissionCoverageTest`); the controller narrows to the grant's scope. Never test a role code.
 
 ## Run the tests
 
@@ -86,8 +87,27 @@ Web requests and jobs connect as `school_runtime`; the console as `platform_admi
 | NFR-SEC-02 | Passwords hashed with Argon2id |
 | NFR-TEN-01 | Requests connect as `school_runtime` (no superuser, no `BYPASSRLS`), credentials read from the process environment |
 
+## Increment 3: permissions and roles (W1.4, first part)
+
+73 invariants on embedded PostgreSQL, 76 on PostgreSQL 16, 32 integration tests (10 October 2026).
+
+| SRS | Covered |
+|---|---|
+| Annex A, FR-IAM-03 | Permission catalog per module, sensitive ones flagged; the 10 school roles of section 3.2 copied into each new school with their default permissions (`super_admin` is the publisher's: the console role) |
+| FR-IAM-03 AC1, AC2 | A school changes its roles without touching another's; a user's permissions are the union of their roles valid today, for the modules the school has |
+| FR-IAM-03 | Custom roles, empty or copied; only permissions of enabled modules are assignable; a role is archived, never deleted, and not while assigned |
+| FR-IAM-04 | Assignment to the whole school, to some sites or to the person's own data; student and parent roles only the latter; sites of the school only; `site.site.manage` limited to its sites |
+| FR-IAM-05 | No assignment to oneself, no change to a role one holds; `school.check_segregation()` for every approving table to come (entry ≠ approval, payment exception flagged `self_validated`, message naming the rule) |
+| FR-IAM-01 AC2 | The last member able to manage assignments can be neither suspended nor deprived of the role, including under concurrent changes |
+| BR-10, BR-09 | Assignments with start and end dates; every change audited with author and reason |
+| TST-02, FR-IAM-03 AC3 | No role code in application code (static scan); every school route declares a permission (route scan) |
+
+The database checks what the code must never get wrong (who may change roles, never on oneself, last administrator, scopes); routes declare their permission with the `permission:` middleware, and controllers narrow to the grant's scope through `App\Support\Permissions`.
+
+Left for later, with their dependencies: scopes by level, group and subject come with the referential (W1.5); the notification to the direction when a sensitive permission is assigned comes with notifications (W1.6); compulsory MFA for privileged roles comes with increment 4.
+
 ## Next increments of lot 1
 
-1. **Identity and permissions** (W1.4): permission catalog (annex A), roles copied per school, scopes, segregation of duties, account lifecycle, MFA, Argon2id.
+1. **Accounts and authentication** (W1.4, second part): invitations and 72 h activation link, password policy, lockout, MFA TOTP with recovery codes, session timeouts, recovery link, suspension and import with `external_ref`.
 2. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
 3. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).

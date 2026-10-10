@@ -44,19 +44,34 @@ abstract class TestCase extends BaseTestCase
         return ['id' => $id, 'email' => $email, 'password' => $password];
     }
 
-    /** A school created through the console's own function, as the publisher would. */
-    protected function school(string $plan = 'essential'): object
+    /** A school created through the console's own function, as the publisher would; its administrator, if any, is invited. */
+    protected function school(string $plan = 'essential', ?array $admin = null): object
     {
         $slug = 'test-'.Str::lower(Str::random(12));
         $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?) AS id',
-            [(string) Str::uuid(), $slug, 'École '.$slug, 'fr', $plan, now()->toDateString(), null, 500, 1024, 'MAIN', 'Site principal', null])->id;
+            [(string) Str::uuid(), $slug, 'École '.$slug, 'fr', $plan, now()->toDateString(), null, 500, 1024, 'MAIN', 'Site principal', $admin['id'] ?? null])->id;
         return (object) ['id' => $id, 'slug' => $slug];
     }
 
-    protected function member(object $school, array $account, string $status = 'active'): void
+    /** Sets the account's membership, and gives it these school roles for the whole school. */
+    protected function member(object $school, array $account, string $status = 'active', array $roles = []): void
     {
         DB::connection('owner')->statement('INSERT INTO school.membership (tenant_id, user_id, status) VALUES (?, ?, ?)
             ON CONFLICT (tenant_id, user_id) DO UPDATE SET status = EXCLUDED.status', [$school->id, $account['id'], $status]);
+        foreach ($roles as $role) $this->grant($school, $account, $role);
+    }
+
+    /** A role assignment written as provisioning would, with a scope of the whole school or of some sites. */
+    protected function grant(object $school, array $account, string $role, string $scope = 'tenant', ?array $ids = null): string
+    {
+        return DB::connection('owner')->selectOne('INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type, scope_ids)
+            SELECT ?, ?, id, ?, ?::uuid[] FROM school.role WHERE tenant_id = ? AND code = ? RETURNING id',
+            [$school->id, $account['id'], $scope, $ids === null ? null : '{'.implode(',', $ids).'}', $school->id, $role])->id;
+    }
+
+    protected function roleId(object $school, string $role): string
+    {
+        return DB::connection('owner')->selectOne('SELECT id FROM school.role WHERE tenant_id = ? AND code = ?', [$school->id, $role])->id;
     }
 
     protected function console(string $sql, array $bindings = []): array

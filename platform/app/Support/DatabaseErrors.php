@@ -18,6 +18,15 @@ final class DatabaseErrors
         'code_immutable' => 'Un code est définitif : il ne peut pas être modifié.',
         'identity_immutable' => 'Cet enregistrement ne peut pas changer d’identité.',
         'immutable_record' => 'Cet enregistrement est définitif.',
+        'last_admin' => 'L’établissement doit garder au moins un administrateur actif qui gère les rôles.',
+        'self_assignment' => 'Vous ne pouvez pas modifier vos propres rôles : un autre administrateur doit le faire.',
+        'self_elevation' => 'Vous ne pouvez pas modifier un rôle que vous détenez : un autre administrateur doit le faire.',
+        'role_in_use' => 'Ce rôle est encore assigné : terminez d’abord ses assignations.',
+        'role_archived' => 'Ce rôle est archivé : il ne peut plus être assigné.',
+        'scope_personal_required' => 'Un rôle élève ou parent porte uniquement sur les données de la personne.',
+        'scope_unknown' => 'La portée désigne un élément qui n’existe pas dans cet établissement.',
+        'permission_module_disabled' => 'Cette permission appartient à un module non activé pour cet établissement.',
+        'segregation_of_duties' => 'Séparation des tâches : la personne qui a saisi une opération ne peut pas la valider elle-même.',
     ];
 
     public static function response(QueryException $e): ?JsonResponse
@@ -42,7 +51,11 @@ final class DatabaseErrors
         if (in_array($state, ['23503', '55P03', '40001', '40P01'], true)) {
             return [409, 'domain_conflict', 'Opération incompatible avec l’état actuel des données. Rechargez puis recommencez.'];
         }
-        // The restricted role lacks the privilege or RLS refused the row: a refusal, not a fault.
+        // A trigger found the permission missing; or the restricted role lacks the privilege, or
+        // RLS refused the row: a refusal, not a fault.
+        if ($state === '42501' && preg_match('/ERROR:\s+permission_denied\b/', $detail)) {
+            return [403, 'permission_denied', 'Vous n’avez pas la permission nécessaire.'];
+        }
         if ($state === '42501') return [403, 'forbidden', 'Cette opération n’est pas autorisée.'];
         return null;
     }

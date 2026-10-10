@@ -28,7 +28,7 @@ async function rejects(s, p, code, rule) {
 }
 
 // Laravel's users table, created by the application's own migration in production.
-await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES (1),(2),(3),(4),(5),(6);');
+await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9);');
 const schemaDir = new URL('../../database/schema/', import.meta.url);
 for (const file of readdirSync(schemaDir).filter(f => /^\d{3}_.+\.sql$/.test(f)).sort())
   await db.exec(readFileSync(new URL(file, schemaDir), 'utf8'));
@@ -183,6 +183,176 @@ await check('audit entries cannot change, even for the database owner', async ()
 await check('a site code never changes, even for the database owner', () =>
   rejects("UPDATE school.site SET code = 'X' WHERE id = $1", [siteA], '23514', 'code_immutable'));
 
+// Roles, permissions, scopes, segregation of duties (FR-IAM-01, FR-IAM-03, FR-IAM-04, FR-IAM-05)
+// User 7 is front office and accountant in A, 8 a supervisor on one site, 9 a student.
+await as(null);
+await sql("INSERT INTO school.membership(tenant_id, user_id, status) VALUES ($1, 7, 'active'), ($1, 8, 'active'), ($1, 9, 'active')", [a]);
+const roles = Object.fromEntries((await sql('SELECT code, id FROM school.role WHERE tenant_id = $1', [a])).rows.map(r => [r.code, r.id]));
+const siteB = (await first("SELECT id FROM school.site WHERE tenant_id = $1 AND code = 'MAIN'", [b])).id;
+const ASSIGN = `INSERT INTO school.role_assignment(tenant_id, user_id, role_id, scope_type, scope_ids, valid_from, valid_until)
+  VALUES ($1, $2, $3, $4, $5::uuid[], coalesce($6::date, current_date), $7::date) RETURNING id`;
+const assign = async (user, code, scope = 'tenant', ids = null, from = null, until = null) =>
+  (await first(ASSIGN, [a, user, roles[code], scope, ids && `{${ids.join(',')}}`, from, until])).id;
+const can = async p => (await first('SELECT school.can($1) AS c', [p])).c;
+const everywhere = async p => (await first('SELECT school.can_everywhere($1) AS c', [p])).c;
+const permissions = async () => (await sql('SELECT DISTINCT permission FROM school.my_permissions()')).rows.map(r => r.permission);
+const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+const lastYear = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+await check('a new school receives its own copy of the school roles and their permissions (FR-IAM-03)', async () => {
+  assert.deepEqual(Object.keys(roles).sort(), ['academic_hr', 'accountant', 'direction', 'front_office', 'parent', 'stock_manager',
+    'student', 'supervisor', 'teacher', 'tenant_admin']);
+  assert.equal(await count('SELECT count(*) n FROM school.role_permission WHERE tenant_id = $1', [a]),
+    await count('SELECT count(*) n FROM platform.role_template_permission'));
+  assert.equal(await count('SELECT count(*) n FROM school.role WHERE tenant_id = $1', [b]), 10);
+});
+await check('the invited administrator holds the administrator role for the whole school', async () =>
+  assert.deepEqual((await sql('SELECT user_id::int AS u, role_id, scope_type FROM school.role_assignment WHERE tenant_id = $1', [a])).rows,
+    [{ u: 1, role_id: roles.tenant_admin, scope_type: 'tenant' }]));
+await check('sensitive permissions are flagged as in annex A', async () =>
+  assert.deepEqual((await sql(`SELECT code FROM platform.permission WHERE sensitive AND code IN ('role.assignment.manage', 'audit.log.read',
+    'finance.payment.validate', 'payroll.amount.read', 'student.record.read', 'site.site.manage', 'payroll.self_view') ORDER BY 1`)).rows.map(r => r.code),
+    ['audit.log.read', 'finance.payment.validate', 'payroll.amount.read', 'role.assignment.manage']));
+await as('school_runtime', a, 1);
+await check('the administrator may manage roles and sites for the whole school', async () => {
+  assert.ok(await everywhere('role.assignment.manage'));
+  assert.ok(await everywhere('site.site.manage'));
+});
+await as('school_runtime', a, 4);
+await check('a member without a role may do nothing', async () => {
+  assert.deepEqual(await permissions(), []);
+  assert.equal(await can('site.site.manage'), false);
+});
+await check('a member sees only their own membership; an administrator sees the school\'s members', async () => {
+  assert.deepEqual((await sql('SELECT user_id::int AS u FROM school.membership')).rows, [{ u: 4 }]);
+  await as('school_runtime', a, 1);
+  assert.deepEqual((await sql('SELECT user_id::int AS u FROM school.membership ORDER BY 1')).rows.map(r => r.u), [1, 4, 5, 7, 8, 9]);
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.membership WHERE tenant_id = $1', [a]), 0);
+});
+await as('school_runtime', a, 1);
+await assign(7, 'front_office');
+await assign(7, 'accountant');
+await as('school_runtime', a, 7);
+await check('front office plus accountant receive the union of both roles (FR-IAM-03 AC2)', async () => {
+  assert.ok(await can('crm.lead.create'));
+  assert.ok(await can('finance.payment.validate'));
+  assert.equal(await can('role.assignment.manage'), false);
+});
+await check('a permission of a module the school does not have is not effective', async () =>
+  assert.equal(await can('payroll.amount.read'), false));
+await check('only a holder of the permission may change roles or assignments', async () => {
+  await rejects("INSERT INTO school.role(tenant_id, code, kind, labels) VALUES ($1, 'custom', 'internal', '{\"fr\": \"x\"}')", [a], '42501', 'permission_denied');
+  await rejects(ASSIGN, [a, 8, roles.teacher, 'tenant', null, null, null], '42501', 'permission_denied');
+  await rejects('DELETE FROM school.role_permission WHERE role_id = $1', [roles.teacher], '42501', 'permission_denied');
+});
+await as('school_runtime', a, 1);
+await check('changing a role in one school leaves the other schools unchanged (FR-IAM-03 AC1)', async () => {
+  await sql("DELETE FROM school.role_permission WHERE role_id = $1 AND permission_code = 'crm.lead.create'", [roles.front_office]);
+  await as(null);
+  assert.equal(await count(`SELECT count(*) n FROM school.role_permission p JOIN school.role r ON r.tenant_id = p.tenant_id AND r.id = p.role_id
+    WHERE r.tenant_id = $1 AND r.code = 'front_office' AND p.permission_code = 'crm.lead.create'`, [b]), 1);
+  await as('school_runtime', a, 7);
+  assert.equal(await can('crm.lead.create'), false);
+  assert.ok(await can('crm.lead.read'));
+});
+await as('school_runtime', a, 1);
+await check('a custom role takes permissions of the modules the school has only (FR-IAM-03)', async () => {
+  const cashier = (await first("INSERT INTO school.role(tenant_id, code, kind, labels) VALUES ($1, 'cashier', 'internal', '{\"fr\": \"Caisse\"}') RETURNING id", [a])).id;
+  await sql("INSERT INTO school.role_permission(tenant_id, role_id, permission_code) VALUES ($1, $2, 'finance.payment.create')", [a, cashier]);
+  await rejects("INSERT INTO school.role_permission(tenant_id, role_id, permission_code) VALUES ($1, $2, 'payroll.amount.read')", [a, cashier], '23514', 'permission_module_disabled');
+});
+await check('nobody assigns a role to themselves or changes a role they hold (FR-IAM-05)', async () => {
+  await rejects(ASSIGN, [a, 1, roles.accountant, 'tenant', null, null, null], '23514', 'self_assignment');
+  await rejects("INSERT INTO school.role_permission(tenant_id, role_id, permission_code) VALUES ($1, $2, 'student.record.read')", [a, roles.tenant_admin], '23514', 'self_elevation');
+});
+await check('a role is never deleted, nor archived while assigned (FR-IAM-03)', async () => {
+  await rejects('DELETE FROM school.role WHERE id = $1', [roles.front_office], '42501');
+  await rejects('UPDATE school.role SET archived_at = now() WHERE id = $1', [roles.front_office], '23514', 'role_in_use');
+});
+await check('a role code never changes', () => rejects("UPDATE school.role SET code = 'x' WHERE id = $1", [roles.front_office], '42501'));
+await check('student and parent roles only ever cover their own data (FR-IAM-04)', async () => {
+  await rejects(ASSIGN, [a, 9, roles.student, 'tenant', null, null, null], '23514', 'scope_personal_required');
+  await assign(9, 'student', 'personal');
+});
+await check('a site scope names sites of this school and limits the role to them (FR-IAM-04)', async () => {
+  await rejects(ASSIGN, [a, 8, roles.supervisor, 'site', `{${siteB}}`, null, null], '23514', 'scope_unknown');
+  await assign(8, 'supervisor', 'site', [siteA]);
+  await as('school_runtime', a, 8);
+  assert.ok(await can('student.record.read'));
+  assert.equal(await everywhere('student.record.read'), false);
+  assert.deepEqual(await first("SELECT scope_type, scope_ids::text AS ids FROM school.my_permissions() WHERE permission = 'student.record.read'"),
+    { scope_type: 'site', ids: `{${siteA}}` });
+});
+await as('school_runtime', a, 1);
+const future = await assign(9, 'teacher', 'tenant', null, tomorrow);
+await assign(9, 'accountant', 'tenant', null, lastYear, yesterday);
+await check('an assignment applies between its dates only (BR-10)', async () => {
+  await as('school_runtime', a, 9);
+  assert.equal(await can('program.program.read'), false);
+  assert.equal(await can('finance.payment.read'), false);
+  assert.ok(await can('referential.node.read'));
+});
+await check('an assignment keeps its person, role and start date', async () => {
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.role_assignment SET role_id = $2 WHERE id = $1', [future, roles.direction], '42501');
+  await as(null);
+  await rejects('UPDATE school.role_assignment SET role_id = $2 WHERE id = $1', [future, roles.direction], '23514', 'identity_immutable');
+});
+await check('a suspended member loses every permission at once (FR-IAM-01)', async () => {
+  await as(null);
+  await sql("UPDATE school.membership SET status = 'suspended' WHERE tenant_id = $1 AND user_id = 7", [a]);
+  await as('school_runtime', a, 7);
+  assert.equal(await can('finance.payment.validate'), false);
+  await as(null);
+  await sql("UPDATE school.membership SET status = 'active' WHERE tenant_id = $1 AND user_id = 7", [a]);
+});
+await check('the last administrator can be neither suspended nor deprived of the role (FR-IAM-01 AC2)', async () => {
+  await as(null);
+  await rejects("UPDATE school.membership SET status = 'suspended' WHERE tenant_id = $1 AND user_id = 1", [a], '23514', 'last_admin');
+  await rejects('UPDATE school.role_assignment SET archived_at = now() WHERE tenant_id = $1 AND user_id = 1', [a], '23514', 'last_admin');
+  await rejects("DELETE FROM school.role_permission WHERE role_id = $1 AND permission_code = 'role.assignment.manage'", [roles.tenant_admin], '23514', 'last_admin');
+});
+await check('an administrator hands over to another, who may then end the first one\'s role', async () => {
+  await as('school_runtime', a, 1);
+  await assign(8, 'tenant_admin');
+  await as('school_runtime', a, 8);
+  await sql('UPDATE school.role_assignment SET archived_at = now() WHERE user_id = 1 AND role_id = $1', [roles.tenant_admin]);
+  await rejects('UPDATE school.role_assignment SET archived_at = now() WHERE user_id = 8 AND role_id = $1', [roles.tenant_admin], '23514', 'self_assignment');
+  await as(null);
+  await rejects("UPDATE school.membership SET status = 'suspended' WHERE tenant_id = $1 AND user_id = 8", [a], '23514', 'last_admin');
+  await as('school_runtime', a, 8);
+  await assign(1, 'tenant_admin');
+});
+await check('role changes are audited with their author', async () => {
+  await as(null);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND object_type = 'role_assignment' AND action = 'INSERT' AND actor_id = 8", [a]), 1);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND object_type = 'role_permission' AND action = 'DELETE' AND actor_id = 1", [a]), 1);
+});
+await as('school_runtime', a, 7);
+await check('who entered an operation cannot approve it, and the message names the rule (FR-IAM-05 AC1, AC2)', async () => {
+  let error;
+  try { await sql("SELECT school.check_segregation('teacher_attendance', 7)"); } catch (e) { error = e; }
+  assert.equal(error?.message, 'segregation_of_duties');
+  assert.match(error.hint, /attendance\.teacher\.entry\.create/);
+  assert.equal((await first("SELECT school.check_segregation('teacher_attendance', 8) AS s")).s, false);
+});
+await check('only payments may be self-validated, when the school allows it, and are then flagged (FR-IAM-05)', async () => {
+  assert.equal((await first("SELECT school.check_segregation('payment', 7, true) AS s")).s, true);
+  await rejects("SELECT school.check_segregation('payment', 7, false)", [], '23514', 'segregation_of_duties');
+  await rejects("SELECT school.check_segregation('expense', 7, true)", [], '23514', 'segregation_of_duties');
+});
+await as('school_runtime', b, 2);
+await check('a school can neither see nor assign the roles of another school', async () => {
+  assert.equal(await count('SELECT count(*) n FROM school.role WHERE tenant_id = $1', [a]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.role_assignment'), 1);
+  await rejects(ASSIGN, [a, 1, roles.teacher, 'tenant', null, null, null], '42501');
+});
+await as('platform_admin', null, 6);
+await check('the console reads the permission catalog but no school role (FR-PLT-04)', async () => {
+  assert.ok(await count('SELECT count(*) n FROM platform.permission') > 90);
+  await rejects('SELECT * FROM school.role', [], '42501');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
@@ -256,6 +426,21 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'last_site');
+  });
+  await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {
+    const clients = await Promise.all([1, 8].map(user => connect('school_runtime', a, user)));
+    const results = await Promise.allSettled([8, 1].map(async (other, i) => {
+      await clients[i].query('BEGIN');
+      try {
+        await clients[i].query('UPDATE school.role_assignment SET archived_at = now() WHERE user_id = $1 AND role_id = $2 AND archived_at IS NULL',
+          [other, roles.tenant_admin]);
+        await clients[i].query('SELECT pg_sleep(0.15)');
+        await clients[i].query('COMMIT');
+      } catch (e) { await clients[i].query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'last_admin');
   });
 }
 console.log(`${passed} checks passed. Engine: ${PgClient ? 'native PostgreSQL with concurrency checks' : 'embedded PostgreSQL; concurrency not measured'}.`);
