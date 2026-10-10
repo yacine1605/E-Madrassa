@@ -10,7 +10,8 @@ The project rule applies: in each lot, a rule's invariant and its test come befo
 |---|---|
 | `database/schema/0NN_*.sql` | The schema, applied in order: the same files the migrations and the tests load |
 | `deploy/roles.sql` | Database roles and privileges; run as administrator after the migrations, on every deployment |
-| `tests/database.mjs` | Invariant suite (embedded PostgreSQL); `tests/concurrency.mjs` reruns it on PostgreSQL 16 with races |
+| `tests/sql/database.mjs` | Invariant suite (embedded PostgreSQL); `tests/sql/concurrency.mjs` reruns it on PostgreSQL 16 with races |
+| `app/`, `routes/`, `tests/Feature/` | Laravel 12 application: sign-in, school context, module guard, API; integration tests on PostgreSQL 16 |
 
 ## Database roles
 
@@ -27,7 +28,7 @@ The migration owner is used for migrations only.
 1. Columns from §7.1: `id`, `tenant_id`, `created_at`, `created_by`, `updated_at`, `updated_by`, `version`, `archived_at`, plus `UNIQUE (tenant_id, id)` so other tables reference it with a composite key `(tenant_id, id)`.
 2. `CALL school.protect('school.<table>')`: row-level security, read-only mode of an expired or archived school, §7.1 columns maintained by trigger, audit with old and new values.
 3. Grants in `deploy/roles.sql`: column-level `UPDATE`, never `DELETE` on a business record (BR-02), never a code column (BR-18).
-4. Its invariants in `tests/database.mjs`, written before the screens.
+4. Its invariants in `tests/sql/database.mjs`, written before the screens; its API behaviour in `tests/Feature/`.
 
 ## Run the tests
 
@@ -36,11 +37,28 @@ npm ci
 npm test
 # Concurrency, on an empty disposable database whose name ends in _test:
 DATABASE_URL=postgres://user:password@localhost:5432/platform_test npm run test:concurrency
+
+# Application: PHP 8.3 with pdo_pgsql, and the same kind of database (settings in phpunit.xml).
+composer install
+cp .env.example .env && php artisan key:generate
+php vendor/bin/phpunit
 ```
+
+## Provisioning
+
+```bash
+php artisan migrate --database=owner        # schema, as the migration owner
+php artisan platform:roles                  # roles, privileges and passwords (DB_PASSWORD, DB_CONSOLE_PASSWORD)
+php artisan platform:user direction@ecole.dz
+php artisan platform:create-school ecole-a "École A" --plan=essential --admin=direction@ecole.dz
+php artisan platform:membership ecole-a direction@ecole.dz --status=active
+```
+
+Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
 ## Increment 1: what is covered
 
-45 invariants on embedded PostgreSQL, 47 on PostgreSQL 16 (10 October 2026).
+47 invariants on embedded PostgreSQL, 49 on PostgreSQL 16 (10 October 2026).
 
 | SRS | Covered at the database level |
 |---|---|
@@ -52,8 +70,24 @@ DATABASE_URL=postgres://user:password@localhost:5432/platform_test npm run test:
 | ARC-04, TST-04 | Module state per school, readable by the application |
 | §7.1, BR-02, BR-09, BR-18 | Common columns with optimistic lock, archiving instead of deletion, append-only audit with old and new values, permanent codes |
 
+## Increment 2: application runtime (W1.1, W1.3)
+
+19 integration tests on PostgreSQL 16 (10 October 2026), all under the restricted roles.
+
+| SRS | Covered through the API |
+|---|---|
+| ARC-02, W1.1 | The school comes from the server session, chosen among the user's active memberships; never from the URL, a header or the body |
+| ND-06 | A dedicated installation (`PLATFORM_DEDICATED_SCHOOL`) serves only its school |
+| FR-PLT-01 AC2, FR-IAM-01 AC1 | A suspended school or membership ends the session at the next request; no sign-in without an open school |
+| FR-PLT-02 AC2, AC3 | A disabled module answers 403 `module_disabled`; an expired school reads but answers 403 `tenant_read_only` to writes |
+| TST-01 (API, jobs) | Sites isolated between schools; background jobs run in their school and recheck access when they run |
+| NFR-TEN-03 | Cache and file keys prefixed per school |
+| BR-09, NFR-UX-04 | Audit with author, reason, request identifier and address; database refusals become clear JSON errors, never SQL |
+| NFR-SEC-02 | Passwords hashed with Argon2id |
+| NFR-TEN-01 | Requests connect as `school_runtime` (no superuser, no `BYPASSRLS`), credentials read from the process environment |
+
 ## Next increments of lot 1
 
-1. **Application runtime** (W1.1, W1.3): the Laravel application of this base, the school taken from the authenticated session (never from a parameter), one connection per role, 403 `module_disabled`, cache, queue and storage keys per school.
-2. **Identity and permissions** (W1.4): permission catalog (annex A), roles copied per school, scopes, segregation of duties, account lifecycle, MFA, Argon2id.
-3. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+1. **Identity and permissions** (W1.4): permission catalog (annex A), roles copied per school, scopes, segregation of duties, account lifecycle, MFA, Argon2id.
+2. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+3. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).
