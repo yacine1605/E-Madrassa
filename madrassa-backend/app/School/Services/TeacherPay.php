@@ -28,8 +28,10 @@ final class TeacherPay
         $covering = $contracts->filter(fn($c)=>$c->starts_on <= $month && (!$c->ends_on || $c->ends_on >= $end));
         $contract = $covering->count() === 1 ? $covering->first() : null;
         $estimate = $contract ? ($contract->basis === 'monthly' ? (int)$contract->rate_minor : intdiv((int)$contract->rate_minor*$validated+30,60)) : null;
-        return compact('contracts','logs','run','expense','payments','paid','validated','pending','contract','estimate')+
-            ['balance'=>$run ? (int)$run->amount_minor-$paid : null,'calculation'=>$run ? json_decode($run->calculation,true) : null];
+        // A draft run awaits validation by another person; nothing is payable yet.
+        $draft = $run && $run->status === 'draft';
+        return compact('contracts','logs','run','expense','payments','paid','validated','pending','contract','estimate','draft')+
+            ['balance'=>$run && !$draft ? (int)$run->amount_minor-$paid : null,'calculation'=>$run ? json_decode($run->calculation,true) : null];
     }
     public static function duration(int $minutes): string { return intdiv($minutes,60).' h '.str_pad((string)($minutes%60),2,'0',STR_PAD_LEFT).' min'; }
     public static function money(?int $minor): string { return $minor === null ? '—' : number_format($minor/100,2,',',' ').' DA'; }

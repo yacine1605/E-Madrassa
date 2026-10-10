@@ -1,0 +1,8 @@
+# Scripts and files copied into Linux images must keep LF line endings on Windows checkouts.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.py text eol=lf
+*.sql text eol=lf
+*.yaml text eol=lf
+*.pdf binary
+*.png binary

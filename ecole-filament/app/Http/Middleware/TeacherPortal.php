@@ -22,6 +22,7 @@ class TeacherPortal
         abort_unless(config('school.backend'), 404);
         if (!$request->user()) return redirect()->route('teacher.login');
         return DB::transaction(function () use ($request, $next) {
+            \App\School\Http\TenantContext::traceRequest($request);
             $teacher = self::teacher($request->user()->id);
             abort_unless($teacher, 403, 'Ce compte ne correspond pas à un enseignant actif de cette école.');
             $request->attributes->set('teacher', $teacher);

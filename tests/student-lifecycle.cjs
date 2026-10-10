@@ -62,6 +62,9 @@ const fixture=action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--entry
   assert.equal((await list('students')).length,3,'No student left behind by failed conversion');assert.equal((await list('guardians')).length,3,'Guardian insertion rolled back');
   const refused=await apply('ADM-REFUSED');assert.equal((await review(refused,'rejected')).status(),302);assert.equal((await send(refused+'/inscrire',{cohort_id:source.id,due_on:'2026-10-01'})).status(),422,'Refused admission cannot enroll');
   const withdrawn=await apply('ADM-WITHDRAWN');assert.equal((await review(withdrawn,'withdrawn')).status(),302);
+  // Enrollments start pending; an authorized person validates them before any promotion.
+  const validate=async id=>{const r=await send(api+'/enrollments/'+id+'/transition',{status:'validated',reason:'Inscription validée par la direction'});assert.equal(r.status(),200,await r.text());};
+  for(const pending of await list('enrollments')){assert.equal(pending.status,'pending','Admission creates a pending enrollment');await validate(pending.id);}
   const original=await list('enrollments');const invoicesBefore=await list('invoices');assert.equal(original.length,3);assert.equal(invoicesBefore.length,3);
   const subject=await create('subjects',{code:'MATH',name:'Mathématiques'});await create('curriculum',{level_id:first.id,subject_id:subject.id,coefficient:1});
   const assessment=await create('assessments',{cohort_id:source.id,subject_id:subject.id,title:'Examen',kind:'examen',held_on:'2026-10-01',max_score:20,coefficient:1});
@@ -80,10 +83,10 @@ const fixture=action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--entry
   for(const old of original)assert.deepEqual(enrolled.find(e=>e.id===old.id),old,'Old enrollment unchanged');
   for(const old of invoicesBefore)assert.deepEqual(invoices.find(i=>i.id===old.id),old,'Old invoice unchanged');
   assert.equal(Number((await list('grades'))[0].score),15,'Old grades preserved');
-  const newEnroll=enrolled.find(e=>e.offering_id===promoted.id);
+  const newEnroll=enrolled.find(e=>e.offering_id===promoted.id);await validate(newEnroll.id);
   assert.equal((await send(api+'/enrollments',{student_id:newEnroll.student_id,offering_id:promoted.id,cohort_id:target.id,due_on:'2027-09-01',idempotency_key:randomUUID()})).status(),409,'Duplicate active enrollment denied');
   assert.equal((await progress({source_enrollment_ids:[newEnroll.id],decision:'completed',reason:'Fin de cycle test'})).status(),302,'Completion does not enroll');
-  const leaving=enrolled.find(e=>e.offering_id===repeat.id);
+  const leaving=enrolled.find(e=>e.offering_id===repeat.id);await validate(leaving.id);
   assert.equal((await progress({source_enrollment_ids:[leaving.id],decision:'left',reason:'Départ test'})).status(),302,'Departure does not enroll');
   assert.equal((await list('enrollments')).length,6);
   await page.goto(school+'/eleves/'+newEnroll.student_id+'/historique');assert.ok((await page.content()).includes('2026/2027'));assert.ok((await page.content()).includes('2027/2028'));

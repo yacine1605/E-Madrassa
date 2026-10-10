@@ -32,7 +32,7 @@ docker-compose run --rm --no-deps backup health
 docker-compose run --rm --no-deps backup verify backup-YYYYMMDDTHHMMSSffffffZ
 ```
 
-Chaque dossier terminé contient `database.dump`, `files.tar.gz` et `manifest.json` : date UTC, projet source, version PostgreSQL, nombre de lignes de chaque table et sommes SHA-256 des archives. `status.json` indique la dernière réussite ou erreur. Le contrôle de santé Docker signale un échec ou une dernière sauvegarde trop ancienne (>26 heures). Consulter les logs en cas de service `unhealthy` ; aucun courriel automatique n'est envoyé.
+Chaque dossier terminé contient `database.dump.gpg`, `files.tar.gz.gpg` et `manifest.json` (version 2) : date UTC, projet source, version PostgreSQL, nombre de lignes de chaque table, sommes SHA-256 des archives chiffrées et des archives d’origine. Les archives sont chiffrées (GnuPG, AES-256) avec `BACKUP_PASSPHRASE`, obligatoire : elles contiennent des données personnelles et la clé de chiffrement de l’école. Conserver la phrase secrète hors du dossier de sauvegarde ; sans elle, aucune restauration n’est possible. Les sauvegardes antérieures, non chiffrées (version 1), restent restaurables. Le contrôle de santé vérifie les sommes chaque minute ; `verify NOM` déchiffre en plus et contrôle le contenu. `status.json` indique la dernière réussite ou erreur. Le contrôle de santé Docker signale un échec ou une dernière sauvegarde trop ancienne (>26 heures). Consulter les logs en cas de service `unhealthy` ; aucun courriel automatique n'est envoyé.
 
 ## Restaurer dans un nouveau déploiement
 

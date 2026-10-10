@@ -6,7 +6,8 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        DB::unprepared('DROP TRIGGER IF EXISTS immutable ON school.cohorts');
+        // Same SQL file as tests/database.mjs, so tests run on the production schema.
+        DB::unprepared(file_get_contents(database_path('schema/003_allow_cohort_edits.sql')));
     }
 
     public function down(): void

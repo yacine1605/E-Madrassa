@@ -1,39 +1,62 @@
 name: ${COMPOSE_PROJECT_NAME:-madrassa}
 
+# The owner credentials below are for migrations and provisioning commands only.
+# The entrypoint switches requests and jobs to the restricted school_runtime role.
+x-app-environment: &app-environment
+  APP_ENV: local
+  APP_DEBUG: ${APP_DEBUG:-true}
+  APP_URL: ${APP_URL:-http://localhost:8000}
+  SESSION_COOKIE: ${COMPOSE_PROJECT_NAME:-madrassa}_session
+  APP_TIMEZONE: Africa/Algiers
+  SCHOOL_DEMO: "false"
+  SCHOOL_BACKEND: "true"
+  SCHOOL_PROFILE: ${SCHOOL_PROFILE:-full}
+  SCHOOL_MODULES: ${SCHOOL_MODULES-}
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: ${DB_DATABASE:-madrassa}
+  DB_USERNAME: school_owner
+  DB_PASSWORD: ${DB_PASSWORD:-madrassa_local_only}
+  DB_RUNTIME_PASSWORD: ${DB_RUNTIME_PASSWORD:-madrassa_runtime_local_only}
+  DB_SSLMODE: disable
+  SESSION_DRIVER: redis
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  QUEUE_FAILED_DRIVER: file
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+
 services:
   app:
+    image: ${COMPOSE_PROJECT_NAME:-madrassa}-app
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:80"
-    environment:
-      APP_ENV: local
-      APP_DEBUG: ${APP_DEBUG:-true}
-      APP_URL: ${APP_URL:-http://localhost:8000}
-      SESSION_COOKIE: ${COMPOSE_PROJECT_NAME:-madrassa}_session
-      APP_TIMEZONE: Africa/Algiers
-      SCHOOL_DEMO: "false"
-      SCHOOL_BACKEND: "true"
-      SCHOOL_PROFILE: ${SCHOOL_PROFILE:-full}
-      SCHOOL_MODULES: ${SCHOOL_MODULES-}
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_DATABASE: ${DB_DATABASE:-madrassa}
-      DB_USERNAME: school_owner
-      DB_PASSWORD: ${DB_PASSWORD:-madrassa_local_only}
-      DB_SSLMODE: disable
-      SESSION_DRIVER: redis
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
-      CACHE_STORE: redis
-      QUEUE_CONNECTION: sync
-      REDIS_CLIENT: phpredis
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
+    environment: *app-environment
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-storage:/var/www/html/storage
+    restart: unless-stopped
+
+  # Background jobs (imports, exports, PDF batches) run here, never in a web request.
+  worker:
+    image: ${COMPOSE_PROJECT_NAME:-madrassa}-app
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    environment:
+      <<: *app-environment
+      RUN_MIGRATIONS: "false"
+    depends_on:
+      app:
+        condition: service_started
       redis:
         condition: service_healthy
     volumes:
@@ -53,6 +76,8 @@ services:
       BACKUP_HOUR: ${BACKUP_HOUR:-3}
       BACKUP_KEEP: ${BACKUP_KEEP:-14}
       SCHOOL_PROJECT: ${COMPOSE_PROJECT_NAME:-madrassa}
+      # Required: backups are encrypted with it. Keep it outside the backup folder.
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
     volumes:
       - app-storage:/school-storage
       - ${BACKUP_DIR:-./backups/${COMPOSE_PROJECT_NAME:-madrassa}}:/backups

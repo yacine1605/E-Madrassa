@@ -1,3 +1,8 @@
 /backups/
 /*.env
 !/*.env.example
+# Installed tooling and caches, never committed.
+node_modules/
+.test-tools/pdf-tools/
+__pycache__/
+*.pyc

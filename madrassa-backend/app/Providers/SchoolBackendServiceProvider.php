@@ -13,7 +13,15 @@ final class SchoolBackendServiceProvider extends ServiceProvider
         $this->app->singleton(\App\School\Modules\ModuleRegistry::class, fn () => new \App\School\Modules\ModuleRegistry(
             config('school_modules.definitions', []), (string) config('school_modules.enabled', '*')
         ));
-        config(['database.connections.pgsql'=>config('school_backend.connection')]);
+        $connection = config('school_backend.connection');
+        // Credentials come from this process's environment on every boot, never from a
+        // config cache built in another shell: requests and jobs keep the restricted role
+        // even after `artisan config:cache` was run with the owner's credentials.
+        if (($username = getenv('DB_USERNAME')) !== false) {
+            $connection['username'] = $username;
+            $connection['password'] = (string) getenv('DB_PASSWORD');
+        }
+        config(['database.connections.pgsql'=>$connection]);
         if (!config('database.redis')) config(['database.redis'=>config('school_backend.redis')]);
     }
     public function boot(): void

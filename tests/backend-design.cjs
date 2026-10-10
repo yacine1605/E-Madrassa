@@ -38,6 +38,8 @@ const fixture=action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--entry
   await create('staff',{code:'SEC-001',name:'خديجة بلقاسم',role:'Secrétaire',is_teacher:false});
   const subject=await create('subjects',{code:'AR',name:'Langue arabe'});
   await create('curriculum',{level_id:level.id,subject_id:subject.id,coefficient:1});
+  // An assignment needs a teacher qualified for the subject and level.
+  await create('teacher_qualifications',{teacher_id:teacher.id,level_id:level.id,subject_id:subject.id});
   await create('teacher_assignments',{cohort_id:cohort.id,subject_id:subject.id,teacher_id:teacher.id});
   const student=(await (await page.request.get(api+'/students?limit=1',{headers})).json()).data[0];
   await create('enrollments',{student_id:student.id,offering_id:offering.id,cohort_id:cohort.id,due_on:'2026-10-01',idempotency_key:crypto.randomUUID()});

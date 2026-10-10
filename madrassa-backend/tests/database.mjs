@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { randomUUID as uuid } from 'node:crypto';
 import assert from 'node:assert/strict';
 let db;
@@ -19,20 +19,21 @@ let passed = 0;
 const sql = (s, p=[]) => db.query(s,p);
 const first = async (s,p=[]) => (await sql(s,p)).rows[0];
 async function check(name, f) { await f(); console.log('PASS '+name); passed++; }
-async function rejects(s,p,code) {
+async function rejects(s,p,code,rule) {
   let rejected = false;
-  try { await sql(s,p); } catch(e) { rejected=true; if(code) assert.equal(e.code,code,e.message); }
+  try { await sql(s,p); } catch(e) { rejected=true; if(code) assert.equal(e.code,code,e.message); if(rule) assert.equal(e.message,rule); }
   assert.ok(rejected,'Expected SQL rejection: '+s);
 }
-await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES(1),(2),(3);');
-await db.exec(readFileSync(new URL('../database/schema/001_school.sql',import.meta.url),'utf8'));
-let grants = readFileSync(new URL('../deploy/runtime-grants.sql',import.meta.url),'utf8');
-if ((await sql("SELECT 1 FROM pg_roles WHERE rolname='school_runtime'")).rows.length)
-  grants = grants.replace(/CREATE ROLE school_runtime[^;]+;/, '');
-await db.exec(grants);
+await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES(1),(2),(3),(4);');
+// Every numbered schema file, in order: the same SQL the Laravel migrations run.
+const schemaDir = new URL('../database/schema/',import.meta.url);
+for (const file of readdirSync(schemaDir).filter(f => /^\d{3}_.+\.sql$/.test(f)).sort())
+  await db.exec(readFileSync(new URL(file,schemaDir),'utf8'));
+await db.exec(readFileSync(new URL('../deploy/runtime-grants.sql',import.meta.url),'utf8'));
 const a=uuid(), b=uuid();
 await sql("INSERT INTO school.institutions(id,name,kind) VALUES($1,'École A','school'),($2,'Centre B','training')",[a,b]);
-await sql('INSERT INTO school.memberships(tenant_id,user_id) VALUES($1,1),($2,2)',[a,b]);
+// User 4 is a second member of school A, for segregation-of-duties checks.
+await sql('INSERT INTO school.memberships(tenant_id,user_id) VALUES($1,1),($2,2),($1,4)',[a,b]);
 await db.exec('SET ROLE school_runtime');
 const context = async (tenant,user=1) => { await sql("select set_config('app.tenant_id',$1,false),set_config('app.user_id',$2,false)",[tenant,String(user)]); };
 await context(a);
@@ -83,10 +84,26 @@ await check('expense payment capped',()=>rejects('INSERT INTO school.disbursemen
 const contract=await insert('contracts',{staff_id:teacher,starts_on:'2026-09-01',basis:'hourly',rate_minor:200000});
 await check('contracts cannot overlap',()=>rejects("INSERT INTO school.contracts(tenant_id,staff_id,starts_on,basis,rate_minor) VALUES($1,$2,'2026-10-01','monthly',1000)",[a,teacher],'23514'));
 const hours=await insert('work_logs',{contract_id:contract,worked_on:'2026-10-01',minutes:60});
-await sql('UPDATE school.work_logs SET validated_at=now() WHERE id=$1',[hours]);
+await check('author cannot validate own hours',()=>rejects('UPDATE school.work_logs SET validated_at=now(),reviewed_by=1 WHERE id=$1',[hours],'23514','segregation_of_duties'));
+await context(a,4);
+await check('reviewer must be the acting user',()=>rejects('UPDATE school.work_logs SET validated_at=now(),reviewed_by=1 WHERE id=$1',[hours],'23514','reviewer_must_be_actor'));
+await sql('UPDATE school.work_logs SET validated_at=now(),reviewed_by=4 WHERE id=$1',[hours]);
+await check('hours record author and reviewer',async()=>assert.deepEqual(await first('SELECT entered_by::int e,reviewed_by::int r FROM school.work_logs WHERE id=$1',[hours]),{e:1,r:4}));
+await context(a);
 await check('validated hours frozen',()=>rejects('UPDATE school.work_logs SET validated_at=now() WHERE id=$1',[hours],'23514'));
-await insert('payroll_runs',{staff_id:teacher,month:'2026-10-01',amount_minor:200000,calculation:'{}',validated_at:'2026-11-01'});
-await check('closed payroll rejects late hours',()=>rejects("INSERT INTO school.work_logs(tenant_id,contract_id,worked_on,minutes) VALUES($1,$2,'2026-10-02',60)",[a,contract],'23514'));
+await check('pay run starts as draft',()=>rejects("INSERT INTO school.payroll_runs(tenant_id,staff_id,month,amount_minor,calculation,status,validated_at) VALUES($1,$2,'2026-10-01',1,'{}','validated',now())",[a,teacher],'23514','payroll_starts_as_draft'));
+const run=await insert('payroll_runs',{staff_id:teacher,month:'2026-10-01',amount_minor:200000,calculation:'{}'});
+await check('closed payroll rejects late hours',()=>rejects("INSERT INTO school.work_logs(tenant_id,contract_id,worked_on,minutes) VALUES($1,$2,'2026-10-02',60)",[a,contract],'23514','payroll_already_closed'));
+await check('draft pay run creates no salary expense',()=>rejects("INSERT INTO school.expenses(tenant_id,label,amount_minor,incurred_on,payroll_id) VALUES($1,'Salaire',200000,'2026-10-31',$2)",[a,run],'23514','payroll_not_validated'));
+await check('author cannot validate own pay run',()=>rejects("UPDATE school.payroll_runs SET status='validated',validated_at=now(),validated_by=1 WHERE id=$1",[run],'23514','segregation_of_duties'));
+await context(a,4);
+await sql("UPDATE school.payroll_runs SET status='validated',validated_at=now(),validated_by=4 WHERE id=$1",[run]);
+await context(a);
+await check('validated pay run frozen',()=>rejects('DELETE FROM school.payroll_runs WHERE id=$1',[run],'23514','immutable_record'));
+await check('salary expense matches validated run',()=>rejects("INSERT INTO school.expenses(tenant_id,label,amount_minor,incurred_on,payroll_id) VALUES($1,'Salaire',1,'2026-10-31',$2)",[a,run],'23514','payroll_not_validated'));
+await insert('expenses',{label:'Salaire',amount_minor:200000,incurred_on:'2026-10-31',payroll_id:run});
+const draft=await insert('payroll_runs',{staff_id:teacher,month:'2026-11-01',amount_minor:0,calculation:'{}'});
+await check('draft pay run can be discarded',()=>sql('DELETE FROM school.payroll_runs WHERE id=$1',[draft]));
 await check('audit recorded without full PII snapshots',async()=>assert.ok(Number((await first('SELECT count(*) n FROM school.audit_events')).n)>20));
 await context(b,2);
 const foreignCampus=await insert('campuses',{tenant_id:b,name:'Oran'});
@@ -131,6 +148,39 @@ await check('RLS survives inactive membership',async()=>{
  await sql('UPDATE school.memberships SET active=true WHERE tenant_id=$1 AND user_id=1',[a]);
  await db.exec('SET ROLE school_runtime');
 });
+await check('records are archived, not deleted',async()=>{
+ await sql('UPDATE school.rooms SET archived_at=now() WHERE id=$1',[room2]);
+ await rejects('DELETE FROM school.rooms WHERE id=$1',[room2],'42501');
+});
+await check('runtime cannot change a registration number',()=>rejects("UPDATE school.students SET matricule='S9' WHERE id=$1",[student],'42501'));
+await check('codes stay permanent for the owner too',async()=>{
+ await db.exec('RESET ROLE');
+ try { await rejects("UPDATE school.subjects SET code='OTHER' WHERE id=$1",[subject],'23514','code_immutable'); }
+ finally { await db.exec('SET ROLE school_runtime'); }
+});
+await check('audit keeps old and new values, masking personal data',async()=>{
+ await sql("select set_config('app.reason','Correction de capacité',false)");
+ await sql('UPDATE school.cohorts SET capacity=20 WHERE id=$1',[cohort2]);
+ await sql('UPDATE school.students SET first_name=$2 WHERE id=$1',[student2,'Lina-Maria']);
+ await sql("select set_config('app.reason','',false)");
+ const capacity=await first("SELECT before,after,reason FROM school.audit_events WHERE entity='cohorts' AND entity_id=$1 AND action='UPDATE'",[cohort2]);
+ assert.deepEqual([capacity.before,capacity.after,capacity.reason],[{capacity:10},{capacity:20},'Correction de capacité']);
+ const name=await first("SELECT before,after FROM school.audit_events WHERE entity='students' AND entity_id=$1 AND action='UPDATE'",[student2]);
+ assert.deepEqual([name.before,name.after],[{first_name:'[masqué]'},{first_name:'[masqué]'}]);
+});
+const offering4=await insert('offerings',{level_id:level,period_id:period,campus_id:campus,name:'Corrections',price_minor:10000});
+const cohort4=await insert('cohorts',{offering_id:offering4,name:'C',capacity:5});
+const enrollment3=await insert('enrollments',{student_id:student,offering_id:offering4,cohort_id:cohort4,price_minor:10000,idempotency_key:uuid()});
+await check('new enrollment starts pending',async()=>assert.equal((await first('SELECT status FROM school.enrollments WHERE id=$1',[enrollment3])).status,'pending'));
+const invoice3=await insert('invoices',{enrollment_id:enrollment3,number:'INV3',amount_minor:10000,due_on:'2026-10-01'});
+const wrongPayment=await insert('payments',{invoice_id:invoice3,amount_minor:9000,method:'bank',reference:'VIR-001',idempotency_key:uuid()});
+await check('payment reference cannot be reused',()=>rejects("INSERT INTO school.payments(tenant_id,invoice_id,amount_minor,method,reference,idempotency_key) VALUES($1,$2,100,'bank',' vir-001 ',$3)",[a,invoice3,uuid()],'23514','duplicate_payment_reference'));
+await insert('payment_reversals',{payment_id:wrongPayment,reason:'Montant saisi par erreur'});
+await check('reversal cancels the payment on the balance',async()=>assert.equal(Number((await first('SELECT balance_minor FROM school.invoice_balances WHERE id=$1',[invoice3])).balance_minor),10000));
+await check('reversed amount can be paid again',()=>insert('payments',{invoice_id:invoice3,amount_minor:10000,method:'bank',reference:'VIR-002',idempotency_key:uuid()}));
+await check('payment cannot be reversed twice',()=>rejects('INSERT INTO school.payment_reversals(tenant_id,payment_id,reason) VALUES($1,$2,$3)',[a,wrongPayment,'Encore une fois'],'23505'));
+await check('reversed payment cannot be refunded',()=>rejects("INSERT INTO school.refunds(tenant_id,payment_id,amount_minor,reason,idempotency_key) VALUES($1,$2,100,'Erreur',$3)",[a,wrongPayment,uuid()],'23514','payment_reversed'));
+await check('refunded payment cannot be reversed',()=>rejects('INSERT INTO school.payment_reversals(tenant_id,payment_id,reason) VALUES($1,$2,$3)',[a,payment,'Erreur de caisse'],'23514','reversal_after_refund'));
 if (PgClient) {
  async function race(commands) {
    const clients=await Promise.all(commands.map(async()=>{
@@ -150,6 +200,9 @@ if (PgClient) {
  }
  await check('concurrent payments cannot overpay',()=>race([0,1].map(()=>[
    "INSERT INTO school.payments(tenant_id,invoice_id,amount_minor,method,idempotency_key) VALUES($1,$2,7000,'cash',$3)",[a,invoice2,uuid()]
+ ])));
+ await check('concurrent payments cannot share a reference',()=>race([0,1].map(()=>[
+   "INSERT INTO school.payments(tenant_id,invoice_id,amount_minor,method,reference,idempotency_key) VALUES($1,$2,100,'bank','RACE-REF',$3)",[a,invoice2,uuid()]
  ])));
  const offering3=await insert('offerings',{level_id:level,period_id:period,campus_id:campus,name:'Last seat',price_minor:10000});
  const cohort3=await insert('cohorts',{offering_id:offering3,name:'Last seat',capacity:1});

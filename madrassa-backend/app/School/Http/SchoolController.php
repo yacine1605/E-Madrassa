@@ -26,10 +26,12 @@ final class SchoolController
         $this->school->authorize($permission);
         $data = $request->validate(['limit'=>'sometimes|integer|between:1,100','after'=>'sometimes|uuid','q'=>'sometimes|string|max:100',
             'ids'=>'sometimes|array|max:100','ids.*'=>'required|uuid','is_teacher'=>'sometimes|boolean',
-            'level_id'=>'sometimes|uuid','cohort_id'=>'sometimes|uuid','subject_id'=>'sometimes|uuid']);
+            'level_id'=>'sometimes|uuid','cohort_id'=>'sometimes|uuid','subject_id'=>'sometimes|uuid','include_archived'=>'sometimes|boolean']);
         // Stable keyset pagination; the filtered total drives the record count in the UI.
         $q = $this->school->query($resource)->orderBy('id');
         if (isset($data['ids'])) $q->whereIn('id', $data['ids']);
+        // Archived records leave lists and choices, but still resolve by id for history.
+        elseif (in_array($resource, config('school_backend.archivable'), true) && !$request->boolean('include_archived')) $q->whereNull('archived_at');
         if (in_array($resource, ['subjects', 'curriculum'], true) && (isset($data['level_id']) || isset($data['cohort_id']))) {
             $level = $data['level_id'] ?? \App\School\Services\Curriculum::levelForCohort($this->school->tenant(), $data['cohort_id']);
             if ($resource === 'curriculum') $q->where('level_id', $level);
@@ -60,7 +62,7 @@ final class SchoolController
                 }
             });
         }
-        $limit = $data['limit'] ?? 50;
+        $limit = $data['limit'] ?? 25;
         $total = (clone $q)->reorder()->count();
         if (isset($data['after'])) $q->where('id', '>', $data['after']);
         $rows = $q->limit($limit + 1)->get();
@@ -77,6 +79,14 @@ final class SchoolController
                     'enseignant'=>$teachers[$row->teacher_id] ?? $row->teacher_id];
             });
         }
+        if ($resource === 'payments') {
+            $reversed = $this->school->query('payment_reversals')->whereIn('payment_id', $rows->pluck('id'))->pluck('payment_id')->flip();
+            $rows = $rows->map(fn ($row) => [...(array) $row, 'status'=>isset($reversed[$row->id]) ? 'reversed' : 'validated']);
+        }
+        // The pay rate belongs to payroll, not to the HR record (FR-STF-04).
+        if ($resource === 'contracts' && !in_array('payroll.read', $request->attributes->get('school.permissions', []), true)) {
+            $rows = $rows->map(fn ($row) => array_diff_key((array) $row, ['rate_minor'=>true]));
+        }
         return response()->json(['data'=>$rows, 'next'=>$next, 'total'=>$total]);
     }
 
@@ -85,12 +95,12 @@ final class SchoolController
         $permissions = $request->attributes->get('school.permissions', []);
         $can = fn ($permission) => in_array($permission, $permissions, true);
         $counts = [];
-        foreach (['students'=>'students.read','cohorts'=>'catalog.read','enrollments'=>'enrollments.read'] as $table=>$permission) {
-            if ($can($permission)) $counts[$table] = $this->school->query($table)->count();
-        }
+        if ($can('students.read')) $counts['students'] = $this->school->query('students')->whereNull('archived_at')->count();
+        if ($can('catalog.read')) $counts['cohorts'] = $this->school->query('cohorts')->whereNull('archived_at')->count();
+        if ($can('enrollments.read')) $counts['enrollments'] = $this->school->query('enrollments')->count();
         if ($can('hr.read')) {
-            $counts['teachers'] = $this->school->query('staff')->where('is_teacher', true)->where('active', true)->count();
-            $counts['staff'] = $this->school->query('staff')->where('is_teacher', false)->where('active', true)->count();
+            $counts['teachers'] = $this->school->query('staff')->where('is_teacher', true)->where('active', true)->whereNull('archived_at')->count();
+            $counts['staff'] = $this->school->query('staff')->where('is_teacher', false)->where('active', true)->whereNull('archived_at')->count();
         }
         if ($can('enrollments.read')) $counts['pending'] = $this->school->query('enrollments')->where('status', 'pending')->count();
         if ($can('finance.read')) $counts['balance_minor'] = $this->school->query('invoice_balances')->sum('balance_minor');
@@ -120,6 +130,8 @@ final class SchoolController
     {
         $entry = $this->catalog($resource);
         $this->school->authorize($entry['permission'].'.write');
+        // A contract carries the pay rate, which only payroll may set (FR-STF-04).
+        if ($resource === 'contracts') $this->school->authorize('payroll.write');
         $data = $request->validate($entry['rules']);
         if ($resource === 'teacher_qualifications' && !$this->school->query('staff')->where('id', $data['teacher_id'])->where('is_teacher', true)->where('active', true)->exists()) {
             throw ValidationException::withMessages(['teacher_id'=>'Choisissez un enseignant actif.']);
@@ -139,7 +151,14 @@ final class SchoolController
         abort_unless(in_array($resource, config('school_backend.mutable_catalog'), true), 404);
         $this->school->authorize($entry['permission'].'.write');
         $row = $this->school->row($resource, $id);
+        abort_if($row->archived_at ?? null, 409, 'Cet enregistrement est archivé.');
         $data = $request->validate($entry['rules']);
+        // Codes and registration numbers are permanent (BR-18).
+        if ($code = config('school_backend.permanent_codes')[$resource] ?? null) {
+            if (array_key_exists($code, $data) && (string) $data[$code] !== (string) $row->$code)
+                throw ValidationException::withMessages([$code=>'Ce code est définitif : il ne peut pas être modifié.']);
+            unset($data[$code]);
+        }
         if ($resource === 'teacher_qualifications' && !$this->school->query('staff')->where('id', $data['teacher_id'])->where('is_teacher', true)->where('active', true)->exists()) {
             throw ValidationException::withMessages(['teacher_id'=>'Choisissez un enseignant actif.']);
         }
@@ -164,27 +183,37 @@ final class SchoolController
         $entry = $this->catalog($resource);
         abort_unless(in_array($resource, config('school_backend.mutable_catalog'), true), 404);
         $this->school->authorize($entry['permission'].'.write');
-        $this->school->row($resource, $id);
-        $dependents = [
-            'campuses'=>[['rooms','campus_id'],['offerings','campus_id']],
-            'periods'=>[['offerings','period_id']],
-            'programs'=>[['levels','program_id']],
-            'levels'=>[['curriculum','level_id'],['offerings','level_id']],
-            'subjects'=>[['curriculum','subject_id'],['sessions','subject_id'],['lesson_versions','subject_id'],['assessments','subject_id']],
-            'offerings'=>[['cohorts','offering_id'],['enrollments','offering_id']],
-            'cohorts'=>[['enrollments','cohort_id'],['sessions','cohort_id'],['assessments','cohort_id'],['teacher_assignments','cohort_id']],
-            'students'=>[['student_guardians','student_id'],['enrollments','student_id'],['documents','student_id']],
-            'guardians'=>[['student_guardians','guardian_id']],
-            'staff'=>[['sessions','teacher_id'],['contracts','staff_id'],['payroll_runs','staff_id'],['teacher_assignments','teacher_id']],
-            'rooms'=>[['sessions','room_id']],
-        ];
-        foreach ($dependents[$resource] ?? [] as [$table, $foreignKey]) {
-            abort_if($this->school->query($table)->where($foreignKey, $id)->exists(), 409,
-                'Suppression impossible : cet enregistrement possède des données liées.');
+        $row = $this->school->row($resource, $id);
+        // A qualification is a setting, not a business record: it is removed.
+        if ($resource === 'teacher_qualifications') {
+            $this->school->query($resource)->where('id', $id)->delete();
+            return response()->noContent();
         }
-        // Foreign keys block removal of referenced records; financial and audit
-        // records are deliberately outside this endpoint.
-        $this->school->query($resource)->where('id', $id)->delete();
+        // Business records are archived, never deleted (BR-02): they leave the lists
+        // but keep their history. Archiving waits until nothing current depends on them.
+        if ($row->archived_at) return response()->noContent();
+        $unarchived = fn ($q) => $q->whereNull('archived_at');
+        $open = fn ($q) => $q->where('status', '<>', 'cancelled');
+        $upcoming = fn ($q) => $q->where('status', '<>', 'cancelled')->where('ends_at', '>', now());
+        $current = fn ($q) => $q->where(fn ($c) => $c->whereNull('ends_on')->orWhere('ends_on', '>=', now()->toDateString()));
+        $dependents = [
+            'campuses'=>[['rooms','campus_id',$unarchived],['offerings','campus_id',$unarchived]],
+            'periods'=>[['offerings','period_id',$unarchived]],
+            'programs'=>[['levels','program_id',$unarchived]],
+            'levels'=>[['curriculum','level_id',$unarchived],['offerings','level_id',$unarchived]],
+            'subjects'=>[['curriculum','subject_id',$unarchived]],
+            'offerings'=>[['cohorts','offering_id',$unarchived],['enrollments','offering_id',$open]],
+            'cohorts'=>[['enrollments','cohort_id',$open],['sessions','cohort_id',$upcoming]],
+            'students'=>[['enrollments','student_id',$open]],
+            'guardians'=>[['student_guardians','guardian_id',$unarchived]],
+            'staff'=>[['sessions','teacher_id',$upcoming],['contracts','staff_id',$current],['teacher_assignments','teacher_id',fn ($q) => $q]],
+            'rooms'=>[['sessions','room_id',$upcoming]],
+        ];
+        foreach ($dependents[$resource] ?? [] as [$table, $foreignKey, $active]) {
+            abort_if($active($this->school->query($table)->where($foreignKey, $id))->exists(), 409,
+                'Archivage impossible : des données en cours en dépendent. Archivez-les, clôturez-les ou annulez-les d’abord.');
+        }
+        $this->school->query($resource)->where('id', $id)->update(['archived_at'=>now()]);
         return response()->noContent();
     }
 
@@ -276,16 +305,32 @@ final class SchoolController
     {
         $map = ['enrollments'=>['enrollments.write','status'], 'sessions'=>['pedagogy.write','status'],
             'assessments'=>['pedagogy.write','published_at'], 'work_logs'=>['payroll.write','validated_at'],
-            'lesson_versions'=>['pedagogy.write','published_at'], 'announcements'=>['pedagogy.write','published_at']];
+            'lesson_versions'=>['pedagogy.write','published_at'], 'announcements'=>['pedagogy.write','published_at'],
+            'payroll_runs'=>['payroll.write','status'], 'payments'=>['finance.write','status']];
+        $statuses = ['enrollments'=>'validated,suspended,cancelled', 'sessions'=>'published,cancelled',
+            'payroll_runs'=>'validated,discarded', 'payments'=>'reversed'];
         abort_unless(isset($map[$resource]), 404);
         [$permission, $field] = $map[$resource];
         $this->school->authorize($permission);
         $row = $this->school->row($resource, $id);
         $rules = ['reason'=>'required|string|min:3|max:1000'];
-        if ($field === 'status') $rules['status'] = 'required|in:'.($resource === 'enrollments' ? 'validated,suspended,cancelled' : 'published,cancelled');
+        if ($field === 'status') $rules['status'] = 'required|in:'.$statuses[$resource];
         $data = $request->validate($rules);
+        // The audit trail records this reason against every change in the transaction.
+        DB::select("select set_config('app.reason', ?, true)", [$data['reason']]);
+        if ($resource === 'payments') return ['data'=>$this->school->reversePayment($id, $data['reason'])];
+        if ($resource === 'payroll_runs') {
+            if ($data['status'] === 'discarded') { $this->school->discardPayroll($id); return ['data'=>null]; }
+            return ['data'=>$this->school->validatePayroll($id)];
+        }
         if ($resource === 'enrollments') abort_if($row->status === 'cancelled', 409, 'Une inscription annulée ne peut pas être réactivée.');
-        $this->school->query($resource)->where('id', $id)->update([$field=>$field === 'status' ? $data['status'] : now()]);
+        if ($resource === 'work_logs') {
+            abort_if($row->validated_at || $row->rejected_at, 409, 'Ces heures ont déjà été examinées.');
+            abort_if((string) ($row->entered_by ?? '') === (string) $request->user()->id, 409,
+                'Séparation des tâches : la personne qui a saisi ces heures ne peut pas les valider.');
+            $this->school->query($resource)->where('id', $id)->update(['validated_at'=>now(), 'reviewed_by'=>$request->user()->id, 'review_reason'=>$data['reason']]);
+        }
+        else $this->school->query($resource)->where('id', $id)->update([$field=>$field === 'status' ? $data['status'] : now()]);
         $this->school->insert('outbox', ['topic'=>$resource.'.transition', 'payload'=>json_encode(['id'=>$id,'actor_id'=>$request->user()->id,'reason'=>$data['reason']], JSON_THROW_ON_ERROR)]);
         return ['data'=>$this->school->row($resource, $id)];
     }
@@ -293,9 +338,12 @@ final class SchoolController
     public function summary()
     {
         $this->school->authorize('finance.read');
+        // A reversed payment was an error, not money received (FR-FIN-03).
+        $reversed = $this->school->query('payments')->whereIn('id', $this->school->query('payment_reversals')->select('payment_id'))->sum('amount_minor');
         return ['data'=>[
             'invoiced_minor'=>$this->school->query('invoices')->sum('amount_minor'),
-            'received_minor'=>$this->school->query('payments')->sum('amount_minor'),
+            'received_minor'=>$this->school->query('payments')->sum('amount_minor') - $reversed,
+            'reversed_minor'=>$reversed,
             'refunded_minor'=>$this->school->query('refunds')->sum('amount_minor'),
             'outstanding_minor'=>$this->school->query('invoice_balances')->sum('balance_minor'),
             'committed_expenses_minor'=>$this->school->query('expenses')->sum('amount_minor'),

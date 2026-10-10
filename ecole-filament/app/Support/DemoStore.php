@@ -17,10 +17,12 @@ class DemoStore
     }
     public static function options(string $module):array {$out=[];foreach(self::all($module) as $r)$out[$r['id']]=self::label($module,$r['id']);return $out;}
     public static function money(int|float|string|null $v):string {return number_format((float)$v,2,',',' ').' DA';}
-    public static function paid(string $id):float {return collect(self::all('payments'))->where('enrollment',$id)->where('status','Validé')->sum('amount');}
-    public static function balance(array $r):float {return round($r['amount']-self::paid($r['id']),2);}
+    /** Sums in integer centimes, like the real backend, so no rounding drift accumulates. */
+    public static function cents(int|float|string|null $v):int {return (int)round((float)$v*100);}
+    public static function paid(string $id):float {return collect(self::all('payments'))->where('enrollment',$id)->where('status','Validé')->sum(fn($p)=>self::cents($p['amount']))/100;}
+    public static function balance(array $r):float {return (self::cents($r['amount'])-self::cents(self::paid($r['id'])))/100;}
     public static function paymentStatus(array $r):string {return self::paid($r['id'])<=0?'Non payé':(self::balance($r)>0?'Payé partiellement':'Payé');}
-    public static function totalPay(array $r):float {return round(($r['type']==='Horaire'?$r['hours']*$r['rate']:$r['base'])+$r['bonus']+$r['adjustment'],2);}
+    public static function totalPay(array $r):float {return (($r['type']==='Horaire'?(int)round((float)$r['hours']*self::cents($r['rate'])):self::cents($r['base']))+self::cents($r['bonus'])+self::cents($r['adjustment']))/100;}
     public static function immutable(string $module,array $r):bool {
         return (in_array($module,['payments','expenses','payroll'])&&in_array($r['status']??'',['Validé','Validée']))||($module==='enrollments'&&($r['status']??'')==='Annulée')||($module==='schedule'&&($r['locked']??false));
     }

@@ -21,6 +21,10 @@ return [
         'technical' => [],
     ],
     'mutable_catalog' => ['campuses','periods','programs','levels','subjects','curriculum','offerings','cohorts','rooms','students','guardians','student_guardians','staff','teacher_qualifications'],
+    // Records the API archives instead of deleting (BR-02).
+    'archivable' => ['campuses','periods','programs','levels','subjects','curriculum','offerings','cohorts','rooms','students','guardians','student_guardians','staff'],
+    // Codes that never change once created (BR-18); the database refuses it too.
+    'permanent_codes' => ['programs'=>'code','levels'=>'code','subjects'=>'code','staff'=>'code','students'=>'matricule'],
     'search_fields' => [
         'enrollments'=>['status'], 'invoices'=>['number'], 'invoice_balances'=>['number'],
         'payments'=>['method','reference'], 'refunds'=>['reason'], 'disbursements'=>[],
@@ -53,7 +57,7 @@ return [
     ],
     'read' => [
         'enrollments'=>'enrollments.read','invoices'=>'finance.read','invoice_balances'=>'finance.read',
-        'payments'=>'finance.read','refunds'=>'finance.read','disbursements'=>'finance.read',
+        'payments'=>'finance.read','refunds'=>'finance.read','disbursements'=>'finance.read','payment_reversals'=>'finance.read',
         'payroll_runs'=>'payroll.read','grades'=>'pedagogy.read','attendance'=>'pedagogy.read',
         'audit_events'=>'audit.read',
     ],

@@ -4,7 +4,20 @@
 **Document de référence :** `SRS_Madrassa_1_1.md` (version 1.1, 9 octobre 2026)
 **Objet :** procédure demandée en §0.5 du SRS — rapport d'écart par identifiant, inventaire de ce qui est réutilisable, puis plan de correction ordonné par lot.
 **Date de l'analyse :** 10 octobre 2026 · **Révision du code analysée :** `263918e` (« version 1.1 »)
+**Révision du rapport :** 1.2 (10 octobre 2026)
 **Statut :** à valider. **Aucune modification de code ne doit être engagée avant validation de ce rapport** (§0.5).
+
+> **Modifications de la révision 1.2**
+> - Nouveau constat **T22** : le déploiement Docker livré connecte l'application en superutilisateur PostgreSQL, ce qui désactive la sécurité au niveau des lignes. `NFR-TEN-01` passe de `CONFORME` à `PARTIEL` ; §1, §3.4 et §4.1 recomptés (7 `CONFORME`, 87 `PARTIEL`).
+> - Nouveau §11 : suivi des corrections T1 à T22 réalisées sur la branche `lot0-corrections`, avec leur vérification.
+>
+> **Modifications de la révision 1.1**
+> - Suite d'invariants SQL **exécutée** : telle que livrée, elle échoue avant le premier contrôle (nouveau constat T19) ; sur le schéma complet (base + 11 migrations + privilèges), **34/34 contrôles réussis**. §0.2, §1, §5, §7 et §10 mis à jour.
+> - Synthèse quantitative (§1, §4.1, §4.2) **recomptée** à partir des tableaux du §3, avec une règle de comptage explicite. Les chiffres de la révision 1.0 (93 exigences ; 9/41/31/12) n'étaient pas reproductibles.
+> - Renvois corrigés : `FR-INS-01` renvoie à T13 (et non T16) ; `W1.4` cite `NFR-SEC-02` (et non « T-SEC-02 »).
+> - Hypothèse d'équipe harmonisée entre §0.3 et §6.1.
+> - Données : les données présentes dans le dépôt et les déploiements sont des **données d'exemple** ; aucun établissement n'est en production. R3 et les chantiers de refonte (W1.5, W2.5, W2.7, W3.1, W3.4, W4.3) ne prévoient plus de migration de données réelles. Recherche de données personnelles réelles dans les fichiers suivis : aucune trouvée (`NFR-DATA-06`).
+> - Nouveaux constats T20 (PDF corrompu dans `docs/`) et T21 (dépendances et caches suivis par git) ; nouvelle décision **ND-09** (refonte incrémentale ou nouvelle base de schéma).
 
 ---
 
@@ -25,7 +38,10 @@
 
 ### 0.2 Limites
 
-- **Analyse statique uniquement.** Aucune base n'a été provisionnée, aucun conteneur démarré, aucun test exécuté. Les statuts `CONFORME` reposent sur la lecture du code *et* la présence d'un test correspondant dans `database.mjs`/`concurrency.mjs`, jamais sur une exécution observée.
+- **Analyse statique, complétée par l'exécution de la suite d'invariants SQL (révision 1.1).** Aucun conteneur n'a été démarré et aucun test HTTP ni d'interface n'a été exécuté. La suite `database.mjs` a été exécutée sur PostgreSQL embarqué (PGlite 0.5.8) :
+  - **telle que livrée (`npm test`), elle échoue à l'initialisation**, avant le premier contrôle : `relation "school.teacher_assignments" does not exist` (constat T19) ;
+  - appliquée au **schéma complet** (`001_school.sql`, puis les 11 migrations suivantes extraites de leurs fichiers PHP, puis `runtime-grants.sql`), sans aucune modification des contrôles : **34/34 réussis**.
+  - `concurrency.mjs` (deux courses sur connexions indépendantes) **n'a pas été exécuté** : il exige PostgreSQL natif. Les statuts qui s'appuient sur lui (`TST-07`, `TST-10`) reposent sur la lecture du test, pas sur une exécution.
 - Les statuts portent sur le **mode backend** (`SCHOOL_BACKEND=true`). Le mode démonstration (`DemoStore`) est traité séparément au §2.4 : il ne constitue pas une implémentation (voir §5, constat T15).
 - Les performances (`NFR-PERF-*`), la disponibilité (`NFR-AVL-*`) et la conformité juridique (`NFR-DATA-02`) ne sont pas vérifiables par lecture de code : elles sont marquées `ABSENT` lorsque ni dispositif ni mesure n'existent, et la documentation du projet le reconnaît déjà explicitement (`docs/ARCHITECTURE.md` §Performances, `docs/VALIDATION.md`).
 
@@ -33,7 +49,7 @@
 
 Statuts : `CONFORME` · `PARTIEL` · `ABSENT` · `DIVERGENT` · `HORS_PÉRIMÈTRE` (§0.5 du SRS).
 Risque : **bloquant** (empêche la clôture du lot) · **majeur** · **mineur**.
-Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem. (par équipe de 1 à 2 personnes).
+Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem., mesuré pour **1 à 2 personnes affectées au chantier**. Les durées de lot et le calendrier (§6.2 à §6.8) supposent une **équipe totale de 2 à 3 développeurs**, soit au plus deux chantiers menés en parallèle.
 `ND-nn` = nouvelle décision à trancher, identifiée par cette analyse et absente de la §10 du SRS.
 
 ---
@@ -44,7 +60,7 @@ Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem. (par équipe de 1 �
 
 **1. Le code existant n'est pas un embryon de SaaS mutualisé : c'est un déploiement dédié mono-établissement, déjà solide.** Le modèle de données est multi-tenant de bout en bout (`tenant_id` partout, RLS `FORCE` sur toutes les tables, clés étrangères composites `(tenant_id, id)`, rôle SQL d'exécution sans `BYPASSRLS` ni propriété des tables). Mais le runtime épingle volontairement un établissement unique : `TenantContext` refuse toute requête dont le tenant diffère de `DeploymentSchool::id()` ([TenantContext.php:17](madrassa-backend/app/School/Http/TenantContext.php:17)), et l'activation des modules se fait par variable d'environnement et non par tenant. **Autrement dit, le lot 9 du SRS (« Mode dédié ») est largement réalisé, alors que le lot 1 (« Fondations », console éditeur, plans, quotas) est quasi inexistant.** C'est l'écart le plus important du projet et il conditionne le plan.
 
-**2. La couche d'invariants est l'actif majeur, et elle est réutilisable presque telle quelle.** Immutabilité financière appliquée *en base* (déclencheurs sur `payments`, `refunds`, `invoices`, `disbursements`, `expenses`, `contracts`, `payroll_runs`, `audit_events`), capacité de groupe atomique (verrou consultatif + déclencheur + test de course), idempotence par clé sur six opérations, prix figé à l'inscription vérifié par déclencheur, conflits d'emploi du temps (enseignant, salle, groupe, **et élève inter-programmes**) refusés en base, note manquante distincte d'un zéro par contrainte `CHECK`. 34 tests d'invariants SQL couvrent déjà, en tout ou partie, `TST-01`, `TST-07`, `TST-09`, `TST-10`, `TST-11` et `TST-15`. Reconstruire cela ailleurs serait la pire décision possible du projet.
+**2. La couche d'invariants est l'actif majeur, et elle est réutilisable presque telle quelle.** Immutabilité financière appliquée *en base* (déclencheurs sur `payments`, `refunds`, `invoices`, `disbursements`, `expenses`, `contracts`, `payroll_runs`, `audit_events`), capacité de groupe atomique (verrou consultatif + déclencheur + test de course), idempotence par clé sur six opérations, prix figé à l'inscription vérifié par déclencheur, conflits d'emploi du temps (enseignant, salle, groupe, **et élève inter-programmes**) refusés en base, note manquante distincte d'un zéro par contrainte `CHECK`. 34 tests d'invariants SQL couvrent déjà, en tout ou partie, `TST-01`, `TST-07`, `TST-09`, `TST-10`, `TST-11` et `TST-15` — **et ils passent (34/34) sur le schéma complet**, une fois réparée l'initialisation de la suite, cassée telle que livrée (T19). Reconstruire cela ailleurs serait la pire décision possible du projet.
 
 **3. Trois absences bloquent la conformité dès maintenant, indépendamment des lots.**
 - **Séparation des tâches (`BR-08`, `FR-IAM-05`, `TST-05`) : aucun dispositif.** Aucune table `sod_rule`, aucun contrôle `approved_by ≠ created_by`. Pire : la génération de rémunération s'auto-valide à la création (`'validated_at' => now()` dans [SchoolService.php:120](madrassa-backend/app/School/Services/SchoolService.php:120)) et la validation des heures n'enregistre pas l'identité du valideur. Les schémas de `work_logs` et `payroll_runs` doivent changer pour que `TST-05` soit même exprimable.
@@ -57,7 +73,7 @@ Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem. (par équipe de 1 �
 
 **5. La pile technique en place satisfait toutes les exigences `ARC-*` : il faut la conserver et amender le SRS (OD-01).** Le code est en **PHP 8.3 / Laravel 12 / Filament 5 / PostgreSQL 16 / Redis**, pas en Python/Django comme le propose la §4.2. Recommandation détaillée au §2.3 : **conserver**, car (a) aucun `ARC-*` ni `NFR-*` ne devient insatisfaisable, (b) l'actif le plus coûteux du projet (constat 2) est en SQL pur, donc indépendant du langage applicatif, (c) les lots 6 et 7 (OR-Tools, IA) doivent de toute façon tourner en processus de fond séparés selon `ARC-09`/`ARC-10` — le dépôt contient déjà des scripts Python de planification, ce qui démontre la cohabitation. Migrer vers Django reviendrait à réécrire le meilleur du code pour un gain architectural nul.
 
-**Volumétrie de l'écart** (détail au §4) : sur 93 exigences fonctionnelles, règles métier et exigences non fonctionnelles évaluées hors lots 5–10 — **9 `CONFORME`, 41 `PARTIEL`, 31 `ABSENT`, 12 `DIVERGENT`**. Le socle est bon mais la surface conforme est faible : le projet est à environ **25–30 % du SRS** en valeur livrée, avec une qualité d'invariants nettement supérieure à ce pourcentage.
+**Volumétrie de l'écart** (détail et règle de comptage au §4) : sur les **147 identifiants** des lots 1 à 4 et des exigences transverses (`ARC-*`, `BR-*`, `NFR-*`) — **7 `CONFORME` (5 %), 87 `PARTIEL` (59 %), 45 `ABSENT` (31 %), 8 `DIVERGENT` (5 %)** ; 24 de ces lignes (16 %) comportent une divergence de modèle, seule ou en second statut. Aucune exigence fonctionnelle des lots 1 à 4 n'est `CONFORME`. Le socle est bon mais la surface conforme est faible : le projet est, **par estimation qualitative**, à environ **25–30 % du SRS** en valeur livrée, avec une qualité d'invariants nettement supérieure à ce pourcentage.
 
 ---
 
@@ -66,7 +82,7 @@ Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem. (par équipe de 1 �
 ### 2.1 Topologie du dépôt
 
 ```
-E:/E-Madrassa
+E-Madrassa/ (racine du dépôt)
 ├── compose.yaml, Dockerfile, docker/           # exploitation : app, postgres, redis, sauvegarde, tunnel
 ├── MODULES.md, DOCKER.md, school.env.example   # un fichier d'environnement par école
 ├── ecole-filament/                             # application Laravel 12 + Filament 5 (interface)
@@ -175,7 +191,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 
 | Sujet | Modèle actuel | Pourquoi il ne peut pas être étendu |
 |---|---|---|
-| Référentiel académique | `programs` → `levels` (arbre fixe à 2 niveaux) | `FR-REF-01` exige un arbre **générique** dont la hiérarchie des types est fixée par le profil (`cycle→grade→track` pour une école, `domain→specialty→pathway` pour un centre). Un centre de formation ne peut rien exprimer aujourd'hui. → tables `node_type` / `ref_node` + migration de données |
+| Référentiel académique | `programs` → `levels` (arbre fixe à 2 niveaux) | `FR-REF-01` exige un arbre **générique** dont la hiérarchie des types est fixée par le profil (`cycle→grade→track` pour une école, `domain→specialty→pathway` pour un centre). Un centre de formation ne peut rien exprimer aujourd'hui. → tables `node_type` / `ref_node` (remplacement direct : seules des données d'exemple existent) |
 | Affectation aux groupes | `enrollments.cohort_id NOT NULL` | `FR-GRP-02` exige `group_membership(enrollment_id, group_id, valid_from, valid_to, is_main)` : multi-groupes, dates, transfert, index unique partiel sur le groupe principal. Modification de la clé du modèle d'inscription |
 | Rémunération | `contracts(basis ∈ monthly\|hourly, rate_minor)` | `FR-REM-01` exige 4 types, des tarifs par nœud du référentiel, une résolution par plus proche ancêtre, une quantité incluse, et **l'interdiction** de porter le montant sur le contrat RH (`FR-STF-04`). → `pay_rule` + `pay_rule_rate` + `payroll_line` + `payroll_adjustment` |
 | Facturation élève | une `invoice` unique couvrant le prix complet, `UNIQUE(tenant_id, enrollment_id)` | `FR-FIN-01` exige des échéances multiples (`installment`) et des ajustements (`adjustment` : remise, annulation de dette, pénalité) avec motif et seuil d'approbation |
@@ -325,7 +341,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | FR-PRG-02 | `PARTIEL` / `DIVERGENT` | `curriculum(level, subject, hours, coefficient)` avec unicité et validation « la matière appartient au programme du niveau » ; volumes hebdomadaires par niveau disponibles en configuration (`primary_weekly_minutes.json`, `WeeklyTeachingPlan`) | rattachement **au programme** et non au niveau ; `weekly_hours`, `session_count`, `session_duration_minutes` ; règle « au moins une des trois valeurs » (`AC2`) ; `valid_from`/`valid_to` et versionnement (`AC1`) ; retrait par fin de validité si des séances existent (`AC3`) ; avertissement d'écart > 10 % ; permission `program.subject.manage` | **bloquant** | M |
 | FR-GRP-01 | `PARTIEL` | `cohorts(offering, name unique/offering, capacity ≥ 1)` ; **réduction de capacité sous l'effectif actif refusée** → `AC2` satisfait ; `AC1` réalisable ; déclencheur d'immutabilité levé explicitement par migration dédiée | `code`, **`group_type ∈ class/support/option/session`**, `site_id` propre, `main_room_id`, `lead_teacher_id`, `valid_from`/`valid_to`, `status ∈ draft/active/closed`, conservation de composition à la fermeture | **bloquant** | M |
 | FR-GRP-02 | `DIVERGENT` | contrôle de capacité **atomique et testé** (verrou + déclencheur + course) → `AC1` satisfait sur le modèle actuel ; conflit d'horaire élève vérifié à l'inscription | **la table `group_membership` n'existe pas** : `enrollments.cohort_id NOT NULL`. Donc : pas de multi-groupes, pas de dates, pas de `is_main` ni d'index unique partiel (`AC2`), pas de transfert ni d'historique (`AC3`), pas de liste d'attente | **bloquant** | L |
-| FR-INS-01 | `PARTIEL` | `enroll()` : idempotence avec comparaison de contenu, prix figé vérifié en base, facture créée dans la même transaction, `UNIQUE` partiel « une inscription non annulée par offre » → **`AC1` et `AC3` satisfaits et testés** | création en `pending` (le défaut en base est `validated` et `enroll()` ne le surcharge pas — voir constat T16, donc l'étape 6 de validation est contournée), affectation de groupe séparée, refus d'un élève bloqué (`AC2`, pas de statut `blocked`), contrôle de quota, génération d'échéancier, instantané des conditions (`terms_snapshot`), `validated_by`/`validated_at`/`cancel_reason` | **bloquant** | M |
+| FR-INS-01 | `PARTIEL` | `enroll()` : idempotence avec comparaison de contenu, prix figé vérifié en base, facture créée dans la même transaction, `UNIQUE` partiel « une inscription non annulée par offre » → **`AC1` et `AC3` satisfaits et testés** | création en `pending` (le défaut en base est `validated` et `enroll()` ne le surcharge pas — voir constat T13, donc l'étape 6 de validation est contournée), affectation de groupe séparée, refus d'un élève bloqué (`AC2`, pas de statut `blocked`), contrôle de quota, génération d'échéancier, instantané des conditions (`terms_snapshot`), `validated_by`/`validated_at`/`cancel_reason` | **bloquant** | M |
 | FR-INS-02 | `PARTIEL` | états pédagogiques exacts ; `invoice_balances` calcule le solde net ; **test « un paiement ne réactive pas une inscription suspendue »** → moitié de `TST-09` couverte | dimension financière nommée (`unpaid`/`partially_paid`/`paid`), libellé combiné, indicateur `overdue` (dépend des échéances) | majeur | M |
 | FR-INS-03 | `PARTIEL` | inscription annulée **gelée** par déclencheur (`enrollment_identity_frozen`) et réactivation refusée par l'API ; aucun remboursement automatique → `AC1` satisfait | motif de suspension stocké seulement dans la charge utile de l'`outbox` ; **transfert de programme inexistant** (`transferred_from`, report de paiements) → `AC2` absent | majeur | M |
 | FR-INS-04 | `ABSENT` | — | indicateur `access_granted`, paramètre `enrollment.access.require_payment ∈ none/first_installment/full`, calcul à la demande | majeur | S |
@@ -423,7 +439,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | NFR-SEC-07 | `ABSENT` | aucune journalisation de sécurité dédiée, aucune alerte | majeur | M |
 | NFR-SEC-08 | `ABSENT` | **aucune intégration continue** (pas de `.github/workflows`), donc aucune analyse de dépendances | majeur | S |
 | NFR-SEC-09 | `PARTIEL` | sauvegardes `pg_dump` + archive de fichiers + empreintes SHA-256 + rétention ; **les sauvegardes ne sont pas chiffrées** (le contrôle de clé porte sur `APP_KEY`, pas sur l'archive) | majeur | S |
-| NFR-TEN-01 | `CONFORME` | RLS `ENABLE`+`FORCE` sur toutes les tables métier ; `school_runtime` `NOSUPERUSER NOBYPASSRLS`, non propriétaire, sans `DELETE` ni écriture d'adhésion ; vues `security_invoker` | — | — |
+| NFR-TEN-01 | `PARTIEL` | RLS `ENABLE`+`FORCE` sur toutes les tables métier ; `school_runtime` `NOSUPERUSER NOBYPASSRLS`, non propriétaire, sans `DELETE` ni écriture d'adhésion ; vues `security_invoker`. **Mais le déploiement Docker livré n'utilise pas ce rôle** : l'application s'y connecte en superutilisateur, ce qui contourne la RLS (constat T22, révision 1.2) | **bloquant** | S |
 | NFR-TEN-02 | `PARTIEL` | 7 tests d'isolation au niveau SQL (lecture croisée, écriture croisée, clé étrangère croisée, adhésion inactive, tenant manquant, non-membre, remise à zéro au rollback) ; **non couvert : interface, API, exports, fichiers, tâches, notifications, recherche** | **bloquant** | M |
 | NFR-TEN-03 | `PARTIEL` | préfixe Redis global `madrassa_`, non segmenté par tenant ; sans objet aujourd'hui (une base par déploiement), bloquant dès ARC-02 | majeur | S |
 | NFR-AVL-01 | `ABSENT` | aucun engagement, aucune mesure | majeur | — |
@@ -436,7 +452,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | NFR-DATA-03 | `ABSENT` | aucune durée de conservation, aucune purge, aucune anonymisation (OD-07) | **bloquant** | M |
 | NFR-DATA-04 | `ABSENT` | aucun export complet de tenant, aucune procédure de rectification | majeur | M |
 | NFR-DATA-05 | `PARTIEL` | les sauvegardes suivent le stockage mais ne sont pas chiffrées | majeur | S |
-| NFR-DATA-06 | `PARTIEL` | les jeux de démonstration sont fictifs ; aucune règle formalisée | mineur | S |
+| NFR-DATA-06 | `PARTIEL` | les jeux de démonstration sont fictifs — **vérifié en révision 1.1** sur les fichiers suivis par git (`seed.json` : téléphones séquentiels et adresses `@example.test` ; fixtures PHP ; bulletins et reçu PDF de `tests/artifacts` issus de fixtures ; captures d'écran ; enseignants des emplois du temps identifiés par des codes et non par des noms) : aucune donnée personnelle réelle trouvée. Le dossier local `backups/` (ignoré par git) n'a pas été inspecté. Aucune règle formalisée | mineur | S |
 | NFR-UX-01 | `PARTIEL` | navigation Filament pilotée par les modules et les permissions, libellés métier français explicites | mineur | M |
 | NFR-UX-02 | `PARTIEL` | captures mobiles et bureau dans `tests/artifacts/` ; pas de recette systématique | mineur | M |
 | NFR-UX-03 | `ABSENT` | WCAG 2.1 AA non évaluée | majeur | M |
@@ -449,7 +465,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | NFR-PORT-01 | `PARTIEL` | Docker, configuration par environnement, aucun service propriétaire ; **stockage S3 et file de tâches non configurables (inexistants)**, e-mail non configuré | majeur | M |
 | NFR-PORT-02 | `CONFORME` | aucune dépendance GPU | — | — |
 | NFR-MNT-01 | `ABSENT` | **aucune intégration continue** : ni tests, ni analyse statique, ni vérification de migrations automatisées | **bloquant** | S |
-| NFR-MNT-02 | `PARTIEL` | 34 invariants SQL + 2 tests de concurrence (excellents) + 7 tests d'interface portant sur le **mode démonstration** (donc non représentatifs du backend) ; aucun test d'intégration HTTP authentifié | **bloquant** | M |
+| NFR-MNT-02 | `PARTIEL` | 34 invariants SQL (**34/34 réussis sur le schéma complet en révision 1.1, mais la suite livrée échoue à l'initialisation** — T19) + 2 tests de concurrence (non exécutés : PostgreSQL natif requis) + 7 tests d'interface portant sur le **mode démonstration** (donc non représentatifs du backend) ; aucun test d'intégration HTTP authentifié | **bloquant** | M |
 | NFR-MNT-03 | `CONFORME` | 13 documents backend + 3 frontend : architecture, schéma, API, validation, exploitation, sauvegardes, règles métier. Qualité notable : les limites y sont nommées | — | — |
 | NFR-MNT-04 | `PARTIEL` | migrations horodatées et explicites ; profils et paramètres de calcul **non versionnés** (codés en dur) | majeur | S |
 
@@ -481,28 +497,39 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 
 ## 4. Synthèse quantitative
 
-### 4.1 Par statut (93 exigences évaluées, lots 1 à 4 et transverses)
+### 4.1 Par statut (147 identifiants : lots 1 à 4 et exigences transverses)
 
-| Statut | Nombre | Part |
-|---|---|---|
-| `CONFORME` | 9 | 10 % |
-| `PARTIEL` | 41 | 44 % |
-| `ABSENT` | 31 | 33 % |
-| `DIVERGENT` | 12 | 13 % |
+**Règle de comptage.** Une ligne des tableaux §3.1 à §3.4 = un identifiant. Une ligne à double statut (« `PARTIEL` / `DIVERGENT` ») est comptée sous son **premier** statut ; la colonne « dont divergence » compte toutes les lignes où `DIVERGENT` apparaît, seul ou en second. Les lots 5 à 10 sont comptés à part (§4.2).
+
+| Famille | Identifiants | `CONFORME` | `PARTIEL` | `ABSENT` | `DIVERGENT` | dont divergence |
+|---|---|---|---|---|---|---|
+| Architecture `ARC-*` | 12 | 2 | 4 | 4 | 2 | 3 |
+| Règles métier `BR-*` | 20 | 3 | 14 | 3 | 0 | 2 |
+| Fonctionnelles `FR-*` (lots 1 à 4) | 72 | 0 | 45 | 22 | 5 | 17 |
+| Non fonctionnelles `NFR-*` | 43 | 2 | 24 | 16 | 1 | 2 |
+| **Total** | **147** | **7 (5 %)** | **87 (59 %)** | **45 (31 %)** | **8 (5 %)** | **24 (16 %)** |
+
+Les 7 `CONFORME` : `ARC-08`, `ARC-12`, `BR-06`, `BR-07`, `BR-11`, `NFR-PORT-02`, `NFR-MNT-03` — tous transverses ; **aucune exigence fonctionnelle n'est conforme**.
+
+Couverture (§0.5 du SRS) : les **170** identifiants `FR-*`, `BR-*`, `NFR-*` et `ARC-*` du SRS sont tous évalués — les 147 ci-dessus et 23 pour les lots 5 à 10, dont trois lignes regroupées (`FR-EDT-01…05`, `FR-IAI-01…05`, `FR-STK-01…04`).
 
 Hors périmètre identifié dans le code : **4 ensembles** (bulletins, passage annuel, validateurs d'emploi du temps figés, mode démonstration) ≈ 2 300 lignes.
 
 ### 4.2 Par lot du SRS
 
-| Lot | Exigences | Conformes | Partielles | Absentes/Divergentes | Maturité estimée |
-|---|---|---|---|---|---|
-| **1 — Fondations** | 19 | 0 | 7 | 12 | **≈ 20 %** — le socle d'isolation et d'audit est excellent, tout le reste (console, plans, IAM fin, référentiel générique, i18n, tâches, fichiers, notifications, import/export, PDF) est à construire |
-| **2 — Cœur scolaire** | 17 | 1 | 13 | 3 | **≈ 45 %** — la zone la plus avancée, mais `group_membership` et le référentiel générique imposent une refonte |
-| **3 — Finance** | 15 | 0 | 8 | 7 | **≈ 30 %** — invariants d'immutabilité et d'idempotence excellents, mais échéanciers, validations, contre-opérations, catégories et règles de rémunération sont absents ou divergents |
-| **4 — Exploitation** | 11 | 0 | 9 | 2 | **≈ 35 %** — détection de conflits remarquable, mais calendrier, récurrences, remplacements, pointage par séance et tableaux de bord rapprochés manquent |
-| **5 à 10** | 23 | 0 | 3 | 20 | **≈ 8 %** — sauf le lot 9 (mode dédié), le plus avancé du projet |
+Répartition des `FR-*` par lot selon la §9.1 du SRS, même règle de comptage. La maturité est une **estimation qualitative** (valeur livrée au regard de l'effort restant), pas un ratio des colonnes précédentes.
+
+| Lot | Exigences | Conformes | Partielles | Absentes | Divergentes | Maturité estimée |
+|---|---|---|---|---|---|---|
+| **1 — Fondations** | 24 | 0 | 11 | 11 | 2 | **≈ 20 %** — le socle d'isolation et d'audit est excellent, tout le reste (console, plans, IAM fin, référentiel générique, i18n, tâches, fichiers, notifications, import/export, PDF) est à construire |
+| **2 — Cœur scolaire** | 20 | 0 | 16 | 3 | 1 | **≈ 45 %** — la zone la plus avancée, mais `group_membership` et le référentiel générique imposent une refonte |
+| **3 — Finance** | 15 | 0 | 8 | 6 | 1 | **≈ 30 %** — invariants d'immutabilité et d'idempotence excellents, mais échéanciers, validations, contre-opérations, catégories et règles de rémunération sont absents ou divergents |
+| **4 — Exploitation** | 13 | 0 | 10 | 2 | 1 | **≈ 35 %** — détection de conflits remarquable, mais calendrier, récurrences, remplacements, pointage par séance et tableaux de bord rapprochés manquent |
+| **5 à 10** | 23 | 0 | 4 | 19 | 0 | **≈ 8 %** — sauf le lot 9 (mode dédié), le plus avancé du projet |
 
 ### 4.3 Les 12 divergences, par décision à prendre
+
+Regroupement par décision des 24 lignes du §3 qui comportent une divergence (§4.1) : plusieurs lignes relèvent souvent d'une même décision.
 
 | Divergence | Décision recommandée |
 |---|---|
@@ -547,6 +574,10 @@ Défauts et incohérences relevés pendant la lecture, indépendants du plan par
 | T16 | **Le module inactif renvoie 404**, alors que `FR-PLT-02 AC2` exige **403** avec le code `module_disabled`. | [TenantContext.php:29-30](madrassa-backend/app/School/Http/TenantContext.php:29) | mineur | Aligner le code et la charge utile d'erreur |
 | T17 | **Pagination par défaut à 50**, `NFR-PERF-04` demande 25. | [SchoolController.php:63](madrassa-backend/app/School/Http/SchoolController.php:63) | mineur | Passer le défaut à 25 (plafond 100 déjà conforme) |
 | T18 | **Sauvegardes non chiffrées.** Le contrôle de clé porte sur `APP_KEY`, pas sur l'archive produite. | [backup.py:123](docker/backup/backup.py:123) | majeur (`NFR-SEC-09`, `NFR-DATA-05`) | Chiffrer l'archive et documenter la gestion de clé |
+| T19 | **La suite d'invariants livrée ne s'exécute pas.** `database.mjs` charge `001_school.sql` puis `runtime-grants.sql`, mais ce fichier accorde des droits sur des tables créées **uniquement** par les migrations Laravel (`teacher_assignments`, `report_card_*`, `admissions`, `annual_progressions`). `npm test` échoue à l'initialisation (`relation "school.teacher_assignments" does not exist`), avant le premier contrôle. `docs/VALIDATION.md` annonce pourtant « 34 contrôles réussis ». Appliquée au schéma complet (base + 11 migrations + privilèges), la suite passe : **34/34** (révision 1.1). | [database.mjs:28-32](madrassa-backend/tests/database.mjs:28), [runtime-grants.sql](madrassa-backend/deploy/runtime-grants.sql) | **bloquant** (`NFR-MNT-01`, préalable à T11) | Faire appliquer par la suite le même schéma que la production : extraire le SQL des migrations dans des fichiers `.sql` chargés à la fois par les migrations Laravel et par `database.mjs`, ou faire exécuter les migrations par la suite. Corriger `docs/VALIDATION.md` |
+| T20 | **Le PDF d'emplois du temps de la documentation est corrompu.** Les octets binaires ont été remplacés par le caractère U+FFFD (fichier écrit comme du texte) ; les 8 pages s'affichent vides. | `madrassa-backend/docs/emplois-du-temps-moyen-2026-2027.pdf` | mineur | Régénérer le PDF en écriture binaire, ou le retirer de `docs/` |
+| T21 | **Dépendances et caches suivis par git** : `.test-tools/node_modules` (183 fichiers) et 19 fichiers `__pycache__`. | `git ls-files` | mineur | Les retirer de l'index et compléter `.gitignore` |
+| T22 | **Le déploiement Docker interroge la base en superutilisateur.** `compose.yaml` connecte l'application avec `school_owner`, que l'image officielle `postgres` crée superutilisateur ; or la sécurité au niveau des lignes ne s'applique jamais à un superutilisateur. La seconde barrière entre écoles n'existe donc pas dans ce déploiement, y compris lorsqu'il est publié par le tunnel Cloudflare. Le README du backend l'interdit pourtant (« Ne jamais utiliser le superutilisateur du conteneur pour les requêtes HTTP »). Constaté en révision 1.2. | `compose.yaml`, `docker/entrypoint.sh` | **bloquant** (`NFR-TEN-01`, `ARC-02`, `BR-01`) | Migrations et commandes d'administration en propriétaire ; requêtes web et tâches de fond sous le rôle restreint `school_runtime`, avec des privilèges complets pour l'API |
 
 ---
 
@@ -558,8 +589,9 @@ Défauts et incohérences relevés pendant la lecture, indépendants du plan par
 2. **Traiter les invariants critiques en premier, lot par lot** (§0.5 du SRS). Dans un lot, aucun écran n'est développé avant que l'invariant correspondant soit vert.
 3. **Un lot est livrable et testable seul** (§0.3) et ne casse aucun lot précédent : chaque chantier se termine par l'exécution complète de la suite d'invariants, pas seulement de ses nouveaux tests.
 4. **L'internationalisation est un chantier du lot 1, pas une finition.** Chaque écran écrit après le lot 1 naît bilingue ; les écrans existants sont reprisés une seule fois, au lot 1. Repousser ce chantier multiplie son coût par le nombre d'écrans ajoutés entre-temps.
-5. **Les divergences se tranchent avant le code**, dans le lot 0. Dix d'entre elles sont des refontes de schéma : les découvrir en cours de lot coûte un cycle de migration de données.
-6. **Les estimations sont des fourchettes pour une équipe de 2 à 3 développeurs**, hors recette client et hors chantiers juridiques (OD-07, OD-08). Elles supposent le maintien de la pile actuelle.
+5. **Les divergences se tranchent avant le code**, dans le lot 0. Dix d'entre elles sont des refontes de schéma : les découvrir en cours de lot coûte une reprise du schéma, des services et des écrans déjà écrits.
+6. **Les durées de lot sont des fourchettes pour une équipe totale de 2 à 3 développeurs** (au plus deux chantiers en parallèle) ; l'effort S/M/L de chaque chantier est mesuré pour 1 à 2 personnes (§0.3). Hors recette client et hors chantiers juridiques (OD-07, OD-08). Elles supposent le maintien de la pile actuelle et la **refonte incrémentale** du code (voir ND-09 pour l'alternative d'une nouvelle base de schéma).
+7. **Aucune donnée de production à migrer.** Les données actuelles sont des données d'exemple : les refontes de schéma remplacent directement les tables concernées et régénèrent les jeux d'exemple, sans vues de compatibilité ni reprise de données. La discipline « une migration + ses tests » reste obligatoire, pour les futurs clients.
 
 ### 6.2 Lot 0 — Décisions et outillage (préalable, 2 à 3 semaines)
 
@@ -567,9 +599,9 @@ Rien de fonctionnel n'est livré ; tout le reste en dépend.
 
 | Réf. | Travail | Effort |
 |---|---|---|
-| 0.1 | **Trancher les décisions ouvertes bloquantes** : OD-01 (pile → maintenir Laravel, amender §4.2), ND-01 (montants entiers en centimes → amender `ARC-11`), ND-02 (sort du sous-système Bulletins), ND-03 (sort du passage annuel), ND-04 (sort du mode démonstration), ND-05 (contrainte d'exclusion `tstzrange` **en complément** du déclencheur), ND-06 (modèle de déploiement cible : SaaS mutualisé **et** dédié, le code partagé) | S |
+| 0.1 | **Trancher les décisions ouvertes bloquantes** : OD-01 (pile → maintenir Laravel, amender §4.2), ND-01 (montants entiers en centimes → amender `ARC-11`), ND-02 (sort du sous-système Bulletins), ND-03 (sort du passage annuel), ND-04 (sort du mode démonstration), ND-05 (contrainte d'exclusion `tstzrange` **en complément** du déclencheur), ND-06 (modèle de déploiement cible : SaaS mutualisé **et** dédié, le code partagé), ND-07 (validateurs d'emploi du temps figés), ND-08 (révision de H5), ND-09 (refonte incrémentale ou nouvelle base de schéma) | S |
 | 0.2 | **Publier le SRS 1.2** avec les amendements §4.2, `ARC-11`, et l'arbitrage des éléments hors périmètre trouvés dans le code | S |
-| 0.3 | **Intégration continue** (T11, `NFR-MNT-01`) : exécuter `database.mjs` + `concurrency.mjs` sur une base jetable, exécuter la suite PHP, analyse statique, vérification que chaque migration s'applique et se vérifie | S |
+| 0.3 | **Intégration continue** (T11, `NFR-MNT-01`) : **réparer d'abord l'initialisation de la suite (T19)**, puis exécuter `database.mjs` + `concurrency.mjs` sur une base jetable, exécuter la suite PHP, analyse statique, vérification que chaque migration s'applique et se vérifie | S |
 | 0.4 | **Socle de tests d'intégration HTTP authentifiés** : fabriques de tenant, d'utilisateur, d'adhésion et de permissions ; base du test route × permission (`TST-02`) | M |
 | 0.5 | **Corrections à faible coût et fort rendement** : T16 (403 `module_disabled`), T17 (pagination 25), T14 (codes immuables), T1 (suppression → archivage ou privilèges cohérents) | S |
 
@@ -584,8 +616,8 @@ Le lot le plus lourd : il transforme un déploiement dédié en plateforme.
 | **W1.1** | **Runtime multi-tenant** (`ARC-02`, `ARC-03`) | Retirer l'épinglage `DeploymentSchool` du chemin SaaS en le conservant comme **mode de déploiement dédié** (ND-06) ; résoudre le tenant depuis la session authentifiée (et/ou le sous-domaine), jamais depuis un paramètre client ; préfixer cache, sessions, files et stockage par tenant (`NFR-TEN-03`) ; garantir « un tenant a au moins un site » | 0.1 | M |
 | **W1.2** | **Console éditeur** (`FR-PLT-01`, `FR-PLT-04`, `FR-PLT-05`) | `tenant(slug immuable, status, default_locale)`, création avec site par défaut + profil + invitation du premier administrateur, suspension révoquant les sessions, archivage en lecture seule, idempotence de création ; `support_access_grant` (consentement, ≤ 72 h, lecture seule, exclusion salariale, journalisation **dans le journal du tenant**, bannière) ; tableau de bord éditeur agrégé | W1.1, W1.4 | L |
 | **W1.3** | **Entitlements par tenant** (`FR-PLT-02`, `ARC-04`, `BR-20`) | `plan`, `tenant_entitlement(module_key, quotas, valid_from, valid_until, grace_days)` ; **réutiliser `ModuleRegistry`** en changeant sa source de vérité de l'environnement vers la base ; blocage d'inscription au dépassement de quota sans bloquer consultation ni paiements ; lecture seule après grâce ; 403 `module_disabled` ; invalidation de cache au changement | W1.1 | M |
-| **W1.4** | **IAM** (`FR-IAM-01` à `05`) | `permission_catalog` **peuplé depuis l'annexe A** avec marquage `sensitive` ; `role`, `role_permission`, `role_assignment(scope, valid_from, valid_to)` ; les 11 rôles prédéfinis **semés et copiés par tenant** ; cumul = union ; portées (tenant, site, niveau, groupe, matière) + portées personnelles implicites ; `sod_rule` + contrôle `approved_by ≠ created_by` ; cycle de vie des comptes (`invited/active/suspended/revoked`, lien 72 h, protection du dernier administrateur) ; **Argon2id** (T-SEC-02), MFA TOTP + codes de récupération, verrouillage progressif, politique de session. **Migrer les 16 permissions actuelles vers le catalogue fin en conservant les ~40 points d'appel `authorize()`** | 0.4 | L |
-| **W1.5** | **Référentiel générique** (`FR-REF-01` à `06`) | `node_type` + `ref_node(parent_id, type, code, labels, sort_order, status, platform_code)` ; **migration de données** `programs`+`levels` → `ref_node` avec vues de compatibilité le temps de la transition ; `subject(kind, labels, status)` ; unicité **normalisée** (casse, espaces, diacritiques arabes) ; `academic_year` + `period` avec unicité de l'année `current`, non-chevauchement, clôture ; `custom_field_def` ; écran de paramètres d'établissement (identité, logo, langues, jours ouverts, créneaux, politiques, seuils) ; **transformer `algerian_curriculum.php` en profil `private_school_dz` versionné en données**, ajouter les libellés arabes (OD-13) et le profil `training_center` | W1.1 | L |
+| **W1.4** | **IAM** (`FR-IAM-01` à `05`) | `permission_catalog` **peuplé depuis l'annexe A** avec marquage `sensitive` ; `role`, `role_permission`, `role_assignment(scope, valid_from, valid_to)` ; les 11 rôles prédéfinis **semés et copiés par tenant** ; cumul = union ; portées (tenant, site, niveau, groupe, matière) + portées personnelles implicites ; `sod_rule` + contrôle `approved_by ≠ created_by` ; cycle de vie des comptes (`invited/active/suspended/revoked`, lien 72 h, protection du dernier administrateur) ; **Argon2id** (`NFR-SEC-02`), MFA TOTP + codes de récupération, verrouillage progressif, politique de session. **Migrer les 16 permissions actuelles vers le catalogue fin en conservant les ~40 points d'appel `authorize()`** | 0.4 | L |
+| **W1.5** | **Référentiel générique** (`FR-REF-01` à `06`) | `node_type` + `ref_node(parent_id, type, code, labels, sort_order, status, platform_code)` ; **remplacement direct** de `programs`+`levels` par `ref_node` (aucune donnée de production : jeux d'exemple régénérés depuis le profil, pas de vues de compatibilité ; services et écrans qui lisent `programs`/`levels` repris dans le même chantier) ; `subject(kind, labels, status)` ; unicité **normalisée** (casse, espaces, diacritiques arabes) ; `academic_year` + `period` avec unicité de l'année `current`, non-chevauchement, clôture ; `custom_field_def` ; écran de paramètres d'établissement (identité, logo, langues, jours ouverts, créneaux, politiques, seuils) ; **transformer `algerian_curriculum.php` en profil `private_school_dz` versionné en données**, ajouter les libellés arabes (OD-13) et le profil `training_center` | W1.1 | L |
 | **W1.6** | **Services transverses** (`FR-JOB-01`, `FR-FIC-01`, `FR-NOT-01`, `FR-IMP-01/02`, `FR-PDF-01`, `FR-AUD-01`) | File Redis + table `job` (états, progression, erreur compréhensible, relance, annulation, idempotence, **vérification du tenant à l'exécution**) + page « Mes tâches » + ouvrier de l'`outbox` (`FOR UPDATE SKIP LOCKED`, tentatives, retrait après succès) ; `file_object` sur S3/MinIO avec préfixe `tenant/{id}/`, URL signées ≤ 15 min, **vérification de signature de contenu**, types et tailles configurables, 5 catégories de droits, quota ; `notification` + SMTP + préférences + suivi et rejeu des échecs ; moteur d'import (XLSX/CSV, modèles, dépôt serveur, **prévisualisation sans écriture**, `external_ref` idempotent, résolution des références par code, doublons, rapprochement financier, reprise à blanc, retour arrière, rapport de rejets, conservation du fichier) ; moteur d'export (permissions et portées, par domaine, arrière-plan > 2 000 lignes, journalisation, purge 7 j, **neutralisation des formules**) ; **service PDF avec polices arabes embarquées** ; audit enrichi (avant/après, motif, IP, identifiant de requête, opération liée, lecture filtrée par domaine) | W1.1, W1.4 | L |
 | **W1.7** | **i18n et RTL** (`FR-I18-01`, `NFR-I18N-*`) | Extraction de **toutes** les chaînes (configurations, validateurs, messages métier, Blade, JS) ; catalogues `fr` et `ar` ; langue par utilisateur avec repli tenant puis `fr` ; **styles logiques** (début/fin) pour un miroir RTL sans duplication ; libellés par langue sur référentiel, catégories, moyens de paiement, rôles ; **champs de nom arabe et latin** sur élèves, responsables et personnel ; normalisation arabe de recherche (alif/hamza, ya/alif maqsura, ta marbuta, diacritiques) + translittération ; formats de dates et de montants localisés ; **test de pseudo-localisation** détectant toute chaîne en dur | — (parallélisable) | L |
 
@@ -600,9 +632,9 @@ Le lot le plus lourd : il transforme un déploiement dédié en plateforme.
 | **W2.2** | Responsables (`FR-ELV-02`) | `relationship` énuméré, noms arabe/latin, profession, `is_primary_contact`, `is_payer`, `emergency_contact`, règle du contact principal pour les mineurs | S |
 | **W2.3** | CRM amont (`FR-CRM-01`) | `lead`, `lead_interaction`, source et statuts paramétrables, rappels + notification à l'assigné, `assigned_to`, `lost_reason`, anti-doublon téléphone, exclusion des effectifs. **Brancher sur `StudentLifecycle::admit()` existant** (`FR-CRM-02` quasi conforme) | M |
 | **W2.4** | Sites et salles (`FR-SLL-01/02`) | Codes, libellés multilingues, statuts, `room_type` et `equipment` paramétrables, **`room_closure` datée** bloquant les séances | S |
-| **W2.5** | **Groupes et affectations** (`FR-GRP-01/02`) — *chantier structurant* | `group_type`, `code`, `site_id`, `main_room_id`, `lead_teacher_id`, dates de validité, statuts ; **création de `group_membership(enrollment_id, group_id, valid_from, valid_to, is_main)`** avec index unique partiel `(enrollment_id) WHERE is_main AND valid_to IS NULL` ; migration de `enrollments.cohort_id` vers des affectations ; transfert atomique (clôture source + création cible) ; contrôle de capacité atomique **porté** sur le nouveau modèle ; file d'attente (OD-14) | L |
+| **W2.5** | **Groupes et affectations** (`FR-GRP-01/02`) — *chantier structurant* | `group_type`, `code`, `site_id`, `main_room_id`, `lead_teacher_id`, dates de validité, statuts ; **création de `group_membership(enrollment_id, group_id, valid_from, valid_to, is_main)`** avec index unique partiel `(enrollment_id) WHERE is_main AND valid_to IS NULL` ; **remplacement direct** de `enrollments.cohort_id` par des affectations (données d'exemple régénérées, aucune reprise) ; transfert atomique (clôture source + création cible) ; contrôle de capacité atomique **porté** sur le nouveau modèle ; file d'attente (OD-14) | L |
 | **W2.6** | Personnel (`FR-STF-01` à `04`) | `staff_type` énuméré (débloque `FR-REM-01 AC3`), statuts `on_leave`/`left`, date d'embauche, noms arabe/latin ; habilitations **datées** avec **héritage du nœud parent** et sortie des codes codés en dur (T8) ; `availability`, `unavailability`, bornes horaires ; contrats **sans montant** (T4) ; `leave` créant des indisponibilités et listant les séances impactées | L |
-| **W2.7** | Programmes et volumes (`FR-PRG-01/02`) | `code`, libellés multilingues, durée, **`price_version`**, `payment_terms`, statuts, gel par année clôturée ; `program_subject(total_hours, weekly_hours, session_count, session_duration_minutes, coefficient, valid_from, valid_to)` **rattaché au programme**, règle « au moins une des trois valeurs », versionnement, retrait par fin de validité, avertissement d'écart > 10 %, programme sans matière valide. **Migration depuis `curriculum` en réutilisant les volumes de `primary_weekly_minutes.json`** | M |
+| **W2.7** | Programmes et volumes (`FR-PRG-01/02`) | `code`, libellés multilingues, durée, **`price_version`**, `payment_terms`, statuts, gel par année clôturée ; `program_subject(total_hours, weekly_hours, session_count, session_duration_minutes, coefficient, valid_from, valid_to)` **rattaché au programme**, règle « au moins une des trois valeurs », versionnement, retrait par fin de validité, avertissement d'écart > 10 %, programme sans matière valide. **Remplace `curriculum` ; les volumes de `primary_weekly_minutes.json` alimentent le profil `private_school_dz`** | M |
 | **W2.8** | Inscriptions (`FR-INS-01` à `04`) | Création en `pending` (T13), validation/suspension/annulation habilitées avec motif, `terms_snapshot`, refus d'un élève bloqué, contrôle de quota, transfert avec `transferred_from`, `enrollment_status_history`, `access_granted` | M |
 
 **Invariants :** `TST-07` (reporté sur `group_membership`, N=30), `TST-08`, `TST-18` complet.
@@ -612,10 +644,10 @@ Le lot le plus lourd : il transforme un déploiement dédié en plateforme.
 
 | Réf. | Chantier | Contenu | Effort |
 |---|---|---|---|
-| **W3.1** | Échéanciers et tarification (`FR-FIN-01`) | `installment(enrollment_id, seq, due_date, amount)`, `adjustment(type, amount, reason, approved_by)`, contrôle bloquant « somme des échéances = dû − remises » avec arrondi `BR-04`, motif obligatoire, seuil d'approbation direction (OD-09), modèle d'échéancier du programme, versionnement. **Remplace la facture unique actuelle** (migration de données) | L |
+| **W3.1** | Échéanciers et tarification (`FR-FIN-01`) | `installment(enrollment_id, seq, due_date, amount)`, `adjustment(type, amount, reason, approved_by)`, contrôle bloquant « somme des échéances = dû − remises » avec arrondi `BR-04`, motif obligatoire, seuil d'approbation direction (OD-09), modèle d'échéancier du programme, versionnement. **Remplace la facture unique actuelle** (sans reprise de données : données d'exemple uniquement) | L |
 | **W3.2** | Paiements, validation, corrections (`FR-FIN-02/03/04`) | `status ∈ pending_validation/validated/reversed`, `paid_on`, **`reference` unique** (T6), moyens de paiement **paramétrables par tenant**, encaissement sur délégation, option `finance.allow_self_validation` + marque `self_validated` (OD-10), contrôle SoD ; **`payment_reversal` distincte du remboursement** (T5) ; `refund_request` + approbation direction avec approbateur ≠ demandeur ; trop-perçu comme crédit avec décision explicite. **Conserver intégralement les gardes et l'immutabilité existantes** | L |
 | **W3.3** | Reçus, impayés, clôture (`FR-FIN-05/06/07`) | Reçu PDF via le service du lot 1, numérotation `REC-{année}-{séquence 6}` par tenant, contenu figé, duplicata, langue du destinataire ; listes d'impayés et de retards par élève/programme/groupe/période avec export contrôlé et notifications J-3/J/J+7 **manuelles ou semi-automatiques** ; `finance_period` avec clôture, réouverture motivée et approuvée, rapport de rapprochement | M |
-| **W3.4** | **Règles de rémunération** (`FR-REM-01`) — *chantier structurant* | `pay_rule(kind ∈ fixed_monthly/hourly/per_session/mixed, monthly_amount, variable_basis, included_quantity, valid_from/valid_to)`, `pay_rule_rate(node_id, unit_amount)` ; **résolution du tarif : nœud du programme du groupe → plus proche ancêtre → tarif par défaut** ; restrictions par `staff_type` ; refus des combinaisons invalides (`AC6`, `AC7`, `AC8`) ; changement au 1er du mois ; permission `payroll.rule.manage` distincte ; primes récurrentes. **Migration depuis `contracts.basis/rate_minor` puis retrait du montant du contrat RH** (T4) | L |
+| **W3.4** | **Règles de rémunération** (`FR-REM-01`) — *chantier structurant* | `pay_rule(kind ∈ fixed_monthly/hourly/per_session/mixed, monthly_amount, variable_basis, included_quantity, valid_from/valid_to)`, `pay_rule_rate(node_id, unit_amount)` ; **résolution du tarif : nœud du programme du groupe → plus proche ancêtre → tarif par défaut** ; restrictions par `staff_type` ; refus des combinaisons invalides (`AC6`, `AC7`, `AC8`) ; changement au 1er du mois ; permission `payroll.rule.manage` distincte ; primes récurrentes. **Retrait du montant du contrat RH** (T4) ; contrats et règles d'exemple régénérés | L |
 | **W3.5** | Génération et détail (`FR-REM-02/03/04/05`) | `payroll_run(status ∈ draft/validated/partially_paid/paid)` recalculable en brouillon, figé à la validation ; `payroll_line` conservant **une copie** du niveau, de la quantité et du tarif appliqués ; `payroll_adjustment` tracé ; ligne **« tarif manquant »** bloquant la validation (`BR-16`) ; proratisation paramétrable de la part fixe ; unités incluses les plus anciennes du mois pour `mixed` ; validation par `payroll.run.validate` ≠ auteur (T2) ; versements liés à la dépense `salaries` avec états. **Conserver le verrou personne/mois, l'unicité et l'instantané existants** | L |
 | **W3.6** | Dépenses (`FR-DEP-01/02/03`) | `expense_category` paramétrable avec `salaries` **système non saisissable**, imputation à un programme ; `validation_status` + `payment_status`, bénéficiaire, motif, pièces jointes sous `expense.attachment.read`, valideur ≠ auteur, seuil direction, filtres et exports ; `expense_reversal` lié | M |
 
@@ -628,7 +660,7 @@ Le lot le plus lourd : il transforme un déploiement dédié en plateforme.
 |---|---|---|---|
 | **W4.1** | Calendrier et séances (`FR-PLN-01/02`) | `closure(scope tenant/site)`, `time_slot`, jours ouverts dimanche–jeudi, priorité des exceptions datées ; `recurrence` + génération de séances excluant fermetures et jours fermés ; statuts `delivered`/`replaced` ; `locked` ; édition série / occurrence ; **suivi de volume** planifié / assuré / restant par groupe et matière, confronté à `program_subject` | L |
 | **W4.2** | Conflits, versions, remplacements (`FR-PLN-03/04/05/06`) | **Ajouter la contrainte d'exclusion `tstzrange`** pour enseignant et salle en **complément** du déclencheur existant (ND-05) ; contrôle des indisponibilités et fermetures ; avertissements (bornes horaires, dépassement de volume, temps de déplacement) ; vues groupe/enseignant/salle/élève + **export ICS** (Africa/Algiers) + PDF ; `timetable_version` avec comparaison, publication par `schedule.timetable.publish` refusant tout conflit bloquant, **notification uniquement après publication** ; annulation et **remplacement** avec recontrôle d'habilitation et de disponibilité, alimentant pointage et rémunération | L |
-| **W4.3** | Pointage enseignant (`FR-PTG-01/02/03`) | `teacher_attendance(session_id, status, late_minutes, actual_start/end, replacement_teacher_id, entered_by, validated_by, validation_status)` : **rattachement à la séance**, « non pointé » distinct d'« absent », refus de pointer une séance future, limite J+N ; validation individuelle ou par lot avec **valideur ≠ auteur** (T3) et rejet motivé notifié ; heures assurées validées dérivées des séances, remplaçant crédité, `teacher_hours_adjustment` tracé ; **brancher sur le calcul de rémunération du lot 3**. Migration depuis `work_logs` | L |
+| **W4.3** | Pointage enseignant (`FR-PTG-01/02/03`) | `teacher_attendance(session_id, status, late_minutes, actual_start/end, replacement_teacher_id, entered_by, validated_by, validation_status)` : **rattachement à la séance**, « non pointé » distinct d'« absent », refus de pointer une séance future, limite J+N ; validation individuelle ou par lot avec **valideur ≠ auteur** (T3) et rejet motivé notifié ; heures assurées validées dérivées des séances, remplaçant crédité, `teacher_hours_adjustment` tracé ; **brancher sur le calcul de rémunération du lot 3**. Remplace `work_logs` (sans reprise de données) | L |
 | **W4.4** | Appel des élèves (`FR-PRE-01`) | Liste des élèves affectés **à la date** de la séance (nécessite `group_membership` daté, W2.5), seuils de notification, notifications aux responsables, portée « un enseignant n'appelle que ses séances ». **Conserver le modèle `attendance` existant** | S |
 | **W4.5** | Tableaux de bord (`FR-TDB-01/02/03`) | Indicateurs financiers avec période, filtres, date de mise à jour, **base de calcul affichée** et retour aux opérations sources ; revenus facturés par mois d'exigibilité ; encaissements nets déduisant contre-opérations et remboursements ; charges salariales distinguant engagé et payé **sans double comptage** ; résultat net de gestion avec convention affichée et paramétrable ; rentabilité par programme avec méthode de répartition affichée et coûts manquants signalés ; indicateurs opérationnels (remplissage, inscriptions en attente, conversion CRM, absences, taux de pointage validé, séances non pointées) ; exports respectant les permissions ; cache invalidé sur événement | M |
 
@@ -677,7 +709,7 @@ Lot 4 : W4.3 pointage par séance ──┘                              │
 | **J3** | Lot 3 clos : R04–R07 verts, `TST-19` au centime, rapprochement validé par la finance | S+39 |
 | **J4** | Lot 4 clos : R08 vert, planning publié sans conflit, pointage validé par un tiers alimentant la paie | S+47 |
 
-Soit environ **11 à 12 mois pour les lots 1 à 4** avec 2 à 3 développeurs, hors recette client, hors chantiers juridiques (OD-07, OD-08) et hors lots 5 à 10. L'hypothèse H5 du SRS (« le premier trimestre vise les lots 1 à 4 ») n'est pas tenable : **le seul lot 1 représente environ un trimestre complet.** C'est le point le plus important à remonter à la direction produit.
+Soit environ **11 à 12 mois pour les lots 1 à 4** avec 2 à 3 développeurs, hors recette client, hors chantiers juridiques (OD-07, OD-08) et hors lots 5 à 10. Ce calendrier n'est pas réduit par l'absence de données de production (révision 1.1) : le gain sur W1.5 et W2.5, de quelques semaines au plus, est conservé comme marge. L'hypothèse H5 du SRS (« le premier trimestre vise les lots 1 à 4 ») n'est pas tenable : **le seul lot 1 représente environ un trimestre complet.** C'est le point le plus important à remonter à la direction produit.
 
 ---
 
@@ -687,14 +719,14 @@ Soit environ **11 à 12 mois pour les lots 1 à 4** avec 2 à 3 développeurs, h
 |---|---|---|---|---|
 | R1 | **Sous-estimation du lot 1.** La console, l'IAM fin, le référentiel générique et l'i18n sont quatre chantiers lourds qui n'existent pas, alors que la perception « il y a déjà une application qui marche » est forte. | élevée | élevé | Faire valider le jalon J1 à S+17 **avant** d'engager le lot 2 ; livrer W1.1+W1.3 en premier pour rendre le multi-tenant démontrable tôt |
 | R2 | **L'internationalisation repoussée.** Chaque écran livré sans i18n augmente le coût de reprise. | élevée | élevé | Traiter W1.7 **dans** le lot 1, en parallèle ; verrouiller par le test de pseudo-localisation en CI dès la première chaîne extraite |
-| R3 | **Migration de données du référentiel (W1.5) et des affectations (W2.5)** sur un déploiement contenant déjà des données réelles d'un établissement. | moyenne | élevé | Vues de compatibilité pendant la transition ; migration répétable et vérifiée sur copie anonymisée ; sauvegarde vérifiée avant chaque bascule (procédure déjà documentée dans `docs/ARCHITECTURE.md`) |
+| R3 | **Refontes de schéma du référentiel (W1.5) et des affectations (W2.5).** *Révision 1.1 :* les données présentes sont des données d'exemple et aucun établissement n'est en production ; le risque de reprise de données réelles **disparaît**. Reste le risque de casser services et écrans qui lisent `programs`/`levels`/`cohort_id` pendant la refonte. | faible | moyen | Remplacement direct des tables, sans vues de compatibilité ; reprise des services et écrans dans le même chantier ; jeux d'exemple régénérés depuis le profil et les fixtures ; suite d'invariants complète à chaque migration (R4). Si un premier client entre en production avant ces chantiers, rétablir l'atténuation initiale (migration répétable vérifiée sur copie anonymisée, sauvegarde vérifiée avant bascule) |
 | R4 | **Régression des invariants** pendant les refontes de schéma (`group_membership`, `pay_rule`, échéanciers). | moyenne | élevé | Exécuter **toute** la suite d'invariants à chaque migration, pas seulement les nouveaux tests ; aucune migration fusionnée sans son test |
 | R5 | **Rupture du lot 3 par le lot 4.** Si `payroll_line` n'accepte pas deux sources d'unités (saisie manuelle puis séances pointées), le lot 4 impose une refonte du calcul validé. | moyenne | élevé | Concevoir `payroll_line` avec un champ de provenance dès W3.5 ; écrire un test du lot 3 avec des unités d'origine « séance » simulée |
 | R6 | **Conformité juridique tardive** (OD-07, OD-08, loi 18-07). Aucune durée de conservation, aucun contrat de sous-traitance. | élevée | élevé | Lancer le chantier juridique **en parallèle du lot 1**, pas à la fin ; `NFR-DATA-02` conditionne le premier client payant |
 | R7 | **Dérive du mode démonstration.** Les règles métier y sont dupliquées en session avec des flottants (T15). | **réalisée** | moyen | Trancher ND-04 au lot 0 : bac à sable d'interface non normatif clairement étiqueté, ou suppression |
 | R8 | **Les bulletins scolaires orientent le produit hors SRS.** ~1 200 lignes et 13 routes implémentent une fonction explicitement exclue du périmètre. | moyenne | moyen | Trancher ND-02 au lot 0 ; si conservé, en faire un module optionnel documenté comme extension hors SRS, avec son propre coût de maintenance assumé |
 | R9 | **Performances non démontrées** (`NFR-PERF-*`), sur une architecture reposant sur un verrou consultatif par établissement pour le planning et les inscriptions. | moyenne | moyen | Instrumenter tôt (latences p95, attentes de verrou, 409) ; test de charge sur le tenant de référence au jalon J2, avant que les volumes ne s'accumulent |
-| R10 | **Absence d'intégration continue** aujourd'hui : 34 tests excellents que rien n'exécute. | **réalisée** | élevé | Chantier 0.3, en première semaine |
+| R10 | **Absence d'intégration continue** aujourd'hui : 34 tests excellents que rien n'exécute — et qui, tels que livrés, ne s'exécutent plus (T19), alors que la documentation les annonce réussis. | **réalisée** | élevé | Chantier 0.3, en première semaine, en commençant par T19 |
 
 ---
 
@@ -727,6 +759,7 @@ Soit environ **11 à 12 mois pour les lots 1 à 4** avec 2 à 3 développeurs, h
 | **ND-06** | Modèle de déploiement cible : SaaS mutualisé, dédié, ou les deux sur le même code | **Les deux sur le même code** : le dédié existe déjà et fonctionne (lot 9 quasi acquis), le mutualisé est le lot 1. Conserver `DeploymentSchool` comme mode d'épinglage **optionnel** et non comme chemin unique | Lot 0 |
 | **ND-07** | Sort des **validateurs d'emploi du temps figés** (`WeeklyTimetable`, 11 classes et 17 enseignants codés en dur) | **Sortir du chemin produit**, conserver comme jeu d'essai dans `tests/fixtures` | Lot 0 |
 | **ND-08** | Révision de l'hypothèse **H5** (« le premier trimestre vise les lots 1 à 4 ») | **Réviser** : le seul lot 1 représente environ un trimestre. Calendrier proposé au §6.8 | Lot 0 |
+| **ND-09** | Stratégie de réalisation : **refonte incrémentale** du code existant (plan du §6) ou **nouvelle base de schéma** écrite depuis le modèle §7.2 du SRS, sur la même pile, en y portant délibérément les actifs de catégorie A (§2.4) et les 34 tests d'invariants | **Nouvelle base de schéma, sur la même pile**, si aucun utilisateur ne dépend de l'application actuelle dans les prochains mois. Raisons : aucune donnée de production à préserver ; la moitié des tables cœur sont à refondre (catégorie C) ; toutes les tables doivent de toute façon recevoir les colonnes communes §7.1 (T10) et les libellés multilingues ; le lot 1 est surtout du neuf. Effort total des lots 1 à 4 **du même ordre** : le gain est un modèle propre dès le départ, la perte est l'absence d'application fonctionnelle pendant la reconstruction. **Ne pas changer de pile** (OD-01). Si l'application actuelle doit servir (école pilote, démonstrations commerciales), la maintenir en l'état pendant la reconstruction plutôt que de la refondre | Lot 0 |
 
 ---
 
@@ -837,6 +870,41 @@ Mais il réalise le **lot 9** du SRS (mode dédié) et non le **lot 1** (fondati
 
 1. **Valider ce rapport et publier le SRS 1.2** avec deux amendements seulement (pile technique, représentation des montants) et l'arbitrage des quatre ensembles hors périmètre trouvés dans le code. Dix des douze divergences doivent être corrigées dans le code, non dans le SRS : le code n'a pas dérivé par facilité, il a été livré pour un périmètre plus étroit.
 2. **Réviser l'hypothèse H5.** Les lots 1 à 4 représentent 11 à 12 mois à 2–3 développeurs, pas un trimestre. C'est le point à remonter en priorité à la direction produit, avant tout engagement commercial.
-3. **Engager le lot 0 immédiatement** (2 à 3 semaines) : trancher les huit décisions `ND`, mettre les 34 invariants existants sous intégration continue — ils ne sont exécutés par personne aujourd'hui — et appliquer les corrections à faible coût du §5. Rien dans ce lot n'est fonctionnel, et tout le reste en dépend.
+3. **Engager le lot 0 immédiatement** (2 à 3 semaines) : trancher les neuf décisions `ND` — dont ND-09, qui décide si le plan du §6 s'applique au code existant ou à une nouvelle base de schéma —, réparer l'initialisation de la suite d'invariants (T19) puis la mettre sous intégration continue — elle n'est exécutée par personne aujourd'hui et, telle que livrée, ne s'exécute plus —, et appliquer les corrections à faible coût du §5. Rien dans ce lot n'est fonctionnel, et tout le reste en dépend.
 
 > Conformément à la §0.5 du SRS, **aucune modification de code ne doit être engagée avant validation de ce rapport.**
+
+---
+
+## 11. Suivi des corrections (branche `lot0-corrections`)
+
+Corrections réalisées après la révision 1.1, dans le code existant (refonte incrémentale). Elles ne préjugent pas de ND-09 : les invariants et leurs tests se reportent tels quels sur une nouvelle base de schéma.
+
+| # | État | Correction | Vérification |
+|---|---|---|---|
+| T1 | Corrigé | L'API n'efface plus : elle **archive** (`archived_at` sur 13 tables), refuse l'archivage tant que des données en cours en dépendent, et le rôle restreint reçoit enfin les droits de modification que l'API utilise | test SQL ; suites navigateur |
+| T2 | Corrigé | Le calcul de paie crée un **brouillon** ; une autre personne le valide, et seule la validation crée la dépense de salaire ; un brouillon peut être supprimé pour corriger les heures | 7 tests SQL ; `teacher-pay.cjs` |
+| T3 | Corrigé | Les heures enregistrent leur auteur (`entered_by`) et leur valideur (`reviewed_by`) ; l'auteur ne peut pas les valider, en base comme à l'écran | 3 tests SQL ; `teacher-pay.cjs` |
+| T4 | Corrigé pour l'API | Le tarif d'un contrat est masqué sans `payroll.read` ; créer un contrat exige `payroll.write`. Reste : sortir le montant du contrat vers `pay_rule` (W3.4) | — |
+| T5 | Corrigé | **Contre-opération** `payment_reversals` : annule l'effet d'un paiement sur le solde, motif obligatoire, une seule par paiement, interdite après remboursement. Reste : circuit de remboursement approuvé (`FR-FIN-04`, lot 3) | 6 tests SQL |
+| T6 | Corrigé | Référence de paiement unique et non réutilisable dans l'école, y compris en concurrence. Reste : numérotation des reçus (`FR-FIN-05`, lot 3) | test SQL ; course native |
+| T7 | Non traité | `group_membership` est une refonte du modèle (W2.5, lot 2) | — |
+| T8 | Corrigé | Les codes de matières algériens quittent le service générique pour le profil (`config/algerian_curriculum.php`). Reste : héritage par nœud parent (W2.6) | `teacher-eligibility.cjs` |
+| T9 | Corrigé | Audit avec valeurs **avant/après**, données personnelles et contenus volumineux masqués, motif, identifiant de requête et adresse IP ; audit ajouté sur 4 tables qui en manquaient | test SQL |
+| T10 | Partiel | `archived_at` sur les tables du catalogue. Restent les colonnes communes §7.1 (`version`, `created_by`, `updated_by`) sur toutes les tables (W1.5) | — |
+| T11 | Corrigé | Intégration continue : SQL embarqué et natif avec courses, syntaxe PHP, tests Laravel, générateurs d'emplois du temps, construction des deux images | à confirmer au premier envoi sur GitHub |
+| T12 | Corrigé (substrat) | File Redis et service `worker`. Restent la table `job` et la page « Mes tâches » (`FR-JOB-01`, W1.6) | démarrage du service |
+| T13 | Corrigé | Une inscription naît `pending` et se valide par transition | test SQL ; `student-lifecycle.cjs` |
+| T14 | Corrigé | Codes et matricules définitifs : refus à l'API, privilège absent pour le rôle restreint, déclencheur pour tout autre rôle | 2 tests SQL |
+| T15 | Partiel | Mode démonstration en centimes entiers et étiqueté « données fictives, règles non contractuelles ». Son sort final reste ND-04 | tests Laravel |
+| T16 | Corrigé | Module inactif : 403 avec le code `module_disabled` | `modular-schools.cjs` |
+| T17 | Corrigé | Pagination par défaut à 25 | — |
+| T18 | Corrigé | Sauvegardes chiffrées (GnuPG, AES-256) avec `BACKUP_PASSPHRASE` ; les anciennes restent restaurables | `backups.cjs` |
+| T19 | Corrigé | La suite charge les mêmes fichiers SQL que les migrations ; `npm test` passe sans outil supplémentaire | 54 contrôles embarqués, 57 natifs |
+| T20 | Corrigé | PDF régénéré depuis sa page HTML, en écriture binaire (8 pages lisibles) | contrôle visuel |
+| T21 | Corrigé | 324 fichiers d'outillage et de cache retirés de git ; Playwright épinglé dans `.test-tools/package.json` ; fins de ligne LF imposées pour les fichiers copiés dans les images | — |
+| T22 | Corrigé | Requêtes et tâches sous `school_runtime`, créé et mis à jour à chaque démarrage ; identifiants relus dans l'environnement du processus, pour qu'un `config:cache` lancé en propriétaire ne les remplace pas | connexions web vérifiées dans le journal PostgreSQL, y compris après `config:cache` ; 9 suites navigateur |
+
+Toutes les nouvelles migrations sont réversibles (vérifié : application, retour arrière complet, réapplication).
+
+**Vérification d'ensemble (10 octobre 2026).** Suite SQL : 54 contrôles sur PostgreSQL embarqué, 57 sur PostgreSQL 16 avec trois courses concurrentes. Suites navigateur Docker : 9 sur 9 réussies, dont 5 après correction de tests anciens (qualification d'enseignant manquante depuis la migration du 2 octobre, nombre de routes, ordre des tests du frontend) ou adaptation au nouveau comportement (inscriptions en attente, validation par un tiers, sauvegardes chiffrées). Tests JavaScript du frontend (4), PHPUnit (7), générateurs d'emplois du temps (13) : réussis. Une régression introduite en cours de travail a été détectée et corrigée : la restauration d'une sauvegarde dans un déploiement neuf échouait faute de rôle `school_runtime`.

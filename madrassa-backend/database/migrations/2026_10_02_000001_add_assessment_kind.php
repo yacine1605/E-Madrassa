@@ -5,8 +5,10 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        DB::statement("ALTER TABLE school.assessments ADD COLUMN kind text CHECK (kind IN ('devoir','examen'))");
+        // Same SQL file as tests/database.mjs, so tests run on the production schema.
+        DB::unprepared(file_get_contents(database_path('schema/006_assessment_kind.sql')));
     }
+
     public function down(): void
     {
         DB::statement('ALTER TABLE school.assessments DROP COLUMN kind');

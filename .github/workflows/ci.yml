@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    name: SQL invariants (embedded and native PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_admin
+          POSTGRES_PASSWORD: ci_admin
+          POSTGRES_DB: madrassa_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci_admin -d madrassa_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: madrassa-backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: madrassa-backend/package-lock.json
+      - run: npm ci
+      - name: Invariants on embedded PostgreSQL
+        run: npm test
+      - name: Invariants and concurrent races on PostgreSQL 16
+        run: npm run test:concurrency
+        env:
+          DATABASE_URL: postgres://ci_admin:ci_admin@localhost:5432/madrassa_test
+
+  php:
+    name: PHP syntax, Laravel bootstrap and frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: intl, mbstring, pdo_pgsql, pdo_sqlite, zip
+          tools: composer
+      - name: Composer dependencies
+        working-directory: ecole-filament
+        run: composer install --prefer-dist --no-interaction --no-progress
+      # The frontend tests cover the standalone application (session demo on SQLite);
+      # once installed, the backend's migrations require PostgreSQL.
+      - name: Frontend tests
+        working-directory: ecole-filament
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php vendor/bin/phpunit
+      - name: Install the backend into the Laravel application, as the Docker image does
+        run: python3 madrassa-backend/scripts/install.py ecole-filament
+      - name: PHP syntax
+        run: find ecole-filament/app ecole-filament/routes ecole-filament/config ecole-filament/database madrassa-backend tests -name '*.php' -not -path '*/vendor/*' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Backend routes load, CSRF and authentication enforced
+        run: php madrassa-backend/tests/bootstrap.php "$PWD/ecole-filament"
+
+  timetables:
+    name: Timetable generators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python tests/middle-timetables.py
+      - run: python tests/secondary-timetables.py
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -f Dockerfile -t madrassa-app:ci .
+      - run: docker build -f docker/backup/Dockerfile -t madrassa-backup:ci .

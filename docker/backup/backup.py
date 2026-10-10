@@ -9,13 +9,16 @@ import signal
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import fcntl
+import contextlib
 
 ROOT = Path('/backups')
 STORAGE = Path('/school-storage')
 PROJECT = os.environ.get('SCHOOL_PROJECT', 'madrassa')
 ALGERIA = dt.timezone(dt.timedelta(hours=1))
+ARCHIVES = ('database.dump', 'files.tar.gz')
 
 
 def sql(query):
@@ -40,6 +43,26 @@ def counts():
 def digest(file):
     with file.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def passphrase():
+    value = os.environ.get('BACKUP_PASSPHRASE', '')
+    if len(value) < 12:
+        raise RuntimeError('BACKUP_PASSPHRASE (12 characters or more) is required: backups hold personal data and the school encryption key')
+    return value
+
+
+def gpg(args, source, target):
+    # Passphrase on stdin, never on a command line.
+    with tempfile.TemporaryDirectory() as home:
+        subprocess.run(['gpg', '--homedir', home, '--batch', '--yes', '--quiet', '--pinentry-mode', 'loopback',
+                        '--passphrase-fd', '0', *args, '--output', str(target), str(source)],
+                       input=passphrase().encode(), check=True)
+
+
+def encrypt(source):
+    gpg(['--symmetric', '--cipher-algo', 'AES256', '--compress-algo', 'none'], source, source.with_name(source.name+'.gpg'))
+    source.unlink()
 
 
 def atomic_json(path, value):
@@ -70,6 +93,7 @@ def backup():
         marker = framework / 'down'
         if marker.exists():
             raise RuntimeError('Application is already in maintenance; backup postponed')
+        passphrase()  # Refuse before entering maintenance, not after the dump.
         now = dt.datetime.now(dt.timezone.utc)
         name = 'backup-'+now.strftime('%Y%m%dT%H%M%S%fZ')
         staging = ROOT / ('.partial-'+name)
@@ -83,9 +107,13 @@ def backup():
             with tarfile.open(staging/'files.tar.gz', 'w:gz') as archive:
                 archive.add(STORAGE/'app', arcname='app')
             subprocess.run(['pg_restore', '--list', str(staging/'database.dump')], check=True, stdout=subprocess.DEVNULL)
-            manifest = {'version': 1, 'project': PROJECT, 'created_at': now.isoformat(), 'postgres_major': 16,
-                        'database': os.environ['PGDATABASE'], 'tables': snapshot_counts,
-                        'sha256': {file: digest(staging/file) for file in ('database.dump','files.tar.gz')}}
+            # Encrypted at rest: the copy holds personal data and the school's encryption key.
+            plain = {file: digest(staging/file) for file in ARCHIVES}
+            for file in ARCHIVES:
+                encrypt(staging/file)
+            manifest = {'version': 2, 'project': PROJECT, 'created_at': now.isoformat(), 'postgres_major': 16,
+                        'database': os.environ['PGDATABASE'], 'tables': snapshot_counts, 'encryption': 'gpg-aes256',
+                        'sha256': {file+'.gpg': digest(staging/(file+'.gpg')) for file in ARCHIVES}, 'sha256_plain': plain}
             atomic_json(staging/'manifest.json', manifest)
             staging.rename(ROOT/name)
             atomic_json(ROOT/'status.json', {'last_success': time.time(), 'backup': name, 'last_error': None})
@@ -102,43 +130,66 @@ def backup():
                 shutil.rmtree(staging)
 
 
-def validate(name):
+@contextlib.contextmanager
+def opened(name, deep=True):
+    """Checks a backup and yields (manifest, dump, files); decrypted copies are removed afterwards."""
     if Path(name).name != name or not name.startswith('backup-'):
         raise RuntimeError('Choose a backup directory name inside /backups')
     folder = ROOT/name
     manifest = json.loads((folder/'manifest.json').read_text())
-    if manifest.get('version') != 1 or manifest.get('postgres_major') != 16:
+    if manifest.get('version') not in (1, 2) or manifest.get('postgres_major') != 16:
         raise RuntimeError('Unsupported backup format')
-    for file in ('database.dump', 'files.tar.gz'):
-        if digest(folder/file) != manifest['sha256'][file]:
+    for file, expected in manifest['sha256'].items():
+        if digest(folder/file) != expected:
             raise RuntimeError('Backup checksum failed: '+file)
-    subprocess.run(['pg_restore','--list',str(folder/'database.dump')], check=True, stdout=subprocess.DEVNULL)
-    # Reject traversal, links and device files before making any database changes.
-    with tarfile.open(folder/'files.tar.gz') as archive:
-        for member in archive.getmembers():
-            parts = Path(member.name).parts
-            if not parts or parts[0] != 'app' or '..' in parts or not (member.isfile() or member.isdir()):
-                raise RuntimeError('Unsafe file archive')
-        key = archive.extractfile('app/.app-key').read().strip()
-        if not key.startswith(b'base64:'):
-            raise RuntimeError('Backup encryption key missing or invalid')
-    return folder, manifest
+    if not deep:
+        yield manifest, None, None
+        return
+    work = None
+    try:
+        if manifest['version'] == 1:  # Unencrypted backups made before version 2.
+            dump, files = folder/'database.dump', folder/'files.tar.gz'
+        else:
+            work = Path(tempfile.mkdtemp(dir=ROOT, prefix='.open-'))
+            dump, files = work/'database.dump', work/'files.tar.gz'
+            for file, target in zip(ARCHIVES, (dump, files)):
+                gpg(['--decrypt'], folder/(file+'.gpg'), target)
+                if digest(target) != manifest['sha256_plain'][file]:
+                    raise RuntimeError('Decrypted backup differs from the original: '+file)
+        subprocess.run(['pg_restore', '--list', str(dump)], check=True, stdout=subprocess.DEVNULL)
+        # Reject traversal, links and device files before making any database changes.
+        with tarfile.open(files) as archive:
+            for member in archive.getmembers():
+                parts = Path(member.name).parts
+                if not parts or parts[0] != 'app' or '..' in parts or not (member.isfile() or member.isdir()):
+                    raise RuntimeError('Unsafe file archive')
+            key = archive.extractfile('app/.app-key').read().strip()
+            if not key.startswith(b'base64:'):
+                raise RuntimeError('Backup encryption key missing or invalid')
+        yield manifest, dump, files
+    finally:
+        if work:
+            shutil.rmtree(work)
 
 
 def restore(name):
-    folder, manifest = validate(name)
-    wait_database()
-    if counts():
-        raise RuntimeError('Restore refused: destination database is not empty. Use a new Compose project.')
-    if STORAGE.exists() and any(STORAGE.iterdir()):
-        raise RuntimeError('Restore refused: destination storage is not empty.')
-    # --single-transaction ensures a failed database restore leaves an empty destination.
-    subprocess.run(['pg_restore', '--exit-on-error', '--single-transaction', '--no-owner', '--dbname='+os.environ['PGDATABASE'], str(folder/'database.dump')], check=True)
-    if counts() != manifest['tables']:
-        raise RuntimeError('Restored table counts differ from the backup')
-    STORAGE.mkdir(exist_ok=True)
-    with tarfile.open(folder/'files.tar.gz') as archive:
-        archive.extractall(STORAGE, filter='data')
+    with opened(name) as (manifest, dump, files):
+        wait_database()
+        if counts():
+            raise RuntimeError('Restore refused: destination database is not empty. Use a new Compose project.')
+        if STORAGE.exists() and any(STORAGE.iterdir()):
+            raise RuntimeError('Restore refused: destination storage is not empty.')
+        # The dump grants privileges to the restricted runtime role, which a new deployment
+        # does not have yet; the app sets its password when it starts.
+        sql("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='school_runtime') THEN "
+            "CREATE ROLE school_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; END IF; END $$")
+        # --single-transaction ensures a failed database restore leaves an empty destination.
+        subprocess.run(['pg_restore', '--exit-on-error', '--single-transaction', '--no-owner', '--dbname='+os.environ['PGDATABASE'], str(dump)], check=True)
+        if counts() != manifest['tables']:
+            raise RuntimeError('Restored table counts differ from the backup')
+        STORAGE.mkdir(exist_ok=True)
+        with tarfile.open(files) as archive:
+            archive.extractall(STORAGE, filter='data')
     print(json.dumps({'restored': name, 'source_project': manifest['project'], 'tables_verified': len(manifest['tables']), 'checksums_verified': True}), flush=True)
 
 
@@ -146,7 +197,9 @@ def health():
     status = json.loads((ROOT/'status.json').read_text())
     if status.get('last_error') or time.time()-status['last_success'] > 26*3600:
         raise RuntimeError('No successful recent backup; inspect backup service logs')
-    validate(status['backup'])
+    # Runs every minute: checksums only. `verify NAME` decrypts and checks the content.
+    with opened(status['backup'], deep=False):
+        pass
 
 
 def schedule():
@@ -185,7 +238,8 @@ if __name__ == '__main__':
         elif action == 'backup': backup()
         elif action == 'restore': restore(sys.argv[2])
         elif action == 'verify':
-            validate(sys.argv[2]); print('Backup checksums and archive verified')
+            with opened(sys.argv[2]):
+                print('Backup checksums and archive verified')
         elif action == 'health': health()
         else: raise RuntimeError('Use schedule, backup, verify NAME, restore NAME, or health')
     except Exception as error:
