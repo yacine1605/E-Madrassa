@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Browser test tooling for tests/*.cjs. Install with: npm install --prefix .test-tools",
+  "devDependencies": {"playwright": "1.63.0"}
+}
