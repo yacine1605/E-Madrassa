@@ -29,10 +29,10 @@ async function rejects(s, p, code, rule) {
 
 // Laravel's users table, created by the application's own migration in production.
 await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES (1),(2),(3),(4),(5),(6);');
-const schemaDir = new URL('../database/schema/', import.meta.url);
+const schemaDir = new URL('../../database/schema/', import.meta.url);
 for (const file of readdirSync(schemaDir).filter(f => /^\d{3}_.+\.sql$/.test(f)).sort())
   await db.exec(readFileSync(new URL(file, schemaDir), 'utf8'));
-await db.exec(readFileSync(new URL('../deploy/roles.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../../deploy/roles.sql', import.meta.url), 'utf8'));
 
 // Users 1 and 4 belong to school A, 2 to school B, 5 is suspended in A, 3 belongs nowhere;
 // 6 is a publisher operator on the console.
@@ -137,6 +137,10 @@ await check('the application cannot grant memberships', () =>
 await check('the application cannot write audit entries', () =>
   rejects("INSERT INTO school.audit_log(tenant_id, action, object_type, object_id) VALUES ($1, 'UPDATE', 'site', $2)", [a, siteA], '42501'));
 await check('the application cannot delete a site (BR-02)', () => rejects('DELETE FROM school.site WHERE id = $1', [siteA], '42501'));
+await check('a member lists the schools they may open', async () =>
+  assert.deepEqual((await sql('SELECT tenant_id, slug, mode FROM school.my_schools()')).rows, [{ tenant_id: a, slug: 'ecole-a', mode: 'active' }]));
+await check('the application lists its school modules', async () =>
+  assert.deepEqual((await sql('SELECT school.my_modules() AS m')).rows.map(r => r.m), ['core', 'enrollment_groups', 'expenses', 'sites_rooms', 'student_finance', 'students_crm']));
 await check('the application knows which modules its school has (ARC-04)', async () => {
   assert.equal((await first("SELECT school.module_enabled('student_finance') AS e")).e, true);
   assert.equal((await first("SELECT school.module_enabled('payroll') AS e")).e, false);
@@ -152,7 +156,7 @@ await check('an update records its author and increments the version', async () 
   assert.deepEqual(await first('SELECT created_by::int c, updated_by::int u, version FROM school.site WHERE id = $1', [annex]), { c: 1, u: 4, version: 2 });
 });
 await check('a writer holding an older version is refused', () =>
-  rejects('UPDATE school.site SET labels = $2, version = 1 WHERE id = $1', [annex, JSON.stringify({ fr: 'Ancienne' })], '40001', 'stale_version'));
+  rejects('UPDATE school.site SET labels = $2, version = 1 WHERE id = $1', [annex, JSON.stringify({ fr: 'Ancienne' })], '23514', 'stale_version'));
 await check('the application cannot change a site code', () => rejects("UPDATE school.site SET code = 'X' WHERE id = $1", [annex], '42501'));
 await check('a school keeps at least one site in use (ARC-03)', async () => {
   await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [annex]);
@@ -187,6 +191,7 @@ await check('a suspended school is closed to its members (FR-PLT-01 AC2)', async
   await as('school_runtime', b, 2);
   assert.equal(await sites(), 0);
   assert.equal((await first("SELECT school.module_enabled('core') AS e")).e, false);
+  assert.equal(await count('SELECT count(*) n FROM school.my_schools()'), 0);
   await as('platform_admin', null, 6);
   await sql("SELECT platform.set_tenant_status($1, 'active', 'Abonnement régularisé')", [b]);
   await as('school_runtime', b, 2);

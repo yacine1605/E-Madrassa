@@ -2,6 +2,6 @@
   "name": "madrassa-platform-database-checks",
   "private": true,
   "type": "module",
-  "scripts": {"test": "node tests/database.mjs", "test:concurrency": "node tests/concurrency.mjs"},
+  "scripts": {"test": "node tests/sql/database.mjs", "test:concurrency": "node tests/sql/concurrency.mjs"},
   "devDependencies": {"@electric-sql/pglite": "0.5.8", "pg": "8.16.3"}
 }

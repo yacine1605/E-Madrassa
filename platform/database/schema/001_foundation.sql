@@ -43,7 +43,8 @@ BEGIN
     RAISE EXCEPTION 'identity_immutable' USING ERRCODE = '23514';
   END IF;
   IF NEW.version IS DISTINCT FROM OLD.version THEN
-    RAISE EXCEPTION 'stale_version' USING ERRCODE = '40001';
+    -- A business conflict, not a serialization failure: retrying would fail the same way.
+    RAISE EXCEPTION 'stale_version' USING ERRCODE = '23514';
   END IF;
   NEW.version := OLD.version + 1; NEW.updated_at := now(); NEW.updated_by := school.actor();
   RETURN NEW;

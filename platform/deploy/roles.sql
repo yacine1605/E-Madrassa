@@ -13,7 +13,7 @@ GRANT SELECT, INSERT ON school.site TO school_runtime;
 GRANT UPDATE (labels, version, archived_at) ON school.site TO school_runtime;
 GRANT SELECT ON platform.tenant, platform.module, platform.module_dependency, platform.plan TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.tenant(), school.actor(), school.allowed(uuid), school.module_enabled(text),
-  platform.tenant_mode(uuid) TO school_runtime;
+  school.my_schools(), school.my_modules(), platform.tenant_mode(uuid) TO school_runtime;
 
 -- Publisher console: platform data and its functions only. No privilege at all on the
 -- `school` schema, so no school data without the school's consent (FR-PLT-04 AC1).
@@ -41,3 +41,5 @@ ALTER FUNCTION platform.module_enabled(uuid, text) OWNER TO platform_provisioner
 ALTER FUNCTION school.module_enabled(text) OWNER TO platform_provisioner;
 ALTER FUNCTION school.audit() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.audit_tenant() OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_schools() OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_modules() OWNER TO platform_provisioner;
