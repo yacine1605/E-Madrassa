@@ -727,6 +727,115 @@ await check('a school cannot see or write the referential of another school', as
   await rejects(NODE, [a, 'cycle', null, 'HACK', JSON.stringify({ fr: 'Intrus' })], '42501');
 });
 
+// Shared services: the journal by domain, jobs, notifications and their outbox (FR-AUD-01, FR-JOB-01, FR-NOT-01)
+await check('the journal opens by domain: administrators read access and settings, an accountant does not (FR-AUD-01)', async () => {
+  const read = async (user, type) => {
+    await as('school_runtime', a, user);
+    return count('SELECT count(*) n FROM school.audit_log WHERE object_type = $1', [type]);
+  };
+  assert.ok(await read(1, 'role_assignment') > 0);
+  assert.ok(await read(1, 'setting') > 0);
+  assert.equal(await read(7, 'role_assignment'), 0);
+  assert.equal(await read(7, 'tenant'), 0);
+  assert.ok(await read(7, 'site') > 0);
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.audit_log'), 0);
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.audit_log SET reason = 'x'", [], '42501');
+});
+await check('every audited table belongs to a journal domain', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT c.relname FROM pg_trigger tg JOIN pg_class c ON c.oid = tg.tgrelid JOIN pg_namespace ns ON ns.oid = c.relnamespace
+    WHERE tg.tgname = 'audit' AND ns.nspname = 'school' AND c.relname NOT IN (SELECT object_type FROM platform.audit_domain)`)).rows, []);
+});
+const JOB = "INSERT INTO school.job (tenant_id, user_id, kind, idempotency_key, input) VALUES ($1, $2, 'accounts.import', $3, '{}') RETURNING id";
+await as('school_runtime', a, 1);
+const job = (await first(JOB, [a, 1, 'import-1'])).id;
+await check('a job is started once per key and seen by its author only (FR-JOB-01)', async () => {
+  await rejects(JOB, [a, 1, 'import-1'], '23505');
+  await rejects(JOB, [a, 8, 'import-2'], '42501');
+  await as('school_runtime', a, 8);
+  assert.equal(await count('SELECT count(*) n FROM school.job'), 0);
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.job'), 0);
+});
+await check('a job moves queued, running, then finished, and a finished job never changes (FR-JOB-01)', async () => {
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.job SET status = 'succeeded' WHERE id = $1", [job], '23514', 'status_invalid');
+  await sql("UPDATE school.job SET status = 'running' WHERE id = $1", [job]);
+  assert.deepEqual(await first('SELECT attempts, started_at IS NOT NULL AS started FROM school.job WHERE id = $1', [job]), { attempts: 1, started: true });
+  await rejects(`UPDATE school.job SET input = '{"rows": []}' WHERE id = $1`, [job], '42501');
+  await sql("UPDATE school.job SET status = 'succeeded', result = '{\"created\": 3}' WHERE id = $1", [job]);
+  assert.deepEqual(await first('SELECT progress, finished_at IS NOT NULL AS finished FROM school.job WHERE id = $1', [job]), { progress: 100, finished: true });
+  await rejects("UPDATE school.job SET status = 'queued' WHERE id = $1", [job], '23514', 'job_finished');
+});
+await check('assigning a sensitive permission notifies the journal\'s watchers, not the author (FR-IAM-05)', async () => {
+  await as('school_runtime', a, 1);
+  const before = await count("SELECT count(*) n FROM school.notification");
+  await assign(9, 'accountant');
+  assert.equal(await count("SELECT count(*) n FROM school.notification"), before);
+  await as('school_runtime', a, 8);
+  assert.equal(await count("SELECT count(*) n FROM school.notification WHERE event = 'access.sensitive_permission' AND data ->> 'user_id' = '9'"), 1);
+  await as(null);
+  assert.equal(await count(`SELECT count(*) n FROM school.outbox o JOIN school.notification n ON n.tenant_id = o.tenant_id AND n.id = o.notification_id
+    WHERE o.tenant_id = $1 AND o.user_id = 8 AND n.data ->> 'user_id' = '9'`, [a]), 1);
+});
+await check('a person sees only their own notifications and chooses which ones come by email (FR-NOT-01 AC2)', async () => {
+  await as('school_runtime', a, 9);
+  assert.equal(await count('SELECT count(*) n FROM school.notification WHERE user_id <> 9'), 0);
+  await as('school_runtime', a, 8);
+  await sql("INSERT INTO school.notification_preference (tenant_id, user_id, event, email) VALUES ($1, 8, 'access.sensitive_permission', false)", [a]);
+  await rejects("INSERT INTO school.notification_preference (tenant_id, user_id, event, email) VALUES ($1, 7, 'job.failed', false)", [a], '42501');
+  await rejects("INSERT INTO school.notification (tenant_id, user_id, event) VALUES ($1, 9, 'job.failed')", [a], '42501');
+  await as(null);
+  const emails = async user => count('SELECT count(*) n FROM school.outbox WHERE tenant_id = $1 AND user_id = $2', [a, user]);
+  const [before8, before9] = [await emails(8), await emails(9)];
+  await as('school_runtime', a, 1);
+  assert.equal((await first("SELECT school.notify('access.sensitive_permission', ARRAY[8, 9, 5]::bigint[]) AS n")).n, 2, 'user 5 is suspended in school A');
+  await as(null);
+  assert.deepEqual([await emails(8), await emails(9)], [before8, before9 + 1]);
+});
+await check('the worker claims each email once, removes it when sent, and keeps it as a failure after five attempts (FR-NOT-01 AC1)', async () => {
+  await as('school_runtime', null, null);
+  const claimed = (await sql('SELECT id, tenant_id, email, event, school FROM platform.claim_outbox(50, 60)')).rows;
+  assert.ok(claimed.length >= 2);
+  assert.ok(claimed.some(r => r.email === 'user8@example.test' && r.event === 'access.sensitive_permission' && r.school === 'École A'));
+  assert.equal((await sql('SELECT * FROM platform.claim_outbox(50, 60)')).rows.length, 0);
+  const sent = claimed[0];
+  const failing = claimed.find(r => r.tenant_id === a && r.id !== sent.id);
+  await sql('SELECT platform.finish_outbox($1, NULL)', [sent.id]);
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    if (attempt > 1) {
+      await as(null);
+      await sql("UPDATE school.outbox SET next_attempt_at = now() WHERE id = $1", [failing.id]);
+      await as('school_runtime', null, null);
+      assert.ok((await sql('SELECT id FROM platform.claim_outbox(50, 60)')).rows.some(r => r.id === failing.id));
+    }
+    await sql("SELECT platform.finish_outbox($1, 'SMTP 451 temporary failure')", [failing.id]);
+  }
+  await as(null);
+  assert.equal(await count('SELECT count(*) n FROM school.outbox WHERE id = $1', [sent.id]), 0);
+  assert.deepEqual(await first('SELECT status, attempts FROM school.outbox WHERE id = $1', [failing.id]), { status: 'failed', attempts: 5 });
+  // A crashed worker's lease runs out and the email comes back.
+  await sql("UPDATE school.outbox SET locked_until = now() - interval '1 second', next_attempt_at = now() WHERE status = 'sending'");
+  await as('school_runtime', null, null);
+  assert.ok((await sql('SELECT * FROM platform.claim_outbox(50, 60)')).rows.length >= 1);
+  await as('school_runtime', a, 7);
+  assert.equal(await count("SELECT count(*) n FROM school.outbox WHERE status = 'failed'"), 0);
+  await rejects('SELECT school.retry_delivery($1)', [failing.id], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+  assert.equal(await count("SELECT count(*) n FROM school.outbox WHERE status = 'failed'"), 1);
+  await sql('SELECT school.retry_delivery($1)', [failing.id]);
+  assert.equal((await first('SELECT status FROM school.outbox WHERE id = $1', [failing.id])).status, 'pending');
+  await rejects('SELECT school.retry_delivery($1)', [failing.id], '23514', 'not_failed');
+});
+await check('a notification is only for active members of the school', async () => {
+  await as('school_runtime', a, 1);
+  assert.equal((await first("SELECT school.notify('job.succeeded', ARRAY[1, 5]::bigint[], '{\"job_id\": \"x\"}') AS n")).n, 1);
+  await as('school_runtime', null, 1);
+  await rejects("SELECT school.notify('job.succeeded', ARRAY[1]::bigint[])", [], '23514', 'tenant_required');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
@@ -818,6 +927,18 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'token_invalid');
+  });
+  await check('two workers claiming emails at once never take the same one (ARC-05)', async () => {
+    await as(null);
+    await sql("UPDATE school.outbox SET status = 'pending', next_attempt_at = now(), locked_until = NULL WHERE status <> 'failed'");
+    const due = await count("SELECT count(*) n FROM school.outbox WHERE status = 'pending'");
+    assert.ok(due >= 2);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, '')));
+    const batches = await Promise.all(clients.map(c => c.query('SELECT id FROM platform.claim_outbox(50, 60)').then(r => r.rows.map(row => row.id))));
+    await Promise.all(clients.map(c => c.end()));
+    const ids = batches.flat();
+    assert.equal(new Set(ids).size, ids.length);
+    assert.equal(ids.length, due);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {
     const clients = await Promise.all([1, 8].map(user => connect('school_runtime', a, user)));

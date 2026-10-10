@@ -158,8 +158,8 @@ final class AuthenticationTest extends TestCase
         $answer = $this->postJson('/api/recovery/request', ['email' => strtoupper($account['email'])])->assertStatus(202)->json('message');
         $this->postJson('/api/recovery/request', ['email' => 'nobody@example.test'])->assertStatus(202)->assertJsonPath('message', $answer);
         $token = null;
-        Mail::assertSent(AccountLink::class, 1);
-        Mail::assertSent(AccountLink::class, function (AccountLink $mail) use (&$token) { $token = $this->tokenFrom($mail); return $mail->purpose === 'recovery'; });
+        Mail::assertQueued(AccountLink::class, 1);
+        Mail::assertQueued(AccountLink::class, function (AccountLink $mail) use (&$token) { $token = $this->tokenFrom($mail); return $mail->purpose === 'recovery'; });
 
         $this->postJson('/api/recovery', ['token' => $token, 'password' => 'Les dunes de Taghit 4', 'password_confirmation' => 'Les dunes de Taghit 4'])
             ->assertNoContent();

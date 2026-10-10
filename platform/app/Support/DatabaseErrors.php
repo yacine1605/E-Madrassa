@@ -59,6 +59,9 @@ final class DatabaseErrors
         'profile_unknown' => 'Profil inconnu ou non publié.',
         'profile_mismatch' => 'Cet établissement suit un autre profil.',
         'profile_published' => 'Une version publiée d’un profil ne change plus.',
+        'job_finished' => 'Cette tâche est terminée : elle ne change plus.',
+        'not_failed' => 'Seul un envoi en échec se relance.',
+        'tenant_required' => 'Aucun établissement choisi.',
     ];
 
     public static function message(string $rule): string

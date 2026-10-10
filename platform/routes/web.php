@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountLinkController;
+use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RoleAssignmentController;
@@ -47,6 +50,23 @@ Route::prefix('api')->group(function () {
         Route::middleware('school')->group(function () {
             Route::get('school', [SchoolController::class, 'show']);
             Route::get('me', [MeController::class, 'show']);
+
+            // The person's own jobs and notifications: row-level security shows them nothing else.
+            Route::get('jobs', [JobController::class, 'index']);
+            Route::get('jobs/{job}', [JobController::class, 'show']);
+            Route::post('jobs/{job}/cancel', [JobController::class, 'cancel']);
+            Route::post('jobs/{job}/retry', [JobController::class, 'retry']);
+            Route::get('notifications', [NotificationController::class, 'index']);
+            Route::post('notifications/read', [NotificationController::class, 'readAll']);
+            Route::post('notifications/{notification}/read', [NotificationController::class, 'read']);
+            Route::get('notifications/preferences', [NotificationController::class, 'preferences']);
+            Route::put('notifications/preferences', [NotificationController::class, 'updatePreferences']);
+            Route::middleware('permission:tenant.settings.manage')->group(function () {
+                Route::get('deliveries/failed', [NotificationController::class, 'failures']);
+                Route::post('deliveries/{delivery}/retry', [NotificationController::class, 'retry']);
+            });
+
+            Route::get('audit', [AuditController::class, 'index'])->middleware('permission:audit.log.read');
 
             Route::get('settings', [SettingController::class, 'index'])->middleware('permission:tenant.settings.manage');
             Route::put('settings/{key}', [SettingController::class, 'update'])->middleware('permission:tenant.settings.manage');

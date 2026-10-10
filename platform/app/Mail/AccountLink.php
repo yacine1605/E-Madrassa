@@ -2,12 +2,13 @@
 
 namespace App\Mail;
 
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
-/** Invitation (link valid 72 h) or password recovery (valid 1 h). */
-final class AccountLink extends Mailable
+/** Invitation (link valid 72 h) or password recovery (valid 1 h). Queued, its link is encrypted in the queue (NFR-SEC-06). */
+final class AccountLink extends Mailable implements ShouldBeEncrypted
 {
     public function __construct(public string $purpose, public string $name, public string $url, public ?string $school = null) {}
 

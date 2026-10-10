@@ -26,6 +26,11 @@ return [
     'mfa_pending_seconds' => 300,
     'mfa_issuer' => env('PLATFORM_MFA_ISSUER', env('APP_NAME', 'Madrassa')),
 
+    // FR-JOB-01: the kinds of school jobs and the task that runs each.
+    'tasks' => [
+        'accounts.import' => App\Tasks\ImportAccounts::class,
+    ],
+
     // Activation and recovery links point to the front end; the token travels in the fragment,
     // which browsers never send to a server or put in a Referer header.
     'front_url' => rtrim((string) env('PLATFORM_FRONT_URL', env('APP_URL', 'http://localhost')), '/'),

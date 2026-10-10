@@ -54,6 +54,16 @@ GRANT INSERT (tenant_id, entity, key, field_type, options, required, is_sensitiv
 GRANT UPDATE (options, required, is_sensitive, labels, sort_order, version, archived_at) ON school.custom_field TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.label_key(text), school.valid_labels(jsonb), school.node_subtree(uuid[]), school.year_open(uuid),
   school.check_custom_values(text, jsonb), school.open_day(date) TO school_runtime;
+-- Shared services (010): the journal read by domain (its policy decides), the user's own jobs,
+-- notifications and preferences; emails leave through the outbox, worked by the definer functions.
+GRANT SELECT ON platform.audit_domain, platform.notification_event TO school_runtime;
+GRANT SELECT, INSERT (tenant_id, user_id, kind, idempotency_key, input) ON school.job TO school_runtime;
+GRANT UPDATE (status, progress, result, error_code, error_message, cancel_requested_at) ON school.job TO school_runtime;
+GRANT SELECT, UPDATE (read_at) ON school.notification TO school_runtime;
+GRANT SELECT, INSERT, UPDATE (email) ON school.notification_preference TO school_runtime;
+GRANT SELECT ON school.outbox TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.audit_readable_types(), school.notify(text, bigint[], jsonb), platform.claim_outbox(integer, integer),
+  platform.finish_outbox(uuid, text), school.retry_delivery(uuid) TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
@@ -75,6 +85,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform TO platfor
 GRANT SELECT, INSERT ON school.site, school.membership, school.audit_log TO platform_provisioner;
 GRANT SELECT, INSERT ON school.role, school.role_permission, school.role_assignment TO platform_provisioner;
 GRANT SELECT, INSERT ON school.node_type, school.ref_node, school.subject TO platform_provisioner;
+GRANT SELECT, INSERT ON school.notification TO platform_provisioner;
+GRANT SELECT, INSERT, UPDATE, DELETE ON school.outbox TO platform_provisioner;
+GRANT SELECT ON school.notification_preference TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.label_key(text), school.valid_labels(jsonb) TO platform_provisioner;
 GRANT SELECT, INSERT ON public.users TO platform_provisioner;
 GRANT UPDATE (name, email, password, must_change_password, password_changed_at, remember_token, updated_at) ON public.users TO platform_provisioner;
@@ -118,3 +131,10 @@ ALTER FUNCTION platform.redeem_token(text, text, text) OWNER TO platform_provisi
 ALTER FUNCTION platform.find_login(text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.peek_token(text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.apply_profile(uuid, text, integer) OWNER TO platform_provisioner;
+ALTER FUNCTION school.audit_readable_types() OWNER TO platform_provisioner;
+ALTER FUNCTION school.notify(text, bigint[], jsonb) OWNER TO platform_provisioner;
+ALTER FUNCTION school.journal_watchers(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.notify_sensitive() OWNER TO platform_provisioner;
+ALTER FUNCTION platform.claim_outbox(integer, integer) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.finish_outbox(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.retry_delivery(uuid) OWNER TO platform_provisioner;

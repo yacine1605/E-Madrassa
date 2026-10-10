@@ -3,9 +3,11 @@
 use App\Support\AccountLinks;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
+use App\Support\Outbox;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 
@@ -91,3 +93,11 @@ Artisan::command('platform:membership {slug} {email} {--status=active}', functio
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET status = EXCLUDED.status', [$tenant, $user, $this->option('status')]);
     $this->info('Membership '.$this->option('status').'.');
 })->purpose('Set an account\'s membership in a school (as the database owner)');
+
+// FR-NOT-01, ARC-05: the email outbox, worked every minute by the scheduler (`php artisan schedule:work`).
+Artisan::command('platform:outbox {--limit=50}', function (Outbox $outbox) {
+    $done = $outbox->work((int) $this->option('limit'));
+    $this->info("Emails sent: {$done['sent']}, failed: {$done['failed']}.");
+})->purpose('Send the notification emails that are due (as school_runtime)');
+
+Schedule::command('platform:outbox')->everyMinute()->withoutOverlapping();

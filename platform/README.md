@@ -60,6 +60,8 @@ php artisan platform:apply-profile ecole-a private_school_dz   # a newer profile
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
+Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, every minute).
+
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
 ## Increment 1: what is covered
@@ -151,7 +153,22 @@ The subjects of `madrassa-backend/config/algerian_curriculum.php` were one per c
 
 Left for later: time slots and approval thresholds come with planning (lot 4) and finance (lot 3); the logo with file storage (W1.6); group scopes with groups (lot 2).
 
+## Increment 6: shared services, part 1 (W1.6)
+
+121 invariants on embedded PostgreSQL, 126 on PostgreSQL 16, 61 integration tests (10 October 2026).
+
+| SRS | Covered |
+|---|---|
+| FR-AUD-01 | The journal is read with `audit.log.read` and, domain by domain, a permission of that domain (`platform.audit_domain`), enforced by row-level security: an administrator reads accounts, rights and settings, an accountant the referential and, later, finance; filters by person, object, action, domain and period; pages that hold while entries are added; no route changes an entry (AC2) |
+| FR-JOB-01 | `school.job`: one job per idempotency key, states queued, running, succeeded, failed, cancelled with guarded transitions; progress; plain error messages; cancellation between steps; manual retry; "Mes tâches" shows the user's own jobs only; each step re-checks the school and the membership (AC1); a job resumed after a crash or delivered twice duplicates nothing (AC2) |
+| FR-IMP-01 (base) | Account import as a background job, by batches of 100 committed one by one, with its report |
+| FR-NOT-01 | Notifications (the bell), each person's own only (AC2); email preferences per event; the email outbox written in the same transaction, claimed by workers without overlap (`SKIP LOCKED`, lease), retried with growing delays, removed once sent, kept as a failure after five attempts, visible and sent again by the settings' manager (AC1); emails carry the title and the school only (BR-19) |
+| FR-IAM-05 | Assigning a sensitive permission (by role or by adding it to an assigned role) notifies the holders of `audit.log.read` for the whole school, the author aside |
+| NFR-SEC-06 | The recovery link is queued, encrypted in the queue, and the answer comes at once whether the address is known or not |
+
+Left for the second part of W1.6: files (FR-FIC-01), the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02), PDF (FR-PDF-01). Security alerts (NFR-SEC-07) come with the console's supervision (FR-PLT-05).
+
 ## Next increments of lot 1
 
-1. **Shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+1. **Shared services, part 2** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).

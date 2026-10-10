@@ -30,6 +30,15 @@ final class AccountLinks
         return config('platform.front_url').'/'.($purpose === 'activation' ? 'activation' : 'recovery').'#token='.$token;
     }
 
+    /**
+     * Queues the link: the request answers at once, the same for a known and an unknown address
+     * (no timing difference), and a failed sending is retried by the queue.
+     */
+    public static function queue(string $purpose, string $email, string $name, string $token): void
+    {
+        Mail::to($email, $name)->queue(new AccountLink($purpose, $name, self::url($purpose, $token)));
+    }
+
     /** Sends the link; false when sending failed, so that an administrator may hand it over another way. */
     public static function send(string $purpose, string $email, string $name, string $token, ?string $school = null): bool
     {

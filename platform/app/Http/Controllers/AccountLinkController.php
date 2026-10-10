@@ -41,7 +41,7 @@ final class AccountLinkController
         $data = $request->validate(['email' => 'required|email|max:200']);
         [$token, $hash] = AccountLinks::token();
         $person = DB::selectOne('SELECT email, name FROM platform.issue_recovery(?, ?)', [$data['email'], $hash]);
-        if ($person) AccountLinks::send('recovery', $person->email, $person->name, $token);
+        if ($person) AccountLinks::queue('recovery', $person->email, $person->name, $token);
         return response()->json(['message' => 'Si un compte correspond à cette adresse, un lien de réinitialisation vient d’y être envoyé.'], 202);
     }
 

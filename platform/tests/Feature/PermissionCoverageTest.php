@@ -13,6 +13,8 @@ final class PermissionCoverageTest extends TestCase
 {
     /** Routes describing the session itself, open to every member of the school. */
     private const OPEN = ['GET api/school', 'GET api/me'];
+    /** The person's own jobs and notifications, which row-level security alone decides (tested in tests/sql). */
+    private const PERSONAL = ['api/jobs', 'api/notifications'];
 
     public function test_application_code_never_names_a_role(): void
     {
@@ -47,7 +49,8 @@ final class PermissionCoverageTest extends TestCase
             $checked++;
             $name = implode('|', array_diff($route->methods(), ['HEAD'])).' '.$route->uri();
             $declared = array_filter($middleware, fn ($m) => is_string($m) && str_starts_with($m, 'permission:'));
-            if (!$declared && !in_array($name, self::OPEN, true)) $missing[] = $name;
+            $personal = (bool) array_filter(self::PERSONAL, fn ($prefix) => str_starts_with($route->uri(), $prefix));
+            if (!$declared && !$personal && !in_array($name, self::OPEN, true)) $missing[] = $name;
         }
         $this->assertGreaterThan(10, $checked);
         $this->assertSame([], $missing, 'School routes without a permission.');
