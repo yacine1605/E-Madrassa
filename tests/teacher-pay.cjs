@@ -21,7 +21,8 @@ const fixture = action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--ent
         const admin=await browser.newPage();
         const teacher=await browser.newPage();
         const other=await browser.newPage();
-        const errors=[]; for(const page of [admin,teacher,other]) page.on('pageerror',e=>errors.push(e.message));
+        const validator=await browser.newPage();
+        const errors=[]; for(const page of [admin,teacher,other,validator]) page.on('pageerror',e=>errors.push(e.message));
         const login=async(page,user,isAdmin=false)=>{
             await page.goto(base+(isAdmin?'/admin/login':'/enseignant/login'));
             await page.locator('input[type=email]').fill(user.email);
@@ -29,9 +30,9 @@ const fixture = action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--ent
             await page.locator('button[type=submit]').click();
             await page.waitForURL(isAdmin?'**/admin/dashboard':'**/enseignant');
         };
-        await login(admin,data.admin,true); await login(teacher,data.teachers[0]); await login(other,data.teachers[1]);
+        await login(admin,data.admin,true); await login(teacher,data.teachers[0]); await login(other,data.teachers[1]); await login(validator,data.validator,true);
         const tokens=new Map();
-        for(const page of [admin,teacher,other]) tokens.set(page,(await (await page.request.get(base+'/school-api/csrf')).json()).csrf_token);
+        for(const page of [admin,teacher,other,validator]) tokens.set(page,(await (await page.request.get(base+'/school-api/csrf')).json()).csrf_token);
         const send=(page,url,payload)=>page.request.post(url,{headers:{Accept:'application/json','X-CSRF-TOKEN':tokens.get(page)},data:payload,maxRedirects:0});
         const adminUrl=base+'/remunerations/'+data.tenant;
         const teacherUrl=base+'/enseignant/remuneration';
@@ -81,6 +82,11 @@ const fixture = action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--ent
         const runs=(await (await admin.request.get(api+'/payroll_runs')).json()).data;
         const run=runs.find(r=>r.staff_id===data.teachers[0].staff);
         assert.equal(Number(run.amount_minor),300000,'150 minutes x 1200 DA per hour');
+        assert.equal(run.status,'draft','A calculation is a draft until another person validates it');
+        assert.equal((await (await admin.request.get(api+'/expenses')).json()).data.filter(e=>e.payroll_id===run.id).length,0,'A draft creates no salary expense');
+        const validateUrl=adminUrl+'/calculs/'+run.id+'/validation';
+        assert.equal((await send(admin,validateUrl,{})).status(),422,'The author cannot validate their own calculation');
+        assert.equal((await send(validator,validateUrl,{})).status(),302,'Another person validates the calculation');
         const expenseRows=(await (await admin.request.get(api+'/expenses')).json()).data;
         assert.equal(expenseRows.filter(e=>e.payroll_id===run.id).length,1,'One expense per remuneration');
         const paymentUrl=adminUrl+'/versements/'+run.id;
@@ -122,7 +128,7 @@ const fixture = action=>JSON.parse(compose(['run','--rm','--no-deps','-T','--ent
         fixture('disable');
         assert.equal((await teacher.request.get(teacherUrl,{headers:{Accept:'application/json'}})).status(),403,'Disabled teacher loses access');
         assert.deepEqual(errors,[]);
-        console.log('PASS teacher payment workflow: declarations, stale edits, review, contracts, hourly/monthly calculation, pending/closed hours, idempotency, partial/concurrent payments, overpayment prevention, privacy, receipt, mobile, revocation.');
+        console.log('PASS teacher payment workflow: segregation of duties on pay runs, declarations, stale edits, review, contracts, hourly/monthly calculation, pending/closed hours, idempotency, partial/concurrent payments, overpayment prevention, privacy, receipt, mobile, revocation.');
     } finally {
         if(browser) await browser.close();
         if(!project.startsWith('madrassa-integration-teacher-pay-')) throw new Error('Unexpected project');

@@ -5,7 +5,7 @@ return [
         'students'=>'Élèves','guardians'=>'Responsables légaux','student_guardians'=>'Liens élève / responsable',
         'programs'=>'Programmes','levels'=>'Niveaux','periods'=>'Périodes','offerings'=>'Offres de formation',
         'cohorts'=>'Groupes','teacher_assignments'=>'Affectations enseignants','subjects'=>'Matières','curriculum'=>'Programme pédagogique','campuses'=>'Campus','rooms'=>'Salles',
-        'enrollments'=>'Inscriptions','invoices'=>'Factures','payments'=>'Paiements','refunds'=>'Remboursements',
+        'enrollments'=>'Inscriptions','invoices'=>'Factures','payments'=>'Paiements','refunds'=>'Remboursements','payment_reversals'=>'Contre-opérations',
         'invoice_balances'=>'Soldes des factures','sessions'=>'Séances','attendance'=>'Présences','grades'=>'Notes',
         'assessments'=>'Évaluations','staff'=>'Personnel et enseignants','contracts'=>'Contrats','work_logs'=>'Heures travaillées',
         'payroll_runs'=>'Rémunérations','expenses'=>'Dépenses','disbursements'=>'Décaissements','lesson_versions'=>'Leçons',

@@ -71,13 +71,17 @@ The local `school:provision` command creates this deployment's school on the fir
 docker-compose exec app php artisan school:provision direction@example.test --name="Mon établissement" --kind=mixed
 ```
 
-This Compose file deliberately uses the PostgreSQL owner account for convenient local integration testing. It must not be used as a production deployment configuration.
+Web requests and background jobs never use the PostgreSQL owner. On every start the app container runs migrations as the owner, then creates or updates the restricted `school_runtime` role (no table ownership, no `BYPASSRLS`, no deletion of business records) from `madrassa-backend/deploy/runtime-grants.sql`, and starts Apache and the queue worker under that role. Row-level security therefore still separates schools if application code has a bug. Set its password with `DB_RUNTIME_PASSWORD`; the local default is for development only. Commands run with `docker-compose exec app php artisan ...` keep the owner account, which provisioning commands such as `school:provision` need.
+
+The `worker` service runs `php artisan queue:work` on Redis for background jobs, so long operations never run inside a web request. Failed jobs are kept in `storage/framework/cache/failed-jobs.json`.
+
+The Compose defaults (`APP_ENV=local`, no TLS between containers, development passwords) are still for local use. For production, set every password, `APP_DEBUG=false` and HTTPS.
 
 Stop the services while retaining data with `docker-compose down`. To also delete the local PostgreSQL, Redis, and application-storage volumes, run `docker-compose down -v`.
 
 ## Automatic backups and recovery
 
-Start with `docker-compose --profile backup up --build -d` to include daily backups at 03:00 Algeria time. The service retains 14 verified database/file backups in `backups/madrassa`, including the persistent application encryption key. It briefly puts the application in maintenance during each backup and catches up missed runs when Docker restarts. Restore into a new deployment, never over the existing school. See [backup and restoration instructions](madrassa-backend/docs/backups.md). Run `node tests/backups.cjs` for an isolated recovery test.
+Start with `docker-compose --profile backup up --build -d` to include daily backups at 03:00 Algeria time. Set `BACKUP_PASSPHRASE` (12 characters or more) first: each backup is encrypted with it (GnuPG, AES-256), because it contains personal data and the school's encryption key. Store the passphrase apart from the backups; without it no restore is possible. Backups made before encryption remain restorable. The service retains 14 verified database/file backups in `backups/madrassa`, including the persistent application encryption key. It briefly puts the application in maintenance during each backup and catches up missed runs when Docker restarts. Restore into a new deployment, never over the existing school. See [backup and restoration instructions](madrassa-backend/docs/backups.md). Run `node tests/backups.cjs` for an isolated recovery test.
 
 ## Separate deployments for separate schools
 
@@ -102,9 +106,11 @@ The migration adopts an existing database when it contains exactly one school, p
 With Docker and Microsoft Edge installed, first build the default application image, then run the isolated tests:
 
 ```bash
-npm install --prefix .test-tools --no-save --package-lock=false playwright
+npm install --prefix .test-tools
 docker-compose build app
 node tests/dedicated-schools.cjs
 ```
+
+The browser suites start their own temporary projects from the images `madrassa-app:latest` and `madrassa-backup:latest`. To test other images without retagging the ones a school runs on, set `TEST_APP_IMAGE` and `TEST_BACKUP_IMAGE`.
 
 This test creates two temporary Compose projects on ports 18181 and 18182. It verifies the browser workflows, removal of the selector, automatic school selection, separate records and credentials, session isolation and rejection of cross-school URLs. It removes only those temporary projects and volumes afterward. The fixture refuses to run in the normal application database.

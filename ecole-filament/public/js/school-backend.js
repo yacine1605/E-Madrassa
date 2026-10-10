@@ -395,20 +395,20 @@ window.schoolBackend = function (config) {
         },
         async deleteRow(row) {
             if (this.busy || !this.canManageRow()) return;
-            if (!window.confirm('Supprimer cet enregistrement ? Cette action est irréversible et sera refusée si des données liées en dépendent.')) return;
+            if (!window.confirm('Archiver cet enregistrement ? Il disparaît des listes mais reste dans l’historique. L’archivage est refusé si des données actives en dépendent.')) return;
             this.busy = true; this.error = ''; this.message = '';
             try {
                 await this.request(this.base() + '/' + this.resource + '/' + encodeURIComponent(row.id), 'DELETE');
-                this.message = 'Enregistrement supprimé.';
+                this.message = 'Enregistrement archivé.';
                 await this.load();
             } catch (e) { this.error = e.message; }
             finally { this.busy = false; }
         },
         canTransition() {
-            const permission = {enrollments:'enrollments.write',sessions:'pedagogy.write',assessments:'pedagogy.write',work_logs:'payroll.write',lesson_versions:'pedagogy.write',announcements:'pedagogy.write'}[this.resource];
+            const permission = {enrollments:'enrollments.write',sessions:'pedagogy.write',assessments:'pedagogy.write',work_logs:'payroll.write',lesson_versions:'pedagogy.write',announcements:'pedagogy.write',payroll_runs:'payroll.write',payments:'finance.write'}[this.resource];
             return !!permission && this.permitted(permission);
         },
-        transitionStatuses() { return this.resource === 'enrollments' ? ['validated','suspended','cancelled'] : this.resource === 'sessions' ? ['published','cancelled'] : []; },
+        transitionStatuses() { return {enrollments:['validated','suspended','cancelled'], sessions:['published','cancelled'], payroll_runs:['validated','discarded'], payments:['reversed']}[this.resource] || []; },
         openTransition(row) { this.editing = false; this.transitionRow = row; this.transitionReason = ''; this.transitionStatus = this.transitionStatuses()[0] || ''; },
         async saveTransition() {
             if (this.busy || !this.canTransition()) return;

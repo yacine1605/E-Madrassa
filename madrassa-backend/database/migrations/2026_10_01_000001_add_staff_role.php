@@ -6,10 +6,8 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        DB::statement('ALTER TABLE school.staff ADD COLUMN role text');
-        if (DB::table('pg_roles')->where('rolname', 'school_runtime')->exists()) {
-            DB::statement('GRANT UPDATE (role) ON school.staff TO school_runtime');
-        }
+        // Same SQL file as tests/database.mjs, so tests run on the production schema.
+        DB::unprepared(file_get_contents(database_path('schema/005_staff_role.sql')));
     }
 
     public function down(): void

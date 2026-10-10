@@ -44,6 +44,8 @@ $result = DB::transaction(function() use ($action,$tenant,$user) {
             $student = $s->insert('students',['matricule'=>sprintf('ARC-%03d',$i),'first_name'=>'Élève','last_name'=>sprintf('Archive %03d',$i),'birth_date'=>'2011-02-03']);
             $enrollment = $s->enroll(['student_id'=>$student->id,'offering_id'=>$offer->id,'cohort_id'=>$cohort->id,
                 'due_on'=>'2026-10-01','idempotency_key'=>(string)Str::uuid()]);
+            // Report cards cover validated enrollments; new enrollments start pending.
+            $s->query('enrollments')->where('id',$enrollment->id)->update(['status'=>'validated']);
             $pupils[] = ['student'=>$student->id,'enrollment'=>$enrollment->id];
             foreach([1=>14,2=>16,3=>18] as $number=>$base) {
                 foreach($exams[$number] as $index=>$exam) {

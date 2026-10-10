@@ -22,7 +22,8 @@ abstract class DemoPage extends Page
     public function mount():void {$this->preferences=session('school_preferences',$this->preferences);}
     public function meta():array {return DemoStore::modules()[static::$module];}
     public function getTitle():string {return $this->meta()['title'];}
-    public function getSubheading():?string {return $this->meta()['description'];}
+    // Interface sandbox only (ND-04): the PostgreSQL backend's rules are the ones that count.
+    public function getSubheading():?string {return 'Mode démonstration : données fictives, règles simplifiées et non contractuelles. '.$this->meta()['description'];}
     public function updatedSearch():void {$this->pageNumber=1;}
     public function updatedCycle():void {$this->pageNumber=1;}
     public function updatedStatus():void {$this->pageNumber=1;}

@@ -44,7 +44,8 @@ class StaffPayrollController
     }
     public function contract(Request $request)
     {
-        $this->school->authorize('hr.write');
+        // The contract carries the pay rate, which only payroll may set (FR-STF-04).
+        $this->school->authorize('hr.write'); $this->school->authorize('payroll.write');
         $data = $request->validate(['staff_id'=>'required|uuid','starts_on'=>'required|date_format:Y-m-d',
             'ends_on'=>'nullable|date_format:Y-m-d|after_or_equal:starts_on','basis'=>'required|in:monthly,hourly',
             'rate'=>'required|numeric|between:0.01,10000000|regex:/^\d{1,8}(\.\d{1,2})?$/']);
@@ -75,9 +76,13 @@ class StaffPayrollController
             throw ValidationException::withMessages(['version'=>'Cette déclaration a déjà été examinée ou modifiée. Rechargez la page.']);
         if ($this->school->query('payroll_runs')->where('staff_id',$contract->staff_id)->where('month',substr($row->worked_on,0,7).'-01')->exists())
             throw ValidationException::withMessages(['decision'=>'La rémunération de ce mois est déjà calculée.']);
+        // Segregation of duties (BR-08); the database enforces it as well.
+        if ($data['decision']==='validate' && (string)$row->entered_by === (string)$request->user()->id)
+            throw ValidationException::withMessages(['decision'=>'Vous avez saisi ces heures : une autre personne doit les valider.']);
         $this->school->query('work_logs')->where('id',$row->id)->update([
             'validated_at'=>$data['decision']==='validate' ? now() : null,
-            'rejected_at'=>$data['decision']==='reject' ? now() : null,'review_reason'=>$data['reason']]);
+            'rejected_at'=>$data['decision']==='reject' ? now() : null,'review_reason'=>$data['reason'],
+            'reviewed_by'=>$request->user()->id]);
         $this->school->event('work_log.'.$data['decision'],$this->school->row('work_logs',$row->id));
         return $this->back($contract->staff_id,substr($row->worked_on,0,7))->with('success',$data['decision']==='validate' ? 'Heures validées.' : 'Heures refusées. L’enseignant peut corriger sa déclaration.');
     }
@@ -90,7 +95,28 @@ class StaffPayrollController
             if($e->getStatusCode()!==422) throw $e;
             throw ValidationException::withMessages(['month'=>$e->getMessage()]);
         }
-        return $this->back($data['staff_id'],$data['month'])->with('success','Rémunération calculée. Les heures du mois sont figées ; le versement reste à enregistrer.');
+        return $this->back($data['staff_id'],$data['month'])->with('success','Rémunération calculée en brouillon. Les heures du mois sont figées ; une autre personne doit valider le calcul avant tout versement.');
+    }
+    public function validateRun(Request $request, string $tenant, string $run)
+    {
+        $row = $this->school->row('payroll_runs',$run); $this->teacher($row->staff_id);
+        $this->decide(fn() => $this->school->validatePayroll($row->id));
+        return $this->back($row->staff_id,substr($row->month,0,7))->with('success','Rémunération validée. Le versement peut être enregistré.');
+    }
+    public function discardRun(Request $request, string $tenant, string $run)
+    {
+        $row = $this->school->row('payroll_runs',$run); $this->teacher($row->staff_id);
+        $this->decide(fn() => $this->school->discardPayroll($row->id));
+        return $this->back($row->staff_id,substr($row->month,0,7))->with('success','Brouillon supprimé. Les heures du mois peuvent être corrigées puis recalculées.');
+    }
+    /** Shows a refused decision on the form instead of an error page. */
+    private function decide(\Closure $action): void
+    {
+        try { $action(); }
+        catch(\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            if($e->getStatusCode()!==409) throw $e;
+            throw ValidationException::withMessages(['run'=>$e->getMessage()]);
+        }
     }
     public function pay(Request $request, string $tenant, string $run)
     {

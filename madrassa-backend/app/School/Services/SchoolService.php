@@ -117,10 +117,52 @@ final class SchoolService
             ->whereBetween('worked_on', [$data['month'], $end])->sum('minutes');
         abort_if($c->basis === 'hourly' && $minutes === 0,422,'Aucune heure validée pour cette rémunération horaire.');
         $amount = $c->basis === 'monthly' ? (int) $c->rate_minor : intdiv((int) $c->rate_minor * $minutes + 30, 60);
-        $row = $this->insert('payroll_runs', [...$data, 'amount_minor' => $amount, 'validated_at' => now(),
+        // A draft: another person validates it before the salary expense exists (BR-08).
+        $row = $this->insert('payroll_runs', [...$data, 'amount_minor' => $amount,
             'calculation' => json_encode(['contract_id' => $c->id, 'basis' => $c->basis, 'rate_minor' => $c->rate_minor, 'minutes' => $minutes, 'rounding' => 'half_up_centime'], JSON_THROW_ON_ERROR)]);
-        if ($amount > 0) $this->insert('expenses', ['label' => 'Rémunération '.$data['month'], 'amount_minor' => $amount, 'incurred_on' => $end, 'payroll_id' => $row->id]);
+        $this->event('payroll.drafted', $row);
+        return $row;
+    }
+
+    private function lockPayroll(string $id): object
+    {
+        $this->authorize('payroll.write');
+        $this->row('payroll_runs', $id);
+        return $this->query('payroll_runs')->where('id', $id)->lockForUpdate()->first();
+    }
+
+    public function validatePayroll(string $id): object
+    {
+        $run = $this->lockPayroll($id);
+        if ($run->status === 'validated') return $run;
+        abort_if((string) $run->created_by === (string) request()->user()->id, 409,
+            'Séparation des tâches : une autre personne que l’auteur du calcul doit valider cette rémunération.');
+        $this->query('payroll_runs')->where('id', $id)->update(['status' => 'validated', 'validated_at' => now(), 'validated_by' => request()->user()->id]);
+        if ($run->amount_minor > 0) $this->insert('expenses', ['label' => 'Rémunération '.$run->month, 'amount_minor' => $run->amount_minor,
+            'incurred_on' => \Carbon\CarbonImmutable::parse($run->month)->endOfMonth()->toDateString(), 'payroll_id' => $run->id]);
+        $row = $this->row('payroll_runs', $id);
         $this->event('payroll.validated', $row);
+        return $row;
+    }
+
+    public function discardPayroll(string $id): void
+    {
+        $run = $this->lockPayroll($id);
+        abort_if($run->status !== 'draft', 409, 'Une rémunération validée est définitive.');
+        // Removing the draft unfreezes the month's hours for correction and a new calculation.
+        $this->query('payroll_runs')->where('id', $id)->delete();
+        $this->insert('outbox', ['topic' => 'payroll.discarded', 'payload' => json_encode(['id' => $id], JSON_THROW_ON_ERROR)]);
+    }
+
+    public function reversePayment(string $id, string $reason): object
+    {
+        $this->authorize('finance.write');
+        $this->row('payments', $id);
+        // One reversal per payment: a repeated request returns the existing one.
+        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 5))', [$this->tenant().':'.$id]);
+        if ($old = $this->query('payment_reversals')->where('payment_id', $id)->first()) return $old;
+        $row = $this->insert('payment_reversals', ['payment_id' => $id, 'reason' => $reason]);
+        $this->event('payment.reversed', $row);
         return $row;
     }
 }

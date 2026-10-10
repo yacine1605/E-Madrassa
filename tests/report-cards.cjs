@@ -33,6 +33,8 @@ const fixture = action => JSON.parse(compose(['run','--rm','--no-deps','-T','--e
         const csrf = (await (await page.request.get(base+'/school-api/csrf')).json()).csrf_token;
         const api = base+'/school-api/v1/tenants/'+user.tenant;
         const send = (url,data,method='post')=>page.request[method](url,{headers:{Accept:'application/json','X-CSRF-TOKEN':csrf},data,maxRedirects:0});
+        // Report cards cover validated enrollments only; new ones start pending.
+        const validateEnrollment = async id=>assert.equal((await send(api+'/enrollments/'+id+'/transition',{status:'validated',reason:'Inscription validée'})).status(),200);
         const create = async(resource,data)=>{
             const response = await send(api+'/'+resource,data);
             assert.equal(response.status(),201,resource+': '+await response.text());
@@ -57,6 +59,7 @@ const fixture = action => JSON.parse(compose(['run','--rm','--no-deps','-T','--e
             const cohort = await create('cohorts',{offering_id:offering.id,name:'Classe '+cycle,capacity:30});
             const student = await create('students',{matricule:cycle+'-001',first_name:'أمين',last_name:'بن علي',birth_date:'2015-01-01'});
             const enrollment = await create('enrollments',{student_id:student.id,cohort_id:cohort.id,offering_id:offering.id,due_on:'2026-10-01',idempotency_key:randomUUID()});
+            await validateEnrollment(enrollment.id);
             for(const [kind,score] of [['continu',14],['devoir',16],['examen',18]]) {
                 const assessment = await create('assessments',{cohort_id:cohort.id,subject_id:subject.id,kind,title:kind,max_score:20,coefficient:1,held_on:'2026-10-01'});
                 const response = await send(api+'/grades',{assessment_id:assessment.id,enrollment_id:enrollment.id,status:'marked',score},'put');
@@ -137,6 +140,7 @@ const fixture = action => JSON.parse(compose(['run','--rm','--no-deps','-T','--e
 
                 const pupil = await create('students',{matricule:'MIDDLE-PRESET',first_name:'Test',last_name:'Coefficients'});
                 const registered = await create('enrollments',{student_id:pupil.id,cohort_id:fourth.middleClass.id,offering_id:fourth.middleOffer.id,due_on:'2026-10-01',idempotency_key:randomUUID()});
+                await validateEnrollment(registered.id);
                 for(const [code,score] of [['MOY-AR',14],['MOY-MATH',20]]) {
                     const exam = await create('assessments',{cohort_id:fourth.middleClass.id,subject_id:middleSubjects[code].id,kind:'examen',title:code,max_score:20,coefficient:1,held_on:'2026-10-01'});
                     assert.equal((await send(api+'/grades',{assessment_id:exam.id,enrollment_id:registered.id,status:'marked',score},'put')).status(),200);

@@ -1,7 +1,10 @@
 services:
   app:
-    image: madrassa-app:latest
+    image: ${TEST_APP_IMAGE:-madrassa-app:latest}
+    pull_policy: never
+  worker:
+    image: ${TEST_APP_IMAGE:-madrassa-app:latest}
     pull_policy: never
   backup:
-    image: madrassa-backup:latest
+    image: ${TEST_BACKUP_IMAGE:-madrassa-backup:latest}
     pull_policy: never

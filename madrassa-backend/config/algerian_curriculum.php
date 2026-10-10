@@ -12,6 +12,10 @@ if (in_array('PRESCOLAIRE', $weekly['language_support']['cycles'], true)) unset(
 $middle = ['MOY-AR','MOY-MATH','MOY-FR','MOY-EN','MOY-ISLAM','MOY-CIV','MOY-SVT','MOY-PHYS','MOY-HG','MOY-SPORT','MOY-ART','MOY-MUSIC','MOY-IT','MOY-AMAZ'];
 $secondary = ['SEC-AR','SEC-MATH','SEC-FR','SEC-EN','SEC-ISLAM','SEC-SVT','SEC-PHYS','SEC-HG','SEC-IT','SEC-SPORT','SEC-ART','SEC-AMAZ'];
 return [
+    // Primary teachers qualified in Arabic teach every subject of their level,
+    // except the specialist subjects, which need their own qualification.
+    'generalist' => ['program' => 'PRIMAIRE', 'qualifying_subject' => 'PRI-AR-LECT',
+        'specialist_subjects' => ['PRI-FR', 'PRI-EN', 'PRI-ES', 'PRI-SPORT']],
     'weekly_reference' => $weekly,
     'subjects' => [
         'PRE-AR'=>'اللغة العربية',

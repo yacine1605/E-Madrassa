@@ -80,6 +80,8 @@ const fixtureCommand = action => execFileSync('docker-compose', ['run','--rm','-
             const room = await create('rooms',{name:'Test room',campus_id:campus.id,capacity:10});
             const subject = await create('subjects',{name:'Test subject',code:'TEST'});
             await create('curriculum',{level_id:level.id,subject_id:subject.id,coefficient:1});
+            // A session needs a teacher qualified for its subject and level.
+            await create('teacher_qualifications',{teacher_id:teacher.id,level_id:level.id,subject_id:subject.id});
             const bilingual = await create('subjects',{name:'Langue française (اللغة الفرنسية)',code:'BILINGUAL'});
             const lookup = async q => {
                 const response = await fetch('/school-api/v1/tenants/'+tenant+'/subjects?'+new URLSearchParams({q}));

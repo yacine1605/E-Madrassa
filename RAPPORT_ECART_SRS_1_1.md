@@ -4,9 +4,13 @@
 **Document de référence :** `SRS_Madrassa_1_1.md` (version 1.1, 9 octobre 2026)
 **Objet :** procédure demandée en §0.5 du SRS — rapport d'écart par identifiant, inventaire de ce qui est réutilisable, puis plan de correction ordonné par lot.
 **Date de l'analyse :** 10 octobre 2026 · **Révision du code analysée :** `263918e` (« version 1.1 »)
-**Révision du rapport :** 1.1 (10 octobre 2026)
+**Révision du rapport :** 1.2 (10 octobre 2026)
 **Statut :** à valider. **Aucune modification de code ne doit être engagée avant validation de ce rapport** (§0.5).
 
+> **Modifications de la révision 1.2**
+> - Nouveau constat **T22** : le déploiement Docker livré connecte l'application en superutilisateur PostgreSQL, ce qui désactive la sécurité au niveau des lignes. `NFR-TEN-01` passe de `CONFORME` à `PARTIEL` ; §1, §3.4 et §4.1 recomptés (7 `CONFORME`, 87 `PARTIEL`).
+> - Nouveau §11 : suivi des corrections T1 à T22 réalisées sur la branche `lot0-corrections`, avec leur vérification.
+>
 > **Modifications de la révision 1.1**
 > - Suite d'invariants SQL **exécutée** : telle que livrée, elle échoue avant le premier contrôle (nouveau constat T19) ; sur le schéma complet (base + 11 migrations + privilèges), **34/34 contrôles réussis**. §0.2, §1, §5, §7 et §10 mis à jour.
 > - Synthèse quantitative (§1, §4.1, §4.2) **recomptée** à partir des tableaux du §3, avec une règle de comptage explicite. Les chiffres de la révision 1.0 (93 exigences ; 9/41/31/12) n'étaient pas reproductibles.
@@ -69,7 +73,7 @@ Effort : **S** ≤ 3 j · **M** ≤ 3 sem. · **L** > 3 sem., mesuré pour **1 �
 
 **5. La pile technique en place satisfait toutes les exigences `ARC-*` : il faut la conserver et amender le SRS (OD-01).** Le code est en **PHP 8.3 / Laravel 12 / Filament 5 / PostgreSQL 16 / Redis**, pas en Python/Django comme le propose la §4.2. Recommandation détaillée au §2.3 : **conserver**, car (a) aucun `ARC-*` ni `NFR-*` ne devient insatisfaisable, (b) l'actif le plus coûteux du projet (constat 2) est en SQL pur, donc indépendant du langage applicatif, (c) les lots 6 et 7 (OR-Tools, IA) doivent de toute façon tourner en processus de fond séparés selon `ARC-09`/`ARC-10` — le dépôt contient déjà des scripts Python de planification, ce qui démontre la cohabitation. Migrer vers Django reviendrait à réécrire le meilleur du code pour un gain architectural nul.
 
-**Volumétrie de l'écart** (détail et règle de comptage au §4) : sur les **147 identifiants** des lots 1 à 4 et des exigences transverses (`ARC-*`, `BR-*`, `NFR-*`) — **8 `CONFORME` (5 %), 86 `PARTIEL` (59 %), 45 `ABSENT` (31 %), 8 `DIVERGENT` (5 %)** ; 24 de ces lignes (16 %) comportent une divergence de modèle, seule ou en second statut. Aucune exigence fonctionnelle des lots 1 à 4 n'est `CONFORME`. Le socle est bon mais la surface conforme est faible : le projet est, **par estimation qualitative**, à environ **25–30 % du SRS** en valeur livrée, avec une qualité d'invariants nettement supérieure à ce pourcentage.
+**Volumétrie de l'écart** (détail et règle de comptage au §4) : sur les **147 identifiants** des lots 1 à 4 et des exigences transverses (`ARC-*`, `BR-*`, `NFR-*`) — **7 `CONFORME` (5 %), 87 `PARTIEL` (59 %), 45 `ABSENT` (31 %), 8 `DIVERGENT` (5 %)** ; 24 de ces lignes (16 %) comportent une divergence de modèle, seule ou en second statut. Aucune exigence fonctionnelle des lots 1 à 4 n'est `CONFORME`. Le socle est bon mais la surface conforme est faible : le projet est, **par estimation qualitative**, à environ **25–30 % du SRS** en valeur livrée, avec une qualité d'invariants nettement supérieure à ce pourcentage.
 
 ---
 
@@ -435,7 +439,7 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | NFR-SEC-07 | `ABSENT` | aucune journalisation de sécurité dédiée, aucune alerte | majeur | M |
 | NFR-SEC-08 | `ABSENT` | **aucune intégration continue** (pas de `.github/workflows`), donc aucune analyse de dépendances | majeur | S |
 | NFR-SEC-09 | `PARTIEL` | sauvegardes `pg_dump` + archive de fichiers + empreintes SHA-256 + rétention ; **les sauvegardes ne sont pas chiffrées** (le contrôle de clé porte sur `APP_KEY`, pas sur l'archive) | majeur | S |
-| NFR-TEN-01 | `CONFORME` | RLS `ENABLE`+`FORCE` sur toutes les tables métier ; `school_runtime` `NOSUPERUSER NOBYPASSRLS`, non propriétaire, sans `DELETE` ni écriture d'adhésion ; vues `security_invoker` | — | — |
+| NFR-TEN-01 | `PARTIEL` | RLS `ENABLE`+`FORCE` sur toutes les tables métier ; `school_runtime` `NOSUPERUSER NOBYPASSRLS`, non propriétaire, sans `DELETE` ni écriture d'adhésion ; vues `security_invoker`. **Mais le déploiement Docker livré n'utilise pas ce rôle** : l'application s'y connecte en superutilisateur, ce qui contourne la RLS (constat T22, révision 1.2) | **bloquant** | S |
 | NFR-TEN-02 | `PARTIEL` | 7 tests d'isolation au niveau SQL (lecture croisée, écriture croisée, clé étrangère croisée, adhésion inactive, tenant manquant, non-membre, remise à zéro au rollback) ; **non couvert : interface, API, exports, fichiers, tâches, notifications, recherche** | **bloquant** | M |
 | NFR-TEN-03 | `PARTIEL` | préfixe Redis global `madrassa_`, non segmenté par tenant ; sans objet aujourd'hui (une base par déploiement), bloquant dès ARC-02 | majeur | S |
 | NFR-AVL-01 | `ABSENT` | aucun engagement, aucune mesure | majeur | — |
@@ -502,10 +506,10 @@ Le seul argument contraire du SRS — « un seul langage avec OR-Tools et l'IA �
 | Architecture `ARC-*` | 12 | 2 | 4 | 4 | 2 | 3 |
 | Règles métier `BR-*` | 20 | 3 | 14 | 3 | 0 | 2 |
 | Fonctionnelles `FR-*` (lots 1 à 4) | 72 | 0 | 45 | 22 | 5 | 17 |
-| Non fonctionnelles `NFR-*` | 43 | 3 | 23 | 16 | 1 | 2 |
-| **Total** | **147** | **8 (5 %)** | **86 (59 %)** | **45 (31 %)** | **8 (5 %)** | **24 (16 %)** |
+| Non fonctionnelles `NFR-*` | 43 | 2 | 24 | 16 | 1 | 2 |
+| **Total** | **147** | **7 (5 %)** | **87 (59 %)** | **45 (31 %)** | **8 (5 %)** | **24 (16 %)** |
 
-Les 8 `CONFORME` : `ARC-08`, `ARC-12`, `BR-06`, `BR-07`, `BR-11`, `NFR-TEN-01`, `NFR-PORT-02`, `NFR-MNT-03` — tous transverses ; **aucune exigence fonctionnelle n'est conforme**.
+Les 7 `CONFORME` : `ARC-08`, `ARC-12`, `BR-06`, `BR-07`, `BR-11`, `NFR-PORT-02`, `NFR-MNT-03` — tous transverses ; **aucune exigence fonctionnelle n'est conforme**.
 
 Couverture (§0.5 du SRS) : les **170** identifiants `FR-*`, `BR-*`, `NFR-*` et `ARC-*` du SRS sont tous évalués — les 147 ci-dessus et 23 pour les lots 5 à 10, dont trois lignes regroupées (`FR-EDT-01…05`, `FR-IAI-01…05`, `FR-STK-01…04`).
 
@@ -573,6 +577,7 @@ Défauts et incohérences relevés pendant la lecture, indépendants du plan par
 | T19 | **La suite d'invariants livrée ne s'exécute pas.** `database.mjs` charge `001_school.sql` puis `runtime-grants.sql`, mais ce fichier accorde des droits sur des tables créées **uniquement** par les migrations Laravel (`teacher_assignments`, `report_card_*`, `admissions`, `annual_progressions`). `npm test` échoue à l'initialisation (`relation "school.teacher_assignments" does not exist`), avant le premier contrôle. `docs/VALIDATION.md` annonce pourtant « 34 contrôles réussis ». Appliquée au schéma complet (base + 11 migrations + privilèges), la suite passe : **34/34** (révision 1.1). | [database.mjs:28-32](madrassa-backend/tests/database.mjs:28), [runtime-grants.sql](madrassa-backend/deploy/runtime-grants.sql) | **bloquant** (`NFR-MNT-01`, préalable à T11) | Faire appliquer par la suite le même schéma que la production : extraire le SQL des migrations dans des fichiers `.sql` chargés à la fois par les migrations Laravel et par `database.mjs`, ou faire exécuter les migrations par la suite. Corriger `docs/VALIDATION.md` |
 | T20 | **Le PDF d'emplois du temps de la documentation est corrompu.** Les octets binaires ont été remplacés par le caractère U+FFFD (fichier écrit comme du texte) ; les 8 pages s'affichent vides. | `madrassa-backend/docs/emplois-du-temps-moyen-2026-2027.pdf` | mineur | Régénérer le PDF en écriture binaire, ou le retirer de `docs/` |
 | T21 | **Dépendances et caches suivis par git** : `.test-tools/node_modules` (183 fichiers) et 19 fichiers `__pycache__`. | `git ls-files` | mineur | Les retirer de l'index et compléter `.gitignore` |
+| T22 | **Le déploiement Docker interroge la base en superutilisateur.** `compose.yaml` connecte l'application avec `school_owner`, que l'image officielle `postgres` crée superutilisateur ; or la sécurité au niveau des lignes ne s'applique jamais à un superutilisateur. La seconde barrière entre écoles n'existe donc pas dans ce déploiement, y compris lorsqu'il est publié par le tunnel Cloudflare. Le README du backend l'interdit pourtant (« Ne jamais utiliser le superutilisateur du conteneur pour les requêtes HTTP »). Constaté en révision 1.2. | `compose.yaml`, `docker/entrypoint.sh` | **bloquant** (`NFR-TEN-01`, `ARC-02`, `BR-01`) | Migrations et commandes d'administration en propriétaire ; requêtes web et tâches de fond sous le rôle restreint `school_runtime`, avec des privilèges complets pour l'API |
 
 ---
 
@@ -868,3 +873,38 @@ Mais il réalise le **lot 9** du SRS (mode dédié) et non le **lot 1** (fondati
 3. **Engager le lot 0 immédiatement** (2 à 3 semaines) : trancher les neuf décisions `ND` — dont ND-09, qui décide si le plan du §6 s'applique au code existant ou à une nouvelle base de schéma —, réparer l'initialisation de la suite d'invariants (T19) puis la mettre sous intégration continue — elle n'est exécutée par personne aujourd'hui et, telle que livrée, ne s'exécute plus —, et appliquer les corrections à faible coût du §5. Rien dans ce lot n'est fonctionnel, et tout le reste en dépend.
 
 > Conformément à la §0.5 du SRS, **aucune modification de code ne doit être engagée avant validation de ce rapport.**
+
+---
+
+## 11. Suivi des corrections (branche `lot0-corrections`)
+
+Corrections réalisées après la révision 1.1, dans le code existant (refonte incrémentale). Elles ne préjugent pas de ND-09 : les invariants et leurs tests se reportent tels quels sur une nouvelle base de schéma.
+
+| # | État | Correction | Vérification |
+|---|---|---|---|
+| T1 | Corrigé | L'API n'efface plus : elle **archive** (`archived_at` sur 13 tables), refuse l'archivage tant que des données en cours en dépendent, et le rôle restreint reçoit enfin les droits de modification que l'API utilise | test SQL ; suites navigateur |
+| T2 | Corrigé | Le calcul de paie crée un **brouillon** ; une autre personne le valide, et seule la validation crée la dépense de salaire ; un brouillon peut être supprimé pour corriger les heures | 7 tests SQL ; `teacher-pay.cjs` |
+| T3 | Corrigé | Les heures enregistrent leur auteur (`entered_by`) et leur valideur (`reviewed_by`) ; l'auteur ne peut pas les valider, en base comme à l'écran | 3 tests SQL ; `teacher-pay.cjs` |
+| T4 | Corrigé pour l'API | Le tarif d'un contrat est masqué sans `payroll.read` ; créer un contrat exige `payroll.write`. Reste : sortir le montant du contrat vers `pay_rule` (W3.4) | — |
+| T5 | Corrigé | **Contre-opération** `payment_reversals` : annule l'effet d'un paiement sur le solde, motif obligatoire, une seule par paiement, interdite après remboursement. Reste : circuit de remboursement approuvé (`FR-FIN-04`, lot 3) | 6 tests SQL |
+| T6 | Corrigé | Référence de paiement unique et non réutilisable dans l'école, y compris en concurrence. Reste : numérotation des reçus (`FR-FIN-05`, lot 3) | test SQL ; course native |
+| T7 | Non traité | `group_membership` est une refonte du modèle (W2.5, lot 2) | — |
+| T8 | Corrigé | Les codes de matières algériens quittent le service générique pour le profil (`config/algerian_curriculum.php`). Reste : héritage par nœud parent (W2.6) | `teacher-eligibility.cjs` |
+| T9 | Corrigé | Audit avec valeurs **avant/après**, données personnelles et contenus volumineux masqués, motif, identifiant de requête et adresse IP ; audit ajouté sur 4 tables qui en manquaient | test SQL |
+| T10 | Partiel | `archived_at` sur les tables du catalogue. Restent les colonnes communes §7.1 (`version`, `created_by`, `updated_by`) sur toutes les tables (W1.5) | — |
+| T11 | Corrigé | Intégration continue : SQL embarqué et natif avec courses, syntaxe PHP, tests Laravel, générateurs d'emplois du temps, construction des deux images | à confirmer au premier envoi sur GitHub |
+| T12 | Corrigé (substrat) | File Redis et service `worker`. Restent la table `job` et la page « Mes tâches » (`FR-JOB-01`, W1.6) | démarrage du service |
+| T13 | Corrigé | Une inscription naît `pending` et se valide par transition | test SQL ; `student-lifecycle.cjs` |
+| T14 | Corrigé | Codes et matricules définitifs : refus à l'API, privilège absent pour le rôle restreint, déclencheur pour tout autre rôle | 2 tests SQL |
+| T15 | Partiel | Mode démonstration en centimes entiers et étiqueté « données fictives, règles non contractuelles ». Son sort final reste ND-04 | tests Laravel |
+| T16 | Corrigé | Module inactif : 403 avec le code `module_disabled` | `modular-schools.cjs` |
+| T17 | Corrigé | Pagination par défaut à 25 | — |
+| T18 | Corrigé | Sauvegardes chiffrées (GnuPG, AES-256) avec `BACKUP_PASSPHRASE` ; les anciennes restent restaurables | `backups.cjs` |
+| T19 | Corrigé | La suite charge les mêmes fichiers SQL que les migrations ; `npm test` passe sans outil supplémentaire | 54 contrôles embarqués, 57 natifs |
+| T20 | Corrigé | PDF régénéré depuis sa page HTML, en écriture binaire (8 pages lisibles) | contrôle visuel |
+| T21 | Corrigé | 324 fichiers d'outillage et de cache retirés de git ; Playwright épinglé dans `.test-tools/package.json` ; fins de ligne LF imposées pour les fichiers copiés dans les images | — |
+| T22 | Corrigé | Requêtes et tâches sous `school_runtime`, créé et mis à jour à chaque démarrage ; identifiants relus dans l'environnement du processus, pour qu'un `config:cache` lancé en propriétaire ne les remplace pas | connexions web vérifiées dans le journal PostgreSQL, y compris après `config:cache` ; 9 suites navigateur |
+
+Toutes les nouvelles migrations sont réversibles (vérifié : application, retour arrière complet, réapplication).
+
+**Vérification d'ensemble (10 octobre 2026).** Suite SQL : 54 contrôles sur PostgreSQL embarqué, 57 sur PostgreSQL 16 avec trois courses concurrentes. Suites navigateur Docker : 9 sur 9 réussies, dont 5 après correction de tests anciens (qualification d'enseignant manquante depuis la migration du 2 octobre, nombre de routes, ordre des tests du frontend) ou adaptation au nouveau comportement (inscriptions en attente, validation par un tiers, sauvegardes chiffrées). Tests JavaScript du frontend (4), PHPUnit (7), générateurs d'emplois du temps (13) : réussis. Une régression introduite en cours de travail a été détectée et corrigée : la restauration d'une sauvegarde dans un déploiement neuf échouait faute de rôle `school_runtime`.

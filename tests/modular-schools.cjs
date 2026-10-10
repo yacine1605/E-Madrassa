@@ -67,7 +67,9 @@ const createStudent = async (context, env, tenant, code) => {
         assert.equal((await request(cb,b.APP_URL+'/scolarite/'+userB.tenant+'/admissions')).status(),200);
         assert.equal((await request(cb,b.APP_URL+'/scolarite/'+userB.tenant+'/passage-annuel')).status(),404);
         for (const endpoint of ['payments','finance/summary','sessions','payroll_runs','announcements']) {
-            assert.equal((await request(cb,apiB+'/'+endpoint)).status(),404,'API hides '+endpoint);
+            const hidden=await request(cb,apiB+'/'+endpoint);
+            assert.equal(hidden.status(),403,'API refuses '+endpoint);
+            assert.equal((await hidden.json()).code,'module_disabled');
         }
         assert.equal((await request(cb,b.APP_URL+'/documents/'+userB.tenant)).status(),404);
         assert.equal((await request(cb,b.APP_URL+'/remunerations/'+userB.tenant)).status(),404);
@@ -77,7 +79,7 @@ const createStudent = async (context, env, tenant, code) => {
             headers:{Accept:'application/json','X-CSRF-TOKEN':token},
             data:{invoice_id:randomUUID(),amount_minor:100,method:'cash',idempotency_key:randomUUID()},
         });
-        assert.equal(denied.status(),404,'Disabled dedicated write endpoint is blocked');
+        assert.equal(denied.status(),403,'Disabled dedicated write endpoint is blocked');
         await createStudent(ca,a,userA.tenant,'SCHOOL-A-ONLY');
         const saved = await createStudent(cb,b,userB.tenant,'SCHOOL-B-ONLY');
         const roster = (await (await request(cb,apiB+'/students')).json()).data;
@@ -90,7 +92,7 @@ const createStudent = async (context, env, tenant, code) => {
         assert.equal((await request(ca,apiA+'/payments')).status(),200,'Preview does not change running school');
         compose(b,['exec','-T','app','php','artisan','route:cache']);
         compose(b,['exec','-T','app','php','artisan','config:cache']);
-        assert.equal((await request(cb,apiB+'/payments')).status(),404,'Caches preserve API feature boundary');
+        assert.equal((await request(cb,apiB+'/payments')).status(),403,'Caches preserve API feature boundary');
         assert.equal((await request(cb,b.APP_URL+'/documents/'+userB.tenant)).status(),404,'Caches preserve module route boundary');
         // Reconfigure one existing school, keeping its project, database and storage.
         b.SCHOOL_MODULES = 'students,lifecycle,finance';

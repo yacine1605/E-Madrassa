@@ -9,18 +9,19 @@ final class TeacherEligibility
     public static function teachers(string $tenant, ?string $level, string $subject)
     {
         $qualifiedSubjects = [$subject];
-        // Arabic teachers are generalists only within their qualified primary level.
-        // The four specialist subjects still require their own qualification.
-        $primaryGeneralistSubject = DB::table('school.curriculum as c')
+        // Generalist rule from the school profile: a qualification in one subject
+        // covers the level's other subjects, except the profile's specialist subjects.
+        $generalist = config('algerian_curriculum.generalist');
+        $generalistSubject = $generalist && DB::table('school.curriculum as c')
             ->join('school.levels as l', fn ($join) => $join->on('l.id', '=', 'c.level_id')->on('l.tenant_id', '=', 'c.tenant_id'))
             ->join('school.programs as p', fn ($join) => $join->on('p.id', '=', 'l.program_id')->on('p.tenant_id', '=', 'l.tenant_id'))
             ->join('school.subjects as s', fn ($join) => $join->on('s.id', '=', 'c.subject_id')->on('s.tenant_id', '=', 'c.tenant_id'))
             ->where('c.tenant_id', $tenant)->where('c.level_id', $level)->where('c.subject_id', $subject)
-            ->whereRaw('upper(p.code) = ?', ['PRIMAIRE'])
-            ->whereNotIn('s.code', ['PRI-FR', 'PRI-EN', 'PRI-ES', 'PRI-SPORT'])->exists();
-        if ($primaryGeneralistSubject) {
-            $arabic = DB::table('school.subjects')->where('tenant_id', $tenant)->where('code', 'PRI-AR-LECT')->value('id');
-            if ($arabic) $qualifiedSubjects[] = $arabic;
+            ->whereRaw('upper(p.code) = ?', [strtoupper($generalist['program'])])
+            ->whereNotIn('s.code', $generalist['specialist_subjects'])->exists();
+        if ($generalistSubject) {
+            $qualifying = DB::table('school.subjects')->where('tenant_id', $tenant)->where('code', $generalist['qualifying_subject'])->value('id');
+            if ($qualifying) $qualifiedSubjects[] = $qualifying;
         }
 
         return DB::table('school.staff')->where('tenant_id', $tenant)
