@@ -35,13 +35,13 @@ final class RoleAssignmentController
 
     public function store(Request $request)
     {
-        // Levels, groups and subjects arrive with the referential (W1.5); until then a role covers
-        // the whole school, some sites, or the person's own data.
+        // A role covers the whole school, some sites, levels (with what lies below) or subjects,
+        // or the person's own data. Groups arrive with lot 2.
         $data = $request->validate([
             'user_id' => 'required|integer',
             'role_id' => 'required|uuid',
-            'scope_type' => ['required', Rule::in(['tenant', 'site', 'personal'])],
-            'scope_ids' => 'required_if:scope_type,site|prohibited_unless:scope_type,site|array|min:1|max:100',
+            'scope_type' => ['required', Rule::in(['tenant', 'site', 'level', 'subject', 'personal'])],
+            'scope_ids' => 'required_if:scope_type,site,level,subject|prohibited_if:scope_type,tenant,personal|array|min:1|max:100',
             'scope_ids.*' => 'uuid|distinct',
             'valid_from' => 'nullable|date_format:Y-m-d',
             'valid_until' => 'nullable|date_format:Y-m-d|after_or_equal:'.($request->input('valid_from') ?: 'today'),

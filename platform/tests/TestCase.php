@@ -61,11 +61,12 @@ abstract class TestCase extends BaseTestCase
     }
 
     /** A school created through the console's own function, as the publisher would; its administrator, if any, is invited. */
-    protected function school(string $plan = 'essential', ?array $admin = null): object
+    protected function school(string $plan = 'essential', ?array $admin = null, ?string $profile = null): object
     {
         $slug = 'test-'.Str::lower(Str::random(12));
-        $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?) AS id',
-            [(string) Str::uuid(), $slug, 'École '.$slug, 'fr', $plan, now()->toDateString(), null, 500, 1024, 'MAIN', 'Site principal', $admin['id'] ?? null])->id;
+        $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?, ?) AS id',
+            [(string) Str::uuid(), $slug, 'École '.$slug, 'fr', $plan, now()->toDateString(), null, 500, 1024, 'MAIN', 'Site principal',
+             $admin['id'] ?? null, $profile])->id;
         return (object) ['id' => $id, 'slug' => $slug];
     }
 

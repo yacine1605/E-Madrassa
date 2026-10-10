@@ -18,13 +18,19 @@ final class PermissionCoverageTest extends TestCase
     {
         $roles = array_column(DB::connection('owner')->select('SELECT code FROM platform.role_template'), 'code');
         $roles[] = 'super_admin';
-        $pattern = '/[\'"]('.implode('|', array_map('preg_quote', $roles)).')[\'"]/';
+        // These three also name kinds of people (custom field entities, staff kinds): a role is
+        // meant only when the line speaks of roles. The other codes are never written at all.
+        $people = ['student', 'parent', 'teacher'];
+        $strict = '/[\'"]('.implode('|', array_map('preg_quote', array_diff($roles, $people))).')[\'"]/';
+        $loose = '/[\'"]('.implode('|', $people).')[\'"]/';
         $found = [];
         foreach (['app', 'routes', 'config'] as $directory) {
             foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path($directory))) as $file) {
                 if ($file->getExtension() !== 'php') continue;
                 foreach (file($file->getPathname()) as $number => $line) {
-                    if (preg_match($pattern, $line)) $found[] = $file->getPathname().':'.($number + 1).': '.trim($line);
+                    if (preg_match($strict, $line) || (preg_match($loose, $line) && stripos($line, 'role') !== false)) {
+                        $found[] = $file->getPathname().':'.($number + 1).': '.trim($line);
+                    }
                 }
             }
         }

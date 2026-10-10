@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\AccountLinks;
+use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,7 @@ Artisan::command('platform:user {email} {--name=} {--password=}', function (stri
     if (!$this->option('password')) $this->warn('Temporary password, shown once: '.$password);
 })->purpose('Create or reset an account (as the database owner)');
 
-Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--locale=fr} {--admin=} {--site-code=MAIN}
+Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--profile=private_school_dz} {--locale=fr} {--admin=} {--site-code=MAIN}
     {--site-name=Site principal} {--students=500} {--storage=1024} {--until=}', function (string $slug, string $name) {
     $admin = $this->option('admin')
         ? DB::connection('owner')->table('users')->where('email', mb_strtolower($this->option('admin')))->value('id')
@@ -37,13 +38,28 @@ Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--loc
     if ($this->option('admin') && !$admin) { $this->error('Unknown account: '.$this->option('admin')); return 1; }
     // The slug decides the creation key: running the command again returns the same school.
     $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'madrassa:school:'.$slug)->toString();
-    $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?) AS id', [
+    $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?, ?) AS id', [
         $key, $slug, $name, $this->option('locale'), $this->option('plan'), now()->toDateString(), $this->option('until') ?: null,
         (int) $this->option('students'), (int) $this->option('storage'), $this->option('site-code'), $this->option('site-name'), $admin,
+        $this->option('profile') ?: null,
     ])->id;
     $this->info('School ready: '.$id);
     if ($admin) return $this->call('platform:invite-admin', ['slug' => $slug]);
-})->purpose('Create a school with its plan, default site and invited administrator (as platform_admin)');
+})->purpose('Create a school with its plan, profile, default site and invited administrator (as platform_admin)');
+
+Artisan::command('platform:apply-profile {slug} {profile} {--profile-version=}', function (string $slug, string $profile) {
+    $console = DB::connection('console');
+    $tenant = $console->table('platform.tenant')->where('slug', $slug)->value('id');
+    if (!$tenant) { $this->error('Unknown school.'); return 1; }
+    // FR-PLT-03: only on request; adds what the school lacks, changes nothing it has.
+    try {
+        $version = $console->selectOne('SELECT platform.apply_profile(?, ?, ?) AS v', [$tenant, $profile, $this->option('profile-version') ?: null])->v;
+    } catch (QueryException $e) {
+        $this->error(DatabaseErrors::classify($e)[2] ?? throw $e);
+        return 1;
+    }
+    $this->info("Profile $profile version $version applied.");
+})->purpose('Apply a profile version to a school, adding what it lacks (as platform_admin)');
 
 Artisan::command('platform:invite-admin {slug}', function (string $slug) {
     $console = DB::connection('console');

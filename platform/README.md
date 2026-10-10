@@ -29,6 +29,7 @@ The migration owner is used for migrations only. It must be a superuser or a mem
 2. `CALL school.protect('school.<table>')`: row-level security, read-only mode of an expired or archived school, §7.1 columns maintained by trigger, audit with old and new values.
 3. Grants in `deploy/roles.sql`: column-level `UPDATE`, never `DELETE` on a business record (BR-02), never a code column (BR-18).
 4. Its invariants in `tests/sql/database.mjs`, written before the screens; its API behaviour in `tests/Feature/`.
+   A level, track, specialty or subject is a key to `school.ref_node` or `school.subject`, never text (BR-13); a table recording results of a school year checks `school.year_open()`.
 5. Its routes declare an annex A permission (`permission:` middleware, checked by `PermissionCoverageTest`); the controller narrows to the grant's scope. Never test a role code.
 
 ## Run the tests
@@ -51,8 +52,10 @@ php vendor/bin/phpunit
 php artisan migrate --database=owner        # schema, as the migration owner
 php artisan platform:roles                  # roles, privileges and passwords (DB_PASSWORD, DB_CONSOLE_PASSWORD)
 php artisan platform:user direction@ecole.dz
-php artisan platform:create-school ecole-a "École A" --plan=essential --admin=direction@ecole.dz   # also sends the activation link
+php artisan platform:create-school ecole-a "École A" --plan=essential --admin=direction@ecole.dz   # profile private_school_dz; sends the activation link
+php artisan platform:create-school centre-b "Centre B" --profile=training_center
 php artisan platform:invite-admin ecole-a   # a new link, if the first one expired (72 h)
+php artisan platform:apply-profile ecole-a private_school_dz   # a newer profile version, only on request: adds, never overwrites
 ```
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
@@ -128,7 +131,27 @@ A person (`users`) signs in once and may belong to several schools; each school 
 
 Left for later: the full import pipeline (file, preview, rejection report, rollback) and queued mail come with the shared services (W1.6); security alerts (NFR-SEC-07) with the enriched audit (W1.6); turning MFA off or regenerating recovery codes, and changing one's own email, with the account screens.
 
+## Increment 5: referential (W1.5)
+
+113 invariants on embedded PostgreSQL, 117 on PostgreSQL 16, 55 integration tests (10 October 2026).
+
+| SRS | Covered |
+|---|---|
+| FR-PLT-03 | Versioned profiles: `private_school_dz` (4 cycles, 15 levels, 14 tracks, 28 subjects, French and Arabic) and `training_center` (domain, specialty, pathway, modules); applied at creation; a published version never changes; a new version reaches a school only on request, adding without overwriting |
+| FR-REF-01 | Types from the profile: renamed, optional ones turned off when unused, never created by the school; "Niveau" or "Spécialité", "Matières" or "Modules" from the same code |
+| FR-REF-02 | Nodes: permanent codes unique per type; labels in French or Arabic, unique among active siblings regardless of case, spaces and Arabic diacritics; parent of the expected type; archived, never deleted, a parent only once its children are |
+| FR-REF-03 | Subject catalog: unique labels, permanent codes; deleted while unused, archived otherwise (a role scope already counts as a use) |
+| FR-REF-04 | Custom fields of students, guardians, staff and leads: types, select options added never removed, 20 active per entity, required fields; the check entity tables will call |
+| FR-REF-05 | School years with one current at most; periods inside their year, never overlapping (exclusion constraint); a closed year final |
+| FR-REF-06 | Settings: open days (Sunday to Thursday by default), first day of the week, languages, receipt contacts; time zone Africa/Algiers |
+| FR-IAM-04 | Role scopes by level (covering what lies below) and by subject |
+| FR-AUD-01 | A deletion keeps the deleted values in the journal; a profile application appears in the school's journal |
+
+The subjects of `madrassa-backend/config/algerian_curriculum.php` were one per cycle; the catalog has one entry per subject (Arabic, Mathematics…), the hours of each level belonging to programs (FR-PRG-02, lot 2). Labels, Arabic ones especially, await the school's validation (OD-13).
+
+Left for later: time slots and approval thresholds come with planning (lot 4) and finance (lot 3); the logo with file storage (W1.6); group scopes with groups (lot 2).
+
 ## Next increments of lot 1
 
-1. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+1. **Shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).

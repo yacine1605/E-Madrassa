@@ -45,8 +45,8 @@ final class AccountController
             'method' => ['required', Rule::in(['link', 'password'])],
             'roles' => 'nullable|array|max:20',
             'roles.*.role_id' => 'required|uuid',
-            'roles.*.scope_type' => ['required', Rule::in(['tenant', 'site', 'personal'])],
-            'roles.*.scope_ids' => 'required_if:roles.*.scope_type,site|nullable|array|min:1|max:100',
+            'roles.*.scope_type' => ['required', Rule::in(['tenant', 'site', 'level', 'subject', 'personal'])],
+            'roles.*.scope_ids' => 'required_if:roles.*.scope_type,site,level,subject|nullable|array|min:1|max:100',
             'roles.*.scope_ids.*' => 'uuid',
         ]);
         if ($data['method'] === 'link' && empty($data['email'])) {

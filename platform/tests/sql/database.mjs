@@ -1,4 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
+import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
 import { readFileSync, readdirSync } from 'node:fs';
 import { randomBytes, randomUUID as uuid } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ if (process.env.DATABASE_URL) {
   db = { query: (s, p) => client.query(s, p), exec: s => client.query(s), close: () => client.end() };
 } else {
   assert.ok(!process.env.REQUIRE_NATIVE, 'DATABASE_URL is required for concurrency tests');
-  db = new PGlite();
+  db = new PGlite({ extensions: { btree_gist } });
 }
 let passed = 0;
 const sql = (s, p = []) => db.query(s, p);
@@ -45,16 +46,16 @@ const as = async (role, tenant, user) => {
 };
 const today = new Date().toISOString().slice(0, 10);
 const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
-const CREATE = 'SELECT platform.create_tenant($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11, $12) AS id';
-const create = async (key, slug, name, plan, admin) =>
-  (await first(CREATE, [key, slug, name, 'fr', plan, today, null, 500, 1024, 'MAIN', 'Site principal', admin])).id;
+const CREATE = 'SELECT platform.create_tenant($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11, $12, $13) AS id';
+const create = async (key, slug, name, plan, admin, profile = null) =>
+  (await first(CREATE, [key, slug, name, 'fr', plan, today, null, 500, 1024, 'MAIN', 'Site principal', admin, profile])).id;
 const modules = async t => (await sql('SELECT module_key FROM platform.tenant_module WHERE tenant_id = $1 ORDER BY 1', [t])).rows.map(r => r.module_key);
 const sites = () => count('SELECT count(*) n FROM school.site');
 
 // Schools and entitlements (FR-PLT-01, FR-PLT-02)
 await as('platform_admin', null, 6);
 const keyA = uuid();
-const a = await create(keyA, 'ecole-a', 'École A', 'essential', 1);
+const a = await create(keyA, 'ecole-a', 'École A', 'essential', 1, 'private_school_dz');
 const b = await create(uuid(), 'centre-b', 'Centre B', 'custom', 2);
 await check('a new school has exactly one default site and one invited administrator', async () => {
   await as(null);
@@ -64,15 +65,15 @@ await check('a new school has exactly one default site and one invited administr
 });
 await as('platform_admin', null, 6);
 await check('a repeated creation returns the same school (FR-PLT-01 AC3)', async () => {
-  assert.equal(await create(keyA, 'ecole-a', 'École A', 'essential', 1), a);
+  assert.equal(await create(keyA, 'ecole-a', 'École A', 'essential', 1, 'private_school_dz'), a);
   assert.equal(await count("SELECT count(*) n FROM platform.tenant WHERE slug = 'ecole-a'"), 1);
 });
 await check('a creation key reused with other content is refused', () =>
-  rejects(CREATE, [keyA, 'ecole-x', 'École X', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null], '23514', 'creation_key_reused'));
+  rejects(CREATE, [keyA, 'ecole-x', 'École X', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null, null], '23514', 'creation_key_reused'));
 await check('a slug is 3 to 40 lowercase letters, digits or hyphens', () =>
-  rejects(CREATE, [uuid(), 'École A!', 'X', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null], '23514'));
+  rejects(CREATE, [uuid(), 'École A!', 'X', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null, null], '23514'));
 await check('a slug is unique', () =>
-  rejects(CREATE, [uuid(), 'ecole-a', 'Autre', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null], '23505'));
+  rejects(CREATE, [uuid(), 'ecole-a', 'Autre', 'fr', 'essential', today, null, 1, 1, 'MAIN', 'Site', null, null], '23505'));
 await check('the plan enables its modules and their dependencies', async () => {
   assert.deepEqual(await modules(a), ['core', 'enrollment_groups', 'sites_rooms', 'student_finance', 'students_crm']);
   assert.deepEqual(await modules(b), ['core']);
@@ -530,6 +531,202 @@ await check('the console invites the administrator named at creation (FR-PLT-01)
   await rejects('SELECT * FROM platform.invite_admin($1, $2)', [a, tokenHash()], '23514', 'not_invited');
 });
 
+// Referential (FR-PLT-03, FR-REF-01 to 06)
+const node = async (type, code, tenant = a) => {
+  await as(null);
+  return (await first('SELECT id FROM school.ref_node WHERE tenant_id = $1 AND type_code = $2 AND code = $3', [tenant, type, code]))?.id;
+};
+const NODE = 'INSERT INTO school.ref_node (tenant_id, type_code, parent_id, code, labels) VALUES ($1, $2, $3, $4, $5) RETURNING id';
+const secondaire = await node('cycle', 'SECONDAIRE');
+const primaire = await node('cycle', 'PRIMAIRE');
+await check('the private school profile gives four cycles and their levels, in French and Arabic (FR-PLT-03 AC1)', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT type_code, count(*)::int AS n FROM school.ref_node WHERE tenant_id = $1 GROUP BY 1 ORDER BY 1`, [a])).rows,
+    [{ type_code: 'cycle', n: 4 }, { type_code: 'grade', n: 15 }, { type_code: 'track', n: 14 }]);
+  assert.equal(await count("SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1 AND NOT (labels ? 'fr' AND labels ? 'ar')", [a]), 0);
+  assert.deepEqual((await sql("SELECT code FROM school.ref_node WHERE tenant_id = $1 AND type_code = 'cycle' ORDER BY sort_order", [a])).rows.map(r => r.code),
+    ['PRESCOLAIRE', 'PRIMAIRE', 'MOYEN', 'SECONDAIRE']);
+  assert.equal(await count("SELECT count(*) n FROM school.subject WHERE tenant_id = $1 AND kind = 'subject'", [a]), 28);
+  assert.deepEqual(await first('SELECT profile_code, profile_version FROM platform.tenant WHERE id = $1', [a]), { profile_code: 'private_school_dz', profile_version: 1 });
+  assert.deepEqual((await first("SELECT after FROM school.audit_log WHERE tenant_id = $1 AND object_type = 'tenant' AND action = 'UPDATE' AND changed_fields ? 'profile_code'", [a])).after,
+    { profile_code: 'private_school_dz', profile_version: 1 });
+  assert.equal(await count('SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1', [b]), 0);
+});
+await as('school_runtime', a, 1);
+await check('a school renames a type, keeps its code, and turns off only an unused optional type (FR-REF-01)', async () => {
+  await sql(`UPDATE school.node_type SET labels = '{"fr": "Classe", "ar": "القسم"}' WHERE code = 'grade'`);
+  assert.equal((await first("SELECT labels ->> 'fr' AS l FROM school.node_type WHERE code = 'grade'")).l, 'Classe');
+  await rejects("UPDATE school.node_type SET code = 'level' WHERE code = 'grade'", [], '42501');
+  await rejects("UPDATE school.node_type SET active = false WHERE code = 'grade'", [], '23514', 'type_required');
+  await rejects("UPDATE school.node_type SET active = false WHERE code = 'track'", [], '23514', 'type_in_use');
+  await rejects("INSERT INTO school.node_type (tenant_id, code, labels, level_order, is_required) VALUES ($1, 'free', '{\"fr\": \"Libre\"}', 9, false)", [a], '42501');
+});
+await check('two levels named alike in one cycle are refused, whatever the case, spaces or Arabic diacritics (FR-REF-02 AC1)', async () => {
+  await rejects(NODE, [a, 'grade', secondaire, '1AS_BIS', JSON.stringify({ fr: '  1re   année SECONDAIRE ' })], '23505');
+  await rejects(NODE, [a, 'grade', secondaire, '1AS_TER', JSON.stringify({ ar: 'السَّنَةُ الأولى ثانوي' })], '23505');
+  await rejects(NODE, [a, 'grade', secondaire, '1AS', JSON.stringify({ fr: 'Autre' })], '23505');
+  // The same label under another parent is a different level.
+  await sql(NODE, [a, 'grade', primaire, 'PREPA', JSON.stringify({ fr: 'Classe préparatoire' })]);
+  await sql(NODE, [a, 'grade', secondaire, 'PREPA_SEC', JSON.stringify({ fr: 'Classe préparatoire' })]);
+});
+await check('labels are given in French or Arabic, never empty', async () => {
+  await rejects(NODE, [a, 'grade', primaire, 'EN_ONLY', JSON.stringify({ en: 'Grade six' })], '23514');
+  await rejects(NODE, [a, 'grade', primaire, 'BLANK', JSON.stringify({ fr: '   ' })], '23514');
+  await rejects(NODE, [a, 'grade', primaire, 'bad-code', JSON.stringify({ fr: 'Code invalide' })], '23514');
+});
+await check('a node hangs from a node of the parent type, of this school, still in use', async () => {
+  const cinqAP = await node('grade', '5AP');
+  await as('school_runtime', a, 1);
+  await rejects(NODE, [a, 'grade', cinqAP, 'X1', JSON.stringify({ fr: 'Sous un niveau' })], '23514', 'parent_invalid');
+  await rejects(NODE, [a, 'cycle', primaire, 'X2', JSON.stringify({ fr: 'Cycle enfant' })], '23514', 'parent_invalid');
+  await rejects(NODE, [a, 'grade', null, 'X3', JSON.stringify({ fr: 'Sans cycle' })], '23514', 'parent_invalid');
+  await rejects(NODE, [a, 'track', uuid(), 'X4', JSON.stringify({ fr: 'Parent inconnu' })], '23514', 'parent_invalid');
+});
+await check('a parent is archived only once its children are; an archived node stays archived (FR-REF-02)', async () => {
+  const prepa = await node('grade', 'PREPA');
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.ref_node SET archived_at = now() WHERE id = $1', [primaire], '23514', 'node_has_children');
+  await sql('UPDATE school.ref_node SET archived_at = now() WHERE id = $1', [prepa]);
+  await rejects(NODE, [a, 'track', prepa, 'UNDER', JSON.stringify({ fr: 'Sous un archivé' })], '23514', 'parent_invalid');
+  await rejects('UPDATE school.ref_node SET archived_at = NULL WHERE id = $1', [prepa], '23514', 'immutable_record');
+  await rejects('DELETE FROM school.ref_node WHERE id = $1', [prepa], '42501');
+  await sql(NODE, [a, 'grade', primaire, 'PREPA2', JSON.stringify({ fr: 'Classe préparatoire' })]);
+});
+await check('a node keeps its code, type and parent', async () => {
+  await rejects("UPDATE school.ref_node SET code = 'Z' WHERE id = $1", [secondaire], '42501');
+  await as(null);
+  await rejects("UPDATE school.ref_node SET parent_id = $2 WHERE code = '1AS' AND tenant_id = $1", [a, primaire], '23514', 'identity_immutable');
+});
+await check('a cycle covers its levels and tracks', async () => {
+  await as('school_runtime', a, 1);
+  assert.equal(await count('SELECT count(*) n FROM school.node_subtree(ARRAY[$1]::uuid[])', [secondaire]), 1 + 3 + 14 + 1);
+});
+await check('a role scoped to levels or subjects names those of the school; groups wait for lot 2 (FR-IAM-04)', async () => {
+  const math = (await first("SELECT id FROM school.subject WHERE code = 'MATH'")).id;
+  await assign(9, 'teacher', 'level', [secondaire]);
+  await assign(9, 'teacher', 'subject', [math]);
+  await rejects(ASSIGN, [a, 9, roles.teacher, 'level', `{${uuid()}}`, null, null], '23514', 'scope_unknown');
+  await rejects(ASSIGN, [a, 9, roles.teacher, 'subject', `{${siteA}}`, null, null], '23514', 'scope_unknown');
+  await rejects(ASSIGN, [a, 9, roles.teacher, 'group', `{${uuid()}}`, null, null], '23514', 'scope_unknown');
+  await rejects("DELETE FROM school.subject WHERE code = 'MATH'", [], '23514', 'subject_in_use');
+});
+const SUBJECT = 'INSERT INTO school.subject (tenant_id, code, kind, labels) VALUES ($1, $2, $3, $4) RETURNING id';
+await check('a subject never used is deleted, its values kept in the journal (FR-REF-03 AC1)', async () => {
+  const robot = (await first(SUBJECT, [a, 'ROBOT', 'subject', JSON.stringify({ fr: 'Robotique', ar: 'الروبوتيك' })])).id;
+  await sql('DELETE FROM school.subject WHERE id = $1', [robot]);
+  await as(null);
+  assert.deepEqual(await first("SELECT before -> 'labels' ->> 'fr' AS l, before ->> 'code' AS c FROM school.audit_log WHERE object_id = $1 AND action = 'DELETE'", [robot]),
+    { l: 'Robotique', c: 'ROBOT' });
+});
+await check('a subject label is unique in the catalog, and its code permanent (FR-REF-03)', async () => {
+  await as('school_runtime', a, 1);
+  await rejects(SUBJECT, [a, 'MATHS2', 'subject', JSON.stringify({ fr: '  MATHéMATIQUES ' })], '23505');
+  await rejects(SUBJECT, [a, 'MATH', 'subject', JSON.stringify({ fr: 'Maths bis' })], '23505');
+  await rejects("UPDATE school.subject SET code = 'M' WHERE code = 'MATH'", [], '42501');
+  await sql("UPDATE school.subject SET archived_at = now() WHERE code = 'REST'");
+  await sql(SUBJECT, [a, 'REST2', 'subject', JSON.stringify({ fr: 'Repos et activités calmes' })]);
+});
+await check('a training centre gets its types and modules, where a school has levels and subjects (FR-REF-01 AC1, FR-REF-03 AC3)', async () => {
+  await as('platform_admin', null, 6);
+  assert.equal((await first("SELECT platform.apply_profile($1, 'training_center') AS v", [b])).v, 1);
+  await as(null);
+  assert.deepEqual((await sql('SELECT code, labels ->> \'fr\' AS fr, parent_code FROM school.node_type WHERE tenant_id = $1 ORDER BY level_order', [b])).rows,
+    [{ code: 'domain', fr: 'Domaine', parent_code: null }, { code: 'specialty', fr: 'Spécialité', parent_code: 'domain' },
+     { code: 'pathway', fr: 'Parcours', parent_code: 'specialty' }]);
+  assert.equal((await first("SELECT subject_kind FROM platform.profile WHERE code = 'training_center'")).subject_kind, 'module');
+  await as('platform_admin', null, 6);
+  await rejects("SELECT platform.apply_profile($1, 'private_school_dz')", [b], '23514', 'profile_mismatch');
+  await rejects("SELECT platform.apply_profile($1, 'nothing')", [b], '23514', 'profile_unknown');
+});
+await check('a published profile never changes; its next version reaches a school only when applied, adding without overwriting (FR-PLT-03 AC2)', async () => {
+  await as(null);
+  await rejects(`UPDATE platform.profile_node SET labels = '{"fr": "Autre"}' WHERE profile_code = 'private_school_dz' AND code = '1AS'`, [], '23514', 'profile_published');
+  await sql(`INSERT INTO platform.profile SELECT code, 2, labels, subject_kind, NULL FROM platform.profile WHERE code = 'private_school_dz' AND version = 1`);
+  await sql(`INSERT INTO platform.profile_node_type SELECT profile_code, 2, code, parent_code, labels, level_order, is_required FROM platform.profile_node_type WHERE profile_code = 'private_school_dz' AND version = 1`);
+  await sql(`INSERT INTO platform.profile_node SELECT profile_code, 2, type_code, code, parent_code, labels, sort_order, platform_code FROM platform.profile_node WHERE profile_code = 'private_school_dz' AND version = 1`);
+  await sql(`INSERT INTO platform.profile_node (profile_code, version, type_code, code, parent_code, labels, sort_order) VALUES ('private_school_dz', 2, 'track', '1AS_TCLE', '1AS', '{"fr": "Tronc commun langues", "ar": "جذع مشترك لغات"}', 3)`);
+  await sql("UPDATE platform.profile SET published_at = now() WHERE code = 'private_school_dz' AND version = 2");
+  const before = await count('SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1', [a]);
+  assert.equal((await first('SELECT profile_version FROM platform.tenant WHERE id = $1', [a])).profile_version, 1);
+  await as('platform_admin', null, 6);
+  assert.equal((await first("SELECT platform.apply_profile($1, 'private_school_dz') AS v", [a])).v, 2);
+  await as(null);
+  assert.equal(await count('SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1', [a]), before + 1);
+  assert.equal((await first("SELECT labels ->> 'fr' AS l FROM school.node_type WHERE tenant_id = $1 AND code = 'grade'", [a])).l, 'Classe');
+  assert.equal(await count("SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1 AND code = 'PREPA' AND archived_at IS NOT NULL", [a]), 1);
+});
+const YEAR = 'INSERT INTO school.academic_year (tenant_id, code, start_date, end_date, status) VALUES ($1, $2, $3, $4, $5) RETURNING id';
+const PERIOD = 'INSERT INTO school.period (tenant_id, year_id, code, labels, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id';
+await as('school_runtime', a, 1);
+const year = (await first(YEAR, [a, '2026-2027', '2026-09-01', '2027-06-30', 'current'])).id;
+await check('one current year at most (FR-REF-05)', async () => {
+  await rejects(YEAR, [a, '2027-2028', '2027-09-01', '2028-06-30', 'current'], '23505');
+  await sql(YEAR, [a, '2027-2028', '2027-09-01', '2028-06-30', 'planned']);
+  await rejects(YEAR, [a, '2025-2026', '2025-09-01', '2026-06-30', 'closed'], '23514', 'status_invalid');
+  await as('school_runtime', b, 2);
+  await sql(YEAR, [b, '2026-2027', '2026-09-01', '2027-06-30', 'current']);
+});
+await check('periods stay inside their year and never overlap (FR-REF-05 AC1)', async () => {
+  await as('school_runtime', a, 1);
+  await sql(PERIOD, [a, year, 'T1', JSON.stringify({ fr: '1er trimestre', ar: 'الفصل الأول' }), '2026-09-01', '2026-11-30']);
+  const t2 = (await first(PERIOD, [a, year, 'T2', JSON.stringify({ fr: '2e trimestre' }), '2026-12-01', '2027-03-15'])).id;
+  await rejects(PERIOD, [a, year, 'T3', JSON.stringify({ fr: '3e trimestre' }), '2027-03-01', '2027-06-30'], '23P01');
+  await rejects(PERIOD, [a, year, 'ETE', JSON.stringify({ fr: 'Été' }), '2027-06-01', '2027-07-31'], '23514', 'period_outside_year');
+  await sql("UPDATE school.period SET end_date = '2027-02-28' WHERE id = $1", [t2]);
+  await sql(PERIOD, [a, year, 'T3', JSON.stringify({ fr: '3e trimestre' }), '2027-03-01', '2027-06-30']);
+  await rejects("UPDATE school.academic_year SET end_date = '2027-05-31' WHERE id = $1", [year], '23514', 'period_outside_year');
+});
+await check('a closed year is final, with its periods (FR-REF-05)', async () => {
+  assert.equal((await first('SELECT school.year_open($1) AS o', [year])).o, true);
+  await sql("UPDATE school.academic_year SET status = 'closed' WHERE id = $1", [year]);
+  assert.equal((await first('SELECT school.year_open($1) AS o', [year])).o, false);
+  await rejects("UPDATE school.academic_year SET status = 'current' WHERE id = $1", [year], '23514', 'year_closed');
+  await rejects("UPDATE school.period SET labels = '{\"fr\": \"Autre\"}' WHERE year_id = $1", [year], '23514', 'year_closed');
+  await rejects(PERIOD, [a, year, 'T4', JSON.stringify({ fr: 'Rattrapage' }), '2027-06-01', '2027-06-30'], '23514', 'year_closed');
+  await sql("UPDATE school.academic_year SET status = 'current' WHERE code = '2027-2028'");
+});
+const FIELD = 'INSERT INTO school.custom_field (tenant_id, entity, key, field_type, options, required, labels) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id';
+const CHECK_VALUES = 'SELECT school.check_custom_values($1, $2)';
+await check('a custom select field takes only its values; a required one cannot stay empty (FR-REF-04 AC1, AC2)', async () => {
+  const options = [{ code: 'A_POS', labels: { fr: 'A+' } }, { code: 'O_NEG', labels: { fr: 'O−' } }];
+  await sql(FIELD, [a, 'student', 'blood_group', 'select', JSON.stringify(options), false, JSON.stringify({ fr: 'Groupe sanguin' })]);
+  await sql(FIELD, [a, 'student', 'emergency_phone', 'text', null, true, JSON.stringify({ fr: 'Téléphone d’urgence' })]);
+  await sql(CHECK_VALUES, ['student', JSON.stringify({ blood_group: 'A_POS', emergency_phone: '0550 00 00 00' })]);
+  let error;
+  try { await sql(CHECK_VALUES, ['student', JSON.stringify({ blood_group: 'B_POS', emergency_phone: '0550' })]); } catch (e) { error = e; }
+  assert.deepEqual([error?.message, error?.hint], ['custom_value_invalid', 'blood_group']);
+  await rejects(CHECK_VALUES, ['student', JSON.stringify({ blood_group: 'A_POS' })], '23514', 'custom_value_required');
+  await rejects(CHECK_VALUES, ['student', JSON.stringify({ emergency_phone: '0550', shoe_size: 42 })], '23514', 'custom_field_unknown');
+  await sql(CHECK_VALUES, ['guardian', JSON.stringify({})]);
+});
+await check('a field keeps its key and type; options are added, never removed; archived values stay valid (FR-REF-04)', async () => {
+  await rejects("UPDATE school.custom_field SET field_type = 'text' WHERE key = 'blood_group'", [], '42501');
+  await rejects(`UPDATE school.custom_field SET options = '[{"code": "A_POS", "labels": {"fr": "A+"}}]' WHERE key = 'blood_group'`, [], '23514', 'option_removed');
+  await sql("UPDATE school.custom_field SET archived_at = now() WHERE key = 'blood_group'");
+  await sql(CHECK_VALUES, ['student', JSON.stringify({ blood_group: 'A_POS', emergency_phone: '0550' })]);
+  await rejects(FIELD, [a, 'student', 'size', 'select', JSON.stringify([{ code: 'small', labels: { fr: 'S' } }]), false, JSON.stringify({ fr: 'Taille' })], '23514', 'options_invalid');
+});
+await check('twenty active custom fields per entity at most (FR-REF-04)', async () => {
+  for (let i = 1; i <= 19; i++) await sql(FIELD, [a, 'student', `extra_${i}`, 'boolean', null, false, JSON.stringify({ fr: `Champ ${i}` })]);
+  await rejects(FIELD, [a, 'student', 'extra_20', 'boolean', null, false, JSON.stringify({ fr: 'Champ 20' })], '23514', 'custom_field_limit');
+  await sql(FIELD, [a, 'staff', 'extra_1', 'number', null, false, JSON.stringify({ fr: 'Champ' })]);
+});
+await check('a school is open Sunday to Thursday unless it says otherwise (FR-REF-06)', async () => {
+  assert.equal((await first("SELECT school.open_day('2026-10-11') AS o")).o, true);
+  assert.equal((await first("SELECT school.open_day('2026-10-09') AS o")).o, false);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'calendar.open_days', '[0, 7]')", [a], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'calendar.open_days', '[1, 1]')", [a], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'locale.languages', '[\"fr\", \"de\"]')", [a], '23514', 'setting_invalid');
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'calendar.open_days', '[0, 1, 2, 3, 4, 6]')", [a]);
+  assert.equal((await first("SELECT school.open_day('2026-10-10') AS o")).o, true);
+});
+await check('a school cannot see or write the referential of another school', async () => {
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.ref_node WHERE tenant_id = $1', [a]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.subject WHERE tenant_id = $1', [a]), 0);
+  await rejects(NODE, [a, 'cycle', null, 'HACK', JSON.stringify({ fr: 'Intrus' })], '42501');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
@@ -545,7 +742,7 @@ await check('a suspended school is closed to its members (FR-PLT-01 AC2)', async
   assert.equal(await sites(), 1);
 });
 await check('suspension and reactivation appear in the school journal with their reasons', async () =>
-  assert.deepEqual((await sql("SELECT reason FROM school.audit_log WHERE object_type = 'tenant' AND action = 'UPDATE' ORDER BY occurred_at, reason")).rows.map(r => r.reason).sort(),
+  assert.deepEqual((await sql("SELECT reason FROM school.audit_log WHERE object_type = 'tenant' AND action = 'UPDATE' AND changed_fields ? 'status' ORDER BY occurred_at, reason")).rows.map(r => r.reason).sort(),
     ['Abonnement impayé', 'Abonnement régularisé']));
 await as('platform_admin', null, 6);
 await sql('SELECT platform.set_entitlement($1, $2::date, $3::date, 15, 500, 1024, 0)', [b, '2025-01-01', '2025-06-30']);
@@ -582,7 +779,7 @@ if (PgClient) {
     const key = uuid();
     const clients = await Promise.all([0, 1].map(() => connect('platform_admin', null, 6)));
     const ids = await Promise.all(clients.map(c =>
-      c.query(CREATE, [key, 'race-school', 'Race', 'fr', 'essential', today, null, 10, 10, 'MAIN', 'Site', null]).then(r => r.rows[0].id)));
+      c.query(CREATE, [key, 'race-school', 'Race', 'fr', 'essential', today, null, 10, 10, 'MAIN', 'Site', null, null]).then(r => r.rows[0].id)));
     await Promise.all(clients.map(c => c.end()));
     assert.equal(ids[0], ids[1]);
     await as(null);

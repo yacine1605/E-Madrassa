@@ -2,15 +2,19 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountLinkController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
+use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\SubjectController;
 use Illuminate\Support\Facades\Route;
 
 // Same-origin API for the application's own front end; CSRF protects every mutation.
@@ -73,6 +77,38 @@ Route::prefix('api')->group(function () {
                 Route::get('role-assignments', [RoleAssignmentController::class, 'index']);
                 Route::post('role-assignments', [RoleAssignmentController::class, 'store']);
                 Route::post('role-assignments/{assignment}/archive', [RoleAssignmentController::class, 'archive']);
+            });
+
+            // Referential (FR-REF-01 to 05): read by every member of the school, managed by the referential's permission.
+            Route::middleware('permission:referential.node.read')->group(function () {
+                Route::get('referential/types', [ReferentialController::class, 'types']);
+                Route::get('referential/nodes', [ReferentialController::class, 'nodes']);
+                Route::get('subjects', [SubjectController::class, 'index']);
+                Route::get('years', [CalendarController::class, 'index']);
+                Route::get('custom-fields', [CustomFieldController::class, 'index']);
+            });
+            Route::middleware('permission:referential.node.manage')->group(function () {
+                Route::put('referential/types/{type}', [ReferentialController::class, 'updateType']);
+                Route::post('referential/nodes', [ReferentialController::class, 'store']);
+                Route::put('referential/nodes/{node}', [ReferentialController::class, 'update']);
+                Route::post('referential/nodes/{node}/archive', [ReferentialController::class, 'archive']);
+                Route::post('years', [CalendarController::class, 'store']);
+                Route::put('years/{year}', [CalendarController::class, 'update']);
+                Route::post('years/{year}/status', [CalendarController::class, 'status']);
+                Route::post('years/{year}/periods', [CalendarController::class, 'storePeriod']);
+                Route::put('periods/{period}', [CalendarController::class, 'updatePeriod']);
+                Route::post('periods/{period}/archive', [CalendarController::class, 'archivePeriod']);
+            });
+            Route::middleware('permission:subject.subject.manage')->group(function () {
+                Route::post('subjects', [SubjectController::class, 'store']);
+                Route::put('subjects/{subject}', [SubjectController::class, 'update']);
+                Route::post('subjects/{subject}/archive', [SubjectController::class, 'archive']);
+                Route::delete('subjects/{subject}', [SubjectController::class, 'destroy']);
+            });
+            Route::middleware('permission:custom_field.definition.manage')->group(function () {
+                Route::post('custom-fields', [CustomFieldController::class, 'store']);
+                Route::put('custom-fields/{field}', [CustomFieldController::class, 'update']);
+                Route::post('custom-fields/{field}/archive', [CustomFieldController::class, 'archive']);
             });
 
             Route::middleware('module:sites_rooms')->group(function () {

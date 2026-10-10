@@ -42,6 +42,23 @@ final class DatabaseErrors
         'membership_revoked' => 'Ce compte est révoqué définitivement.',
         'status_invalid' => 'État de compte inconnu.',
         'setting_invalid' => 'Cette valeur n’est pas permise pour ce paramètre.',
+        'type_required' => 'Ce type du référentiel est obligatoire : il reste actif.',
+        'type_in_use' => 'Ce type a encore des éléments actifs : archivez-les d’abord.',
+        'type_inactive' => 'Ce type du référentiel est désactivé.',
+        'parent_invalid' => 'Le parent choisi n’est pas du type attendu, ou il est archivé.',
+        'node_has_children' => 'Cet élément a encore des éléments actifs en dessous : archivez-les d’abord.',
+        'subject_in_use' => 'Cette matière est utilisée : archivez-la plutôt.',
+        'year_closed' => 'Cette année est clôturée : elle ne change plus.',
+        'period_outside_year' => 'La période doit rester dans les dates de son année.',
+        'options_invalid' => 'Chaque valeur de la liste a un code (A-Z, 0-9, _) unique et un libellé.',
+        'option_removed' => 'Une valeur de la liste ne se retire pas : des fiches peuvent l’utiliser.',
+        'custom_field_limit' => 'Vingt champs personnalisés actifs au plus par type de fiche.',
+        'custom_value_invalid' => 'Valeur invalide pour un champ personnalisé.',
+        'custom_value_required' => 'Un champ personnalisé obligatoire est vide.',
+        'custom_field_unknown' => 'Champ personnalisé inconnu.',
+        'profile_unknown' => 'Profil inconnu ou non publié.',
+        'profile_mismatch' => 'Cet établissement suit un autre profil.',
+        'profile_published' => 'Une version publiée d’un profil ne change plus.',
     ];
 
     public static function message(string $rule): string
@@ -71,6 +88,7 @@ final class DatabaseErrors
             return [409, 'account_exists', 'Cette adresse e-mail a déjà un compte dans cet établissement.'];
         }
         if ($state === '23505') return [409, 'duplicate', 'Cette valeur est déjà utilisée.'];
+        if ($state === '23P01') return [409, 'overlap', 'Ces dates chevauchent celles d’un autre enregistrement.'];
         if (in_array($state, ['23503', '55P03', '40001', '40P01'], true)) {
             return [409, 'domain_conflict', 'Opération incompatible avec l’état actuel des données. Rechargez puis recommencez.'];
         }
