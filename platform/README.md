@@ -51,9 +51,11 @@ php vendor/bin/phpunit
 php artisan migrate --database=owner        # schema, as the migration owner
 php artisan platform:roles                  # roles, privileges and passwords (DB_PASSWORD, DB_CONSOLE_PASSWORD)
 php artisan platform:user direction@ecole.dz
-php artisan platform:create-school ecole-a "École A" --plan=essential --admin=direction@ecole.dz
-php artisan platform:membership ecole-a direction@ecole.dz --status=active
+php artisan platform:create-school ecole-a "École A" --plan=essential --admin=direction@ecole.dz   # also sends the activation link
+php artisan platform:invite-admin ecole-a   # a new link, if the first one expired (72 h)
 ```
+
+The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
@@ -104,10 +106,29 @@ Web requests and jobs connect as `school_runtime`; the console as `platform_admi
 
 The database checks what the code must never get wrong (who may change roles, never on oneself, last administrator, scopes); routes declare their permission with the `permission:` middleware, and controllers narrow to the grant's scope through `App\Support\Permissions`.
 
-Left for later, with their dependencies: scopes by level, group and subject come with the referential (W1.5); the notification to the direction when a sensitive permission is assigned comes with notifications (W1.6); compulsory MFA for privileged roles comes with increment 4.
+Left for later, with their dependencies: scopes by level, group and subject come with the referential (W1.5); the notification to the direction when a sensitive permission is assigned comes with notifications (W1.6).
+
+## Increment 4: accounts and authentication (W1.4, second part)
+
+92 invariants on embedded PostgreSQL, 96 on PostgreSQL 16, 47 integration tests (10 October 2026).
+
+A person (`users`) signs in once and may belong to several schools; each school holds its account of the person (`school.membership`: status, username, import reference). Schools create, change, invite and suspend accounts only through database functions that check the permission; the application never writes accounts, memberships or links directly.
+
+| SRS | Covered |
+|---|---|
+| FR-IAM-01 | Account by activation link (72 h, single use, a new one replaces the previous) or provisional password changed at first sign-in; email unique per school, optional for pupils and parents, required for privileged roles; username unique per school; a person already known by email joins as they are, and no single school changes their name, email or password |
+| FR-IAM-01 AC1, AC2, AC3 | Suspension with a reason closes access at the next request; never one's own account; the last administrator cannot be suspended; revoked is final; 500 accounts imported twice by `external_ref` without duplicate, refused rows reported |
+| FR-IAM-01 | Sending fails: the administrator receives the link to hand over, only for a person who has no password yet |
+| FR-IAM-02 AC1 | MFA (TOTP) compulsory before any access for whoever holds a sensitive permission in the school; 8 single-use recovery codes; a code is never accepted twice |
+| FR-IAM-02 AC2 | After 5 consecutive failures, per account and per address, the next attempt waits; each new failure doubles the wait (1 min to 60 min); the same answer whether the account exists or not |
+| FR-IAM-02 AC3 | Recovery link valid 1 hour, single use even under concurrent use; the same answer for known and unknown addresses |
+| FR-IAM-02 | Passwords of 10 characters or more, Argon2id, common passwords, sequences and the person's own name refused; session ends after the school's inactivity delay (15 to 120 min, default 30) and after 12 hours |
+| FR-REF-06 (base) | School settings: a catalog with type, bounds and permission; the school stores what it changes |
+| BR-09, NFR-SEC-06 | Account changes, invitations and password resets in the school's journal; tokens stored as hashes, sent in the URL fragment, never logged |
+
+Left for later: the full import pipeline (file, preview, rejection report, rollback) and queued mail come with the shared services (W1.6); security alerts (NFR-SEC-07) with the enriched audit (W1.6); turning MFA off or regenerating recovery codes, and changing one's own email, with the account screens.
 
 ## Next increments of lot 1
 
-1. **Accounts and authentication** (W1.4, second part): invitations and 72 h activation link, password policy, lockout, MFA TOTP with recovery codes, session timeouts, recovery link, suspension and import with `external_ref`.
-2. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
-3. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).
+1. **Referential** (W1.5), **shared services** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).

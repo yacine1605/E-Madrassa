@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { randomUUID as uuid } from 'node:crypto';
+import { randomBytes, randomUUID as uuid } from 'node:crypto';
 import assert from 'node:assert/strict';
 
 let db;
@@ -28,7 +28,10 @@ async function rejects(s, p, code, rule) {
 }
 
 // Laravel's users table, created by the application's own migration in production.
-await db.exec('CREATE TABLE public.users(id bigserial PRIMARY KEY, name text, email text, password text, remember_token text, updated_at timestamptz); INSERT INTO public.users(id) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9);');
+await db.exec(`CREATE TABLE public.users(id bigserial PRIMARY KEY, name varchar(255) NOT NULL, email varchar(255) NOT NULL UNIQUE, email_verified_at timestamptz,
+  password varchar(255) NOT NULL, remember_token text, created_at timestamptz, updated_at timestamptz);
+  INSERT INTO public.users(id, name, email, password) SELECT g, 'Person ' || g, 'user' || g || '@example.test', 'hash' FROM generate_series(1, 9) g;
+  SELECT setval('public.users_id_seq', 9);`);
 const schemaDir = new URL('../../database/schema/', import.meta.url);
 for (const file of readdirSync(schemaDir).filter(f => /^\d{3}_.+\.sql$/.test(f)).sort())
   await db.exec(readFileSync(new URL(file, schemaDir), 'utf8'));
@@ -353,6 +356,180 @@ await check('the console reads the permission catalog but no school role (FR-PLT
   await rejects('SELECT * FROM school.role', [], '42501');
 });
 
+// Accounts, links, MFA requirement, settings (FR-IAM-01, FR-IAM-02, FR-REF-06)
+const tokenHash = () => randomBytes(32).toString('hex');
+const CREATE_ACCOUNT = 'SELECT user_id::int AS id, linked, status FROM school.create_account($1, $2, $3, $4, $5)';
+const REDEEM = 'SELECT user_id::int AS u, tenant_id AS t FROM platform.redeem_token($1, $2, $3)';
+const membership = async (user, tenant = a) => {
+  await as(null);
+  return first('SELECT status, username, external_ref FROM school.membership WHERE tenant_id = $1 AND user_id = $2', [tenant, user]);
+};
+// User 3 joins school B here, so that school A later meets a person of several schools.
+await as(null);
+await sql("INSERT INTO school.membership(tenant_id, user_id, status) VALUES ($1, 3, 'active')", [b]);
+await as('school_runtime', a, 1);
+const nadia = await first(CREATE_ACCOUNT, ['Nadia B.', ' Nadia@Example.test ', null, 'EMP-001', null]);
+const firstLink = tokenHash();
+await sql('SELECT school.issue_activation($1, $2)', [nadia.id, firstLink]);
+await check('a new account is invited, without password, under its normalized email (FR-IAM-01)', async () => {
+  assert.deepEqual([nadia.linked, nadia.status], [false, 'invited']);
+  await as(null);
+  assert.deepEqual(await first('SELECT email, password FROM public.users WHERE id = $1', [nadia.id]), { email: 'nadia@example.test', password: null });
+  assert.deepEqual(await membership(nadia.id), { status: 'invited', username: null, external_ref: 'EMP-001' });
+});
+await check('a new link replaces the previous one, which no longer works', async () => {
+  const secondLink = tokenHash();
+  await as('school_runtime', a, 1);
+  const expiry = (await first('SELECT school.issue_activation($1, $2) AS e', [nadia.id, secondLink])).e;
+  assert.ok(Math.abs(new Date(expiry) - Date.now() - 72 * 3600e3) < 60e3, 'valid 72 hours');
+  await as('school_runtime', null, null);
+  await rejects(REDEEM, ['activation', firstLink, 'argon-hash'], '23514', 'token_invalid');
+  assert.deepEqual(await first(REDEEM, ['activation', secondLink, 'argon-hash']), { u: nadia.id, t: a });
+  assert.equal((await membership(nadia.id)).status, 'active');
+  await as('school_runtime', null, null);
+  await rejects(REDEEM, ['activation', secondLink, 'argon-hash'], '23514', 'token_invalid');
+});
+await check('an expired link is refused like an unknown one', async () => {
+  await as('school_runtime', a, 1);
+  const late = await first(CREATE_ACCOUNT, ['Karim', 'karim@example.test', null, null, null]);
+  const link = tokenHash();
+  await sql('SELECT school.issue_activation($1, $2)', [late.id, link]);
+  await as(null);
+  await sql("UPDATE public.account_token SET expires_at = now() - interval '1 second' WHERE token_hash = $1", [link]);
+  await as('school_runtime', null, null);
+  await rejects(REDEEM, ['activation', link, 'argon-hash'], '23514', 'token_invalid');
+  await rejects(REDEEM, ['activation', tokenHash(), 'argon-hash'], '23514', 'token_invalid');
+});
+await as('school_runtime', a, 1);
+const known = await first(CREATE_ACCOUNT, ['Autre nom', 'user3@example.test', null, null, null]);
+await check('a person already known by email joins as they are, keeping name and password', async () => {
+  assert.deepEqual([known.id, known.linked, known.status], [3, true, 'invited']);
+  const link = tokenHash();
+  await as('school_runtime', a, 1);
+  await sql('SELECT school.issue_activation($1, $2)', [3, link]);
+  await as('school_runtime', null, null);
+  await rejects(REDEEM, ['activation', link, 'new-hash'], '23514', 'password_already_set');
+  await first(REDEEM, ['activation', link, null]);
+  await as(null);
+  assert.deepEqual(await first('SELECT name, password FROM public.users WHERE id = 3'), { name: 'Person 3', password: 'hash' });
+});
+await as('school_runtime', a, 1);
+await check('an email is used once per school', () => rejects(CREATE_ACCOUNT, ['X', 'USER3@example.test', null, null, null], '23505', 'account_exists'));
+await check('nobody changes the identity or password of a person of several schools', async () => {
+  await rejects('SELECT school.update_account(3, $1, $2, null, null)', ['Nouveau nom', 'user3@example.test'], '23514', 'account_shared');
+  await rejects("SELECT school.reset_password(3, 'hash')", [], '23514', 'account_shared');
+});
+const pupil = await first(CREATE_ACCOUNT, ['Élève Un', null, 'Eleve.1', 'EL-1', 'provisional-hash']);
+await check('an account without email has a username and a provisional password, changed at first sign-in', async () => {
+  assert.equal(pupil.status, 'active');
+  await as(null);
+  assert.deepEqual(await first('SELECT must_change_password AS m FROM public.users WHERE id = $1', [pupil.id]), { m: true });
+  assert.equal((await membership(pupil.id)).username, 'eleve.1');
+  await as('school_runtime', null, null);
+  assert.equal((await first("SELECT platform.find_login('ELEVE.1', 'ecole-a')::int AS u")).u, pupil.id);
+  assert.equal((await first("SELECT platform.find_login('eleve.1', 'centre-b')::int AS u")).u, null);
+  assert.equal((await first("SELECT platform.find_login('Nadia@example.test', null)::int AS u")).u, nadia.id);
+});
+await as('school_runtime', a, 1);
+await check('usernames and import references are unique in the school', async () => {
+  await rejects(CREATE_ACCOUNT, ['Élève Deux', null, 'eleve.1', 'EL-2', 'h'], '23505');
+  await rejects(CREATE_ACCOUNT, ['Élève Deux', null, 'eleve.2', 'EL-1', 'h'], '23505');
+  await rejects(CREATE_ACCOUNT, ['Sans identifiant', null, null, null, 'h'], '23514', 'login_required');
+});
+await check('a privileged role needs an email, and keeps it (FR-IAM-01)', async () => {
+  await rejects(ASSIGN, [a, pupil.id, roles.accountant, 'tenant', null, null, null], '23514', 'email_required');
+  await rejects('SELECT school.update_account(7, $1, null, null, null)', ['Person 7'], '23514', 'email_required');
+});
+await check('suspension needs a reason, never targets oneself, and closes access at once (FR-IAM-01 AC1)', async () => {
+  await rejects("SELECT school.set_account_status(1, 'suspended', 'Test')", [], '23514', 'self_account');
+  await rejects("SELECT school.set_account_status($1, 'suspended', '')", [pupil.id], '23514', 'reason_required');
+  await sql("SELECT school.set_account_status($1, 'suspended', 'Absences répétées')", [pupil.id]);
+  await as('school_runtime', a, pupil.id);
+  assert.equal(await sites(), 0);
+  await as('school_runtime', a, 1);
+  await sql("SELECT school.set_account_status($1, 'active', 'Retour')", [pupil.id]);
+  assert.equal((await membership(pupil.id)).status, 'active');
+});
+await check('a revoked account is final and no longer signs in (FR-IAM-01)', async () => {
+  await as('school_runtime', a, 1);
+  await sql("SELECT school.set_account_status($1, 'revoked', 'Départ définitif')", [pupil.id]);
+  await rejects("SELECT school.set_account_status($1, 'active', 'Erreur')", [pupil.id], '23514', 'membership_revoked');
+  await as('school_runtime', null, null);
+  assert.equal((await first("SELECT platform.find_login('eleve.1', 'ecole-a')::int AS u")).u, null);
+});
+await check('an invited account opens through its link, not by an administrator', async () => {
+  await as('school_runtime', a, 1);
+  const invited = await first(CREATE_ACCOUNT, ['Invité', 'invite@example.test', null, null, null]);
+  await rejects("SELECT school.set_account_status($1, 'active', 'Ouverture')", [invited.id], '23514', 'activation_required');
+});
+await check('account changes are in the school journal, with author and reason', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT action, actor_id::int AS actor, reason, after ->> 'status' AS status FROM school.audit_log
+    WHERE tenant_id = $1 AND object_type = 'membership' AND object_id = (SELECT id FROM school.membership WHERE tenant_id = $1 AND user_id = $2)
+    ORDER BY occurred_at, action`, [a, pupil.id])).rows.map(r => [r.action, r.actor, r.reason, r.status]),
+    [['INSERT', 1, null, null], ['UPDATE', 1, 'Absences répétées', 'suspended'], ['UPDATE', 1, 'Retour', 'active'], ['UPDATE', 1, 'Départ définitif', 'revoked']]);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND action = 'INVITATION'", [a]), 4);
+});
+await check('only a holder of the permission manages accounts, and only through these functions', async () => {
+  await as('school_runtime', a, 7);
+  await rejects(CREATE_ACCOUNT, ['X', 'x@example.test', null, null, null], '42501', 'permission_denied');
+  await rejects("SELECT school.set_account_status(9, 'suspended', 'Test')", [], '42501', 'permission_denied');
+  await rejects("UPDATE public.users SET email = 'pirate@example.test' WHERE id = 1", [], '42501');
+  await rejects("UPDATE school.membership SET status = 'active' WHERE user_id = 7", [], '42501');
+  await rejects('SELECT * FROM public.account_token', [], '42501');
+});
+await check('a school cannot invite or change the accounts of another school', async () => {
+  await as('school_runtime', b, 2);
+  await rejects('SELECT school.issue_activation($1, $2)', [nadia.id, tokenHash()], '23514', 'not_invited');
+  await rejects('SELECT school.update_account($1, $2, $3, null, null)', [nadia.id, 'Nadia', 'nadia@example.test'], '23514', 'account_unknown');
+});
+await check('a recovery link exists for a known email only, works once and for one hour (FR-IAM-02 AC3)', async () => {
+  await as('school_runtime', null, null);
+  const link = tokenHash();
+  assert.deepEqual((await sql('SELECT user_id::int AS u FROM platform.issue_recovery($1, $2)', ['USER7@example.test', link])).rows, [{ u: 7 }]);
+  assert.equal((await sql('SELECT * FROM platform.issue_recovery($1, $2)', ['nobody@example.test', tokenHash()])).rows.length, 0);
+  await as(null);
+  const expiry = (await first('SELECT expires_at AS e FROM public.account_token WHERE token_hash = $1', [link])).e;
+  assert.ok(Math.abs(new Date(expiry) - Date.now() - 3600e3) < 60e3, 'valid one hour');
+  await as('school_runtime', null, null);
+  await rejects(REDEEM, ['recovery', link, null], '23514', 'password_required');
+  assert.deepEqual(await first(REDEEM, ['recovery', link, 'recovered-hash']), { u: 7, t: null });
+  await rejects(REDEEM, ['recovery', link, 'again-hash'], '23514', 'token_invalid');
+  await as(null);
+  assert.equal((await first('SELECT password FROM public.users WHERE id = 7')).password, 'recovered-hash');
+});
+await check('MFA is compulsory for whoever holds a sensitive permission here (FR-IAM-02)', async () => {
+  await as('school_runtime', a, 1);
+  assert.equal((await first('SELECT school.mfa_required() AS r')).r, true);
+  await as('school_runtime', a, 9);
+  assert.equal((await first('SELECT school.mfa_required() AS r')).r, false);
+});
+await check('a school setting defaults, stays within its bounds and needs its permission (FR-REF-06)', async () => {
+  await as('school_runtime', a, 1);
+  assert.equal((await first("SELECT school.setting_value('session.idle_minutes') AS v")).v, 30);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'session.idle_minutes', '45')", [a]);
+  assert.equal((await first("SELECT school.setting_value('session.idle_minutes') AS v")).v, 45);
+  await rejects("UPDATE school.setting SET value = '200' WHERE key = 'session.idle_minutes'", [], '23514', 'setting_invalid');
+  await rejects("UPDATE school.setting SET value = '\"x\"' WHERE key = 'session.idle_minutes'", [], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'finance.allow_self_validation', '1')", [a], '23514', 'setting_invalid');
+  await as('school_runtime', a, 7);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'finance.allow_self_validation', 'true')", [a], '42501', 'permission_denied');
+  await as('school_runtime', b, 2);
+  assert.equal((await first("SELECT school.setting_value('session.idle_minutes') AS v")).v, 30);
+});
+await as('platform_admin', null, 6);
+await check('the console invites the administrator named at creation (FR-PLT-01)', async () => {
+  const c = await create(uuid(), 'ecole-c', 'École C', 'essential', 5);
+  const link = tokenHash();
+  assert.deepEqual((await sql('SELECT user_id::int AS u, email FROM platform.invite_admin($1, $2)', [c, link])).rows, [{ u: 5, email: 'user5@example.test' }]);
+  await as('school_runtime', null, null);
+  assert.deepEqual(await first('SELECT name, school, needs_password FROM platform.peek_token($1, $2)', ['activation', link]),
+    { name: 'Person 5', school: 'École C', needs_password: false });
+  assert.equal((await sql('SELECT * FROM platform.peek_token($1, $2)', ['recovery', link])).rows.length, 0);
+  await as('platform_admin', null, 6);
+  await rejects('SELECT * FROM platform.invite_admin($1, $2)', [a, tokenHash()], '23514', 'not_invited');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
@@ -426,6 +603,24 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'last_site');
+  });
+  await check('a link used twice at once opens the account once (FR-IAM-02 AC3)', async () => {
+    await as('school_runtime', a, 1);
+    const twice = await first(CREATE_ACCOUNT, ['Course', 'course@example.test', null, null, null]);
+    const link = tokenHash();
+    await sql('SELECT school.issue_activation($1, $2)', [twice.id, link]);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, '')));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(REDEEM, ['activation', link, 'hash-' + i]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'token_invalid');
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {
     const clients = await Promise.all([1, 8].map(user => connect('school_runtime', a, user)));

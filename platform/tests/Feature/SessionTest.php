@@ -66,7 +66,7 @@ final class SessionTest extends TestCase
     public function test_wrong_credentials_are_refused(): void
     {
         $account = $this->account();
-        $this->postJson('/api/session', ['email' => $account['email'], 'password' => 'not-the-password'])
+        $this->postJson('/api/session', ['login' => $account['email'], 'password' => 'not-the-password'])
             ->assertUnauthorized()->assertJsonPath('code', 'invalid_credentials');
     }
 

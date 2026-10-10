@@ -27,7 +27,27 @@ final class DatabaseErrors
         'scope_unknown' => 'La portée désigne un élément qui n’existe pas dans cet établissement.',
         'permission_module_disabled' => 'Cette permission appartient à un module non activé pour cet établissement.',
         'segregation_of_duties' => 'Séparation des tâches : la personne qui a saisi une opération ne peut pas la valider elle-même.',
+        'token_invalid' => 'Ce lien n’est plus valable : demandez-en un nouveau.',
+        'password_already_set' => 'Vous avez déjà un mot de passe : connectez-vous avec lui pour accepter l’invitation.',
+        'password_required' => 'Choisissez un mot de passe.',
+        'account_shared' => 'Cette personne a aussi un compte dans un autre établissement : son nom, son e-mail et son mot de passe ne peuvent être changés que par elle.',
+        'account_unknown' => 'Ce compte n’existe pas dans cet établissement.',
+        'email_required' => 'Un rôle privilégié demande une adresse e-mail.',
+        'self_account' => 'Vous ne pouvez pas faire cette opération sur votre propre compte.',
+        'reason_required' => 'Indiquez un motif.',
+        'activation_required' => 'Ce compte n’est pas encore activé : renvoyez-lui l’invitation.',
+        'not_invited' => 'Ce compte n’attend pas d’activation.',
+        'login_required' => 'Un compte a besoin d’une adresse e-mail ou d’un identifiant.',
+        'name_required' => 'Indiquez le nom de la personne.',
+        'membership_revoked' => 'Ce compte est révoqué définitivement.',
+        'status_invalid' => 'État de compte inconnu.',
+        'setting_invalid' => 'Cette valeur n’est pas permise pour ce paramètre.',
     ];
+
+    public static function message(string $rule): string
+    {
+        return self::RULES[$rule];
+    }
 
     public static function response(QueryException $e): ?JsonResponse
     {
@@ -46,6 +66,9 @@ final class DatabaseErrors
                 if (preg_match('/ERROR:\s+'.preg_quote($rule, '/').'\b/', $detail)) return [409, $rule, $message];
             }
             return [409, 'domain_conflict', 'Opération incompatible avec l’état actuel des données.'];
+        }
+        if ($state === '23505' && preg_match('/ERROR:\s+account_exists\b/', $detail)) {
+            return [409, 'account_exists', 'Cette adresse e-mail a déjà un compte dans cet établissement.'];
         }
         if ($state === '23505') return [409, 'duplicate', 'Cette valeur est déjà utilisée.'];
         if (in_array($state, ['23503', '55P03', '40001', '40P01'], true)) {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AccountState;
 use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequirePermission;
 use App\Http\Middleware\SchoolContext;
@@ -16,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['school' => SchoolContext::class, 'module' => RequireModule::class, 'permission' => RequirePermission::class]);
+        $middleware->alias(['account' => AccountState::class, 'school' => SchoolContext::class, 'module' => RequireModule::class, 'permission' => RequirePermission::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The application is an API for its own front end: errors are always JSON.

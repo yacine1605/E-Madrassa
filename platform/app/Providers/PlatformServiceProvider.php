@@ -34,9 +34,11 @@ final class PlatformServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        RateLimiter::for('login', fn (Request $request) => [
-            Limit::perMinute(5)->by($request->ip()),
-            Limit::perMinute(5)->by(hash('sha256', mb_strtolower((string) $request->input('email')))),
+        // Flood limits before sign-in (NFR-SEC-05); the lockout of FR-IAM-02 is LoginThrottle's.
+        RateLimiter::for('public', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
+        RateLimiter::for('recovery', fn (Request $request) => [
+            Limit::perHour(10)->by($request->ip()),
+            Limit::perHour(3)->by(hash('sha256', mb_strtolower(trim((string) $request->input('email'))))),
         ]);
     }
 }

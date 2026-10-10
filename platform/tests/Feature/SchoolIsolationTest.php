@@ -56,7 +56,7 @@ final class SchoolIsolationTest extends TestCase
         $this->console("SELECT platform.set_tenant_status(?, 'suspended', 'Abonnement impayé')", [$school->id]);
         $this->getJson('/api/school')->assertForbidden()->assertJsonPath('code', 'tenant_suspended');
         $this->getJson('/api/session/schools')->assertUnauthorized();
-        $this->postJson('/api/session', ['email' => $account['email'], 'password' => $account['password']])->assertForbidden();
+        $this->signIn($account)->assertForbidden()->assertJsonPath('code', 'no_school');
     }
 
     public function test_a_suspended_membership_ends_the_session(): void

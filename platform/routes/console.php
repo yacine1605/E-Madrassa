@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\AccountLinks;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +42,29 @@ Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--loc
         (int) $this->option('students'), (int) $this->option('storage'), $this->option('site-code'), $this->option('site-name'), $admin,
     ])->id;
     $this->info('School ready: '.$id);
+    if ($admin) return $this->call('platform:invite-admin', ['slug' => $slug]);
 })->purpose('Create a school with its plan, default site and invited administrator (as platform_admin)');
+
+Artisan::command('platform:invite-admin {slug}', function (string $slug) {
+    $console = DB::connection('console');
+    $tenant = $console->table('platform.tenant')->where('slug', $slug)->first(['id', 'name']);
+    if (!$tenant) { $this->error('Unknown school.'); return 1; }
+    [$token, $hash] = AccountLinks::token();
+    try {
+        $admin = $console->selectOne('SELECT email, name FROM platform.invite_admin(?, ?)', [$tenant->id, $hash]);
+    } catch (QueryException $e) {
+        $this->warn('No administrator awaiting activation in this school.');
+        return 0;
+    }
+    if (AccountLinks::send('activation', $admin->email, $admin->name, $token, $tenant->name)) {
+        $this->info('Invitation sent to '.$admin->email.' (valid 72 hours).');
+        return 0;
+    }
+    // FR-IAM-01: sending failed; the link goes to the administrator another way. Never logged.
+    $this->warn('Sending failed. Activation link, valid 72 hours, to hand over securely:');
+    $this->line(AccountLinks::url('activation', $token));
+    return 0;
+})->purpose('Send the activation link to the administrator named when the school was created (as platform_admin)');
 
 Artisan::command('platform:membership {slug} {email} {--status=active}', function (string $slug, string $email) {
     $owner = DB::connection('owner');

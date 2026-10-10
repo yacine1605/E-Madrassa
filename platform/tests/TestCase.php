@@ -4,10 +4,12 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use PragmaRX\Google2FA\Google2FA;
 use RuntimeException;
 
 /**
@@ -34,14 +36,28 @@ abstract class TestCase extends BaseTestCase
         self::$prepared = true;
     }
 
-    /** @return array{id: int, email: string, password: string} */
-    protected function account(string $label = 'user'): array
+    /**
+     * An activated person, with MFA unless told otherwise: most roles here hold a sensitive
+     * permission, and then MFA is compulsory (FR-IAM-02).
+     *
+     * @return array{id: int, email: string, password: string, mfa_secret: ?string}
+     */
+    protected function account(string $label = 'user', bool $mfa = true): array
     {
         $email = $label.'-'.Str::lower(Str::random(10)).'@example.test';
         $password = 'Secret-'.Str::random(12);
+        $secret = $mfa ? (new Google2FA())->generateSecretKey(32) : null;
         $id = DB::connection('owner')->table('users')->insertGetId(['name' => $label, 'email' => $email,
-            'password' => Hash::make($password), 'created_at' => now(), 'updated_at' => now()]);
-        return ['id' => $id, 'email' => $email, 'password' => $password];
+            'password' => Hash::make($password), 'created_at' => now(), 'updated_at' => now(),
+            'mfa_secret' => $secret ? Crypt::encryptString($secret) : null, 'mfa_enabled_at' => $mfa ? now() : null]);
+        return ['id' => $id, 'email' => $email, 'password' => $password, 'mfa_secret' => $secret];
+    }
+
+    /** The current code of the account's authenticator; the last step is forgotten so that tests may sign in again at once. */
+    protected function totp(array $account): string
+    {
+        DB::connection('owner')->table('users')->where('id', $account['id'])->update(['mfa_last_step' => null]);
+        return (new Google2FA())->getCurrentOtp($account['mfa_secret']);
     }
 
     /** A school created through the console's own function, as the publisher would; its administrator, if any, is invited. */
@@ -80,9 +96,11 @@ abstract class TestCase extends BaseTestCase
     }
 
     /** Signs out whoever is signed in, then signs in this account. */
-    protected function signIn(array $account): TestResponse
+    protected function signIn(array $account, ?string $password = null): TestResponse
     {
         $this->deleteJson('/api/session');
-        return $this->postJson('/api/session', ['email' => $account['email'], 'password' => $account['password']]);
+        $response = $this->postJson('/api/session', ['login' => $account['email'], 'password' => $password ?? $account['password']]);
+        if (!$response->json('mfa_required')) return $response;
+        return $this->postJson('/api/session/mfa', ['code' => $this->totp($account)]);
     }
 }

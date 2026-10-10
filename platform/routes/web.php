@@ -1,21 +1,40 @@
 <?php
 
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountLinkController;
+use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SessionController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Support\Facades\Route;
 
 // Same-origin API for the application's own front end; CSRF protects every mutation.
 Route::prefix('api')->group(function () {
     Route::get('csrf', fn () => ['csrf_token' => csrf_token()]);
-    Route::post('session', [SessionController::class, 'login'])->middleware('throttle:login');
     Route::delete('session', [SessionController::class, 'logout']);
 
-    Route::middleware('auth')->group(function () {
+    // Before sign-in (NFR-SEC-05): a flood limit per address; sign-in has its own progressive lockout.
+    Route::middleware('throttle:public')->group(function () {
+        Route::post('session', [SessionController::class, 'login']);
+        Route::post('session/mfa', [SessionController::class, 'mfa']);
+        Route::post('activation/check', [AccountLinkController::class, 'show'])->defaults('purpose', 'activation');
+        Route::post('activation', [AccountLinkController::class, 'activate']);
+        Route::post('recovery/check', [AccountLinkController::class, 'show'])->defaults('purpose', 'recovery');
+        Route::post('recovery', [AccountLinkController::class, 'reset']);
+        Route::post('recovery/request', [AccountLinkController::class, 'forgot'])->middleware('throttle:recovery');
+    });
+
+    Route::middleware(['auth', 'account'])->group(function () {
+        // The person's own credentials, outside any school.
+        Route::put('account/password', [CredentialController::class, 'password'])->name('account.password');
+        Route::post('account/mfa', [CredentialController::class, 'startMfa']);
+        Route::post('account/mfa/confirm', [CredentialController::class, 'confirmMfa']);
+
         Route::get('session/schools', [SessionController::class, 'schools']);
         Route::put('session/school', [SessionController::class, 'select']);
 
@@ -24,6 +43,21 @@ Route::prefix('api')->group(function () {
         Route::middleware('school')->group(function () {
             Route::get('school', [SchoolController::class, 'show']);
             Route::get('me', [MeController::class, 'show']);
+
+            Route::get('settings', [SettingController::class, 'index'])->middleware('permission:tenant.settings.manage');
+            Route::put('settings/{key}', [SettingController::class, 'update'])->middleware('permission:tenant.settings.manage');
+
+            Route::get('accounts', [AccountController::class, 'index'])->middleware('permission:user.account.read');
+            Route::middleware('permission:user.account.create')->group(function () {
+                Route::post('accounts', [AccountController::class, 'store']);
+                Route::post('accounts/import', [AccountController::class, 'import']);
+                Route::post('accounts/{user}/invitation', [AccountController::class, 'invitation'])->whereNumber('user');
+            });
+            Route::middleware('permission:user.account.update')->group(function () {
+                Route::put('accounts/{user}', [AccountController::class, 'update'])->whereNumber('user');
+                Route::post('accounts/{user}/password', [AccountController::class, 'password'])->whereNumber('user');
+            });
+            Route::post('accounts/{user}/status', [AccountController::class, 'status'])->whereNumber('user')->middleware('permission:user.account.suspend');
 
             Route::middleware('permission:role.definition.manage,role.assignment.manage')->group(function () {
                 Route::get('permissions', [PermissionController::class, 'index']);

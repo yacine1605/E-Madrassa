@@ -34,6 +34,11 @@ final class SchoolContext
             if ($state->mode === 'suspended') { $closed = 'tenant_suspended'; return null; }
             if (!$state->allowed) { $closed = 'membership_inactive'; return null; }
             $this->school->setMode($state->mode);
+            // FR-IAM-02: the school's inactivity delay, and MFA before any access for whoever
+            // holds a sensitive permission here (AC1); enrolment itself is outside the school.
+            $policy = DB::selectOne("SELECT school.mfa_required() AS mfa, (school.setting_value('session.idle_minutes'))::int AS idle");
+            $request->session()->put('school.idle_minutes', $policy->idle);
+            if ($policy->mfa && !$user->mfa_enabled_at) { $closed = 'mfa_setup_required'; return null; }
             DB::statement('SET LOCAL lock_timeout = '.DB::getPdo()->quote(config('platform.lock_timeout')));
             DB::statement('SET LOCAL statement_timeout = '.DB::getPdo()->quote(config('platform.statement_timeout')));
             $response = $next($request);
@@ -42,6 +47,9 @@ final class SchoolContext
             if ($response->exception ?? null) throw $response->exception;
             return $response;
         }, 3);
+        if ($closed === 'mfa_setup_required') {
+            return response()->json(['message' => 'Activez la double authentification pour accéder à cet établissement.', 'code' => $closed], 403);
+        }
         if ($closed) {
             // FR-PLT-01 AC2 / FR-IAM-01 AC1: a suspended school or membership ends the session.
             Auth::guard('web')->logout();
