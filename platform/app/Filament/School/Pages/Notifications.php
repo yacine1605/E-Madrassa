@@ -36,8 +36,8 @@ final class Notifications extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(fn () => collect(SchoolScreen::call([], NotificationController::class, 'index')['data'])->keyBy('id')->all())
-            ->paginated(false)->poll('30s')->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage([], NotificationController::class, 'index', [], $page, $recordsPerPage))
+            ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->poll('30s')->columns([
                 TextColumn::make('labels')->label(__('services.notification'))->state(fn (array $record) => Locales::label($record['labels']))
                     ->weight(fn (array $record) => $record['read_at'] ? null : 'bold'),
                 TextColumn::make('read_at')->label(__('school.status'))->badge()

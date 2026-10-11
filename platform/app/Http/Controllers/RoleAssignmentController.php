@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -26,11 +27,15 @@ final class RoleAssignmentController
 
     public function index(Request $request)
     {
-        $request->validate(['user_id' => 'nullable|integer']);
+        $request->validate(['user_id' => 'nullable|integer', 'q' => 'nullable|string|max:100'] + Paging::RULES);
         $where = ' WHERE a.tenant_id = ?'.($request->boolean('include_archived') ? '' : ' AND a.archived_at IS NULL');
         $bindings = [$this->school->id()];
         if ($request->filled('user_id')) { $where .= ' AND a.user_id = ?'; $bindings[] = (int) $request->input('user_id'); }
-        return ['data' => array_map(fn ($row) => $this->present($row), DB::select(self::SELECT.$where.' ORDER BY u.name, r.code, a.valid_from', $bindings))];
+        if ($request->filled('q')) {
+            $where .= ' AND '.Paging::search(['u.name', 'u.email', "r.labels ->> 'fr'", "r.labels ->> 'ar'"]);
+            $bindings[] = $request->input('q');
+        }
+        return Paging::select($request, self::SELECT.$where, $bindings, 'u.name, r.code, a.valid_from', fn ($row) => $this->present($row));
     }
 
     public function store(Request $request)

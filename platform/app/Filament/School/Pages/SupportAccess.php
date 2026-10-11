@@ -15,7 +15,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * FR-PLT-04: the school's consents to the publisher's support. Given for 72 hours at most,
@@ -40,10 +39,8 @@ final class SupportAccess extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(function (int $page, int $recordsPerPage) {
-            $rows = collect(SchoolScreen::call(self::$permissions, SupportGrantController::class, 'index')['data'])->keyBy('id');
-            return new LengthAwarePaginator($rows->forPage($page, $recordsPerPage), $rows->count(), $recordsPerPage, $page);
-        })->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage(self::$permissions, SupportGrantController::class, 'index', [],
+            $page, $recordsPerPage))->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
             TextColumn::make('starts_at')->label(__('admin.starts_at'))->formatStateUsing(fn ($state) => Formats::dateTime($state)),
             TextColumn::make('expires_at')->label(__('admin.expires_at'))->formatStateUsing(fn ($state) => Formats::dateTime($state)),
             TextColumn::make('state')->label(__('school.status'))->badge()->state(fn (array $record) => self::state($record))

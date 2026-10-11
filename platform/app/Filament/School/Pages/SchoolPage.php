@@ -8,6 +8,7 @@ use App\Support\SchoolScreen;
 use App\Http\Controllers\SchoolController;
 use Filament\Forms\Components\Textarea;
 use Filament\Pages\Page;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Locked;
 
 abstract class SchoolPage extends Page
@@ -42,6 +43,13 @@ abstract class SchoolPage extends Page
     }
 
     protected function writable(string $permission): bool { return SchoolScreen::writable($permission); }
+
+    /** A page of the list the API gives, with its total (NFR-PERF-04): the screen never loads the whole list. */
+    protected function apiPage(string|array $permission, string $controller, string $method, array $data, int $page, int $perPage): LengthAwarePaginator
+    {
+        $result = SchoolScreen::call($permission, $controller, $method, [...$data, 'paginate' => true, 'page' => $page, 'per_page' => $perPage]);
+        return new LengthAwarePaginator(collect($result['data'])->keyBy('id'), $result['meta']['total'], $perPage, $page);
+    }
 
     public function schoolState(): array
     {

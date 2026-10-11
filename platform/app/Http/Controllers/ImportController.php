@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\Refusal;
 use App\Imports\DependentOperation;
 use App\Support\Imports;
+use App\Support\Paging;
 use App\Support\Permissions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,12 +39,13 @@ final class ImportController
     }
 
     /** The latest imports, each with its rows counted: in all, valid or applied, rejected. */
-    public function index()
+    public function index(Request $request)
     {
-        return ['data' => DB::select('SELECT '.Imports::BATCH_COLUMNS.", coalesce(c.total, 0) AS rows_total, coalesce(c.rejected, 0) AS rows_rejected,
+        $request->validate(Paging::RULES);
+        return Paging::select($request, 'SELECT '.Imports::BATCH_COLUMNS.", coalesce(c.total, 0) AS rows_total, coalesce(c.rejected, 0) AS rows_rejected,
             coalesce(c.total - c.rejected, 0) AS rows_valid FROM school.import_batch b
             LEFT JOIN (SELECT batch_id, count(*) AS total, count(*) FILTER (WHERE outcome = 'rejected') AS rejected FROM school.import_row GROUP BY batch_id) c
-              ON c.batch_id = b.id ORDER BY created_at DESC LIMIT 100")];
+              ON c.batch_id = b.id", [], 'created_at DESC', whole: 100);
     }
 
     public function show(string $batch)

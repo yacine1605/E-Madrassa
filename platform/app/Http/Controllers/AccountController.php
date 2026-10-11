@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\Accounts;
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use App\Support\Tasks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,22 +23,14 @@ final class AccountController
 
     public function index(Request $request)
     {
-        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])], 'q' => 'nullable|string|max:100',
-            'paginate' => 'boolean', 'page' => 'integer|min:1', 'per_page' => 'integer|min:1|max:100']);
+        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])], 'q' => 'nullable|string|max:100']
+            + Paging::RULES);
         $sql = Accounts::SELECT.' WHERE m.tenant_id = ?';
         $bindings = [$this->school->id()];
         if (isset($data['status'])) { $sql .= ' AND m.status = ?'; $bindings[] = $data['status']; }
         // FR-I18-01 AC2: « احمد » finds « أحمد », « helene » finds « Hélène », by name, email or username.
-        if (isset($data['q'])) {
-            $sql .= " AND position(coalesce(school.search_key(?), '') IN coalesce(school.search_key(concat_ws(' ', u.name, u.email, m.username)), '')) > 0";
-            $bindings[] = $data['q'];
-        }
-        if (!$request->boolean('paginate')) return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id', $bindings)];
-        $total = (int) DB::selectOne('SELECT count(*) AS n FROM ('.$sql.') accounts', $bindings)->n;
-        $perPage = $data['per_page'] ?? 25;
-        $page = $data['page'] ?? 1;
-        return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id LIMIT ? OFFSET ?', [...$bindings, $perPage, ($page - 1) * $perPage]),
-            'meta' => ['total' => $total, 'per_page' => $perPage, 'page' => $page]];
+        if (isset($data['q'])) { $sql .= ' AND '.Paging::search(['u.name', 'u.email', 'm.username']); $bindings[] = $data['q']; }
+        return Paging::select($request, $sql, $bindings, 'u.name, m.user_id');
     }
 
     /**

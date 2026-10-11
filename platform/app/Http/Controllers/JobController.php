@@ -3,17 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\Refusal;
+use App\Support\Paging;
 use App\Support\Tasks;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /** "Mes tâches" (FR-JOB-01): the signed-in user's own jobs in this school, as row-level security shows them. */
 final class JobController
 {
-    public function index()
+    public function index(Request $request)
     {
-        return ['data' => array_map(fn ($job) => Tasks::present($job),
-            DB::select('SELECT '.Tasks::COLUMNS.' FROM school.job ORDER BY created_at DESC LIMIT 50'))];
+        $request->validate(Paging::RULES);
+        return Paging::select($request, 'SELECT '.Tasks::COLUMNS.' FROM school.job', [], 'created_at DESC', fn ($job) => Tasks::present($job), whole: 50);
     }
 
     public function show(string $job)

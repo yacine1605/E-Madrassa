@@ -39,8 +39,9 @@ final class Exports extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(fn () => collect(SchoolScreen::call('export.job.create', ExportController::class, 'index')['data'])->keyBy('id')->all())
-            ->paginated(false)->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage('export.job.create', ExportController::class, 'index', [],
+            $page, $recordsPerPage))
+            ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
                 TextColumn::make('kind')->label(__('services.export_kind'))->formatStateUsing(fn (string $state) => __('services.export_kinds.'.$state)),
                 TextColumn::make('format')->label(__('services.format'))->formatStateUsing(fn (string $state) => __('services.formats.'.$state)),
                 TextColumn::make('row_count')->label(__('services.rows'))->formatStateUsing(fn ($state) => Formats::number((int) $state)),

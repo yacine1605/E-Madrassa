@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HandlesLabels;
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -17,8 +18,11 @@ final class ReferentialController
     use HandlesLabels;
 
     private const TYPE = 'SELECT code, parent_code, labels, level_order, is_required, active, version FROM school.node_type';
-    private const NODE = 'SELECT n.id, n.type_code, n.parent_id, n.code, n.labels, n.sort_order, n.platform_code, n.version, n.archived_at
-        FROM school.ref_node n JOIN school.node_type t ON t.tenant_id = n.tenant_id AND t.code = n.type_code';
+    // Each node with its parent's code and labels: a page of nodes names its parents without loading them all.
+    private const NODE = 'SELECT n.id, n.type_code, n.parent_id, p.code AS parent_code, p.labels AS parent_labels, n.code, n.labels, n.sort_order,
+            n.platform_code, n.version, n.archived_at
+        FROM school.ref_node n JOIN school.node_type t ON t.tenant_id = n.tenant_id AND t.code = n.type_code
+        LEFT JOIN school.ref_node p ON p.tenant_id = n.tenant_id AND p.id = n.parent_id';
 
     public function __construct(private CurrentSchool $school) {}
 
@@ -40,13 +44,20 @@ final class ReferentialController
     /** Nodes, by type or under a parent; archived ones only on request (they stay in the history). */
     public function nodes(Request $request)
     {
-        $data = $request->validate(['type' => 'nullable|string|max:40', 'parent_id' => 'nullable|uuid', 'include_archived' => 'boolean']);
+        $data = $request->validate(['type' => 'nullable|string|max:40', 'parent_id' => 'nullable|uuid', 'include_archived' => 'boolean',
+            'archived' => 'boolean', 'q' => 'nullable|string|max:100'] + Paging::RULES);
         $sql = self::NODE.' WHERE n.tenant_id = ?';
         $bindings = [$this->school->id()];
         if (isset($data['type'])) { $sql .= ' AND n.type_code = ?'; $bindings[] = $data['type']; }
         if (isset($data['parent_id'])) { $sql .= ' AND n.parent_id = ?'; $bindings[] = $data['parent_id']; }
-        if (!$request->boolean('include_archived')) $sql .= ' AND n.archived_at IS NULL';
-        return ['data' => array_map(fn ($row) => $this->decoded($row), DB::select($sql.' ORDER BY t.level_order, n.sort_order, n.code', $bindings))];
+        // Active only by default; `archived` for the archived only; `include_archived` for both.
+        if ($request->boolean('archived')) $sql .= ' AND n.archived_at IS NOT NULL';
+        elseif (!$request->boolean('include_archived')) $sql .= ' AND n.archived_at IS NULL';
+        if (isset($data['q'])) {
+            $sql .= ' AND '.Paging::search(['n.code', "n.labels ->> 'fr'", "n.labels ->> 'ar'", "n.labels ->> 'en'"]);
+            $bindings[] = $data['q'];
+        }
+        return Paging::select($request, $sql, $bindings, 't.level_order, n.sort_order, n.code', fn ($row) => $this->decoded($row, ['labels', 'parent_labels']));
     }
 
     public function store(Request $request)
@@ -84,6 +95,6 @@ final class ReferentialController
 
     private function node(string $id): array
     {
-        return $this->decoded(DB::selectOne(self::NODE.' WHERE n.tenant_id = ? AND n.id = ?', [$this->school->id(), $id]));
+        return $this->decoded(DB::selectOne(self::NODE.' WHERE n.tenant_id = ? AND n.id = ?', [$this->school->id(), $id]), ['labels', 'parent_labels']);
     }
 }

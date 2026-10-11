@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,12 +19,13 @@ final class NotificationController
     /** The person's own notifications (AC2), newest first, with their event's labels. */
     public function index(Request $request)
     {
+        $request->validate(Paging::RULES);
         $sql = 'SELECT n.id, n.event, e.labels, n.data, n.read_at, n.created_at FROM school.notification n
             JOIN platform.notification_event e ON e.code = n.event'.($request->boolean('unread') ? ' WHERE n.read_at IS NULL' : '');
-        $rows = DB::select($sql.' ORDER BY n.created_at DESC LIMIT 100');
         $unread = DB::selectOne('SELECT count(*) AS n FROM school.notification WHERE read_at IS NULL')->n;
-        return ['data' => array_map(fn ($row) => [...(array) $row, 'labels' => json_decode($row->labels, true), 'data' => json_decode($row->data, true)], $rows),
-            'unread' => (int) $unread];
+        return Paging::select($request, $sql, [], 'n.created_at DESC',
+            fn ($row) => [...(array) $row, 'labels' => json_decode($row->labels, true), 'data' => json_decode($row->data, true)], whole: 100)
+            + ['unread' => (int) $unread];
     }
 
     public function read(string $notification)
@@ -60,10 +62,11 @@ final class NotificationController
     }
 
     /** FR-NOT-01 AC1: emails that failed five times, with the reason; the notification itself was delivered in the application. */
-    public function failures()
+    public function failures(Request $request)
     {
-        return ['data' => DB::select("SELECT o.id, o.event, o.user_id, u.name AS recipient, o.attempts, o.last_error, o.created_at
-            FROM school.outbox o JOIN public.users u ON u.id = o.user_id WHERE o.status = 'failed' ORDER BY o.created_at DESC")];
+        $request->validate(Paging::RULES);
+        return Paging::select($request, "SELECT o.id, o.event, o.user_id, u.name AS recipient, o.attempts, o.last_error, o.created_at
+            FROM school.outbox o JOIN public.users u ON u.id = o.user_id WHERE o.status = 'failed'", [], 'o.created_at DESC');
     }
 
     public function retry(string $delivery)

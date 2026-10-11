@@ -352,6 +352,12 @@ Fixed on the way: `platform:invite-admin` passed the school's name where `Accoun
 
 Found and fixed on the way: after the password, the school's sign-in page kept its first fields and never showed the code's until reloaded (the form is built once per request); it now comes again with the code's field. Lists use the language's comma (« ، » in Arabic), the first day of the week is named and chosen as a day, long settings wrap instead of pushing their action off the screen, and the forgotten password link stands on its own line.
 
+## Increment 22: lists by pages (NFR-PERF-04)
+
+The lists that grow with use come by pages of 25 by default and 100 at most, with their total, when the caller asks for it (`paginate=1`, `page`, `per_page`); without it, the whole list as before (`App\Support\Paging`). They are the accounts, the referential's nodes, the role assignments, the support consents, the imports, the exports, the tasks, the notifications and the emails not sent. The nodes and the assignments are also searched by the database, however a word is written (`q`), and each node names its parent. The school's screens ask for one page at a time: none loads a whole list any more.
+
+The small catalogs (types, subjects, years, roles, custom fields, sites, settings, permissions) stay whole: a school has a few dozen of each.
+
 ## Next increments of lot 1
 
-1. **Exit of the lot**: the walkthroughs (two schools end to end, R01, R09, R10), the permissions' security review, the remaining API pagination; Firefox and Safari; a native speaker's review of the Arabic labels.
+1. **Exit of the lot**: the walkthroughs (two schools end to end, R01, R09, R10) and the permissions' security review; Firefox and Safari; a native speaker's review of the Arabic labels.

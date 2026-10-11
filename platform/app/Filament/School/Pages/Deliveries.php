@@ -32,8 +32,9 @@ final class Deliveries extends SchoolPage implements HasTable
     public function table(Table $table): Table
     {
         $events = collect(DB::select('SELECT code, labels FROM platform.notification_event'))->mapWithKeys(fn ($event) => [$event->code => Locales::label($event->labels)]);
-        return $table->records(fn () => collect(SchoolScreen::call('tenant.settings.manage', NotificationController::class, 'failures')['data'])->keyBy('id')->all())
-            ->paginated(false)->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage('tenant.settings.manage', NotificationController::class, 'failures', [],
+            $page, $recordsPerPage))
+            ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
                 TextColumn::make('recipient')->label(__('services.recipient')),
                 TextColumn::make('event')->label(__('services.notification'))->formatStateUsing(fn (string $state) => $events[$state] ?? $state),
                 TextColumn::make('attempts')->label(__('services.attempts'))->formatStateUsing(fn ($state) => Formats::number((int) $state)),

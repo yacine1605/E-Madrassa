@@ -39,8 +39,9 @@ final class Imports extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(fn () => collect(SchoolScreen::call(self::$permissions, ImportController::class, 'index')['data'])->keyBy('id')->all())
-            ->paginated(false)->poll('5s')->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage(self::$permissions, ImportController::class, 'index', [],
+            $page, $recordsPerPage))
+            ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->poll('5s')->columns([
                 TextColumn::make('kind')->label(__('services.import_kind'))->formatStateUsing(fn (string $state) => __('services.import_kinds.'.$state)),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('services.import_states.'.$state))
                     ->color(fn (string $state) => ['previewed' => 'warning', 'imported' => 'success', 'failed' => 'danger'][$state] ?? 'gray'),

@@ -17,7 +17,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 final class Assignments extends SchoolPage implements HasTable
@@ -36,11 +35,8 @@ final class Assignments extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(function (?string $search, int $page, int $recordsPerPage) {
-            $rows = collect(SchoolScreen::call('role.assignment.manage', RoleAssignmentController::class, 'index')['data'])->keyBy('id');
-            if ($search) $rows = $rows->filter(fn ($r) => str_contains(mb_strtolower($r['user_name'].' '.$r['user_email'].' '.implode(' ', $r['role_labels'])), mb_strtolower($search)));
-            return new LengthAwarePaginator($rows->forPage($page, $recordsPerPage), $rows->count(), $recordsPerPage, $page);
-        })->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
+        return $table->records(fn (?string $search, int $page, int $recordsPerPage) => $this->apiPage('role.assignment.manage',
+            RoleAssignmentController::class, 'index', array_filter(['q' => $search]), $page, $recordsPerPage))->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
             TextColumn::make('user_name')->label(__('school.name'))->searchable(),
             TextColumn::make('role_labels')->label(__('school.role'))->state(fn (array $record) => Locales::label($record['role_labels'])),
             TextColumn::make('scope_type')->label(__('school.scope'))->formatStateUsing(fn (string $state) => __('school.scopes.'.$state)),

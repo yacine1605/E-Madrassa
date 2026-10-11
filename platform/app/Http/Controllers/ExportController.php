@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\RequirePermission;
 use App\Support\CurrentSchool;
 use App\Support\Exporter;
+use App\Support\Paging;
 use App\Support\Permissions;
 use App\Support\Tasks;
 use Illuminate\Http\Request;
@@ -44,11 +45,13 @@ final class ExportController
     }
 
     /** The user's exports; whoever reads the journal sees everyone's. */
-    public function index()
+    public function index(Request $request)
     {
-        return ['data' => array_map(fn ($row) => [...(array) $row, 'filters' => json_decode($row->filters, true)],
-            DB::select('SELECT l.id, l.user_id, u.name AS author, l.kind, l.format, l.filters, l.row_count, l.file_id, f.purged_at IS NOT NULL AS purged, l.created_at
-                FROM school.export_log l JOIN public.users u ON u.id = l.user_id
-                LEFT JOIN school.file_object f ON f.tenant_id = l.tenant_id AND f.id = l.file_id ORDER BY l.created_at DESC LIMIT 100'))];
+        $request->validate(Paging::RULES);
+        return Paging::select($request, 'SELECT l.id, l.user_id, u.name AS author, l.kind, l.format, l.filters, l.row_count, l.file_id,
+                f.purged_at IS NOT NULL AS purged, l.created_at
+            FROM school.export_log l JOIN public.users u ON u.id = l.user_id
+            LEFT JOIN school.file_object f ON f.tenant_id = l.tenant_id AND f.id = l.file_id', [], 'l.created_at DESC',
+            fn ($row) => [...(array) $row, 'filters' => json_decode($row->filters, true)], whole: 100);
     }
 }

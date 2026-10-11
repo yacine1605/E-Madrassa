@@ -26,8 +26,8 @@ final class Tasks extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(fn () => collect(SchoolScreen::call([], JobController::class, 'index')['data'])->keyBy('id')->all())
-            ->paginated(false)->poll('5s')->columns([
+        return $table->records(fn (int $page, int $recordsPerPage) => $this->apiPage([], JobController::class, 'index', [], $page, $recordsPerPage))
+            ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->poll('5s')->columns([
                 TextColumn::make('kind')->label(__('services.task'))->formatStateUsing(fn (string $state) => __('services.task_kinds.'.$state)),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('services.task_states.'.$state))
                     ->color(fn (string $state) => ['queued' => 'gray', 'running' => 'info', 'succeeded' => 'success', 'failed' => 'danger', 'cancelled' => 'gray'][$state]),

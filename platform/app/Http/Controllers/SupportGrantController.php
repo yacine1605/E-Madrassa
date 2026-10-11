@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,9 +21,10 @@ final class SupportGrantController
 
     public function __construct(private CurrentSchool $school) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return ['data' => DB::select(self::SELECT.' ORDER BY g.starts_at DESC')];
+        $request->validate(Paging::RULES);
+        return Paging::select($request, self::SELECT, [], 'g.starts_at DESC');
     }
 
     public function store(Request $request)

@@ -15,7 +15,6 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 final class Accounts extends SchoolPage implements HasTable
 {
@@ -33,12 +32,8 @@ final class Accounts extends SchoolPage implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->records(function (?string $search, array $filters, int $page, int $recordsPerPage) {
-            $data = ['paginate' => true, 'page' => $page, 'per_page' => $recordsPerPage, 'q' => $search];
-            if (!empty($filters['status']['value'])) $data['status'] = $filters['status']['value'];
-            $result = SchoolScreen::call('user.account.read', AccountController::class, 'index', $data);
-            return new LengthAwarePaginator(collect($result['data'])->keyBy('id'), $result['meta']['total'], $recordsPerPage, $page);
-        })->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)
+        return $table->records(fn (?string $search, array $filters, int $page, int $recordsPerPage) => $this->apiPage('user.account.read',
+            AccountController::class, 'index', array_filter(['q' => $search, 'status' => $filters['status']['value'] ?? null]), $page, $recordsPerPage))->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)
             ->columns([
                 TextColumn::make('name')->label(__('school.name'))->searchable(),
                 TextColumn::make('email')->label(__('school.email')),

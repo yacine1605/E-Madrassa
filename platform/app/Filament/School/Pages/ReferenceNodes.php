@@ -20,7 +20,6 @@ final class ReferenceNodes extends ReferencePage
     protected static ?int $navigationSort = 50;
     // Private properties are request-local; Livewire never carries these catalogs across requests.
     private ?array $typeRows = null;
-    private ?array $nodeNames = null;
 
     public static function getNavigationLabel(): string { return __('reference.nodes'); }
     public function getTitle(): string { return __('reference.nodes'); }
@@ -28,15 +27,17 @@ final class ReferenceNodes extends ReferencePage
     public function table(Table $table): Table
     {
         return $table->records(function (?string $search, array $filters, int $page, int $recordsPerPage) {
-            $data = ['include_archived' => true];
-            if ($type = $filters['type']['value'] ?? null) $data['type'] = $type;
-            $rows = SchoolScreen::call('referential.node.read', ReferentialController::class, 'nodes', $data)['data'];
-            return $this->catalogPage($this->filterArchived($rows, $filters), $search, $page, $recordsPerPage);
+            $data = array_filter(['type' => $filters['type']['value'] ?? null, 'q' => $search]);
+            $status = $filters['archive_status']['value'] ?? null;
+            if ($status === 'archived') $data['archived'] = true;
+            elseif ($status !== 'active') $data['include_archived'] = true;
+            return $this->apiPage('referential.node.read', ReferentialController::class, 'nodes', $data, $page, $recordsPerPage);
         })->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
             TextColumn::make('code')->label(__('school.code'))->searchable(),
             TextColumn::make('labels')->label(__('school.name'))->state(fn (array $record) => Locales::label($record['labels'])),
             TextColumn::make('type_code')->label(__('reference.type'))->formatStateUsing(fn (string $state) => Locales::label($this->types()[$state]['labels'] ?? null) ?? $state),
-            TextColumn::make('parent_id')->label(__('reference.parent'))->formatStateUsing(fn (string $state) => $this->nodeLabels()[$state] ?? $state),
+            TextColumn::make('parent_code')->label(__('reference.parent'))
+                ->formatStateUsing(fn (string $state, array $record) => $state.' · '.Locales::label($record['parent_labels'])),
             TextColumn::make('sort_order')->label(__('reference.sort_order')),
             TextColumn::make('archived_at')->label(__('school.status'))->state(fn (array $record) => __('reference.archive_states.'.($record['archived_at'] ? 'archived' : 'active'))),
         ])->filters([
@@ -81,12 +82,6 @@ final class ReferenceNodes extends ReferencePage
         $parent = $this->parentType($type);
         if (!$parent) return [];
         return collect(SchoolScreen::call('referential.node.read', ReferentialController::class, 'nodes', ['type' => $parent])['data'])
-            ->mapWithKeys(fn ($row) => [$row['id'] => $row['code'].' · '.Locales::label($row['labels'])])->all();
-    }
-
-    private function nodeLabels(): array
-    {
-        return $this->nodeNames ??= collect(SchoolScreen::call('referential.node.read', ReferentialController::class, 'nodes', ['include_archived' => true])['data'])
             ->mapWithKeys(fn ($row) => [$row['id'] => $row['code'].' · '.Locales::label($row['labels'])])->all();
     }
 }
