@@ -47,7 +47,7 @@ return [
     ],
     'export_background_rows' => 2000,
 
-    // Activation and recovery links point to the front end; the token travels in the fragment,
-    // which browsers never send to a server or put in a Referer header.
-    'front_url' => rtrim((string) env('PLATFORM_FRONT_URL', env('APP_URL', 'http://localhost')), '/'),
+    // Activation and recovery links point to the school panel's pages; the token travels in the
+    // fragment, which browsers never send to a server or put in a Referer header.
+    'front_url' => rtrim((string) env('PLATFORM_FRONT_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/school'), '/'),
 ];

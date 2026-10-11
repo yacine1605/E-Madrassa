@@ -30,4 +30,8 @@ return [
     'close_help' => 'La clôture est définitive. Les dates et les périodes de cette année seront figées.',
     'delete_unused' => 'Supprimer si inutilisée',
     'delete_help' => 'La suppression est définitive et reste journalisée. Une entrée utilisée doit être archivée ; sa suppression sera refusée.',
+    'sites' => 'Sites',
+    'default_site' => 'Site principal',
+    'create_site' => 'Nouveau site',
+    'site_code' => 'De 1 à 40 lettres, chiffres, tirets ou tirets bas ; définitif.',
 ];

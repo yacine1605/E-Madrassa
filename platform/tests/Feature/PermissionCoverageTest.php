@@ -27,7 +27,8 @@ final class PermissionCoverageTest extends TestCase
             'reference-types' => 'referential.node.read', 'reference-nodes' => 'referential.node.read', 'subjects' => 'referential.node.read',
             'years' => 'referential.node.read', 'periods' => 'referential.node.read', 'custom-fields' => 'referential.node.read',
             'settings' => 'tenant.settings.manage', 'support-access' => 'support.access.grant,audit.log.read', 'journal' => 'audit.log.read',
-            'deliveries' => 'tenant.settings.manage', 'imports' => 'import.job.create,import.job.read', 'exports' => 'export.job.create'] as $slug => $permission) {
+            'deliveries' => 'tenant.settings.manage', 'imports' => 'import.job.create,import.job.read', 'exports' => 'export.job.create',
+            'sites' => 'referential.node.read'] as $slug => $permission) {
             $route = Route::getRoutes()->getByName('filament.school.pages.'.$slug);
             $this->assertNotNull($route);
             $this->assertContains('permission:'.$permission, $route->gatherMiddleware());

@@ -302,7 +302,19 @@ Tasks and notifications need no permission: row-level security shows each person
 
 Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (145 tests, 4,142 assertions) and the 147 embedded SQL checks; no schema change.
 
+## Increment 18: account links in the browser, and sites (W1.7, continued)
+
+| Path | SRS | Behavior |
+|---|---|---|
+| `/school/activation` | FR-IAM-01 | An invitation link opens the account: the first password, or acceptance by a person who already has one; then sign-in |
+| `/school/recovery` | FR-IAM-02 | Linked from the sign-in page: the email asked for (the same answer whether or not it has an account), then the link opens the choice of a new password |
+| `/school/sites` | FR-SLL-01 | Sites named in French or Arabic, archived with a reason; the last one in use stays. Only with the `sites_rooms` module: without it, neither menu entry nor page (R09) |
+
+Links now point to the panel: `PLATFORM_FRONT_URL` defaults to `APP_URL/school`. The token still travels in the fragment, which never reaches a server: the page reads it, takes it out of the address bar and history, and checks it with the API's controller. These pages before sign-in have the same limits as the API's public routes (60 a minute per address; recovery: 10 an hour per address, 3 per email). Module routes are checked again on every Livewire update, like permissions.
+
+Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (149 tests, 4,282 assertions) and the 147 embedded SQL checks; no schema change.
+
 ## Next increments of lot 1
 
-1. **Public pages**: invitation activation and password recovery in the browser; the sites screen. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
-2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).
+1. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups and their restoration).
+2. **Acceptance**: browser, mobile and right-to-left visual checks of every screen; the remaining API pagination.

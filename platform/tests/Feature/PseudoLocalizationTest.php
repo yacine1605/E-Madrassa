@@ -139,7 +139,8 @@ final class PseudoLocalizationTest extends TestCase
             'direction', 'academic_hr', 'supervisor', 'front_office', ...array_values(Locales::NAMES), Locales::NAMES['fr'].', '.Locales::NAMES['ar'],
             'École '.$school->slug, $school->slug];
         $data = [...$data, ...array_column(DB::connection('owner')->select("SELECT labels ->> 'fr' AS l FROM school.role WHERE tenant_id = ?
-            UNION ALL SELECT labels ->> 'fr' FROM platform.setting_definition", [$school->id]), 'l')];
+            UNION ALL SELECT labels ->> 'fr' FROM platform.setting_definition UNION ALL SELECT labels ->> 'fr' FROM school.site WHERE tenant_id = ?",
+            [$school->id, $school->id]), 'l')];
         foreach (['node_type', 'ref_node', 'subject'] as $table) {
             $rows = DB::connection('owner')->select('SELECT code, labels FROM school.'.$table.' WHERE tenant_id = ?', [$school->id]);
             foreach ($rows as $row) {
@@ -148,7 +149,7 @@ final class PseudoLocalizationTest extends TestCase
             }
         }
         foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods',
-            'custom-fields', 'settings', 'support-access', 'journal', 'tasks', 'notifications', 'deliveries', 'imports', 'exports'] as $page) {
+            'custom-fields', 'settings', 'support-access', 'journal', 'tasks', 'notifications', 'deliveries', 'imports', 'exports', 'sites', 'activation', 'recovery'] as $page) {
             $data = array_map(fn ($text) => trim((string) $text, self::PUNCTUATION), $data);
             $unmarked = array_values(array_diff($this->visibleTexts($this->get('/school/'.$page)->assertOk()->getContent()), $data));
             $this->assertSame([], $unmarked, "Text outside the catalogs on /school/$page.");
