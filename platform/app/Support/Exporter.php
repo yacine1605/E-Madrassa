@@ -99,6 +99,7 @@ final class Exporter
 
     private function describe(array $filters): string
     {
-        return implode(' · ', array_map(fn ($key, $value) => $key.' = '.(is_bool($value) ? ($value ? 'oui' : 'non') : $value), array_keys($filters), $filters));
+        return implode(' · ', array_map(fn ($key, $value) => $key.' = '.(is_bool($value) ? __($value ? 'exports.yes' : 'exports.no') : $value),
+            array_keys($filters), $filters));
     }
 }

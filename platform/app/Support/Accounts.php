@@ -31,7 +31,8 @@ final class Accounts
         DB::select('SELECT school.issue_activation(?, ?)', [$user, $hash]);
         $person = DB::selectOne('SELECT name, email, password IS NULL AS fresh FROM public.users WHERE id = ?', [$user]);
         $school = DB::selectOne('SELECT name FROM platform.tenant WHERE id = ?', [$this->school->id()])->name;
-        if ($person->email && AccountLinks::send('activation', $person->email, $person->name, $token, $school)) return ['delivery' => 'sent'];
+        $locale = Locales::of($user, $this->school->id());
+        if ($person->email && AccountLinks::send('activation', $person->email, $person->name, $token, $locale, $school)) return ['delivery' => 'sent'];
         // FR-IAM-01: when sending fails, the administrator may hand the link over, but only for
         // a person who has no password yet: the link never opens an existing person's account.
         return ['delivery' => 'failed'] + ($person->fresh ? ['activation_url' => AccountLinks::url('activation', $token)] : []);

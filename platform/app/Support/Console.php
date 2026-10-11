@@ -19,6 +19,12 @@ final class Console
     }
 
     /** @template T @param callable(Connection): T $work @return T */
+    /** The reason written in the school's journal, in the school's language. */
+    private function reason(string $key, string $tenant): string
+    {
+        return __('console.reasons.'.$key, [], $this->db()->selectOne('SELECT platform.locale_for(NULL, ?::uuid) AS l', [$tenant])->l);
+    }
+
     private function as(?string $reason, callable $work): mixed
     {
         return $this->db()->transaction(function (Connection $db) use ($reason, $work) {
@@ -37,11 +43,11 @@ final class Console
     public function createSchool(array $data): array
     {
         $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'madrassa:school:'.$data['slug'])->toString();
-        $tenant = $this->as('Création', function (Connection $db) use ($data, $key) {
+        $tenant = $this->as(__('console.reasons.creation', [], $data['default_locale']), function (Connection $db) use ($data, $key) {
             $admin = $db->selectOne('SELECT platform.ensure_user(?, ?) AS id', [$data['admin_email'], $data['admin_name']])->id;
             return $db->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?, ?) AS id', [
                 $key, $data['slug'], $data['name'], $data['default_locale'], $data['plan'], $data['valid_from'], $data['valid_until'] ?? null,
-                (int) $data['quota_active_students'], (int) $data['quota_storage_mb'], $data['site_code'] ?? 'MAIN', $data['site_name'] ?? 'Site principal',
+                (int) $data['quota_active_students'], (int) $data['quota_storage_mb'], $data['site_code'] ?? 'MAIN', $data['site_name'] ?? null,
                 $admin, $data['profile']])->id;
         });
         return ['tenant' => $tenant, ...$this->inviteAdmin($tenant)];
@@ -56,9 +62,13 @@ final class Console
     public function inviteAdmin(string $tenant): array
     {
         [$token, $hash] = AccountLinks::token();
-        $admin = $this->as('Invitation', fn (Connection $db) => $db->selectOne('SELECT email, name FROM platform.invite_admin(?, ?)', [$tenant, $hash]));
-        $school = $this->db()->selectOne('SELECT name FROM platform.tenant WHERE id = ?', [$tenant])->name;
-        if (AccountLinks::send('activation', $admin->email, $admin->name, $token, $school)) return ['delivery' => 'sent', 'activation_url' => null];
+        $school = $this->db()->selectOne('SELECT name, platform.locale_for(NULL, id) AS locale FROM platform.tenant WHERE id = ?', [$tenant]);
+        $admin = $this->as(__('console.reasons.invitation', [], $school->locale),
+            fn (Connection $db) => $db->selectOne('SELECT email, name FROM platform.invite_admin(?, ?)', [$tenant, $hash]));
+        // In the school's language: the administrator has not chosen one yet.
+        if (AccountLinks::send('activation', $admin->email, $admin->name, $token, Locales::usable($school->locale), $school->name)) {
+            return ['delivery' => 'sent', 'activation_url' => null];
+        }
         return ['delivery' => 'failed', 'activation_url' => AccountLinks::url('activation', $token)];
     }
 
@@ -71,7 +81,7 @@ final class Console
     /** The school's modules become exactly these, their dependencies included (FR-PLT-02). */
     public function setModules(string $tenant, array $modules): void
     {
-        $this->as('Modules', function (Connection $db) use ($tenant, $modules) {
+        $this->as($this->reason('modules', $tenant), function (Connection $db) use ($tenant, $modules) {
             foreach ($modules as $module) $db->select('SELECT platform.enable_module(?, ?)', [$tenant, $module]);
             // The others go, a module required by one still enabled last: passes until nothing more can go.
             do {
@@ -88,7 +98,7 @@ final class Console
 
     public function setEntitlement(string $tenant, array $data): void
     {
-        $this->as('Abonnement', fn (Connection $db) => $db->select('SELECT platform.set_entitlement(?, ?::date, ?::date, ?, ?, ?, ?)', [$tenant,
+        $this->as($this->reason('entitlement', $tenant), fn (Connection $db) => $db->select('SELECT platform.set_entitlement(?, ?::date, ?::date, ?, ?, ?, ?)', [$tenant,
             $data['valid_from'], $data['valid_until'] ?? null, (int) $data['grace_days'], (int) $data['quota_active_students'],
             (int) $data['quota_storage_mb'], (int) ($data['quota_ai_requests_month'] ?? 0)]));
     }
@@ -96,7 +106,7 @@ final class Console
     /** FR-PLT-03: a newer profile version, only on request; it adds and never overwrites. */
     public function applyProfile(string $tenant, string $profile): int
     {
-        return (int) $this->as('Profil', fn (Connection $db) => $db->selectOne('SELECT platform.apply_profile(?, ?) AS v', [$tenant, $profile])->v);
+        return (int) $this->as($this->reason('profile', $tenant), fn (Connection $db) => $db->selectOne('SELECT platform.apply_profile(?, ?) AS v', [$tenant, $profile])->v);
     }
 
     /** FR-PLT-04: the school's consents, their dates and use; never the school's data. */

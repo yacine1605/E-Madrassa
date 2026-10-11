@@ -13,7 +13,7 @@ final class SupportSessionController
     {
         $data = $request->validate(['tenant_id' => 'required|uuid', 'grant_id' => 'required|uuid']);
         if (!$sessions->open($data['tenant_id'], $data['grant_id'])) {
-            throw new Refusal('support_not_granted', 'Aucun consentement valable de cet établissement ne permet cet accès.', 403);
+            throw Refusal::of('support_not_granted', 403);
         }
         return response()->noContent();
     }

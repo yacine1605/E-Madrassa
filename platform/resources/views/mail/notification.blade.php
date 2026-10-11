@@ -1,7 +1,7 @@
-Bonjour {{ $name }},
+{{ __('mail.greeting', ['name' => $name]) }}
 
-{{ $title }} ({{ $school }}).
+{{ __('mail.notification.line', ['title' => $title, 'school' => $school]) }}
 
-Connectez-vous pour en voir le détail.
+{{ __('mail.notification.details') }}
 
-Vous recevez ce message selon vos préférences de notification, modifiables dans l’application.
+{{ __('mail.notification.why') }}

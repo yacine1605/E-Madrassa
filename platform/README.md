@@ -218,7 +218,24 @@ The operator opens a support session from the console (action "Accès support" o
 
 At deployment, `php artisan filament:assets` publishes Filament's assets.
 
+## Increment 13: languages (W1.7, first part)
+
+152 invariants on PostgreSQL 16, 110 integration tests (11 October 2026).
+
+| SRS | Covered |
+|---|---|
+| FR-I18-01 | Each person's language (`PUT /api/account/locale`; none follows the school) if the school offers it (`locale.languages`), else the school's, else French; the database resolves it (`platform.locale_for`) for requests, background jobs and emails. Before sign-in, the browser's preference. `GET /api/me` gives the language in use and its direction; every answer carries `Content-Language` |
+| NFR-I18N-01 | Every message comes from the catalogs `lang/fr` and `lang/ar`: the database's refusals, the session's, validation, emails, the console, the framework's own errors (404, 419, 429, 500). Filament turns right to left in Arabic; its French catalog is completed in `lang/vendor` |
+| AC2 | `school.search_key`: alif and hamza forms, alif maqsura, ta marbuta folded, diacritics and tatweel dropped, Latin case and accents ignored, Arabic-Indic digits read as digits. `GET /api/accounts?q=احمد` finds « أحمد » |
+| AC3, TST-17 | French shown as a pseudo-language (every catalog string marked): the API's messages, the emails and the console's pages read back carry no text outside the catalogs. The code and the views are read for texts too, French and Arabic compared key by key with the same placeholders, Filament's catalogs checked complete, the screens' styles checked for logical directions (start, end) only |
+| Formats | Gregorian dates, day first, in Algiers time; « 12 500,00 DA » and « 12 500,00 د.ج »; Arabic-Indic digits in Arabic on the school's request (`locale.arabic_digits`) |
+| BR-18 | A new school's default site is named in French and Arabic; a site, like every label, needs one of the two |
+
+English is accepted by the database but not offered yet: it arrives with its catalog (`Locales::AVAILABLE`). A background job writes its messages in the language of the person who started it. The console's changes are recorded in the school's journal with a reason in the school's language. Label uniqueness (008) dropped Arabic-Indic digits along with the diacritics: « فوج ١ » and « فوج ٢ » are now two labels.
+
+Left for the second part of W1.7: the school's screens in Filament. Names in Arabic and in Latin letters come with the people they belong to (students, guardians, staff: lot 2).
+
 ## Next increments of lot 1
 
-1. **The school's screens** in Filament, in French and Arabic, right to left (W1.7).
+1. **The school's screens** in Filament (W1.7, second part): accounts and roles, referential, years, settings, imports and exports, journal, support consents and the support session's banner.
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).

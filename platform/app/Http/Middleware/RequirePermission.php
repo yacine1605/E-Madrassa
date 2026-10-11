@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\Refusal;
 use App\Support\Permissions;
 use Closure;
 use Illuminate\Http\Request;
@@ -26,6 +27,6 @@ final class RequirePermission
 
     public static function denied(): Response
     {
-        return response()->json(['message' => 'Vous n’avez pas la permission nécessaire.', 'code' => 'permission_denied'], 403);
+        return Refusal::response('permission_denied', 403);
     }
 }

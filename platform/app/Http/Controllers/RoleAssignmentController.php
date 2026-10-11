@@ -48,10 +48,10 @@ final class RoleAssignmentController
         ]);
         $tenant = $this->school->id();
         if (!DB::selectOne("SELECT 1 AS found FROM school.membership WHERE tenant_id = ? AND user_id = ? AND status IN ('invited', 'active')", [$tenant, $data['user_id']])) {
-            throw ValidationException::withMessages(['user_id' => 'Cette personne n’a pas de compte actif dans cet établissement.']);
+            throw ValidationException::withMessages(['user_id' => __('errors.member_unknown')]);
         }
         if (!DB::selectOne('SELECT 1 AS found FROM school.role WHERE tenant_id = ? AND id = ?', [$tenant, $data['role_id']])) {
-            throw ValidationException::withMessages(['role_id' => 'Rôle inconnu dans cet établissement.']);
+            throw ValidationException::withMessages(['role_id' => __('errors.role_unknown')]);
         }
         $id = DB::selectOne('INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type, scope_ids, valid_from, valid_until)
             VALUES (?, ?, ?, ?, (SELECT array_agg(value::uuid) FROM json_array_elements_text(?::json)), coalesce(?::date, current_date), ?::date) RETURNING id',

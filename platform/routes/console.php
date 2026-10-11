@@ -34,7 +34,7 @@ Artisan::command('platform:user {email} {--name=} {--password=}', function (stri
 })->purpose('Create or reset an account (as the database owner)');
 
 Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--profile=private_school_dz} {--locale=fr} {--admin=} {--site-code=MAIN}
-    {--site-name=Site principal} {--students=500} {--storage=1024} {--until=}', function (string $slug, string $name) {
+    {--site-name=} {--students=500} {--storage=1024} {--until=}', function (string $slug, string $name) {
     $admin = $this->option('admin')
         ? DB::connection('owner')->table('users')->where('email', mb_strtolower($this->option('admin')))->value('id')
         : null;
@@ -43,7 +43,7 @@ Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--pro
     $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'madrassa:school:'.$slug)->toString();
     $id = DB::connection('console')->selectOne('SELECT platform.create_tenant(?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?, ?, ?) AS id', [
         $key, $slug, $name, $this->option('locale'), $this->option('plan'), now()->toDateString(), $this->option('until') ?: null,
-        (int) $this->option('students'), (int) $this->option('storage'), $this->option('site-code'), $this->option('site-name'), $admin,
+        (int) $this->option('students'), (int) $this->option('storage'), $this->option('site-code'), $this->option('site-name') ?: null, $admin,
         $this->option('profile') ?: null,
     ])->id;
     $this->info('School ready: '.$id);

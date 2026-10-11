@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Rules\StrongPassword;
 use App\Support\AccountLinks;
-use App\Support\DatabaseErrors;
+use App\Support\Locales;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -40,9 +41,11 @@ final class AccountLinkController
     {
         $data = $request->validate(['email' => 'required|email|max:200']);
         [$token, $hash] = AccountLinks::token();
-        $person = DB::selectOne('SELECT email, name FROM platform.issue_recovery(?, ?)', [$data['email'], $hash]);
-        if ($person) AccountLinks::queue('recovery', $person->email, $person->name, $token);
-        return response()->json(['message' => 'Si un compte correspond à cette adresse, un lien de réinitialisation vient d’y être envoyé.'], 202);
+        $person = DB::selectOne('SELECT r.email, r.name, u.locale FROM platform.issue_recovery(?, ?) r LEFT JOIN public.users u ON u.id = r.user_id',
+            [$data['email'], $hash]);
+        // In the person's own language, else in the language of the page that asked.
+        if ($person) AccountLinks::queue('recovery', $person->email, $person->name, $token, Locales::usable($person->locale ?? app()->getLocale()));
+        return response()->json(['message' => __('messages.recovery_sent')], 202);
     }
 
     private function redeem(Request $request, string $purpose)
@@ -50,7 +53,7 @@ final class AccountLinkController
         $request->validate(['token' => 'required|string|size:64']);
         $hash = AccountLinks::hash($request->input('token'));
         $owner = DB::selectOne('SELECT name, email, username, needs_password FROM platform.peek_token(?, ?)', [$purpose, $hash]);
-        if (!$owner) return response()->json(['message' => DatabaseErrors::message('token_invalid'), 'code' => 'token_invalid'], 409);
+        if (!$owner) return Refusal::response('token_invalid', 409);
         // A person who already has a password keeps it: accepting the invitation is enough.
         $data = $request->validate(['password' => [$owner->needs_password ? 'required' : 'prohibited', 'string', 'confirmed',
             new StrongPassword([$owner->name, $owner->email, $owner->username])]]);

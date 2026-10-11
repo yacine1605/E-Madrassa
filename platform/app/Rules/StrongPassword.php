@@ -23,18 +23,18 @@ final class StrongPassword implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (!is_string($value) || mb_strlen($value) < 10) { $fail('Le mot de passe doit contenir au moins 10 caractères.'); return; }
-        if (mb_strlen($value) > 128) { $fail('Le mot de passe ne doit pas dépasser 128 caractères.'); return; }
+        if (!is_string($value) || mb_strlen($value) < 10) { $fail('validation.password_policy.short')->translate(); return; }
+        if (mb_strlen($value) > 128) { $fail('validation.password_policy.long')->translate(); return; }
         $lower = mb_strtolower($value);
         // The part that remains once digits and symbols are taken off the ends: "Password123!" is "password".
         $core = trim(preg_replace('/^[\d\W_]+|[\d\W_]+$/u', '', $lower));
         if (in_array($core, self::COMMON, true) || $this->runOrSequence($lower)) {
-            $fail('Ce mot de passe est trop courant ou trop simple.');
+            $fail('validation.password_policy.common')->translate();
             return;
         }
         foreach ($this->identity as $part) {
             foreach (preg_split('/[\s@._-]+/u', mb_strtolower((string) $part)) as $piece) {
-                if (mb_strlen($piece) >= 4 && str_contains($lower, $piece)) { $fail('Le mot de passe ne doit pas reprendre votre nom ni votre identifiant.'); return; }
+                if (mb_strlen($piece) >= 4 && str_contains($lower, $piece)) { $fail('validation.password_policy.personal')->translate(); return; }
             }
         }
     }

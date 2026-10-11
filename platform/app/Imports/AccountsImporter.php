@@ -44,7 +44,7 @@ final class AccountsImporter implements Importer
         }
         $current = DB::selectOne(Accounts::SELECT.' WHERE m.tenant_id = ? AND m.user_id = ?', [$this->school->id(), (int) $targetId]);
         if (!$current || [$current->name, $current->email, $current->username] !== array_values($this->wanted($row))) {
-            throw new DependentOperation(0, 'Ce compte a changé depuis l’import.');
+            throw new DependentOperation(0, __('errors.account_changed'));
         }
         DB::select('SELECT school.update_account(?, ?, ?, ?, ?)', [(int) $targetId, $previous['name'], $previous['email'], $previous['username'], $this->key($row)]);
     }

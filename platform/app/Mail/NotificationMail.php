@@ -13,7 +13,7 @@ final class NotificationMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->title.' — '.$this->school);
+        return new Envelope(subject: __('mail.notification.subject', ['title' => $this->title, 'school' => $this->school]));
     }
 
     public function content(): Content

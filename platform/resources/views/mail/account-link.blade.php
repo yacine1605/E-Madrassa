@@ -1,13 +1,13 @@
-Bonjour {{ $name }},
+{{ __('mail.greeting', ['name' => $name]) }}
 
 @if ($purpose === 'activation')
-{{ $school ? 'L’établissement '.$school.' vous a ouvert un compte.' : 'Un compte vous a été ouvert.' }}
-Pour l’activer, ouvrez ce lien dans les 72 heures :
+{{ $school ? __('mail.activation.opened_school', ['school' => $school]) : __('mail.activation.opened') }}
+{{ __('mail.activation.action') }}
 @else
-Une réinitialisation de votre mot de passe a été demandée.
-Pour choisir un nouveau mot de passe, ouvrez ce lien dans l’heure :
+{{ __('mail.recovery.asked') }}
+{{ __('mail.recovery.action') }}
 @endif
 
 {{ $url }}
 
-Ce lien ne sert qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.
+{{ __('mail.once') }}

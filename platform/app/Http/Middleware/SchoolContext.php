@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\Refusal;
 use App\Support\CurrentSchool;
+use App\Support\Locales;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,17 +23,22 @@ final class SchoolContext
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (!$user) return response()->json(['message' => 'Connectez-vous.', 'code' => 'unauthenticated'], 401);
+        if (!$user) return Refusal::response('unauthenticated', 401);
         $tenant = $request->session()->get('school.tenant');
         if (!is_string($tenant)) {
-            return response()->json(['message' => 'Choisissez un établissement.', 'code' => 'school_not_selected'], 409);
+            return Refusal::response('school_not_selected', 409);
         }
         $requestId = CurrentSchool::requestId($request->headers->get('X-Request-Id'));
         $closed = null;
         $support = $request->session()->get('support.grant');
         $response = DB::transaction(function () use ($request, $next, $user, $tenant, $requestId, $support, &$closed) {
             $this->school->enter($tenant, $user->getAuthIdentifier(), $requestId, $request->ip(), $support);
-            $state = DB::selectOne('SELECT platform.tenant_mode(?::uuid) AS mode, school.allowed(?::uuid) AS allowed', [$tenant, $tenant]);
+            $state = DB::selectOne('SELECT platform.tenant_mode(?::uuid) AS mode, school.allowed(?::uuid) AS allowed, platform.locale_for(?, ?::uuid) AS locale',
+                [$tenant, $tenant, $user->getAuthIdentifier(), $tenant]);
+            // FR-I18-01: the person's language if the school offers it, else the school's; kept for
+            // the requests outside the school (sign-in, account) until the school changes.
+            Locales::apply(Locales::usable($state->locale));
+            $request->session()->put('locale', app()->getLocale());
             if ($state->mode === 'suspended') { $closed = 'tenant_suspended'; return null; }
             if (!$state->allowed) { $closed = $support ? 'support_ended' : 'membership_inactive'; return null; }
             $this->school->setMode($state->mode);
@@ -55,19 +62,18 @@ final class SchoolContext
         }, 3);
         if ($closed === 'support_ended') {
             // The consent expired or was revoked: the support session ends, the operator stays signed in.
-            $request->session()->forget(['support.grant', 'school.tenant', 'school.idle_minutes']);
-            return response()->json(['message' => 'L’accès support a pris fin : le consentement a expiré ou a été retiré.', 'code' => $closed], 403);
+            $request->session()->forget(['support.grant', 'school.tenant', 'school.idle_minutes', 'locale']);
+            return Refusal::response($closed, 403);
         }
         if ($closed === 'mfa_setup_required') {
-            return response()->json(['message' => 'Activez la double authentification pour accéder à cet établissement.', 'code' => $closed], 403);
+            return Refusal::response($closed, 403);
         }
         if ($closed) {
             // FR-PLT-01 AC2 / FR-IAM-01 AC1: a suspended school or membership ends the session.
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            $message = $closed === 'tenant_suspended' ? 'Cet établissement est suspendu.' : 'Votre accès à cet établissement n’est plus actif.';
-            return response()->json(['message' => $message, 'code' => $closed], 403);
+            return Refusal::response($closed, 403);
         }
         // Through the header bag: file downloads are streamed responses.
         $response->headers->set('X-Request-Id', $requestId);

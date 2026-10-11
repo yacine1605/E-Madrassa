@@ -22,7 +22,8 @@ final class TaskContext
     {
         return DB::transaction(function () {
             $this->enter(true);
-            $job = DB::selectOne('SELECT id, kind, status, input, cancel_requested_at FROM school.job WHERE id = ? FOR UPDATE', [$this->jobId]);
+            $job = DB::selectOne('SELECT id, kind, status, input, cancel_requested_at, platform.locale_for(user_id, tenant_id) AS locale
+                FROM school.job WHERE id = ? FOR UPDATE', [$this->jobId]);
             if (!$job || in_array($job->status, ['succeeded', 'cancelled', 'failed'], true)) return null;
             if ($job->cancel_requested_at) {
                 DB::update("UPDATE school.job SET status = 'cancelled' WHERE id = ?", [$this->jobId]);

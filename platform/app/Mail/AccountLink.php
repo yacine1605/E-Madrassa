@@ -15,8 +15,8 @@ final class AccountLink extends Mailable implements ShouldBeEncrypted
     public function envelope(): Envelope
     {
         return new Envelope(subject: $this->purpose === 'activation'
-            ? 'Activez votre compte'.($this->school ? ' — '.$this->school : '')
-            : 'Réinitialisation de votre mot de passe');
+            ? ($this->school ? __('mail.activation.subject_school', ['school' => $this->school]) : __('mail.activation.subject'))
+            : __('mail.recovery.subject'));
     }
 
     public function content(): Content

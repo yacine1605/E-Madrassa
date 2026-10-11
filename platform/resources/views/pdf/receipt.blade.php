@@ -7,8 +7,8 @@
 <table class="grid">
     <tr><th>{{ __('pdf.label', [], $locale) }}</th><th>{{ __('pdf.amount', [], $locale) }}</th></tr>
     @foreach ($lines as $line)
-        <tr><td>{{ $line['label'] }}</td><td class="number">{{ \App\Support\Money::format($line['amount'], $locale) }}</td></tr>
+        <tr><td>{{ $line['label'] }}</td><td class="number">{{ \App\Support\Money::format($line['amount'], $locale, $arabicDigits) }}</td></tr>
     @endforeach
     <tr><th>{{ __('pdf.total', [], $locale) }}</th>
-        <th class="number">{{ \App\Support\Money::format(array_sum(array_column($lines, 'amount')), $locale) }}</th></tr>
+        <th class="number">{{ \App\Support\Money::format(array_sum(array_column($lines, 'amount')), $locale, $arabicDigits) }}</th></tr>
 </table>

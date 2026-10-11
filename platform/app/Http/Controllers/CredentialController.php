@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Rules\StrongPassword;
 use App\Support\MultiFactor;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ final class CredentialController
             'password' => ['required', 'string', 'confirmed', 'different:current_password', new StrongPassword([$user->name, $user->email, $username])],
         ]);
         if (!Hash::check($data['current_password'], $user->password)) {
-            throw ValidationException::withMessages(['current_password' => 'Mot de passe actuel incorrect.']);
+            throw ValidationException::withMessages(['current_password' => __('errors.current_password_wrong')]);
         }
         // Hashed with Argon2id by the model's cast (NFR-SEC-02).
         $user->forceFill(['password' => $data['password'], 'must_change_password' => false, 'password_changed_at' => now(), 'remember_token' => null])->save();
@@ -38,7 +39,7 @@ final class CredentialController
     public function startMfa(Request $request, MultiFactor $mfa)
     {
         $user = $request->user();
-        if ($user->mfa_enabled_at) return response()->json(['message' => 'La double authentification est déjà active.', 'code' => 'mfa_already_enabled'], 409);
+        if ($user->mfa_enabled_at) return Refusal::response('mfa_already_enabled', 409);
         $secret = $mfa->newSecret();
         $request->session()->put('mfa.pending_secret', Crypt::encryptString($secret));
         return ['secret' => $secret, 'uri' => $mfa->uri($secret, $user->email ?? $user->name)];
@@ -50,10 +51,10 @@ final class CredentialController
         $data = $request->validate(['code' => 'required|string|max:20']);
         $user = $request->user();
         $pending = $request->session()->get('mfa.pending_secret');
-        if ($user->mfa_enabled_at || !$pending) return response()->json(['message' => 'Recommencez l’activation.', 'code' => 'mfa_not_started'], 409);
+        if ($user->mfa_enabled_at || !$pending) return Refusal::response('mfa_not_started', 409);
         $secret = Crypt::decryptString($pending);
         $step = $mfa->check($secret, $data['code'], null);
-        if ($step === null) throw ValidationException::withMessages(['code' => 'Code incorrect.']);
+        if ($step === null) throw ValidationException::withMessages(['code' => __('errors.invalid_code')]);
         $codes = $mfa->enable($user, $secret, $step);
         $request->session()->forget('mfa.pending_secret');
         return ['recovery_codes' => $codes];

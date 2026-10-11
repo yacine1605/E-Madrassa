@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Http\Controllers\Concerns\HandlesLabels;
 use App\Support\CurrentSchool;
 use Illuminate\Database\QueryException;
@@ -69,7 +70,7 @@ final class SubjectController
         } catch (QueryException $e) {
             // A later table's reference (program, qualification, session, grade).
             if ((string) $e->getCode() !== '23503') throw $e;
-            return response()->json(['message' => 'Cette matière est utilisée : archivez-la plutôt.', 'code' => 'subject_in_use'], 409);
+            return Refusal::response('subject_in_use', 409);
         }
         abort_unless($deleted, 404);
         return response()->noContent();

@@ -28,7 +28,7 @@ final class SupportSessions
 
     public function close(): void
     {
-        session()->forget(['support.grant', 'school.tenant', 'school.idle_minutes']);
+        session()->forget(['support.grant', 'school.tenant', 'school.idle_minutes', 'locale']);
         session()->regenerate();
     }
 }

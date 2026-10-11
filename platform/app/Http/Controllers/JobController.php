@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Support\Tasks;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -26,13 +27,13 @@ final class JobController
         $current = $this->find($job);
         if ($current->status === 'queued') DB::update("UPDATE school.job SET status = 'cancelled' WHERE id = ?", [$job]);
         elseif ($current->status === 'running') DB::update('UPDATE school.job SET cancel_requested_at = now() WHERE id = ?', [$job]);
-        else return response()->json(['message' => 'Cette tâche est déjà terminée.', 'code' => 'job_finished'], 409);
+        else return Refusal::response('job_finished', 409, key: 'job_already_finished');
         return ['data' => Tasks::present($this->find($job))];
     }
 
     public function retry(string $job, Tasks $tasks)
     {
-        if ($this->find($job)->status !== 'failed') return response()->json(['message' => 'Seule une tâche en échec se relance.', 'code' => 'not_failed'], 409);
+        if ($this->find($job)->status !== 'failed') return Refusal::response('not_failed', 409, key: 'job_not_failed');
         $tasks->retry($job);
         return response()->json(['data' => Tasks::present($this->find($job))], 202);
     }

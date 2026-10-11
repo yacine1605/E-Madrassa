@@ -9,12 +9,14 @@ namespace App\Support;
  */
 final class Money
 {
-    public static function format(int $centimes, string $locale): string
+    public static function format(int $centimes, string $locale, bool $arabicDigits = false): string
     {
         $sign = $centimes < 0 ? '-' : '';
         $centimes = abs($centimes);
-        $number = $sign.number_format(intdiv($centimes, 100), 0, '', "\u{00A0}").','.str_pad((string) ($centimes % 100), 2, '0', STR_PAD_LEFT);
+        $number = Formats::digits($sign.number_format(intdiv($centimes, 100), 0, '', "\u{00A0}").','.str_pad((string) ($centimes % 100), 2, '0', STR_PAD_LEFT),
+            $locale, $arabicDigits);
+        $currency = __('formats.currency', [], $locale);
         // In Arabic the number is isolated left-to-right, the currency follows it in reading order.
-        return $locale === 'ar' ? "\u{2066}".$number."\u{2069}\u{00A0}د.ج" : $number."\u{00A0}DA";
+        return $locale === 'ar' ? "\u{2066}".$number."\u{2069}\u{00A0}".$currency : $number."\u{00A0}".$currency;
     }
 }

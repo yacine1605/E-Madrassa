@@ -32,18 +32,19 @@ final class AccountLinks
 
     /**
      * Queues the link: the request answers at once, the same for a known and an unknown address
-     * (no timing difference), and a failed sending is retried by the queue.
+     * (no timing difference), and a failed sending is retried by the queue. In the person's
+     * language (FR-I18-01).
      */
-    public static function queue(string $purpose, string $email, string $name, string $token): void
+    public static function queue(string $purpose, string $email, string $name, string $token, string $locale): void
     {
-        Mail::to($email, $name)->queue(new AccountLink($purpose, $name, self::url($purpose, $token)));
+        Mail::to($email, $name)->locale($locale)->queue(new AccountLink($purpose, $name, self::url($purpose, $token)));
     }
 
     /** Sends the link; false when sending failed, so that an administrator may hand it over another way. */
-    public static function send(string $purpose, string $email, string $name, string $token, ?string $school = null): bool
+    public static function send(string $purpose, string $email, string $name, string $token, string $locale, ?string $school = null): bool
     {
         try {
-            Mail::to($email, $name)->send(new AccountLink($purpose, $name, self::url($purpose, $token), $school));
+            Mail::to($email, $name)->locale($locale)->send(new AccountLink($purpose, $name, self::url($purpose, $token), $school));
             return true;
         } catch (Throwable $e) {
             Log::warning('Account link not sent', ['purpose' => $purpose, 'error' => $e::class]);

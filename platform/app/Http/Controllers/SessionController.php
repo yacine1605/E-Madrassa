@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Models\User;
 use App\Support\LoginThrottle;
 use App\Support\MultiFactor;
@@ -36,7 +37,7 @@ final class SessionController
         $valid = Hash::check($data['password'], $user?->password ?: (self::$decoy ??= Hash::make(Str::random(40))));
         if (!$user?->password || !$valid) {
             $throttle->failed($key, $request->ip());
-            return response()->json(['message' => 'Identifiants incorrects.', 'code' => 'invalid_credentials'], 401);
+            return Refusal::response('invalid_credentials', 401);
         }
         $throttle->succeeded($key);
         if ($user->mfa_enabled_at) {
@@ -55,7 +56,7 @@ final class SessionController
         $pending = $request->session()->get('auth.pending');
         if (!$pending || now()->getTimestamp() - $pending['at'] > config('platform.mfa_pending_seconds')) {
             $request->session()->forget('auth.pending');
-            return response()->json(['message' => 'Reconnectez-vous.', 'code' => 'mfa_expired'], 401);
+            return Refusal::response('mfa_expired', 401);
         }
         $user = User::findOrFail($pending['user']);
         $key = 'mfa|'.$user->id;
@@ -63,7 +64,7 @@ final class SessionController
         $ok = isset($data['code']) ? $mfa->verify($user, $data['code']) : $mfa->useRecoveryCode($user, $data['recovery_code']);
         if (!$ok) {
             $throttle->failed($key, $request->ip());
-            return response()->json(['message' => 'Code incorrect.', 'code' => 'invalid_code'], 401);
+            return Refusal::response('invalid_code', 401);
         }
         $throttle->succeeded($key);
         $request->session()->forget('auth.pending');
@@ -85,12 +86,12 @@ final class SessionController
     {
         $data = $request->validate(['tenant_id' => 'required|uuid']);
         if (!$this->schoolsOf((int) $request->user()->getAuthIdentifier())->contains('tenant_id', $data['tenant_id'])) {
-            return response()->json(['message' => 'Cet établissement ne vous est pas accessible.', 'code' => 'school_forbidden'], 403);
+            return Refusal::response('school_forbidden', 403);
         }
         // A new session identifier for a new school: nothing carries over between schools.
         $request->session()->regenerate();
         $request->session()->put('school.tenant', $data['tenant_id']);
-        $request->session()->forget('school.idle_minutes');
+        $request->session()->forget(['school.idle_minutes', 'locale']);
         return response()->noContent();
     }
 
@@ -100,7 +101,7 @@ final class SessionController
         if ($schools->isEmpty()) {
             // FR-PLT-01 AC2: no session without an open school (suspended, revoked, none).
             $this->end($request);
-            return response()->json(['message' => 'Aucun établissement accessible avec ce compte.', 'code' => 'no_school'], 403);
+            return Refusal::response('no_school', 403);
         }
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
@@ -113,8 +114,7 @@ final class SessionController
 
     private function locked(int $seconds): JsonResponse
     {
-        return response()->json(['message' => 'Trop de tentatives. Réessayez dans quelques minutes.', 'code' => 'too_many_attempts'], 429)
-            ->header('Retry-After', (string) $seconds);
+        return Refusal::response('too_many_attempts', 429)->header('Retry-After', (string) $seconds);
     }
 
     /** The schools this user may open; a dedicated installation offers only its own. */

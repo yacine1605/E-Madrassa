@@ -12,6 +12,6 @@ final class ListTenants extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->label('Nouvel établissement')];
+        return [CreateAction::make()->label(__('console.tenant.create'))];
     }
 }

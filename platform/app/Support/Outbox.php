@@ -25,7 +25,7 @@ final class Outbox
         foreach (DB::select('SELECT id, email, name, event, school, locale FROM platform.claim_outbox(?, ?)', [$limit, self::LEASE_SECONDS]) as $email) {
             $title = $labels[$email->event][$email->locale] ?? $labels[$email->event]['fr'] ?? $labels[$email->event]['ar'];
             try {
-                Mail::to($email->email, $email->name)->send(new NotificationMail($email->name, $title, $email->school));
+                Mail::to($email->email, $email->name)->locale(Locales::usable($email->locale))->send(new NotificationMail($email->name, $title, $email->school));
                 DB::select('SELECT platform.finish_outbox(?, NULL)', [$email->id]);
                 $done['sent']++;
             } catch (Throwable $e) {

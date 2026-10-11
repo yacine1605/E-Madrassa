@@ -26,7 +26,7 @@ final class ImportReader
                 continue;
             }
             if (count(array_filter($cells, fn ($cell) => $cell !== null && trim((string) $cell) !== '')) === 0) continue;
-            if (count($rows) >= $maxRows) throw new RuntimeException("Le fichier dépasse $maxRows lignes.");
+            if (count($rows) >= $maxRows) throw new RuntimeException(__('errors.file_too_many_rows', ['max' => $maxRows]));
             $values = [];
             foreach ($header as $index => $column) {
                 if ($column !== '') $values[$column] = self::value($cells[$index] ?? null);

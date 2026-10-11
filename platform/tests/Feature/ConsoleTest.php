@@ -41,6 +41,8 @@ final class ConsoleTest extends TestCase
     public function test_only_operators_with_mfa_enter_the_console(): void
     {
         $this->get('/console/login')->assertOk();
+        // A page of the console sends whoever is signed out to its sign-in; only the API answers in JSON.
+        $this->get('/console/tenants')->assertRedirect('/console/login');
         $school = $this->school();
         $member = $this->account('member');
         $this->member($school, $member, 'active', ['tenant_admin']);

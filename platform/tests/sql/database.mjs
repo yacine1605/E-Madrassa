@@ -1046,6 +1046,62 @@ await check('the school sees every consent, the console their dates and use, nev
   assert.deepEqual(listed.find(r => r.reason === 'Ticket 1042 : import bloqué'), { reason: 'Ticket 1042 : import bloqué', c: 1 });
 });
 
+// Languages (FR-I18-01, NFR-I18N-01)
+await as('school_runtime', a, 1);
+const locale = async (user, tenant) => (await first('SELECT platform.locale_for($1, $2) AS l', [user, tenant])).l;
+await check('a person\'s language comes first, if the school offers it; then the school\'s, then French (FR-I18-01)', async () => {
+  assert.equal(await locale(1, a), 'fr');
+  await sql("UPDATE public.users SET locale = 'ar' WHERE id = 1");
+  assert.equal(await locale(1, a), 'ar');
+  await sql("UPDATE public.users SET locale = 'en' WHERE id = 1");
+  assert.equal(await locale(1, a), 'fr', 'school A offers French and Arabic only');
+  assert.equal(await locale(1, null), 'en', 'outside any school, the person\'s own');
+  assert.equal(await locale(3, null), 'fr');
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'locale.languages', '[\"fr\", \"ar\", \"en\"]')", [a]);
+  assert.equal(await locale(1, a), 'en');
+  await sql("UPDATE school.setting SET value = '[\"fr\", \"ar\"]' WHERE tenant_id = $1 AND key = 'locale.languages'", [a]);
+  await sql('UPDATE public.users SET locale = NULL WHERE id = 1');
+});
+await check('a language is French, Arabic or English', () => rejects("UPDATE public.users SET locale = 'de' WHERE id = 1", [], '23514'));
+await check('Arabic-Indic digits are a school\'s choice, off by default (FR-I18-01)', async () => {
+  assert.equal((await first("SELECT school.setting_value('locale.arabic_digits') AS v")).v, false);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'locale.arabic_digits', '\"oui\"')", [a], '23514', 'setting_invalid');
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'locale.arabic_digits', 'true')", [a]);
+  assert.equal((await first("SELECT school.setting_value('locale.arabic_digits') AS v")).v, true);
+});
+await check('a search finds a name however its letters are written (FR-I18-01 AC2)', async () => {
+  const key = async text => (await first('SELECT school.search_key($1) AS k', [text])).k;
+  for (const [written, searched] of [['أحمد', 'احمد'], ['إيمان', 'ايمان'], ['آمنة', 'امنه'], ['مُصْطَفَى', 'مصطفي'], ['عـــلي', 'علي'],
+                                     ['Hélène  BEN-ALI', 'helene ben ali'], ['Zoé L’Hôte', 'zoe l hote'], ['قسم ٣', 'قسم 3']]) {
+    assert.equal(await key(written), await key(searched), written);
+  }
+  assert.equal(await key('Hélène  BEN-ALI'), 'helene ben ali');
+  assert.equal(await key(' ـ '), null);
+});
+await check('labels differing by an Arabic-Indic digit are two labels', async () => {
+  await sql(SUBJECT, [a, 'GROUPE_1', 'subject', JSON.stringify({ ar: 'فوج ١' })]);
+  await sql(SUBJECT, [a, 'GROUPE_2', 'subject', JSON.stringify({ ar: 'فوج ٢' })]);
+  await rejects(SUBJECT, [a, 'GROUPE_1B', 'subject', JSON.stringify({ ar: 'فوج 1' })], '23505');
+});
+await check('an email goes out in its recipient\'s language (FR-I18-01)', async () => {
+  await sql("UPDATE public.users SET locale = 'ar' WHERE id = 9");
+  await sql("SELECT school.notify('access.sensitive_permission', ARRAY[9]::bigint[])");
+  await as('school_runtime', null, '');
+  const claimed = (await sql('SELECT id, email, locale FROM platform.claim_outbox(50, 60)')).rows.find(r => r.email === 'user9@example.test');
+  assert.equal(claimed.locale, 'ar');
+  await sql('SELECT platform.finish_outbox($1, NULL)', [claimed.id]);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE public.users SET locale = NULL WHERE id = 9');
+});
+await check('a new school\'s site is named in French and Arabic, or in its language when named (BR-18)', async () => {
+  await as('platform_admin', null, 6);
+  const unnamed = (await first(CREATE, [uuid(), 'ecole-ar', 'مدرسة النور', 'ar', 'essential', today, null, 10, 10, 'MAIN', null, null, null])).id;
+  const named = (await first(CREATE, [uuid(), 'ecole-ar-2', 'مدرسة الأمل', 'ar', 'essential', today, null, 10, 10, 'MAIN', 'المقر', null, null])).id;
+  await as(null);
+  assert.deepEqual((await first('SELECT labels FROM school.site WHERE tenant_id = $1', [unnamed])).labels, { fr: 'Site principal', ar: 'الموقع الرئيسي' });
+  assert.deepEqual((await first('SELECT labels FROM school.site WHERE tenant_id = $1', [named])).labels, { ar: 'المقر' });
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));

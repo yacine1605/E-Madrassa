@@ -54,7 +54,7 @@ final class Imports
             try {
                 $file = $this->read($batch->file_id);
                 $missing = array_diff($this->requiredColumns($importer), $file['header']);
-                if ($missing) throw new RuntimeException('Colonnes manquantes : '.implode(', ', $missing).'. Partez du modèle de l’import.');
+                if ($missing) throw new RuntimeException(__('errors.columns_missing', ['columns' => implode(', ', $missing)]));
             } catch (RuntimeException $e) {
                 DB::update("UPDATE school.import_batch SET status = 'failed', error_message = ? WHERE id = ?", [mb_substr($e->getMessage(), 0, 1000), $batchId]);
                 return $this->summary($batchId);
@@ -74,7 +74,7 @@ final class Imports
     public function confirm(string $batchId): array
     {
         if (!DB::update("UPDATE school.import_batch SET status = 'importing' WHERE id = ? AND status = 'previewed'", [$batchId])) {
-            self::conflict('not_previewed', 'Seul un import prévisualisé, et par son auteur, se confirme.');
+            throw Refusal::of('not_previewed');
         }
         return ['batch' => $this->summary($batchId), 'job' => $this->tasks->start('imports.run', 'run-'.$batchId, ['batch' => $batchId])];
     }
@@ -113,7 +113,7 @@ final class Imports
     public function undo(string $batchId): array
     {
         $batch = DB::selectOne('SELECT kind, status FROM school.import_batch WHERE id = ? FOR UPDATE', [$batchId]) ?? abort(404);
-        if ($batch->status !== 'imported') self::conflict('not_imported', 'Seul un import terminé s’annule.');
+        if ($batch->status !== 'imported') throw Refusal::of('not_imported');
         $importer = $this->importer($batch->kind);
         $rows = DB::select("SELECT id, line, outcome, target_id, previous, data FROM school.import_row
             WHERE batch_id = ? AND outcome IN ('created', 'updated') ORDER BY line DESC", [$batchId]);
@@ -195,7 +195,7 @@ final class Imports
         $data = $validator->validated();
         $result['key'] = $importer->key($data);
         if ($seen !== null) {
-            if (isset($seen[$result['key']])) return [...$result, 'error' => ['duplicate_in_file', 'Même référence qu’à la ligne '.$seen[$result['key']].'.']];
+            if (isset($seen[$result['key']])) return [...$result, 'error' => ['duplicate_in_file', __('errors.duplicate_in_file', ['line' => $seen[$result['key']]])]];
             $seen[$result['key']] = $row['line'];
         }
         try {
@@ -207,11 +207,6 @@ final class Imports
             $result['error'] = [$refusal[1], $refusal[2]];
         }
         return $result;
-    }
-
-    private static function conflict(string $code, string $message): never
-    {
-        throw new Refusal($code, $message);
     }
 
     private function requiredColumns(Importer $importer): array

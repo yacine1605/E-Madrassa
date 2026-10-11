@@ -81,8 +81,7 @@ final class ImportController
             return ['data' => $this->imports->undo($batch)];
         } catch (DependentOperation $e) {
             // Rendered by the handler: the rows already undone are rolled back with the rest.
-            throw new Refusal('dependent_operation', 'Ligne '.$e->importLine.' : '.$e->getMessage().' L’import n’a pas été annulé.', 409,
-                ['line' => $e->importLine]);
+            throw Refusal::of('dependent_operation', 409, ['line' => $e->importLine, 'reason' => $e->getMessage()], ['line' => $e->importLine], 'import_line');
         }
     }
 

@@ -25,7 +25,7 @@ final class Files
     public function upload(UploadedFile $upload, string $category, ?string $ownerType = null, ?string $ownerId = null): object
     {
         $type = FileType::detect($upload->getRealPath(), $upload->getClientOriginalName())
-            ?? throw ValidationException::withMessages(['file' => 'Ce fichier n’est pas d’un type accepté, ou son contenu ne correspond pas à son extension.']);
+            ?? throw ValidationException::withMessages(['file' => __('errors.file_unrecognized')]);
         $stream = fopen($upload->getRealPath(), 'rb');
         try {
             return $this->register($category, $upload->getClientOriginalName(), $type, $upload->getSize(), hash_file('sha256', $upload->getRealPath()), $stream,

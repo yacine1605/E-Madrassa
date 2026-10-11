@@ -22,10 +22,15 @@ final class AccountController
 
     public function index(Request $request)
     {
-        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])]]);
+        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])], 'q' => 'nullable|string|max:100']);
         $sql = Accounts::SELECT.' WHERE m.tenant_id = ?';
         $bindings = [$this->school->id()];
         if (isset($data['status'])) { $sql .= ' AND m.status = ?'; $bindings[] = $data['status']; }
+        // FR-I18-01 AC2: « احمد » finds « أحمد », « helene » finds « Hélène », by name, email or username.
+        if (isset($data['q'])) {
+            $sql .= " AND position(coalesce(school.search_key(?), '') IN coalesce(school.search_key(concat_ws(' ', u.name, u.email, m.username)), '')) > 0";
+            $bindings[] = $data['q'];
+        }
         return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id', $bindings)];
     }
 
@@ -45,7 +50,7 @@ final class AccountController
             'roles.*.scope_ids.*' => 'uuid',
         ]);
         if ($data['method'] === 'link' && empty($data['email'])) {
-            throw ValidationException::withMessages(['email' => 'Un lien d’activation s’envoie à une adresse e-mail.']);
+            throw ValidationException::withMessages(['email' => __('errors.activation_needs_email')]);
         }
         $provisional = $data['method'] === 'password' ? $this->accounts->provisional() : null;
         $created = $this->accounts->create($data, $provisional);
@@ -117,7 +122,7 @@ final class AccountController
             $job = $tasks->start('accounts.import', $data['idempotency_key'], ['rows' => $rows, 'invite' => $request->boolean('invite')]);
             return response()->json(['data' => $job], 202);
         }
-        if (count($rows) > 1000) throw ValidationException::withMessages(['rows' => 'Au-delà de 1 000 lignes, importez en tâche de fond.']);
+        if (count($rows) > 1000) throw ValidationException::withMessages(['rows' => __('errors.rows_too_many')]);
         return $this->accounts->import($rows, $request->boolean('invite'));
     }
 

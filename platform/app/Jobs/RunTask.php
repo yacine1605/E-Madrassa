@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Exceptions\SchoolAccessRevoked;
 use App\Support\DatabaseErrors;
+use App\Support\Locales;
 use App\Tasks\Task;
 use App\Tasks\TaskCancelled;
 use App\Tasks\TaskContext;
@@ -35,6 +36,8 @@ final class RunTask implements ShouldQueue
             return;
         }
         if (!$job) return;
+        // Messages and documents in the language of the person who started the job (FR-I18-01).
+        Locales::apply(Locales::usable($job->locale));
         try {
             /** @var Task $task */
             $task = app(config('platform.tasks')[$job->kind]);
@@ -42,7 +45,7 @@ final class RunTask implements ShouldQueue
         } catch (TaskCancelled) {
             $context->cancelled();
         } catch (SchoolAccessRevoked) {
-            $context->fail('school_access_revoked', 'Votre accès à cet établissement a été retiré : la tâche s’est arrêtée.');
+            $context->fail('school_access_revoked', __('errors.school_access_revoked'));
         } catch (QueryException $e) {
             $refusal = DatabaseErrors::classify($e);
             $refusal ? $context->fail($refusal[1], $refusal[2]) : $this->transient($context, $e);
@@ -55,10 +58,10 @@ final class RunTask implements ShouldQueue
     {
         report($e);
         if ($this->attempts() < $this->tries) {
-            $context->requeue('Erreur passagère : nouvel essai en cours.');
+            $context->requeue(__('errors.transient_error'));
             $this->release($this->backoff[min($this->attempts(), count($this->backoff)) - 1] ?? 60);
             return;
         }
-        $context->fail('technical_error', 'Erreur technique : la tâche a échoué. Relancez-la plus tard ; si cela se répète, prévenez le support.');
+        $context->fail('technical_error', __('errors.technical_error'));
     }
 }

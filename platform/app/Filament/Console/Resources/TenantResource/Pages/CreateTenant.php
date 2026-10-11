@@ -24,12 +24,11 @@ final class CreateTenant extends CreateRecord
             $created = app(Console::class)->createSchool($data);
         } catch (QueryException $e) {
             $refusal = DatabaseErrors::classify($e) ?? throw $e;
-            Notification::make()->title($refusal[1] === 'duplicate' ? 'Cet identifiant court est déjà pris.' : $refusal[2])->danger()->send();
+            Notification::make()->title($refusal[1] === 'duplicate' ? __('errors.slug_taken') : $refusal[2])->danger()->send();
             throw new Halt();
         }
         if ($created['delivery'] === 'failed') {
-            Notification::make()->title('Établissement créé, mais l’invitation n’a pas pu partir : transmettez ce lien de façon sûre, valable 72 heures.')
-                ->body($created['activation_url'])->warning()->persistent()->send();
+            Notification::make()->title(__('console.tenant.created_not_sent'))->body($created['activation_url'])->warning()->persistent()->send();
         }
         return Tenant::query()->findOrFail($created['tenant']);
     }

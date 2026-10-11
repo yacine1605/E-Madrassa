@@ -13,6 +13,7 @@ use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
@@ -50,6 +51,7 @@ Route::prefix('api')->group(function () {
         Route::put('account/password', [CredentialController::class, 'password'])->name('account.password');
         Route::post('account/mfa', [CredentialController::class, 'startMfa']);
         Route::post('account/mfa/confirm', [CredentialController::class, 'confirmMfa']);
+        Route::put('account/locale', [PreferenceController::class, 'locale']);
 
         // FR-PLT-04: an operator works in a school that consented, read-only.
         Route::post('support/session', [SupportSessionController::class, 'open']);

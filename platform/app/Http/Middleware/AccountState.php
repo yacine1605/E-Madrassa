@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\Refusal;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
@@ -27,12 +28,11 @@ final class AccountState
             $session->regenerateToken();
             // The API answers; a page of the console goes back to its sign-in.
             if (!$request->expectsJson()) return redirect()->guest(Filament::getCurrentPanel()?->getLoginUrl() ?? '/');
-            return response()->json(['message' => 'Votre session a expiré. Reconnectez-vous.', 'code' => 'session_expired'], 401);
+            return Refusal::response('session_expired', 401);
         }
         $session->put('auth.seen_at', $now);
         if ($request->user()->must_change_password && !$request->routeIs('account.password')) {
-            if (!$request->expectsJson()) abort(403, 'Choisissez un nouveau mot de passe avant de continuer.');
-            return response()->json(['message' => 'Choisissez un nouveau mot de passe avant de continuer.', 'code' => 'password_change_required'], 403);
+            return Refusal::response('password_change_required', 403);
         }
         return $next($request);
     }

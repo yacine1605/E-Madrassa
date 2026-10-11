@@ -69,8 +69,8 @@ final class SiteController
 
     private function labelRules(): array
     {
-        return ['labels' => 'required|array', 'labels.fr' => 'required|string|max:150',
-            'labels.ar' => 'nullable|string|max:150', 'labels.en' => 'nullable|string|max:150'];
+        return ['labels' => 'required|array', 'labels.fr' => 'required_without:labels.ar|nullable|string|max:150',
+            'labels.ar' => 'required_without:labels.fr|nullable|string|max:150', 'labels.en' => 'nullable|string|max:150'];
     }
 
     private function labels(array $data): array

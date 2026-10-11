@@ -1,0 +1,5 @@
+{
+    "The given data was invalid.": "Les données envoyées ne sont pas valides.",
+    "(and :count more error)": "(et :count autre erreur)",
+    "(and :count more errors)": "(et :count autres erreurs)"
+}

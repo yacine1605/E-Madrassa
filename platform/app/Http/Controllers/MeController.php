@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Locales;
 use App\Support\Permissions;
 use Illuminate\Http\Request;
 
@@ -11,6 +12,8 @@ final class MeController
     public function show(Request $request, Permissions $permissions)
     {
         $user = $request->user();
-        return ['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'permissions' => $permissions->all()]];
+        // FR-I18-01: the person's choice (none follows the school) and the language in use, with its direction.
+        return ['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'locale' => $user->locale,
+            'effective_locale' => app()->getLocale(), 'text_direction' => Locales::direction(), 'permissions' => $permissions->all()]];
     }
 }

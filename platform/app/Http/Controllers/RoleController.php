@@ -45,7 +45,7 @@ final class RoleController
         $permissions = $data['permissions'] ?? null;
         if (isset($data['copy_from'])) {
             $source = DB::selectOne('SELECT id, kind FROM school.role WHERE tenant_id = ? AND id = ?', [$this->school->id(), $data['copy_from']]);
-            if (!$source) throw ValidationException::withMessages(['copy_from' => 'Rôle inconnu dans cet établissement.']);
+            if (!$source) throw ValidationException::withMessages(['copy_from' => __('errors.role_unknown')]);
             $kind = $source->kind;
             $permissions ??= array_column(DB::select('SELECT rp.permission_code FROM school.role_permission rp
                 JOIN platform.permission p ON p.code = rp.permission_code
@@ -107,7 +107,7 @@ final class RoleController
     {
         $unknown = array_column(DB::select('SELECT value FROM json_array_elements_text(?::json)
             WHERE value NOT IN (SELECT code FROM platform.permission)', [json_encode(array_values($permissions), JSON_THROW_ON_ERROR)]), 'value');
-        if ($unknown) throw ValidationException::withMessages(['permissions' => 'Permissions inconnues : '.implode(', ', $unknown).'.']);
+        if ($unknown) throw ValidationException::withMessages(['permissions' => __('errors.permissions_unknown', ['codes' => implode(', ', $unknown)])]);
     }
 
     private function labelRules(): array

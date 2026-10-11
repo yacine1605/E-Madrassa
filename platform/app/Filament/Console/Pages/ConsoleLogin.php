@@ -19,7 +19,7 @@ final class ConsoleLogin extends Login
         $login = (string) ($this->data['email'] ?? '');
         $throttle = app(LoginThrottle::class);
         if ($throttle->wait($login, (string) request()->ip())) {
-            Notification::make()->title('Trop de tentatives. Réessayez dans quelques minutes.')->danger()->send();
+            Notification::make()->title(__('errors.too_many_attempts'))->danger()->send();
             return null;
         }
         try {

@@ -34,17 +34,22 @@ final class Pdf
         $mpdf->SetCreator('Madrassa');
         $mpdf->SetSubject($reference);
         $mpdf->SetHTMLHeader(view('pdf.header', ['identity' => $identity, 'rtl' => $rtl])->render());
-        $mpdf->SetHTMLFooter(view('pdf.footer', ['reference' => $reference, 'generated' => $generated, 'locale' => $locale, 'rtl' => $rtl])->render());
-        $mpdf->WriteHTML(view('pdf.'.$view, [...$data, 'locale' => $locale, 'rtl' => $rtl, 'title' => $title, 'reference' => $reference])->render());
+        $digits = $identity['arabic_digits'];
+        $mpdf->SetHTMLFooter(view('pdf.footer', ['reference' => $reference, 'generated' => Formats::dateTime($generated, $locale, $digits),
+            'locale' => $locale, 'rtl' => $rtl])->render());
+        $mpdf->WriteHTML(view('pdf.'.$view, [...$data, 'locale' => $locale, 'rtl' => $rtl, 'title' => $title, 'reference' => $reference,
+            'arabicDigits' => $digits])->render());
         return $mpdf->Output('', 'S');
     }
 
-    /** @return array{name: string, address: string, phone: string, email: string} */
+    /** @return array{name: string, address: string, phone: string, email: string, arabic_digits: bool} */
     private function identity(): array
     {
         $row = DB::selectOne("SELECT t.name, school.setting_value('identity.address') #>> '{}' AS address,
-            school.setting_value('identity.phone') #>> '{}' AS phone, school.setting_value('identity.email') #>> '{}' AS email
+            school.setting_value('identity.phone') #>> '{}' AS phone, school.setting_value('identity.email') #>> '{}' AS email,
+            (school.setting_value('locale.arabic_digits'))::boolean AS arabic_digits
             FROM platform.tenant t WHERE t.id = ?", [$this->school->id()]);
-        return ['name' => $row->name, 'address' => (string) $row->address, 'phone' => (string) $row->phone, 'email' => (string) $row->email];
+        return ['name' => $row->name, 'address' => (string) $row->address, 'phone' => (string) $row->phone, 'email' => (string) $row->email,
+            'arabic_digits' => (bool) $row->arabic_digits];
     }
 }

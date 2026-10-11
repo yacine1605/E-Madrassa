@@ -29,7 +29,7 @@ final class ReferentialImporter implements Importer
     {
         $tenant = $this->school->id();
         $kind = DB::selectOne('SELECT parent_code FROM school.node_type WHERE tenant_id = ? AND code = ?', [$tenant, $row['type']])
-            ?? throw new RowRefused('reference_unknown', 'Type inconnu dans le référentiel : '.$row['type'].'.');
+            ?? throw new RowRefused('reference_unknown', __('errors.type_unknown', ['code' => $row['type']]));
         $current = DB::selectOne('SELECT id, labels, sort_order FROM school.ref_node WHERE tenant_id = ? AND type_code = ? AND code = ?', [$tenant, $row['type'], $row['code']]);
         // A column the file leaves out keeps the current value; an empty cell clears a label.
         $labels = $this->labels($row, $current ? json_decode($current->labels, true) : []);
@@ -42,10 +42,10 @@ final class ReferentialImporter implements Importer
         }
         $parent = null;
         if ($kind->parent_code !== null) {
-            if (empty($row['parent_code'])) throw new RowRefused('reference_missing', 'Le parent est obligatoire pour ce type.');
+            if (empty($row['parent_code'])) throw new RowRefused('reference_missing', __('errors.parent_missing'));
             $parent = DB::selectOne('SELECT id FROM school.ref_node WHERE tenant_id = ? AND type_code = ? AND code = ? AND archived_at IS NULL',
                 [$tenant, $kind->parent_code, $row['parent_code']])?->id
-                ?? throw new RowRefused('reference_unknown', 'Parent inconnu dans le référentiel : '.$row['parent_code'].'.');
+                ?? throw new RowRefused('reference_unknown', __('errors.parent_unknown', ['code' => $row['parent_code']]));
         }
         $id = DB::selectOne('INSERT INTO school.ref_node (tenant_id, type_code, parent_id, code, labels, sort_order) VALUES (?, ?, ?, ?, ?::jsonb, ?) RETURNING id',
             [$tenant, $row['type'], $parent, $row['code'], json_encode($labels), $sort])->id;
@@ -57,13 +57,13 @@ final class ReferentialImporter implements Importer
         $tenant = $this->school->id();
         $current = DB::selectOne('SELECT labels, archived_at, (SELECT count(*) FROM school.ref_node c WHERE c.tenant_id = n.tenant_id AND c.parent_id = n.id AND c.archived_at IS NULL) AS children
             FROM school.ref_node n WHERE tenant_id = ? AND id = ?', [$tenant, $targetId]);
-        if (!$current || $current->archived_at !== null) throw new DependentOperation(0, 'Cet élément a changé depuis l’import.');
+        if (!$current || $current->archived_at !== null) throw new DependentOperation(0, __('errors.node_changed'));
         if ($outcome === 'created') {
-            if ($current->children > 0) throw new DependentOperation(0, 'Des éléments ont été ajoutés sous cet élément depuis l’import.');
+            if ($current->children > 0) throw new DependentOperation(0, __('errors.node_grown'));
             DB::update('UPDATE school.ref_node SET archived_at = now() WHERE tenant_id = ? AND id = ?', [$tenant, $targetId]);
             return;
         }
-        if (json_decode($current->labels, true) != $this->labels($row, $previous['labels'])) throw new DependentOperation(0, 'Cet élément a été renommé depuis l’import.');
+        if (json_decode($current->labels, true) != $this->labels($row, $previous['labels'])) throw new DependentOperation(0, __('errors.node_renamed'));
         DB::update('UPDATE school.ref_node SET labels = ?::jsonb, sort_order = ? WHERE tenant_id = ? AND id = ?',
             [json_encode($previous['labels']), $previous['sort_order'], $tenant, $targetId]);
     }

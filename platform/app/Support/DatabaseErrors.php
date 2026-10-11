@@ -11,66 +11,22 @@ use Illuminate\Http\JsonResponse;
  */
 final class DatabaseErrors
 {
-    /** Rules raised by the schema's triggers, with the message shown to the user. */
+    /** Rules raised by the schema's triggers; each one's message is in the catalog `errors`, in the reader's language. */
     private const RULES = [
-        'stale_version' => 'Cet enregistrement a été modifié par quelqu’un d’autre. Rechargez-le puis recommencez.',
-        'last_site' => 'Un établissement garde au moins un site en service.',
-        'code_immutable' => 'Un code est définitif : il ne peut pas être modifié.',
-        'identity_immutable' => 'Cet enregistrement ne peut pas changer d’identité.',
-        'immutable_record' => 'Cet enregistrement est définitif.',
-        'last_admin' => 'L’établissement doit garder au moins un administrateur actif qui gère les rôles.',
-        'self_assignment' => 'Vous ne pouvez pas modifier vos propres rôles : un autre administrateur doit le faire.',
-        'self_elevation' => 'Vous ne pouvez pas modifier un rôle que vous détenez : un autre administrateur doit le faire.',
-        'role_in_use' => 'Ce rôle est encore assigné : terminez d’abord ses assignations.',
-        'role_archived' => 'Ce rôle est archivé : il ne peut plus être assigné.',
-        'scope_personal_required' => 'Un rôle élève ou parent porte uniquement sur les données de la personne.',
-        'scope_unknown' => 'La portée désigne un élément qui n’existe pas dans cet établissement.',
-        'permission_module_disabled' => 'Cette permission appartient à un module non activé pour cet établissement.',
-        'segregation_of_duties' => 'Séparation des tâches : la personne qui a saisi une opération ne peut pas la valider elle-même.',
-        'token_invalid' => 'Ce lien n’est plus valable : demandez-en un nouveau.',
-        'password_already_set' => 'Vous avez déjà un mot de passe : connectez-vous avec lui pour accepter l’invitation.',
-        'password_required' => 'Choisissez un mot de passe.',
-        'account_shared' => 'Cette personne a aussi un compte dans un autre établissement : son nom, son e-mail et son mot de passe ne peuvent être changés que par elle.',
-        'account_unknown' => 'Ce compte n’existe pas dans cet établissement.',
-        'email_required' => 'Un rôle privilégié demande une adresse e-mail.',
-        'self_account' => 'Vous ne pouvez pas faire cette opération sur votre propre compte.',
-        'reason_required' => 'Indiquez un motif.',
-        'activation_required' => 'Ce compte n’est pas encore activé : renvoyez-lui l’invitation.',
-        'not_invited' => 'Ce compte n’attend pas d’activation.',
-        'login_required' => 'Un compte a besoin d’une adresse e-mail ou d’un identifiant.',
-        'name_required' => 'Indiquez le nom de la personne.',
-        'membership_revoked' => 'Ce compte est révoqué définitivement.',
-        'status_invalid' => 'État de compte inconnu.',
-        'setting_invalid' => 'Cette valeur n’est pas permise pour ce paramètre.',
-        'type_required' => 'Ce type du référentiel est obligatoire : il reste actif.',
-        'type_in_use' => 'Ce type a encore des éléments actifs : archivez-les d’abord.',
-        'type_inactive' => 'Ce type du référentiel est désactivé.',
-        'parent_invalid' => 'Le parent choisi n’est pas du type attendu, ou il est archivé.',
-        'node_has_children' => 'Cet élément a encore des éléments actifs en dessous : archivez-les d’abord.',
-        'subject_in_use' => 'Cette matière est utilisée : archivez-la plutôt.',
-        'year_closed' => 'Cette année est clôturée : elle ne change plus.',
-        'period_outside_year' => 'La période doit rester dans les dates de son année.',
-        'options_invalid' => 'Chaque valeur de la liste a un code (A-Z, 0-9, _) unique et un libellé.',
-        'option_removed' => 'Une valeur de la liste ne se retire pas : des fiches peuvent l’utiliser.',
-        'custom_field_limit' => 'Vingt champs personnalisés actifs au plus par type de fiche.',
-        'custom_value_invalid' => 'Valeur invalide pour un champ personnalisé.',
-        'custom_value_required' => 'Un champ personnalisé obligatoire est vide.',
-        'custom_field_unknown' => 'Champ personnalisé inconnu.',
-        'profile_unknown' => 'Profil inconnu ou non publié.',
-        'profile_mismatch' => 'Cet établissement suit un autre profil.',
-        'profile_published' => 'Une version publiée d’un profil ne change plus.',
-        'job_finished' => 'Cette tâche est terminée : elle ne change plus.',
-        'not_failed' => 'Seul un envoi en échec se relance.',
-        'tenant_required' => 'Aucun établissement choisi.',
-        'file_type_refused' => 'Ce type de fichier n’est pas accepté ici.',
-        'file_too_large' => 'Ce fichier dépasse la taille permise par l’établissement.',
-        'dependent_operation' => 'Une opération saisie depuis dépend de cet enregistrement.',
-        'storage_quota_exceeded' => 'L’espace de stockage de l’établissement est plein : archivez des fichiers ou augmentez l’abonnement.',
+        'stale_version', 'last_site', 'code_immutable', 'identity_immutable', 'immutable_record', 'last_admin', 'self_assignment',
+        'self_elevation', 'role_in_use', 'role_archived', 'scope_personal_required', 'scope_unknown', 'permission_module_disabled',
+        'segregation_of_duties', 'token_invalid', 'password_already_set', 'password_required', 'account_shared', 'account_unknown',
+        'email_required', 'self_account', 'reason_required', 'activation_required', 'not_invited', 'login_required', 'name_required',
+        'membership_revoked', 'status_invalid', 'setting_invalid', 'type_required', 'type_in_use', 'type_inactive', 'parent_invalid',
+        'node_has_children', 'subject_in_use', 'year_closed', 'period_outside_year', 'options_invalid', 'option_removed',
+        'custom_field_limit', 'custom_value_invalid', 'custom_value_required', 'custom_field_unknown', 'profile_unknown',
+        'profile_mismatch', 'profile_published', 'job_finished', 'not_failed', 'tenant_required', 'file_type_refused', 'file_too_large',
+        'dependent_operation', 'storage_quota_exceeded',
     ];
 
     public static function message(string $rule): string
     {
-        return self::RULES[$rule];
+        return __('errors.'.$rule);
     }
 
     public static function response(QueryException $e): ?JsonResponse
@@ -86,29 +42,29 @@ final class DatabaseErrors
         $detail = $e->errorInfo[2] ?? '';
         // A support session writes nothing: the database's guard, or the read-only transaction itself.
         if ($state === '25006' && (str_contains($detail, 'support_read_only') || str_contains($detail, 'read-only transaction'))) {
-            return [403, 'support_read_only', 'Accès support : lecture seule.'];
+            return [403, 'support_read_only', __('errors.support_read_only')];
         }
-        if ($state === '25006') return [403, 'tenant_read_only', 'Cet établissement est en lecture seule : son abonnement a expiré ou il est archivé.'];
+        if ($state === '25006') return [403, 'tenant_read_only', __('errors.tenant_read_only')];
         if ($state === '23514') {
-            foreach (self::RULES as $rule => $message) {
-                if (preg_match('/ERROR:\s+'.preg_quote($rule, '/').'\b/', $detail)) return [409, $rule, $message];
+            foreach (self::RULES as $rule) {
+                if (preg_match('/ERROR:\s+'.preg_quote($rule, '/').'\b/', $detail)) return [409, $rule, __('errors.'.$rule)];
             }
-            return [409, 'domain_conflict', 'Opération incompatible avec l’état actuel des données.'];
+            return [409, 'domain_conflict', __('errors.domain_conflict')];
         }
         if ($state === '23505' && preg_match('/ERROR:\s+account_exists\b/', $detail)) {
-            return [409, 'account_exists', 'Cette adresse e-mail a déjà un compte dans cet établissement.'];
+            return [409, 'account_exists', __('errors.account_exists')];
         }
-        if ($state === '23505') return [409, 'duplicate', 'Cette valeur est déjà utilisée.'];
-        if ($state === '23P01') return [409, 'overlap', 'Ces dates chevauchent celles d’un autre enregistrement.'];
+        if ($state === '23505') return [409, 'duplicate', __('errors.duplicate')];
+        if ($state === '23P01') return [409, 'overlap', __('errors.overlap')];
         if (in_array($state, ['23503', '55P03', '40001', '40P01'], true)) {
-            return [409, 'domain_conflict', 'Opération incompatible avec l’état actuel des données. Rechargez puis recommencez.'];
+            return [409, 'domain_conflict', __('errors.domain_conflict_retry')];
         }
         // A trigger found the permission missing; or the restricted role lacks the privilege, or
         // RLS refused the row: a refusal, not a fault.
         if ($state === '42501' && preg_match('/ERROR:\s+permission_denied\b/', $detail)) {
-            return [403, 'permission_denied', 'Vous n’avez pas la permission nécessaire.'];
+            return [403, 'permission_denied', __('errors.permission_denied')];
         }
-        if ($state === '42501') return [403, 'forbidden', 'Cette opération n’est pas autorisée.'];
+        if ($state === '42501') return [403, 'forbidden', __('errors.forbidden')];
         return null;
     }
 }

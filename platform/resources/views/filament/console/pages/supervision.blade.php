@@ -1,36 +1,33 @@
 <x-filament-panels::page>
     <x-filament::section>
-        <x-slot name="heading">{{ count($schools) }} établissement(s)</x-slot>
-        <x-slot name="description">Comptages agrégés : aucune donnée d’établissement n’apparaît ici.</x-slot>
+        <x-slot name="heading">{{ __('console.supervision.count', ['count' => count($schools)]) }}</x-slot>
+        <x-slot name="description">{{ __('console.supervision.description') }}</x-slot>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-start">
                 <thead>
                     <tr class="border-b">
-                        <th class="p-2 text-start">Établissement</th>
-                        <th class="p-2 text-start">État</th>
-                        <th class="p-2 text-start">Plan</th>
-                        <th class="p-2 text-end">Modules</th>
-                        <th class="p-2 text-end">Comptes actifs</th>
-                        <th class="p-2 text-end">Stockage</th>
-                        <th class="p-2 text-end">Tâches en cours</th>
-                        <th class="p-2 text-end">Tâches en échec (7 j)</th>
-                        <th class="p-2 text-end">E-mails en échec</th>
-                        <th class="p-2 text-start">Dernière modification</th>
+                        @foreach (['school', 'status', 'plan'] as $column)
+                            <th class="p-2 text-start">{{ __('console.supervision.columns.'.$column) }}</th>
+                        @endforeach
+                        @foreach (['modules', 'members', 'storage', 'jobs_active', 'jobs_failed', 'emails_failed'] as $column)
+                            <th class="p-2 text-end">{{ __('console.supervision.columns.'.$column) }}</th>
+                        @endforeach
+                        <th class="p-2 text-start">{{ __('console.supervision.columns.last_activity') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($schools as $school)
                         <tr class="border-b">
                             <td class="p-2">{{ $school->name }} <span class="text-gray-500">({{ $school->slug }})</span></td>
-                            <td class="p-2">{{ ['active' => 'actif', 'read_only' => 'lecture seule', 'suspended' => 'suspendu', 'archived' => 'archivé'][$school->mode] ?? $school->mode }}</td>
-                            <td class="p-2">{{ $school->plan }}@if ($school->valid_until) · {{ \Illuminate\Support\Carbon::parse($school->valid_until)->format('d/m/Y') }}@endif</td>
-                            <td class="p-2 text-end">{{ $school->modules }}</td>
-                            <td class="p-2 text-end">{{ $school->members }}</td>
-                            <td class="p-2 text-end">{{ number_format($school->storage_used / 1048576, 1, ',', ' ') }} / {{ number_format($school->storage_quota / 1048576, 0, ',', ' ') }} Mo</td>
-                            <td class="p-2 text-end">{{ $school->jobs_active }}</td>
-                            <td class="p-2 text-end">{{ $school->jobs_failed }}</td>
-                            <td class="p-2 text-end">{{ $school->emails_failed }}</td>
-                            <td class="p-2">{{ $school->last_activity ? \Illuminate\Support\Carbon::parse($school->last_activity)->timezone('Africa/Algiers')->format('d/m/Y H:i') : '—' }}</td>
+                            <td class="p-2">{{ __('console.tenant.status.'.$school->mode) }}</td>
+                            <td class="p-2">{{ $school->plan }}@if ($school->valid_until) · {{ \App\Support\Formats::date($school->valid_until) }}@endif</td>
+                            <td class="p-2 text-end">{{ \App\Support\Formats::number($school->modules) }}</td>
+                            <td class="p-2 text-end">{{ \App\Support\Formats::number($school->members) }}</td>
+                            <td class="p-2 text-end">{{ __('formats.megabytes', ['value' => \App\Support\Formats::number($school->storage_used / 1048576, 1).' / '.\App\Support\Formats::number($school->storage_quota / 1048576)]) }}</td>
+                            <td class="p-2 text-end">{{ \App\Support\Formats::number($school->jobs_active) }}</td>
+                            <td class="p-2 text-end">{{ \App\Support\Formats::number($school->jobs_failed) }}</td>
+                            <td class="p-2 text-end">{{ \App\Support\Formats::number($school->emails_failed) }}</td>
+                            <td class="p-2">{{ $school->last_activity ? \App\Support\Formats::dateTime($school->last_activity) : '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
