@@ -166,7 +166,11 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 | FR-IAM-05 | Assigning a sensitive permission (by role or by adding it to an assigned role) notifies the holders of `audit.log.read` for the whole school, the author aside |
 | NFR-SEC-06 | The recovery link is queued, encrypted in the queue, and the answer comes at once whether the address is known or not |
 
-Left for the second part of W1.6: files (FR-FIC-01), the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02), PDF (FR-PDF-01). Security alerts (NFR-SEC-07) come with the console's supervision (FR-PLT-05).
+Left for the second part of W1.6: files (FR-FIC-01), the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02).
+
+### PDF (FR-PDF-01, TST-17)
+
+`App\Support\Pdf` renders a view of `resources/views/pdf` with mPDF: DejaVu Sans and XB Riyaz embedded, Arabic letters joined and laid out right to left, the school's name and receipt contacts in the header, the reference and generation time fixed by the caller in the footer with the page numbers. `App\Support\Money` writes amounts from whole centimes with no-break spaces between digit groups, so that an Arabic line never shows "500,50 12". Tests read the documents back with poppler (`pdftotext`, `pdffonts`); the PHP `gd` extension is required by mPDF. A receipt and a list template are ready for finance (lot 3) and exports. Security alerts (NFR-SEC-07) come with the console's supervision (FR-PLT-05).
 
 ## Next increments of lot 1
 

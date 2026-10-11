@@ -94,8 +94,10 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: intl, mbstring, pdo_pgsql
+          extensions: intl, mbstring, pdo_pgsql, gd
           tools: composer
+      # pdftotext and pdffonts read the generated PDFs back (FR-PDF-01, TST-17).
+      - run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
       - run: composer install --prefer-dist --no-interaction --no-progress
       - name: Integration tests under the restricted database roles
         run: |
