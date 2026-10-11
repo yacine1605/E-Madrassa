@@ -1,8 +1,11 @@
 #!/bin/sh
 # Browser acceptance (tests/browser/acceptance.mjs) on a disposable installation: a school with
 # its administrator, a console operator, both with MFA; every screen in French and Arabic, on a
-# desktop and a phone. Screenshots and report in .acceptance/. Removes its project afterwards.
-# Usage: sh deploy/acceptance-test.sh   (BROWSER_CHANNEL=msedge to use an installed Edge)
+# desktop and a phone, in each browser of BROWSERS. Screenshots and report in .acceptance/.
+# Removes its project afterwards.
+# Usage: sh deploy/acceptance-test.sh
+#   BROWSERS=chromium,firefox,webkit   the browsers, chromium by default
+#   BROWSER_CHANNEL=msedge             an installed Edge or Chrome instead of Playwright's Chromium
 set -eu
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1
@@ -29,7 +32,12 @@ compose run --rm -T migrate php artisan platform:create-school acceptance-a "Éc
 compose run --rm -T migrate php artisan platform:membership acceptance-a direction@acceptance.test >/dev/null
 
 [ -d tests/browser/node_modules/playwright ] || npm ci --prefix tests/browser --no-audit --no-fund >/dev/null
-[ -n "${BROWSER_CHANNEL:-}" ] || (cd tests/browser && npx playwright install chromium >/dev/null)
+export BROWSERS="${BROWSERS:-chromium}"
+for browser in $(printf '%s' "$BROWSERS" | tr ',' ' '); do
+    [ "$browser" = chromium ] && [ -n "${BROWSER_CHANNEL:-}" ] && continue
+    # Playwright's own command, not npx: Windows's command shim breaks on a path with `&`.
+    node tests/browser/node_modules/playwright/cli.js install "$browser" >/dev/null
+done
 BASE_URL="https://localhost:$port" SHOTS=.acceptance \
 ACCEPTANCE_ACCOUNTS="{\"admin\":{\"email\":\"direction@acceptance.test\",\"password\":\"$password\",\"secret\":\"$admin_secret\"},\"operator\":{\"email\":\"operator@acceptance.test\",\"password\":\"$password\",\"secret\":\"$operator_secret\"}}" \
     node tests/browser/acceptance.mjs

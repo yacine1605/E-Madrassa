@@ -1,21 +1,25 @@
 #!/bin/sh
 # Deploys the platform in a disposable Compose project and checks it end to end: HTTPS and HSTS
 # through the proxy, the restricted roles at work, the owner's password absent from the running
-# services, files in the bundled storage, the scheduler, a school created and signed in to.
+# services, the data services out of the proxy's reach and Redis behind its password, files in
+# the bundled storage, the scheduler, a school created and signed in to.
 # Usage: sh deploy/smoke-test.sh   (removes its project and volumes afterwards)
 set -eu
 cd "$(dirname "$0")/.."
 # Git Bash on Windows would rewrite container paths such as /backups; no effect elsewhere.
 export MSYS_NO_PATHCONV=1
 project=madrassa-smoke
-env_file=$(mktemp)
-rm -f "$env_file"
+# Its files in the project's folder: Docker and curl on Windows would not find a POSIX path.
+work=.smoke
+env_file=$work/env
+jar=$work/cookies
+rm -rf "$work"
+mkdir -p "$work"
 port=18443
 DEPLOY_ENV="$env_file" sh deploy/new-env.sh "https://localhost:$port" >/dev/null
 sed -i -e "s#^COMPOSE_PROJECT_NAME=.*#COMPOSE_PROJECT_NAME=$project#" -e 's#^HTTP_PORT=.*#HTTP_PORT=18080#' -e "s#^HTTPS_PORT=.*#HTTPS_PORT=$port#" "$env_file"
 compose() { docker compose -p "$project" --env-file "$env_file" "$@"; }
-cleanup() { compose down -v --remove-orphans >/dev/null 2>&1 || true; rm -f "$env_file" "$jar"; }
-jar=$(mktemp)
+cleanup() { compose down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }
 trap cleanup EXIT
 fail() { echo "FAIL: $*" >&2; compose logs --tail=40 >&2 || true; exit 1; }
 pass() { echo "PASS $*"; }
@@ -24,17 +28,24 @@ compose up -d --build --wait --wait-timeout 300 || fail "the deployment did not 
 pass "every service started; migrations, roles and storage applied by the one-shot service"
 
 base="https://localhost:$port"
-headers=$(curl -ksS -D - -o /dev/null "$base/school/login")
+headers=$(curl -ksS -D - -o "$work/login.html" "$base/school/login")
 echo "$headers" | grep -q "^HTTP/[0-9.]* 200" || fail "the sign-in page is not served"
 echo "$headers" | grep -qi "^strict-transport-security: max-age=31536000" || fail "no HSTS header"
 echo "$headers" | grep -qi "^x-content-type-options: nosniff" || fail "no nosniff header"
 pass "the sign-in page is served over HTTPS with HSTS (NFR-SEC-01)"
-curl -ksS "$base/school/login" | grep -q "Se connecter" || fail "the sign-in page is not the platform's"
+grep -q "Se connecter" "$work/login.html" || fail "the sign-in page is not the platform's"
 
 [ "$(compose exec -T app php artisan tinker --execute="echo DB::selectOne('select current_user u')->u;")" = school_runtime ] \
     || fail "requests do not run as school_runtime"
 compose exec -T app sh -c 'test -z "${DB_OWNER_PASSWORD:-}"' || fail "the owner's password reaches the application"
 pass "requests run as school_runtime; the owner's password stays with the migrate service"
+
+compose exec -T proxy nc -z -w 3 app 80 || fail "the proxy cannot reach the application"
+for service in postgres:5432 redis:6379 garage:3900; do
+    if compose exec -T proxy nc -z -w 3 "${service%:*}" "${service#*:}" >/dev/null 2>&1; then fail "the proxy reaches $service"; fi
+done
+compose exec -T redis env -u REDISCLI_AUTH redis-cli ping 2>&1 | grep -q NOAUTH || fail "Redis answers without its password"
+pass "the database, Redis and the storage are out of the proxy's reach; Redis asks for its password"
 
 [ "$(compose exec -T app php artisan tinker --execute="Storage::disk('files')->put('smoke/check.txt', 'ok'); echo Storage::disk('files')->get('smoke/check.txt');")" = ok ] \
     || fail "the files' storage does not answer"

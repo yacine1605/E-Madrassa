@@ -12,9 +12,11 @@ One Compose project per installation: the shared SaaS, or a school's dedicated i
 | `scheduler` | The email outbox every minute, the purge of expired files every day |
 | `migrate` | One-shot, on every start: migrations as the database owner, then `deploy/roles.sql` and the roles' passwords, then the files' bucket |
 | `postgres` | PostgreSQL 16 |
-| `redis` | Sessions, cache, job queue |
+| `redis` | Sessions, cache, job queue; behind its password (`REDIS_PASSWORD`) |
 | `garage` | S3-compatible storage for the schools' files (FR-FIC-01), on its own volume |
 | `backup` | With `--profile backup`: the daily encrypted backups, and restorations (below) |
+
+The database, Redis and the storage are on the internal `data` network: no way out to the internet, and no way in but from the application's services (`app`, `worker`, `scheduler`, `migrate`, `backup`). The proxy cannot reach them.
 
 The database owner's password reaches `migrate` only. Requests and jobs connect as `school_runtime` (row-level security), the console as `platform_admin` (no school data); neither owns a table nor bypasses row-level security. The application's encryption key is created on the first start and kept on the storage volume, with the data it protects.
 
@@ -59,11 +61,11 @@ git pull
 docker compose --env-file deploy.env up -d --build --wait
 ```
 
-`migrate` applies the new migrations and privileges before the application restarts. Every migration has its reverse (`php artisan migrate:rollback --database=owner`, in `migrate`).
+`migrate` applies the new migrations and privileges before the application restarts. When Compose answers `set REDIS_PASSWORD`, the `deploy.env` predates Redis's password: add one with `echo "REDIS_PASSWORD=$(openssl rand -hex 24)" >> deploy.env`, then update again. Every migration has its reverse (`php artisan migrate:rollback --database=owner`, in `migrate`).
 
 ## Checking an installation
 
-`sh deploy/smoke-test.sh` builds the image and deploys it in a disposable project on ports 18080 and 18443, then checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the files' storage, a school created, its administrator invited and signed in, the scheduler and the worker; it removes its project afterwards. CI runs it on every change.
+`sh deploy/smoke-test.sh` builds the image and deploys it in a disposable project on ports 18080 and 18443, then checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the data services out of the proxy's reach and Redis behind its password, the files' storage, a school created, its administrator invited and signed in, the scheduler and the worker; it removes its project afterwards. CI runs it on every change.
 
 ## Backups and restoration
 

@@ -364,7 +364,22 @@ The lot's walkthroughs run as tests, each step through the API or the screens a 
 
 The permissions' security review is in [SECURITY-REVIEW.md](SECURITY-REVIEW.md): the layers a request crosses, the access matrix of every route and screen (`php artisan platform:access-matrix`, which `PermissionCoverageTest` keeps equal to the review's copy), what the tests keep true for later lots, and the findings. One was fixed here: every function of the schemas was executable by everyone, so a school's application could call the publisher's functions; `deploy/roles.sql` now takes that back on every deployment, and the SQL suite checks it. CI also audits the PHP dependencies (`composer audit`).
 
+## Increment 24: Redis behind its password, and every browser
+
+Redis asks for a password (`REDIS_PASSWORD`, written by `deploy/new-env.sh`), and the database, Redis and the storage are on an internal network that only the application's services join: the proxy cannot reach them, and they cannot reach the internet (finding F5 of [SECURITY-REVIEW.md](SECURITY-REVIEW.md)). `deploy/smoke-test.sh` checks both. An existing `deploy.env` needs the new password (DEPLOY.md, Updates).
+
+Every screen is now checked in Chromium, Firefox and WebKit, Safari's engine (finding F6): `BROWSERS=chromium,firefox,webkit sh deploy/acceptance-test.sh`; CI runs the three side by side, each with its screenshots. All 324 screens pass, 108 in each browser.
+
+| Requirement | Evidence |
+|---|---|
+| NFR-COMP-01 | Chromium (Chrome in CI, Edge locally), Firefox and WebKit: every screen in French and Arabic, desktop and phone |
+| NFR-TEN-01 | The data services on an internal network, Redis behind its password, checked by the smoke test |
+
+The smoke and acceptance tests also run from Git Bash on Windows, in a folder whose name holds `&`: their files stay in the project's folder, and Playwright is called without `npx`.
+
+The screens' font, Inter, has no Arabic letters: Arabic is shown in the system's font, which differs between browsers (a serif in WebKit on Windows). Whether to ship an Arabic font is for the review of the Arabic labels.
+
 ## Next increments of lot 1
 
-1. **Remaining exit items**: Firefox and Safari; a native speaker's review of the Arabic labels; Redis's password (finding F5).
+1. **Last exit item**: a native speaker's review of the Arabic labels, on the acceptance screenshots (CI artifacts `platform-screens-*`), with the choice of an Arabic font.
 2. **Lot 2** opens with findings F2 to F4: the credentials of `public.users`, out of the school application's reach, and a Content Security Policy.

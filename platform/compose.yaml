@@ -1,6 +1,7 @@
 # The platform's deployment (DEPLOY.md): `docker compose --env-file deploy.env up -d --build`.
-# Only the TLS proxy faces the network. The database owner's password reaches the one-shot
-# `migrate` service only; requests, jobs and the schedule run as the restricted roles.
+# Only the TLS proxy faces the network. The database, Redis and the storage are on an internal
+# network that only the application's services join. The database owner's password reaches the
+# one-shot `migrate` service only; requests, jobs and the schedule run as the restricted roles.
 name: ${COMPOSE_PROJECT_NAME:-madrassa-platform}
 
 x-database: &database
@@ -35,6 +36,7 @@ x-application: &application
   QUEUE_CONNECTION: redis
   REDIS_CLIENT: phpredis
   REDIS_HOST: redis
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
   TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
   PLATFORM_FRONT_URL: ${APP_URL}/school
   PLATFORM_DEDICATED_SCHOOL: ${PLATFORM_DEDICATED_SCHOOL:-}
@@ -72,6 +74,7 @@ services:
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-}
     volumes:
       - app-storage:/var/www/html/storage
+    networks: [default, data]
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +87,7 @@ services:
     environment: *application
     volumes:
       - app-storage:/var/www/html/storage
+    networks: [default, data]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -104,6 +108,7 @@ services:
     environment: *application
     volumes:
       - app-storage:/var/www/html/storage
+    networks: [default, data]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -118,6 +123,7 @@ services:
     environment: *application
     volumes:
       - app-storage:/var/www/html/storage
+    networks: [default, data]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -178,6 +184,8 @@ services:
     volumes:
       - app-storage:/app-storage
       - ${BACKUP_DIR:-./backups}:/backups
+    # The outside too: the files may be at an S3 provider instead of the bundled Garage.
+    networks: [default, data]
     depends_on:
       postgres:
         condition: service_healthy
@@ -204,18 +212,23 @@ services:
       retries: 20
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks: [data]
     restart: unless-stopped
 
+  # Sessions, cache and queue, behind a password (SECURITY-REVIEW.md, F5).
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
     volumes:
       - redis-data:/data
+    networks: [data]
     restart: unless-stopped
 
   # S3-compatible storage for the schools' files, on its own volume (ARC-07).
@@ -227,12 +240,19 @@ services:
     volumes:
       - ./docker/garage.toml:/etc/garage.toml:ro
       - garage-data:/var/lib/garage
+    networks: [data]
     healthcheck:
       test: ["CMD", "/garage", "status"]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
+
+networks:
+  default:
+  # No way out to the internet, and no way in but from the services that join it.
+  data:
+    internal: true
 
 volumes:
   app-storage:

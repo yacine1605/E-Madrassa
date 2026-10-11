@@ -1,18 +1,26 @@
 // Browser acceptance of every screen (FR-I18-01 AC1, NFR-UX-02): in French and Arabic, on a desktop
 // and a phone, each page loads, runs right to left in Arabic, overflows nothing sideways, shows
 // no raw catalog key and raises no script error; a screenshot of each goes to SHOTS for a
-// person to look at. Run by deploy/acceptance-test.sh against a disposable installation.
-import { chromium } from 'playwright';
+// person to look at. In each browser of BROWSERS (chromium, firefox, webkit; chromium by default,
+// BROWSER_CHANNEL for an installed Chrome or Edge). Run by deploy/acceptance-test.sh against a
+// disposable installation.
+import { chromium, firefox, webkit } from 'playwright';
 import { createHmac } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const base = process.env.BASE_URL;
 const shots = process.env.SHOTS ?? '.acceptance';
 const accounts = JSON.parse(process.env.ACCEPTANCE_ACCOUNTS);
-const viewports = {
+const engines = { chromium, firefox, webkit };
+const browsers = (process.env.BROWSERS || 'chromium').split(',').map(name => name.trim()).filter(Boolean);
+for (const name of browsers) if (!engines[name]) throw new Error(`unknown browser ${name}: chromium, firefox or webkit`);
+// Firefox has no mobile mode: its phone is the same screen, touch and density, without it.
+const screens = name => ({
   desktop: { viewport: { width: 1280, height: 800 } },
-  phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
-};
+  phone: { viewport: { width: 390, height: 844 }, ...(name === 'firefox' ? {} : { isMobile: true }), hasTouch: true, deviceScaleFactor: 2 },
+});
+let viewports;
+let shotsOf;
 const schoolPages = ['home', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years',
   'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
@@ -24,13 +32,18 @@ const failures = [];
 const report = [];
 mkdirSync(shots, { recursive: true });
 
-function totp(secret) {
+// A code is accepted once: the same account signing in again, in the next browser, waits for the next one.
+const usedSteps = new Map();
+async function totp(secret) {
+  while (usedSteps.get(secret) === Math.floor(Date.now() / 30000)) await new Promise(resolve => setTimeout(resolve, 1000));
+  const step = Math.floor(Date.now() / 30000);
+  usedSteps.set(secret, step);
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
   for (const char of secret.replace(/=+$/, '')) bits += alphabet.indexOf(char).toString(2).padStart(5, '0');
   const key = Buffer.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
   const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  counter.writeBigUInt64BE(BigInt(step));
   const hash = createHmac('sha1', key).update(counter).digest();
   const offset = hash[hash.length - 1] & 15;
   return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
@@ -55,9 +68,9 @@ async function check(context, path, locale, name) {
   const key = state.text.match(rawKey);
   if (key) problems.push(`raw key "${key[0]}"`);
   if (errors.length) problems.push('script error: ' + errors[0]);
-  await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
-  report.push({ page: path, screen: name, problems });
-  if (problems.length) failures.push(`${name} (/${path}): ${problems.join('; ')}`);
+  await page.screenshot({ path: `${shotsOf}/${name}.png`, fullPage: true });
+  report.push({ browser: shotsOf.split('/').pop(), page: path, screen: name, problems });
+  if (problems.length) failures.push(`${shotsOf.split('/').pop()} ${name} (/${path}): ${problems.join('; ')}`);
   await page.close();
 }
 
@@ -83,8 +96,8 @@ async function signIn(browser, kind) {
     await signInSteps(page, kind, account);
   } catch (error) {
     // What the person would have seen, for the failure's report.
-    await page.screenshot({ path: `${shots}/sign-in-${kind}.png`, fullPage: true });
-    writeFileSync(`${shots}/sign-in-${kind}.txt`, `${page.url()}\n\n${await page.evaluate(() => document.body.innerText)}`);
+    await page.screenshot({ path: `${shotsOf}/sign-in-${kind}.png`, fullPage: true });
+    writeFileSync(`${shotsOf}/sign-in-${kind}.txt`, `${page.url()}\n\n${await page.evaluate(() => document.body.innerText)}`);
     throw error;
   }
   await page.close();
@@ -97,7 +110,7 @@ async function signInSteps(page, kind, account) {
     await page.getByLabel('E-mail ou identifiant').fill(account.email);
     await page.locator('input[type="password"]').fill(account.password);
     await page.getByRole('button', { name: 'Se connecter' }).click();
-    await page.locator('input[autocomplete="one-time-code"]').fill(totp(account.secret));
+    await page.locator('input[autocomplete="one-time-code"]').fill(await totp(account.secret));
     await page.getByRole('button', { name: 'Se connecter' }).click();
     await page.waitForURL('**/school/home');
   } else {
@@ -105,7 +118,7 @@ async function signInSteps(page, kind, account) {
     await page.locator('input[type="email"]').fill(account.email);
     await page.locator('input[type="password"]').fill(account.password);
     await page.locator('form button[type="submit"]').click();
-    await page.locator('input[autocomplete="one-time-code"]').fill(totp(account.secret));
+    await page.locator('input[autocomplete="one-time-code"]').fill(await totp(account.secret));
     // Filament sends the form by itself once the code is complete; otherwise, the button.
     const signedIn = url => !url.pathname.endsWith('/login');
     await page.waitForURL(signedIn, { timeout: 5000 }).catch(async () => {
@@ -115,8 +128,7 @@ async function signInSteps(page, kind, account) {
   }
 }
 
-const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, headless: true });
-try {
+async function run(browser) {
   const sessions = { admin: await signIn(browser, 'admin'), operator: await signIn(browser, 'operator') };
   for (const locale of ['fr', 'ar']) {
     for (const [kind, prefix, pages] of [['admin', 'school', schoolPages], ['operator', 'console', consolePages]]) {
@@ -136,11 +148,22 @@ try {
       await context.close();
     }
   }
-} finally {
-  await browser.close();
+}
+
+for (const name of browsers) {
+  viewports = screens(name);
+  shotsOf = `${shots}/${name}`;
+  mkdirSync(shotsOf, { recursive: true });
+  const browser = await engines[name].launch({ channel: name === 'chromium' ? process.env.BROWSER_CHANNEL || undefined : undefined, headless: true });
+  try {
+    await run(browser);
+  } finally {
+    await browser.close();
+  }
+  console.log(`${name}: ${report.filter(entry => entry.browser === name).length} screens checked.`);
 }
 writeFileSync(`${shots}/report.json`, JSON.stringify(report, null, 2));
-console.log(`${report.length} screens checked, ${failures.length} with problems; screenshots in ${shots}.`);
+console.log(`${report.length} screens checked in ${browsers.join(', ')}, ${failures.length} with problems; screenshots in ${shots}.`);
 if (failures.length) {
   for (const failure of failures) console.log('FAIL ' + failure);
   process.exit(1);

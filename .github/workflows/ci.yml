@@ -178,8 +178,12 @@ jobs:
         run: sh deploy/restore-test.sh
 
   platform-screens:
-    name: Platform screens in French and Arabic (browser)
+    name: Platform screens in French and Arabic (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     defaults:
       run:
         working-directory: platform
@@ -188,14 +192,21 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: The browser and the system libraries it needs
+        if: matrix.browser != 'chromium'
+        run: |
+          npm ci --prefix tests/browser --no-audit --no-fund
+          cd tests/browser && npx playwright install --with-deps ${{ matrix.browser }}
       - name: Every screen, on a desktop and a phone, in a disposable installation
         run: sh deploy/acceptance-test.sh
         env:
-          BROWSER_CHANNEL: chrome
+          BROWSERS: ${{ matrix.browser }}
+          # The runner's Chrome stands for Chromium.
+          BROWSER_CHANNEL: ${{ matrix.browser == 'chromium' && 'chrome' || '' }}
       - name: Screenshots for a person to review
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: platform-screens
+          name: platform-screens-${{ matrix.browser }}
           path: platform/.acceptance
           if-no-files-found: ignore

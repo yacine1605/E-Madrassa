@@ -188,6 +188,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | Support access only under the school's consent, limited in time, revocable, each consultation journaled, read-only | `SupportTest`, `tests/sql/database.mjs` (support access) |
 | No PHP dependency with a known vulnerability is shipped (NFR-SEC-08) | CI, `composer audit` |
 | Requests run as `school_runtime`; the owner's password never reaches the application | `deploy/smoke-test.sh`, `SessionTest` |
+| The database, Redis and the storage are out of the proxy's reach; Redis asks for its password | `deploy/smoke-test.sh` |
 
 ## Findings
 
@@ -197,8 +198,8 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | F2 | `school_runtime` reads every person's credentials | Medium | Open, lot 2 |
 | F3 | `school_runtime` may change the credential columns of any person | Medium | Open, lot 2 |
 | F4 | No Content Security Policy | Medium | Open, lot 2 |
-| F5 | Redis has no password | Low | Open, before the first production |
-| F6 | Firefox and Safari not tested | Low | Open, lot 1 |
+| F5 | Redis had no password | Low | Fixed in increment 24 |
+| F6 | Firefox and Safari were not tested | Low | Fixed in increment 24 |
 
 ### F1. Every function was executable by everyone (fixed)
 
@@ -226,17 +227,17 @@ The headers stop sniffing, framing by another site and the leak of addresses (`d
 
 To do (lot 2): a policy with nonces, first in report-only mode across the browser acceptance test, then enforced.
 
-### F5. Redis has no password
+### F5. Redis had no password (fixed)
 
-Sessions, the cache and the queue are in Redis, which listens without a password on the deployment's private network. No port is published, but any other container of that network could read the sessions.
+Sessions, the cache and the queue are in Redis, which listened without a password on the deployment's network. No port was published, but any other container of that network, the proxy included, could read the sessions.
 
-To do before the first production: `requirepass` set from the environment file, like the database's passwords, and an internal network for Redis, the database and the storage.
+Fix (increment 24): Redis asks for `REDIS_PASSWORD`, written by `deploy/new-env.sh` like the other secrets. The database, Redis and the storage moved to an internal network that only the application's services join: the proxy no longer reaches them, and they have no way out to the internet. `deploy/smoke-test.sh` checks both, on every change.
 
-### F6. Firefox and Safari not tested
+### F6. Firefox and Safari were not tested (fixed)
 
-The browser acceptance runs on Chromium (Chrome in CI, Edge locally). The server's checks do not depend on the browser, but the screens' behaviour may.
+The browser acceptance ran on Chromium only. The server's checks do not depend on the browser, but the screens' behaviour may.
 
-To do (lot 1): run `deploy/acceptance-test.sh` with Firefox and WebKit.
+Fix (increment 24): `deploy/acceptance-test.sh` runs every screen in Chromium, Firefox and WebKit, Safari's engine (`BROWSERS`); CI runs the three side by side. All 324 screens pass: 108 in each browser.
 
 ## Outside this review
 

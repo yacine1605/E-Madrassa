@@ -28,3 +28,4 @@ Thumbs.db
 /tests/browser/node_modules
 /.acceptance
 /.acceptance.env
+/.smoke

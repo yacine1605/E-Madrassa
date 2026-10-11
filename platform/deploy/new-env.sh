@@ -14,6 +14,7 @@ sed -e "s#^APP_URL=.*#APP_URL=$url#" \
     -e "s#^DB_OWNER_PASSWORD=.*#DB_OWNER_PASSWORD=$(hex 24)#" \
     -e "s#^DB_RUNTIME_PASSWORD=.*#DB_RUNTIME_PASSWORD=$(hex 24)#" \
     -e "s#^DB_CONSOLE_PASSWORD=.*#DB_CONSOLE_PASSWORD=$(hex 24)#" \
+    -e "s#^REDIS_PASSWORD=.*#REDIS_PASSWORD=$(hex 24)#" \
     -e "s#^FILES_ACCESS_KEY_ID=.*#FILES_ACCESS_KEY_ID=GK$(hex 12)#" \
     -e "s#^FILES_SECRET_ACCESS_KEY=.*#FILES_SECRET_ACCESS_KEY=$(hex 32)#" \
     -e "s#^GARAGE_RPC_SECRET=.*#GARAGE_RPC_SECRET=$(hex 32)#" \
