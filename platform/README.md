@@ -166,7 +166,11 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 | FR-IAM-05 | Assigning a sensitive permission (by role or by adding it to an assigned role) notifies the holders of `audit.log.read` for the whole school, the author aside |
 | NFR-SEC-06 | The recovery link is queued, encrypted in the queue, and the answer comes at once whether the address is known or not |
 
-Left for the second part of W1.6: files (FR-FIC-01), the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02).
+Left for the second part of W1.6: the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02).
+
+### Files (FR-FIC-01)
+
+`school.file_object` registers every file: category of rights (`platform.file_category`: finance attachments, student documents and photos, staff documents, teaching resources, exports and imports), real type read from the content, size, SHA-256, owner record, expiry. The database shows and accepts a file only with its category's permission, an export or an import only to its author (AC2); it applies the school's types and size (`files.types`, `files.max_mb`; by default PDF, JPEG, PNG, DOCX, XLSX, 10 MB) and its storage quota, also under concurrent uploads; an expired school still exports and adds nothing else. The bytes are on the `files` disk under `tenant/{id}/{category}/`: S3-compatible storage in production (`FILES_DRIVER=s3`, MinIO or a provider), a local directory in development. An executable renamed `.pdf` is refused (AC1); downloads are attachments the browser does not interpret; a signed link opens one file for 15 minutes without a session (AC3). `php artisan platform:purge-files`, daily, removes expired files from storage.
 
 ### PDF (FR-PDF-01, TST-17)
 

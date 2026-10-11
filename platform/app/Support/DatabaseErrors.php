@@ -62,6 +62,9 @@ final class DatabaseErrors
         'job_finished' => 'Cette tâche est terminée : elle ne change plus.',
         'not_failed' => 'Seul un envoi en échec se relance.',
         'tenant_required' => 'Aucun établissement choisi.',
+        'file_type_refused' => 'Ce type de fichier n’est pas accepté ici.',
+        'file_too_large' => 'Ce fichier dépasse la taille permise par l’établissement.',
+        'storage_quota_exceeded' => 'L’espace de stockage de l’établissement est plein : archivez des fichiers ou augmentez l’abonnement.',
     ];
 
     public static function message(string $rule): string

@@ -836,6 +836,80 @@ await check('a notification is only for active members of the school', async () 
   await rejects("SELECT school.notify('job.succeeded', ARRAY[1]::bigint[])", [], '23514', 'tenant_required');
 });
 
+// Files (FR-FIC-01)
+const FILE = `INSERT INTO school.file_object (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256)
+  VALUES ($1::uuid, $2, 'tenant/' || $1::text || '/' || $2 || '/' || gen_random_uuid(), $3, $4, 'application/octet-stream', $5, repeat('a', 64)) RETURNING id`;
+const file = async (category, type = 'pdf', size = 1000, tenant = a) => (await first(FILE, [tenant, category, `piece.${type}`, type, size])).id;
+await as('school_runtime', a, 7);
+const invoice = await file('finance_attachment');
+await check('a financial attachment is seen with a finance permission, not by the administrator (FR-FIC-01 AC2)', async () => {
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [invoice]), 1);
+  for (const user of [8, 4]) {
+    await as('school_runtime', a, user);
+    assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [invoice]), 0);
+  }
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object'), 0);
+});
+await check('adding a file needs its category\'s permission; exports belong to their author', async () => {
+  await as('school_runtime', a, 8);
+  await rejects(FILE, [a, 'finance_attachment', 'x.pdf', 'pdf', 10], '42501');
+  const exported = await file('export', 'csv');
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [exported]), 1);
+  await as('school_runtime', a, 1);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [exported]), 0);
+});
+await check('a file is stored under its school\'s prefix and keeps its identity', async () => {
+  await as('school_runtime', a, 7);
+  await rejects(`INSERT INTO school.file_object (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256)
+    VALUES ($1::uuid, 'finance_attachment', 'tenant/' || $2::text || '/finance_attachment/x', 'x.pdf', 'pdf', 'application/pdf', 10, repeat('a', 64))`, [a, b], '23514');
+  await rejects("UPDATE school.file_object SET sha256 = repeat('b', 64) WHERE id = $1", [invoice], '42501');
+  await as(null);
+  await rejects("UPDATE school.file_object SET sha256 = repeat('b', 64) WHERE id = $1", [invoice], '23514', 'identity_immutable');
+});
+await check('types and size follow the school\'s settings; a photo is an image (FR-FIC-01)', async () => {
+  await as('school_runtime', a, 7);
+  await rejects(FILE, [a, 'finance_attachment', 'x.csv', 'csv', 10], '23514', 'file_type_refused');
+  await rejects(FILE, [a, 'finance_attachment', 'x.pdf', 'pdf', 11 * 1024 * 1024], '23514', 'file_too_large');
+  await rejects(FILE, [a, 'student_photo', 'x.pdf', 'pdf', 10], '23514', 'file_type_refused');
+  await file('student_photo', 'jpeg');
+  await as('school_runtime', a, 1);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'files.types', '[\"pdf\", \"exe\"]')", [a], '23514', 'setting_invalid');
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'files.types', '[\"pdf\", \"csv\"]')", [a]);
+  await as('school_runtime', a, 7);
+  await file('finance_attachment', 'csv');
+  await rejects(FILE, [a, 'finance_attachment', 'x.png', 'png', 10], '23514', 'file_type_refused');
+});
+await check('the storage quota is never exceeded (FR-PLT-02)', async () => {
+  await as('school_runtime', a, 7);
+  await rejects(FILE, [a, 'export', 'big.csv', 'csv', 1024 * 1024 * 1024], '23514', 'storage_quota_exceeded');
+});
+await check('an expired school still exports, and adds no other file (FR-PLT-02 AC3)', async () => {
+  await as('platform_admin', null, 6);
+  const d = await create(uuid(), 'ecole-d', 'École D', 'essential', null);
+  await sql('SELECT platform.set_entitlement($1, $2::date, $3::date, 15, 500, 1024, 0)', [d, '2025-01-01', '2025-06-30']);
+  await as(null);
+  await sql(FILE, [d, 'export', 'liste.csv', 'csv', 10]);
+  await rejects(FILE, [d, 'student_document', 'acte.pdf', 'pdf', 10], '25006', 'tenant_read_only');
+});
+await check('a signed link reaches a file still in storage; expired exports are purged and stop counting', async () => {
+  await as('school_runtime', null, null);
+  assert.equal((await sql('SELECT * FROM school.file_for_link($1, $2)', [a, invoice])).rows.length, 1);
+  assert.equal((await sql('SELECT * FROM school.file_for_link($1, $2)', [b, invoice])).rows.length, 0);
+  await as(null);
+  const { id: exported, size_bytes: size } = await first("SELECT id, size_bytes::int AS size_bytes FROM school.file_object WHERE tenant_id = $1 AND category = 'export' AND purged_at IS NULL LIMIT 1", [a]);
+  const used = async () => Number((await first('SELECT used FROM school.storage_use($1)', [a])).used);
+  const before = await used();
+  await sql("UPDATE school.file_object SET expires_at = now() - interval '1 day' WHERE id = $1", [exported]);
+  await as('school_runtime', null, null);
+  assert.ok((await sql('SELECT id FROM platform.expired_files(10)')).rows.some(r => r.id === exported));
+  await sql('SELECT platform.mark_purged($1)', [exported]);
+  await as(null);
+  assert.equal(await used(), before - size);
+  await as('school_runtime', null, null);
+  assert.equal((await sql('SELECT * FROM school.file_for_link($1, $2)', [a, exported])).rows.length, 0);
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
@@ -939,6 +1013,23 @@ if (PgClient) {
     const ids = batches.flat();
     assert.equal(new Set(ids).size, ids.length);
     assert.equal(ids.length, due);
+  });
+  await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
+    await as(null);
+    const use = await first('SELECT used::text AS used, quota::text AS quota FROM school.storage_use($1)', [a]);
+    const size = Math.floor((Number(use.quota) - Number(use.used)) * 0.6);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 7)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(FILE, [a, 'export', `part-${i}.csv`, 'csv', size]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'storage_quota_exceeded');
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {
     const clients = await Promise.all([1, 8].map(user => connect('school_runtime', a, user)));

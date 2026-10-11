@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 
@@ -101,3 +102,16 @@ Artisan::command('platform:outbox {--limit=50}', function (Outbox $outbox) {
 })->purpose('Send the notification emails that are due (as school_runtime)');
 
 Schedule::command('platform:outbox')->everyMinute()->withoutOverlapping();
+
+// FR-IMP-02: temporary files (exports) leave storage once expired.
+Artisan::command('platform:purge-files {--limit=500}', function () {
+    $purged = 0;
+    foreach (DB::select('SELECT id, storage_key FROM platform.expired_files(?)', [(int) $this->option('limit')]) as $file) {
+        Storage::disk('files')->delete($file->storage_key);
+        DB::select('SELECT platform.mark_purged(?)', [$file->id]);
+        $purged++;
+    }
+    $this->info("Files purged: $purged.");
+})->purpose('Remove expired temporary files from storage (as school_runtime)');
+
+Schedule::command('platform:purge-files')->daily()->withoutOverlapping();

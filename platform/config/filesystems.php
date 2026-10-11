@@ -47,6 +47,26 @@ return [
             'report' => false,
         ],
 
+        // FR-FIC-01, ARC-07: the schools' files, private, under `tenant/{id}/…`. S3-compatible
+        // storage in production (MinIO or a provider, the AWS_* settings); a local directory
+        // for development and tests. Never the container alone.
+        'files' => env('FILES_DRIVER', 'local') === 's3' ? [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'bucket' => env('AWS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+            'visibility' => 'private',
+            'throw' => true,
+        ] : [
+            'driver' => 'local',
+            'root' => env('FILES_ROOT', storage_path('app/private/files')),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

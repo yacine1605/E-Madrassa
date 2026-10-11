@@ -64,6 +64,14 @@ GRANT SELECT, INSERT, UPDATE (email) ON school.notification_preference TO school
 GRANT SELECT ON school.outbox TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.audit_readable_types(), school.notify(text, bigint[], jsonb), platform.claim_outbox(integer, integer),
   platform.finish_outbox(uuid, text), school.retry_delivery(uuid) TO school_runtime;
+-- Files (011): the register, read and written within the categories the user's permissions
+-- open (row-level security); the bytes are the application's, in private storage.
+GRANT SELECT ON platform.file_category TO school_runtime;
+GRANT SELECT, INSERT (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256, owner_type, owner_id, expires_at)
+  ON school.file_object TO school_runtime;
+GRANT UPDATE (owner_type, owner_id, archived_at, version) ON school.file_object TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.file_categories(text), school.storage_use(uuid), school.file_for_link(uuid, uuid),
+  platform.expired_files(integer), platform.mark_purged(uuid) TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
@@ -88,6 +96,7 @@ GRANT SELECT, INSERT ON school.node_type, school.ref_node, school.subject TO pla
 GRANT SELECT, INSERT ON school.notification TO platform_provisioner;
 GRANT SELECT, INSERT, UPDATE, DELETE ON school.outbox TO platform_provisioner;
 GRANT SELECT ON school.notification_preference TO platform_provisioner;
+GRANT SELECT, UPDATE ON school.file_object TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.label_key(text), school.valid_labels(jsonb) TO platform_provisioner;
 GRANT SELECT, INSERT ON public.users TO platform_provisioner;
 GRANT UPDATE (name, email, password, must_change_password, password_changed_at, remember_token, updated_at) ON public.users TO platform_provisioner;
@@ -138,3 +147,8 @@ ALTER FUNCTION school.notify_sensitive() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.claim_outbox(integer, integer) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finish_outbox(uuid, text) OWNER TO platform_provisioner;
 ALTER FUNCTION school.retry_delivery(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.file_categories(text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.storage_use(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.file_for_link(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.expired_files(integer) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.mark_purged(uuid) OWNER TO platform_provisioner;

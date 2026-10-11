@@ -6,6 +6,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
@@ -35,6 +36,10 @@ Route::prefix('api')->group(function () {
         Route::post('recovery', [AccountLinkController::class, 'reset']);
         Route::post('recovery/request', [AccountLinkController::class, 'forgot'])->middleware('throttle:recovery');
     });
+
+    // FR-FIC-01 AC3: a temporary signed link opens one file without a session, until it expires.
+    Route::get('files/link/{tenant}/{file}', [FileController::class, 'linked'])->name('files.link')
+        ->whereUuid(['tenant', 'file'])->middleware(['signed', 'throttle:public']);
 
     Route::middleware(['auth', 'account'])->group(function () {
         // The person's own credentials, outside any school.
@@ -67,6 +72,16 @@ Route::prefix('api')->group(function () {
             });
 
             Route::get('audit', [AuditController::class, 'index'])->middleware('permission:audit.log.read');
+
+            Route::middleware(FileController::WRITERS)->group(function () {
+                Route::post('files', [FileController::class, 'store']);
+                Route::post('files/{file}/archive', [FileController::class, 'archive']);
+            });
+            Route::middleware(FileController::READERS)->group(function () {
+                Route::get('files/{file}', [FileController::class, 'show']);
+                Route::get('files/{file}/content', [FileController::class, 'content']);
+                Route::post('files/{file}/link', [FileController::class, 'link']);
+            });
 
             Route::get('settings', [SettingController::class, 'index'])->middleware('permission:tenant.settings.manage');
             Route::put('settings/{key}', [SettingController::class, 'update'])->middleware('permission:tenant.settings.manage');

@@ -58,6 +58,8 @@ final class SchoolContext
             $message = $closed === 'tenant_suspended' ? 'Cet établissement est suspendu.' : 'Votre accès à cet établissement n’est plus actif.';
             return response()->json(['message' => $message, 'code' => $closed], 403);
         }
-        return $response->header('X-Request-Id', $requestId);
+        // Through the header bag: file downloads are streamed responses.
+        $response->headers->set('X-Request-Id', $requestId);
+        return $response;
     }
 }
