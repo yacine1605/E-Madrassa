@@ -99,6 +99,12 @@ final class Console
         return (int) $this->as('Profil', fn (Connection $db) => $db->selectOne('SELECT platform.apply_profile(?, ?) AS v', [$tenant, $profile])->v);
     }
 
+    /** FR-PLT-04: the school's consents, their dates and use; never the school's data. */
+    public function supportGrants(string $tenant): array
+    {
+        return $this->db()->select('SELECT * FROM platform.support_grants(?)', [$tenant]);
+    }
+
     /** FR-PLT-05: each school by its numbers. */
     public function supervision(): array
     {

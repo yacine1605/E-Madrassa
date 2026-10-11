@@ -16,7 +16,9 @@ final class SchoolController
         // FR-REF-03 AC3: "Matières" or "Modules" follows the profile, with the same codes. Time zone fixed (FR-REF-06).
         $profile = $row->profile_code ? ['code' => $row->profile_code, 'version' => $row->profile_version, 'subject_kind' => $row->subject_kind,
             'labels' => json_decode($row->profile_labels, true, 4, JSON_THROW_ON_ERROR)] : null;
+        // FR-PLT-04: in a support session, what the banner shows.
+        $support = $school->support() ? DB::selectOne('SELECT id, expires_at, include_sensitive FROM school.support_grant WHERE id = ?', [$school->support()]) : null;
         return ['data' => ['id' => $row->id, 'slug' => $row->slug, 'name' => $row->name, 'default_locale' => $row->default_locale,
-            'time_zone' => 'Africa/Algiers', 'mode' => $school->mode(), 'modules' => $modules, 'profile' => $profile]];
+            'time_zone' => 'Africa/Algiers', 'mode' => $school->mode(), 'modules' => $modules, 'profile' => $profile, 'support' => $support]];
     }
 }

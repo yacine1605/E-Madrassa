@@ -82,6 +82,10 @@ GRANT SELECT, INSERT (tenant_id, batch_id, line, external_ref, data, outcome, ac
   ON school.import_row TO school_runtime;
 GRANT UPDATE (outcome, action, error_code, error_message, target_type, target_id, previous) ON school.import_row TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.discard_account(bigint) TO school_runtime;
+-- Support access (015): consents written by the school; a support session reads under one.
+GRANT SELECT, INSERT (tenant_id, include_sensitive, reason, starts_at, expires_at) ON school.support_grant TO school_runtime;
+GRANT UPDATE (revoked_at, version) ON school.support_grant TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.support_grant_in_use(), school.log_support_access(text) TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
@@ -95,7 +99,7 @@ GRANT EXECUTE ON FUNCTION platform.create_tenant(uuid, text, text, text, text, d
   platform.set_tenant_status(uuid, text, text), platform.enable_module(uuid, text), platform.disable_module(uuid, text),
   platform.set_entitlement(uuid, date, date, integer, integer, integer, integer), platform.tenant_mode(uuid),
   platform.module_enabled(uuid, text), platform.invite_admin(uuid, text), platform.apply_profile(uuid, text, integer),
-  platform.ensure_user(text, text), platform.supervision() TO platform_admin;
+  platform.ensure_user(text, text), platform.supervision(), platform.support_grants(uuid) TO platform_admin;
 
 -- The provisioner owns the SECURITY DEFINER functions and holds exactly the privileges
 -- they need. It bypasses RLS but cannot log in.
@@ -109,7 +113,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON school.outbox TO platform_provisioner;
 GRANT SELECT ON school.notification_preference TO platform_provisioner;
 GRANT SELECT, UPDATE ON school.file_object TO platform_provisioner;
 GRANT DELETE ON school.membership, public.users, public.account_token TO platform_provisioner;
-GRANT SELECT ON school.job TO platform_provisioner;
+GRANT SELECT ON school.job, school.support_grant TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.can_everywhere(text) TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.label_key(text), school.valid_labels(jsonb) TO platform_provisioner;
 GRANT SELECT, INSERT ON public.users TO platform_provisioner;
 GRANT UPDATE (name, email, password, must_change_password, password_changed_at, remember_token, updated_at) ON public.users TO platform_provisioner;
@@ -168,3 +173,6 @@ ALTER FUNCTION platform.mark_purged(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.discard_account(bigint) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.ensure_user(text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.supervision() OWNER TO platform_provisioner;
+ALTER FUNCTION school.support_grant_in_use() OWNER TO platform_provisioner;
+ALTER FUNCTION school.log_support_access(text) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.support_grants(uuid) OWNER TO platform_provisioner;

@@ -21,6 +21,8 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SupportGrantController;
+use App\Http\Controllers\SupportSessionController;
 use Illuminate\Support\Facades\Route;
 
 // Same-origin API for the application's own front end; CSRF protects every mutation.
@@ -49,6 +51,10 @@ Route::prefix('api')->group(function () {
         Route::post('account/mfa', [CredentialController::class, 'startMfa']);
         Route::post('account/mfa/confirm', [CredentialController::class, 'confirmMfa']);
 
+        // FR-PLT-04: an operator works in a school that consented, read-only.
+        Route::post('support/session', [SupportSessionController::class, 'open']);
+        Route::delete('support/session', [SupportSessionController::class, 'close']);
+
         Route::get('session/schools', [SessionController::class, 'schools']);
         Route::put('session/school', [SessionController::class, 'select']);
 
@@ -74,6 +80,12 @@ Route::prefix('api')->group(function () {
             });
 
             Route::get('audit', [AuditController::class, 'index'])->middleware('permission:audit.log.read');
+
+            Route::get('support-grants', [SupportGrantController::class, 'index'])->middleware('permission:support.access.grant,audit.log.read');
+            Route::middleware('permission:support.access.grant')->group(function () {
+                Route::post('support-grants', [SupportGrantController::class, 'store']);
+                Route::post('support-grants/{grant}/revoke', [SupportGrantController::class, 'revoke']);
+            });
 
             Route::middleware('permission:import.job.create')->group(function () {
                 Route::get('imports/templates/{kind}', [ImportController::class, 'template']);

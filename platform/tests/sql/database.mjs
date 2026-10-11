@@ -42,7 +42,9 @@ await db.exec(readFileSync(new URL('../../deploy/roles.sql', import.meta.url), '
 // 6 is a publisher operator on the console.
 const as = async (role, tenant, user) => {
   await db.exec(role ? `SET ROLE ${role}` : 'RESET ROLE');
-  await sql("SELECT set_config('app.tenant_id', $1, false), set_config('app.user_id', $2, false)", [tenant ?? '', user == null ? '' : String(user)]);
+  // A new identity starts outside any support session (FR-PLT-04).
+  await sql("SELECT set_config('app.tenant_id', $1, false), set_config('app.user_id', $2, false), set_config('app.support_grant', '', false)",
+    [tenant ?? '', user == null ? '' : String(user)]);
 };
 const today = new Date().toISOString().slice(0, 10);
 const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
@@ -977,6 +979,71 @@ await check('supervision counts each school\'s activity without showing any of i
   assert.deepEqual(Object.keys(row).sort(), ['emails_failed', 'jobs_active', 'jobs_failed', 'last_activity', 'members', 'mode', 'modules', 'name',
     'plan', 'slug', 'status', 'storage_quota', 'storage_used', 'tenant_id', 'valid_until']);
   await rejects('SELECT count(*) FROM school.membership', [], '42501');
+});
+
+// Support access (FR-PLT-04)
+const GRANT = "INSERT INTO school.support_grant (tenant_id, reason, expires_at, include_sensitive) VALUES ($1, $2, now() + ($3 || ' hours')::interval, $4) RETURNING id";
+const support = async (grant) => {
+  await as('school_runtime', a, 6);
+  await sql("SELECT set_config('app.support_grant', $1, false)", [grant ?? '']);
+};
+await as(null);
+await sql('INSERT INTO platform.operator (user_id) VALUES (6) ON CONFLICT DO NOTHING');
+await as('school_runtime', a, 1);
+const consent = (await first(GRANT, [a, 'Ticket 1042 : import bloqué', 48, false])).id;
+await check('a school consents for 72 hours at most, by the permission meant for it (FR-PLT-04)', async () => {
+  await rejects(GRANT, [a, 'Trop long', 73, false], '23514');
+  await as('school_runtime', a, 7);
+  await rejects(GRANT, [a, 'Sans droit', 24, false], '42501', 'permission_denied');
+});
+await check('without consent the operator reads nothing of the school (FR-PLT-04 AC1)', async () => {
+  await support(null);
+  assert.equal(await sites(), 0);
+  await support(uuid());
+  assert.equal(await sites(), 0);
+});
+await check('under consent the operator reads, read-only, without sensitive data, and each consultation is journaled', async () => {
+  await support(consent);
+  assert.ok(await sites() > 0);
+  const granted = (await sql('SELECT DISTINCT permission FROM school.my_permissions()')).rows.map(r => r.permission);
+  assert.ok(granted.includes('referential.node.read') && granted.includes('finance.payment.read') && granted.includes('audit.log.read'));
+  assert.ok(!granted.includes('student.sensitive.read') && !granted.some(p => !p.endsWith('.read')));
+  await rejects("INSERT INTO school.site(tenant_id, code, labels) VALUES ($1, 'SUPPORT', '{\"fr\": \"x\"}')", [a], '25006', 'support_read_only');
+  assert.equal(await count("SELECT count(*) n FROM school.file_object WHERE category = 'finance_attachment'"), 0);
+  await sql("SELECT school.log_support_access('GET /api/sites')");
+  await support(null);
+  await as('school_runtime', a, 1);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE action = 'SUPPORT_READ' AND object_id = $1 AND actor_id = 6", [consent]), 1);
+});
+await check('a distinct consent opens sensitive data and financial attachments', async () => {
+  await as('school_runtime', a, 1);
+  const wide = (await first(GRANT, [a, 'Ticket 1043 : écart de paie', 2, true])).id;
+  await support(wide);
+  assert.ok((await sql('SELECT DISTINCT permission FROM school.my_permissions()')).rows.some(r => r.permission === 'student.sensitive.read'));
+  assert.ok(await count("SELECT count(*) n FROM school.file_object WHERE category = 'finance_attachment'") > 0);
+  await support(null);
+});
+await check('revoked or expired, a consent opens nothing more (FR-PLT-04 AC2)', async () => {
+  await as('school_runtime', a, 1);
+  const short = (await first(GRANT, [a, 'Ticket 1044', 1, false])).id;
+  await sql('UPDATE school.support_grant SET revoked_at = now() WHERE id = $1', [short]);
+  await rejects('UPDATE school.support_grant SET revoked_at = NULL WHERE id = $1', [short], '23514', 'immutable_record');
+  await support(short);
+  assert.equal(await sites(), 0);
+  await as(null);
+  const expired = (await first(`INSERT INTO school.support_grant (tenant_id, reason, starts_at, expires_at) VALUES ($1, 'Ticket 1040', now() - interval '3 hours',
+    now() - interval '1 hour') RETURNING id`, [a])).id;
+  await support(expired);
+  assert.equal(await sites(), 0);
+  await rejects("SELECT school.log_support_access('GET /api/sites')", [], '42501', 'support_not_granted');
+  await support(null);
+});
+await check('the school sees every consent, the console their dates and use, never the school\'s data (FR-PLT-04 AC3)', async () => {
+  await as('school_runtime', a, 1);
+  assert.ok(await count('SELECT count(*) n FROM school.support_grant') >= 3);
+  await as('platform_admin', null, 6);
+  const listed = (await sql('SELECT reason, consultations::int AS c FROM platform.support_grants($1) ORDER BY reason', [a])).rows;
+  assert.deepEqual(listed.find(r => r.reason === 'Ticket 1042 : import bloqué'), { reason: 'Ticket 1042 : import bloqué', c: 1 });
 });
 
 // School modes (FR-PLT-01, FR-PLT-02 AC3)

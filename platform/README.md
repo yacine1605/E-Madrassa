@@ -199,9 +199,26 @@ A refusal that must undo what the request already wrote is thrown as `App\Except
 | FR-IAM-02 | Operators (`platform.operator`, the `super_admin`) sign in with compulsory MFA (Filament's, on the platform's own secret and recovery codes), progressive lockout, session limits |
 | FR-PLT-04 AC1 | The console reads through `platform_admin`, which has no privilege on school data |
 
-Left for the second part: support access with the school's consent (FR-PLT-04).
+## Increment 12: support access (FR-PLT-04)
+
+145 invariants on PostgreSQL 16, 97 integration tests (11 October 2026).
+
+| SRS | Covered |
+|---|---|
+| FR-PLT-04 | The school consents (`POST /api/support-grants`, permission `support.access.grant`, the administrator and the direction by default): a reason, 72 hours at most, sensitive data included or not; revoked at any time; every consent listed with its author and its consultations (AC3) |
+| AC1 | Without a valid consent the operator reaches nothing: the database itself checks the consent named by the session (`app.support_grant`), its school, its dates, that it is not revoked, and that the actor is an active operator |
+| AC2 | Expired or revoked, the consent ends the support session at the next request (`support_ended`); the database's clock decides |
+| Read-only | A support session reads the school's modules (`*.read` permissions), never manages roles, and writes nothing: the transaction is read-only and every school table refuses writes (`support_read_only`), exports included |
+| Sensitive data | Salaries, financial attachments and the other sensitive data of annex A need the distinct consent |
+| Journal | Each request of a support session, refused ones included, is a `SUPPORT_READ` entry in the school's journal, with the operator as author |
+
+The operator opens a support session from the console (action "Accès support" on a school, which lists the school's consents) or through `POST /api/support/session`; `DELETE /api/support/session` closes it. The console still reads no school data itself; only `platform.support_grants()` tells it the consents.
+
+`support.access.grant` is not in annex A; FR-PLT-04 needs it, since the code asks for a permission and never for a role (P4).
+
+At deployment, `php artisan filament:assets` publishes Filament's assets.
 
 ## Next increments of lot 1
 
-1. **Support access** (FR-PLT-04), then the school's screens in Filament, in French and Arabic, right to left (W1.7).
-2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).
+1. **The school's screens** in Filament, in French and Arabic, right to left (W1.7).
+2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).

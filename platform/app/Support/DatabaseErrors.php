@@ -84,6 +84,10 @@ final class DatabaseErrors
     {
         $state = (string) $e->getCode();
         $detail = $e->errorInfo[2] ?? '';
+        // A support session writes nothing: the database's guard, or the read-only transaction itself.
+        if ($state === '25006' && (str_contains($detail, 'support_read_only') || str_contains($detail, 'read-only transaction'))) {
+            return [403, 'support_read_only', 'Accès support : lecture seule.'];
+        }
         if ($state === '25006') return [403, 'tenant_read_only', 'Cet établissement est en lecture seule : son abonnement a expiré ou il est archivé.'];
         if ($state === '23514') {
             foreach (self::RULES as $rule => $message) {

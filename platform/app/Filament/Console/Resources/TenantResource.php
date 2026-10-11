@@ -7,6 +7,7 @@ use App\Filament\Console\Resources\TenantResource\Pages\ListTenants;
 use App\Models\Console\Tenant;
 use App\Support\Console;
 use App\Support\DatabaseErrors;
+use App\Support\SupportSessions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -101,6 +102,19 @@ final class TenantResource extends Resource
                         }
                         return 'Invitation envoyée (valable 72 heures).';
                     })),
+                Action::make('support')->label('Accès support')->visible(fn (Tenant $t) => $t->status !== 'suspended')
+                    ->modalDescription(fn (Tenant $t) => self::grants($t))
+                    ->modalSubmitActionLabel('Ouvrir l’accès en lecture seule')
+                    ->action(function (Tenant $t) {
+                        $grant = collect(app(Console::class)->supportGrants($t->id))
+                            ->first(fn ($g) => $g->revoked_at === null && strtotime($g->starts_at) <= time() && strtotime($g->expires_at) > time());
+                        if (!$grant || !app(SupportSessions::class)->open($t->id, $grant->id)) {
+                            Notification::make()->title('Aucun consentement valable : l’établissement doit d’abord accorder l’accès.')->danger()->send();
+                            return;
+                        }
+                        Notification::make()->title('Accès support ouvert jusqu’au '.\Illuminate\Support\Carbon::parse($grant->expires_at)->timezone('Africa/Algiers')
+                            ->format('d/m/Y H:i').', en lecture seule'.($grant->include_sensitive ? ', données sensibles comprises.' : '.'))->success()->send();
+                    }),
                 Action::make('profile')->label('Appliquer un profil')->visible(fn (Tenant $t) => $t->status === 'active')
                     ->fillForm(fn (Tenant $t) => ['profile' => $t->profile_code])
                     ->schema([Select::make('profile')->label('Profil')->required()
@@ -133,6 +147,16 @@ final class TenantResource extends Resource
             $refusal = DatabaseErrors::classify($e) ?? throw $e;
             Notification::make()->title($refusal[2])->danger()->send();
         }
+    }
+
+    /** The school's consents, as the operator sees them before opening an access. */
+    private static function grants(Tenant $tenant): string
+    {
+        $lines = array_map(fn ($g) => sprintf('%s → %s · %s · %s · %d consultation(s)%s',
+            \Illuminate\Support\Carbon::parse($g->starts_at)->timezone('Africa/Algiers')->format('d/m H:i'),
+            \Illuminate\Support\Carbon::parse($g->expires_at)->timezone('Africa/Algiers')->format('d/m H:i'),
+            $g->granted_by ?? '?', $g->reason, $g->consultations, $g->revoked_at ? ' · retiré' : ''), app(Console::class)->supportGrants($tenant->id));
+        return $lines ? implode("\n", $lines) : 'Aucun consentement de cet établissement.';
     }
 
     /** @return array<string, string> */
