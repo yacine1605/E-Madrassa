@@ -16,6 +16,22 @@ final class PermissionCoverageTest extends TestCase
     /** The person's own jobs and notifications, which row-level security alone decides (tested in tests/sql). */
     private const PERSONAL = ['api/jobs', 'api/notifications'];
 
+    public function test_school_panel_pages_declare_permissions_and_persist_the_school_context(): void
+    {
+        $panel = \Filament\Facades\Filament::getPanel('school');
+        $this->assertContains(\App\Http\Middleware\SchoolPanelContext::class, $panel->getAuthMiddleware());
+        $persistent = app(\Livewire\Mechanisms\PersistentMiddleware\PersistentMiddleware::class)->getPersistentMiddleware();
+        $this->assertContains(\App\Http\Middleware\SchoolPanelContext::class, $persistent);
+        $this->assertContains(\App\Http\Middleware\RequirePermission::class, $persistent);
+        foreach (['accounts' => 'user.account.read', 'roles' => 'role.definition.manage', 'assignments' => 'role.assignment.manage',
+            'reference-types' => 'referential.node.read', 'reference-nodes' => 'referential.node.read', 'subjects' => 'referential.node.read',
+            'years' => 'referential.node.read', 'periods' => 'referential.node.read'] as $slug => $permission) {
+            $route = Route::getRoutes()->getByName('filament.school.pages.'.$slug);
+            $this->assertNotNull($route);
+            $this->assertContains('permission:'.$permission, $route->gatherMiddleware());
+        }
+    }
+
     public function test_application_code_never_names_a_role(): void
     {
         $roles = array_column(DB::connection('owner')->select('SELECT code FROM platform.role_template'), 'code');

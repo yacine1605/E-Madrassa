@@ -21,10 +21,11 @@ final class CalendarController
 
     public function __construct(private CurrentSchool $school) {}
 
-    /** Years, most recent first, each with its periods in use. */
-    public function index()
+    /** Years, most recent first; archived periods appear only when explicitly requested for history. */
+    public function index(Request $request)
     {
-        $periods = collect(DB::select(self::PERIOD.' WHERE tenant_id = ? AND archived_at IS NULL ORDER BY start_date', [$this->school->id()]))
+        $request->validate(['include_archived' => 'boolean']);
+        $periods = collect(DB::select(self::PERIOD.' WHERE tenant_id = ?'.($request->boolean('include_archived') ? '' : ' AND archived_at IS NULL').' ORDER BY start_date', [$this->school->id()]))
             ->map(fn ($row) => $this->decoded($row))->groupBy('year_id');
         return ['data' => array_map(fn ($year) => [...(array) $year, 'periods' => $periods->get($year->id, collect())->values()],
             DB::select(self::YEAR.' WHERE tenant_id = ? ORDER BY start_date DESC', [$this->school->id()]))];

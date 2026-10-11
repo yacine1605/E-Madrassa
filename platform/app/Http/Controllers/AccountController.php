@@ -22,7 +22,8 @@ final class AccountController
 
     public function index(Request $request)
     {
-        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])], 'q' => 'nullable|string|max:100']);
+        $data = $request->validate(['status' => ['nullable', Rule::in(['invited', 'active', 'suspended', 'revoked'])], 'q' => 'nullable|string|max:100',
+            'paginate' => 'boolean', 'page' => 'integer|min:1', 'per_page' => 'integer|min:1|max:100']);
         $sql = Accounts::SELECT.' WHERE m.tenant_id = ?';
         $bindings = [$this->school->id()];
         if (isset($data['status'])) { $sql .= ' AND m.status = ?'; $bindings[] = $data['status']; }
@@ -31,7 +32,12 @@ final class AccountController
             $sql .= " AND position(coalesce(school.search_key(?), '') IN coalesce(school.search_key(concat_ws(' ', u.name, u.email, m.username)), '')) > 0";
             $bindings[] = $data['q'];
         }
-        return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id', $bindings)];
+        if (!$request->boolean('paginate')) return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id', $bindings)];
+        $total = (int) DB::selectOne('SELECT count(*) AS n FROM ('.$sql.') accounts', $bindings)->n;
+        $perPage = $data['per_page'] ?? 25;
+        $page = $data['page'] ?? 1;
+        return ['data' => DB::select($sql.' ORDER BY u.name, m.user_id LIMIT ? OFFSET ?', [...$bindings, $perPage, ($page - 1) * $perPage]),
+            'meta' => ['total' => $total, 'per_page' => $perPage, 'page' => $page]];
     }
 
     /**

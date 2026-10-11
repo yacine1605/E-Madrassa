@@ -3,6 +3,7 @@
 use App\Exceptions\Refusal;
 use App\Http\Middleware\AccountState;
 use App\Http\Middleware\Localize;
+use App\Http\Middleware\LivewireTransaction;
 use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequirePermission;
 use App\Http\Middleware\SchoolContext;
@@ -25,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['account' => AccountState::class, 'school' => SchoolContext::class, 'module' => RequireModule::class, 'permission' => RequirePermission::class]);
-        $middleware->web(append: [Localize::class]);
+        $middleware->web(append: [Localize::class, LivewireTransaction::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The API answers in JSON; the consoles' pages keep their redirects and error pages.

@@ -235,7 +235,43 @@ English is accepted by the database but not offered yet: it arrives with its cat
 
 Left for the second part of W1.7: the school's screens in Filament. Names in Arabic and in Latin letters come with the people they belong to (students, guardians, staff: lot 2).
 
+## Increment 14: the school's accounts and rights (W1.7, second part)
+
+The school panel is at `/school/login`. It uses the existing email/username login, MFA/recovery-code challenge and progressive lockout. People belonging to several schools choose one from their memberships; a dedicated installation keeps its configured school. `/school/credentials` provides provisional-password replacement, MFA enrolment and the person's language before school access.
+
+| SRS | Covered |
+|---|---|
+| FR-IAM-01 | Paginated account list, normalized Arabic/Latin search, status filter, invitation, provisional password, identity changes, suspension/reactivation/revocation with a reason; self-suspension and the last-administrator rule remain enforced |
+| FR-IAM-03, FR-IAM-04 | School roles, copies, labels, active-module permissions, archival; assignments with school/site/referential/subject/personal scope and validity dates; self-assignment and self-elevation refused |
+| FR-PLT-02, FR-PLT-04 | Expired schools and support sessions show a read-only banner and offer no writes; consent revocation ends access on the next update and returns the operator to the console |
+| NFR-TEN-02, NFR-SEC-04 | Permissions and membership are checked again on Livewire updates; a tab opened in another school is refused. The entire update holds the restricted SQL transaction through hydration, actions and rendering; handled write refusals roll back to a savepoint |
+| FR-I18-01, NFR-I18N-01 | French/Arabic catalogs, Arabic RTL and pseudo-localization checks for the new screens |
+
+Forms call the same controllers and SQL functions as the API. Account pagination is opt-in (`paginate=1`, `per_page` up to 100); existing API consumers keep their response shape. Permission checks use permission codes, never role names. Empty roles and roles without permissions in enabled modules are excluded from assignment/copy choices.
+
+Validation on 11 October 2026: 152 PostgreSQL 16 checks including concurrency, and the full PHP regression suite (124 tests, 2,745 assertions). See the [SRS 1.2 gap report](../RAPPORT_ECART_SRS_1_2.md) for the remaining requirements. Invitation activation and forgotten-password completion remain API flows; their public browser forms are still to build. MFA enrolment currently shows the secret for manual entry in an authenticator. Browser/mobile acceptance and visual RTL checks remain pending.
+
+## Increment 15: academic reference data and calendar (W1.7, continued)
+
+Five school pages extend the same permission-checked panel:
+
+| Path | Behavior |
+|---|---|
+| `/school/reference-types` | Profile-defined types, their labels and optional activation; codes and hierarchy stay fixed (FR-REF-01) |
+| `/school/reference-nodes` | Nodes by type and archival status; compatible active parents, French or Arabic labels, ordering, immutable codes and reasoned archival from children upwards (FR-REF-02) |
+| `/school/subjects` | Subjects for a school, training modules for a centre; descriptions, ordering, unused-entry deletion, archival and history (FR-REF-03) |
+| `/school/years` | Planned/current/closed years, dates, one current year, final closure with a reason and a link to the year's periods (FR-REF-05) |
+| `/school/periods` | Periods filtered by year and archival status; dates within the year, inclusive non-overlap, ordering and archival; closed-year periods remain readable |
+
+Every page requires `referential.node.read`. Changes require `referential.node.manage`, or `subject.subject.manage` for the subject catalog, for the whole school. Support and expired-school sessions remain read-only. Forms reuse the existing controllers, including optimistic versions and database refusals isolated by savepoints. Lists use the database's Arabic/Latin search normalization; catalogs are paginated for display but still fetched in full through the existing APIs. Large-catalog server pagination remains pending.
+
+`GET /api/years?include_archived=1` additionally includes archived periods for history; the default response still includes active periods only. No schema change or migration is needed. French and Arabic catalogs, permission coverage and pseudo-localization checks include all five pages. `SchoolReferencePanelTest` exercises stale edits, foreign parent/record IDs, school switching, revoked management rights, duplicate labels, subject usage, period boundaries and closure, including real HTTP Livewire submissions.
+
+Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite passes with 134 tests and 3,144 assertions, without a local `.env` file. All 146 embedded SQL checks pass. The 152 native SQL/concurrency checks were last run in increment 14; this increment changes no SQL schema.
+
+The SRS source document is unchanged. Custom fields, school settings and the remaining shared-service screens are still to implement; browser/mobile acceptance and visual RTL checks remain pending.
+
 ## Next increments of lot 1
 
-1. **The school's screens** in Filament (W1.7, second part): accounts and roles, referential, years, settings, imports and exports, journal, support consents and the support session's banner.
+1. **The remaining school's screens** in Filament: invitation activation and password recovery, custom fields, settings, imports and exports, journal, tasks, notifications and support consents. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).

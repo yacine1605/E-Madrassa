@@ -128,6 +128,32 @@ final class PseudoLocalizationTest extends TestCase
         return array_values(array_unique($texts));
     }
 
+    public function test_school_pages_come_from_the_catalogs_and_arabic_uses_rtl(): void
+    {
+        $this->pseudo();
+        $admin = $this->account('admin');
+        $school = $this->school('essential', $admin, 'private_school_dz');
+        $this->member($school, $admin);
+        $this->signIn($admin)->assertOk();
+        $data = ['Madrassa', $admin['email'], 'admin', 'A', 'MAIN', 'tenant_admin', 'accountant', 'stock_manager', 'teacher', 'student', 'parent',
+            'direction', 'academic_hr', 'supervisor', 'front_office', ...array_values(Locales::NAMES),
+            'École '.$school->slug, $school->slug];
+        $data = [...$data, ...array_column(DB::connection('owner')->select("SELECT labels ->> 'fr' AS l FROM school.role WHERE tenant_id = ?", [$school->id]), 'l')];
+        foreach (['node_type', 'ref_node', 'subject'] as $table) {
+            $rows = DB::connection('owner')->select('SELECT code, labels FROM school.'.$table.' WHERE tenant_id = ?', [$school->id]);
+            foreach ($rows as $row) {
+                $labels = array_values(json_decode($row->labels, true));
+                $data = [...$data, $row->code, ...$labels, ...array_map(fn ($label) => $row->code.' · '.$label, $labels)];
+            }
+        }
+        foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods'] as $page) {
+            $unmarked = array_values(array_diff($this->visibleTexts($this->get('/school/'.$page)->assertOk()->getContent()), $data));
+            $this->assertSame([], $unmarked, "Text outside the catalogs on /school/$page.");
+        }
+        $this->putJson('/api/account/locale', ['locale' => 'ar'])->assertOk();
+        $this->get('/school/accounts')->assertOk()->assertSee('dir="rtl"', false)->assertHeader('Content-Language', 'ar');
+    }
+
     public function test_no_text_is_written_in_the_code(): void
     {
         $found = [];

@@ -13,6 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use SensitiveParameter;
+use App\Support\SchoolMemberships;
 
 /**
  * A person: one sign-in, possibly in several schools, possibly an operator of the publisher's
@@ -46,7 +47,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /** The console opens to its operators only (the `super_admin` of section 3.2). */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $panel->getId() === 'console' && $this->isOperator();
+        if ($panel->getId() === 'console') return $this->isOperator();
+        // Support access is checked again by SchoolContext against the current consent.
+        if ($panel->getId() === 'school') return session()->has('school.tenant') || app(SchoolMemberships::class)->forUser($this->id)->isNotEmpty()
+            || (session()->has('support.grant') && $this->isOperator());
+        return false;
     }
 
     public function isOperator(): bool

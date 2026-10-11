@@ -16,6 +16,8 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_LOCALE" value="fr"/>
+        <env name="APP_FALLBACK_LOCALE" value="fr"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="HASH_DRIVER" value="argon2id"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

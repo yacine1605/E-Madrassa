@@ -22,6 +22,7 @@ final class RequirePermission
         foreach ($required as $permission) {
             if ($this->permissions->can($permission)) return $next($request);
         }
+        if ($request->routeIs('filament.school.*')) throw Refusal::permissionDenied();
         return self::denied();
     }
 

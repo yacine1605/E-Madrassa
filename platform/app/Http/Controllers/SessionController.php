@@ -6,6 +6,7 @@ use App\Exceptions\Refusal;
 use App\Models\User;
 use App\Support\LoginThrottle;
 use App\Support\MultiFactor;
+use App\Support\SchoolMemberships;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -91,7 +92,7 @@ final class SessionController
         // A new session identifier for a new school: nothing carries over between schools.
         $request->session()->regenerate();
         $request->session()->put('school.tenant', $data['tenant_id']);
-        $request->session()->forget(['school.idle_minutes', 'locale']);
+        $request->session()->forget(['school.idle_minutes', 'locale', 'support.grant']);
         return response()->noContent();
     }
 
@@ -120,12 +121,7 @@ final class SessionController
     /** The schools this user may open; a dedicated installation offers only its own. */
     private function schoolsOf(int $user): Collection
     {
-        $schools = collect(DB::transaction(function () use ($user) {
-            DB::select("SELECT set_config('app.user_id', ?, true)", [(string) $user]);
-            return DB::select('SELECT tenant_id, slug, name, default_locale, mode FROM school.my_schools()');
-        }));
-        $pinned = config('platform.dedicated_school');
-        return $pinned ? $schools->where('slug', $pinned)->values() : $schools;
+        return app(SchoolMemberships::class)->forUser($user);
     }
 
     private function end(Request $request): void

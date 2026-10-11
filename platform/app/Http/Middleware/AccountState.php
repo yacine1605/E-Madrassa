@@ -27,11 +27,12 @@ final class AccountState
             $session->invalidate();
             $session->regenerateToken();
             // The API answers; a page of the console goes back to its sign-in.
-            if (!$request->expectsJson()) return redirect()->guest(Filament::getCurrentPanel()?->getLoginUrl() ?? '/');
+            if (!$request->expectsJson() || $request->routeIs('filament.*')) return redirect()->guest(Filament::getCurrentPanel()?->getLoginUrl() ?? '/');
             return Refusal::response('session_expired', 401);
         }
         $session->put('auth.seen_at', $now);
-        if ($request->user()->must_change_password && !$request->routeIs('account.password')) {
+        if ($request->user()->must_change_password && !$request->routeIs('account.password', 'filament.school.pages.credentials', 'filament.school.auth.logout')) {
+            if (!$request->expectsJson() || $request->routeIs('filament.school.*')) return redirect('/school/credentials');
             return Refusal::response('password_change_required', 403);
         }
         return $next($request);
