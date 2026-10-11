@@ -14,6 +14,7 @@ One Compose project per installation: the shared SaaS, or a school's dedicated i
 | `postgres` | PostgreSQL 16 |
 | `redis` | Sessions, cache, job queue |
 | `garage` | S3-compatible storage for the schools' files (FR-FIC-01), on its own volume |
+| `backup` | With `--profile backup`: the daily encrypted backups, and restorations (below) |
 
 The database owner's password reaches `migrate` only. Requests and jobs connect as `school_runtime` (row-level security), the console as `platform_admin` (no school data); neither owns a table nor bypasses row-level security. The application's encryption key is created on the first start and kept on the storage volume, with the data it protects.
 
@@ -62,8 +63,38 @@ docker compose --env-file deploy.env up -d --build --wait
 
 ## Checking an installation
 
-`sh deploy/smoke-test.sh` builds the image and deploys it in a disposable project on ports 18080 and 18443, then checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the files' storage, a school created and signed in to, the scheduler and the worker; it removes its project afterwards. CI runs it on every change.
+`sh deploy/smoke-test.sh` builds the image and deploys it in a disposable project on ports 18080 and 18443, then checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the files' storage, a school created, its administrator invited and signed in, the scheduler and the worker; it removes its project afterwards. CI runs it on every change.
 
-## Not yet
+## Backups and restoration
 
-Encrypted backups and their tested restoration (NFR-REC-01, NFR-REC-02) come with the next increment.
+```sh
+docker compose --env-file deploy.env --profile backup up -d --build --wait
+```
+
+The `backup` service copies, every day at `BACKUP_HOUR` (Algeria time, 3 by default), the database, the files' bucket and the encryption key, then keeps the last `BACKUP_KEEP` (14) in `BACKUP_DIR` (`./backups`). The first start and missed days catch up at once. During a copy the application answers 503 for a few seconds and the jobs pause, so that the database and the files are copied at rest. Each backup is a folder with `database.dump.gpg`, `key.tar.gz.gpg`, `objects.tar.gz.gpg` (GnuPG, AES-256, with `BACKUP_PASSPHRASE`) and `manifest.json`: the row count of every table, the number and size of the files, the checksums before and after encryption.
+
+`BACKUP_PASSPHRASE` is kept apart from the backups: without it no restoration is possible. The folder holds personal data and the encryption key, encrypted: keep it private, and copy it regularly to another disk or site (NFR-REC-01: a copy on the same disk does not survive the disk).
+
+```sh
+docker compose --env-file deploy.env run --rm backup backup        # a backup now
+docker compose --env-file deploy.env run --rm backup verify NAME   # decrypt and check one
+docker compose --env-file deploy.env run --rm backup health        # the latest one is recent and intact
+```
+
+The service reports itself unhealthy when the last success is more than 26 hours old.
+
+### Restoring
+
+Always into a **new** installation: the restoration refuses a database, a storage volume or a bucket that is not empty, and never touches the installation the backup comes from.
+
+```sh
+sh deploy/new-env.sh https://madrassa.example.dz   # in another folder, or with DEPLOY_ENV=recovery.env
+# In the new settings: another COMPOSE_PROJECT_NAME, the same BACKUP_PASSPHRASE and BACKUP_DIR.
+docker compose --env-file recovery.env up -d --wait postgres garage redis
+docker compose --env-file recovery.env run --rm backup restore backup-YYYYMMDDTHHMMSSffffffZ
+docker compose --env-file recovery.env up -d --build --wait
+```
+
+The restoration prepares the bucket, recreates the database roles, restores the database in one transaction and checks every table's row count, then the files (their number and size checked) and the encryption key. The new installation keeps its own passwords: `migrate` sets them again with the roles' privileges when it starts. Sessions are not kept: people sign in again.
+
+`sh deploy/restore-test.sh` does all of this between two disposable installations and checks that the school, its administrator's sign-in, a file and the key come back; CI runs it on every change.

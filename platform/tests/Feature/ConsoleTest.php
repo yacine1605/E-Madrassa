@@ -76,6 +76,20 @@ final class ConsoleTest extends TestCase
         Mail::assertSent(AccountLink::class, fn (AccountLink $mail) => $mail->hasTo("direction@$slug.dz") && $mail->purpose === 'activation');
     }
 
+    /** The publisher's commands (DEPLOY.md) invite as the console does: in the school's language. */
+    public function test_the_commands_create_a_school_and_invite_its_administrator_in_its_language(): void
+    {
+        Mail::fake();
+        $admin = $this->account('direction', false);
+        $slug = 'cmd-'.strtolower(\Illuminate\Support\Str::random(8));
+        $this->artisan('platform:create-school', ['slug' => $slug, 'name' => 'مدرسة الأمل', '--locale' => 'ar', '--admin' => $admin['email']])
+            ->assertSuccessful();
+        Mail::assertSent(AccountLink::class, fn (AccountLink $mail) => $mail->locale === 'ar' && $mail->school === 'مدرسة الأمل'
+            && $mail->hasTo($admin['email']));
+        $this->artisan('platform:invite-admin', ['slug' => $slug])->expectsOutput('Invitation sent (valid 72 hours).')->assertSuccessful();
+        $this->artisan('platform:invite-admin', ['slug' => 'unknown-school'])->assertFailed();
+    }
+
     public function test_a_school_suspended_from_the_console_is_closed_and_the_journal_says_by_whom(): void
     {
         $school = $this->school();

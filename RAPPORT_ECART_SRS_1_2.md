@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 19. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 20. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 19 : déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh` (aussi en CI) ; 147 contrôles SQL embarqués et 149 tests PHP/PostgreSQL 16, sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 20 : déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; 147 contrôles SQL embarqués et 150 tests PHP/PostgreSQL 16, sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -132,20 +132,20 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-SEC-06 | PARTIEL | Refusal, DatabaseErrors, liens chiffrés ; revue exploitation/logs à terminer | majeur | M |
 | NFR-SEC-07 | PARTIEL | Audit droits et verrouillage ; alertes anormales non livrées | majeur | M |
 | NFR-SEC-08 | ABSENT | Pas de job d'audit dépendances dans CI | majeur | S |
-| NFR-SEC-09 | PARTIEL | docker/backup de l'ancienne application ; adapter au déploiement platform | majeur | M |
+| NFR-SEC-09 | PARTIEL | Sauvegardes de platform chiffrées (GnuPG AES-256), phrase secrète hors des archives, contrôles d'intégrité (platform/docker/backup) ; copie hors site à organiser par l'exploitant | majeur | S |
 | NFR-TEN-01 | PARTIEL | SQL, deploy/roles.sql, tests ; revalider pour toute nouvelle table | bloquant | M |
 | NFR-TEN-02 | PARTIEL | SchoolIsolationTest, fichiers/exports/jobs, SchoolPanelTest, SchoolReferencePanelTest ; étendre aux autres écrans | bloquant | M |
 | NFR-TEN-03 | PARTIEL | CurrentSchool, WithinSchool, Files ; déploiement et prochains modules | bloquant | M |
 | NFR-AVL-01 | ABSENT | SLO et mesure d'exploitation à contractualiser | majeur | M |
-| NFR-REC-01 | ABSENT | Déploiement platform et sauvegarde séparée à créer | bloquant | L |
-| NFR-REC-02 | ABSENT | Restauration base+fichiers platform à tester | bloquant | M |
+| NFR-REC-01 | PARTIEL | Sauvegarde quotidienne de la base, du bucket et de la clé, 14 conservées, santé du service (DEPLOY.md) ; copie hors site et RPO à valider en exploitation | bloquant | S |
+| NFR-REC-02 | PARTIEL | Restauration testée en CI dans une installation neuve : école, connexion, fichiers et clé ; exercice de reprise réel et RTO à mesurer | bloquant | S |
 | NFR-REC-03 | ABSENT | Validation RPO par la finance requise hors code | majeur | S |
 | NFR-OPS-01 | PARTIEL | CI migrations, request_id, déploiement Compose et DEPLOY.md ; supervision et environnements de recette à compléter | majeur | M |
 | NFR-DATA-01 | PARTIEL | Aucun cloud imposé ; résidence des services à vérifier au déploiement | bloquant | M |
 | NFR-DATA-02 | ABSENT | Validation juridique OD-08 hors code | bloquant | L |
 | NFR-DATA-03 | ABSENT | Politique OD-07, purge et anonymisation à créer | majeur | L |
 | NFR-DATA-04 | PARTIEL | Exports par domaine ; export tenant complet et procédure de rectification absents | majeur | L |
-| NFR-DATA-05 | PARTIEL | Fichiers privés et export signé ; sauvegardes platform à intégrer | majeur | M |
+| NFR-DATA-05 | PARTIEL | Fichiers privés, export signé, sauvegardes chiffrées ; procédure de purge des sauvegardes selon OD-07 | majeur | S |
 | NFR-DATA-06 | PARTIEL | Tests avec données fictives ; règles à maintenir avec lots suivants | majeur | S |
 | NFR-UX-01 | PARTIEL | Console et panneau école Filament ; autres écrans et recette utilisateur à terminer | majeur | L |
 | NFR-UX-02 | PARTIEL | Composants Filament ; tests visuels mobile/tablette à faire | majeur | M |
@@ -171,8 +171,9 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 4. **Lot 1, incrément 17 livré** : mes tâches, notifications et préférences, e-mails non envoyés, imports et exports à l'écran.
 5. **Lot 1, incrément 18 livré** : activation et récupération dans le navigateur, sites selon leur module.
 6. **Lot 1, incrément 19 livré** : déploiement Docker Compose (HTTPS, rôles restreints, stockage S3, worker, planificateur), vérifié en CI.
-7. **Lot 1, suite** : sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
-8. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-9. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+7. **Lot 1, incrément 20 livré** : sauvegardes chiffrées et restauration vérifiée dans une installation neuve, en CI.
+8. **Lot 1, suite** : tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
+9. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+10. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
 10. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
 11. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

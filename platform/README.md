@@ -328,7 +328,18 @@ Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (149 tests, 4,28
 
 `deploy/new-env.sh` writes a deployment's settings with fresh secrets; `deploy/smoke-test.sh` deploys the image in a disposable project and checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the files' storage, a school created and signed in to, the scheduler and the worker. CI runs it on every change.
 
+## Increment 20: backups and restoration
+
+| SRS | Covered |
+|---|---|
+| NFR-REC-01 | With `--profile backup`, every day at 3:00 Algeria time: the database, the files' bucket and the encryption key, 14 kept; the application in maintenance for the few seconds of the copy; a health check that fails after 26 hours without success |
+| NFR-SEC-09, NFR-DATA-05 | Each archive encrypted (GnuPG, AES-256) with a passphrase kept apart; checksums before and after encryption, the row count of every table and the size of the files in a manifest; `verify` decrypts and checks a backup |
+| NFR-REC-02 | Restoration into a fresh installation only, refused over existing data: the bucket prepared, the roles recreated, the database restored in one transaction and every table counted, the files counted, the key put back; the new installation keeps its own passwords |
+
+`deploy/restore-test.sh` backs up one installation and restores it into another; the school, its administrator's sign-in, a file and the key come back. CI runs it with the smoke test.
+
+Fixed on the way: `platform:invite-admin` passed the school's name where `AccountLinks::send` expects the language since increment 13, so the command's invitations failed; it now invites exactly as the console does, and the smoke test checks the email leaves.
+
 ## Next increments of lot 1
 
-1. **Backups**: encrypted backups of the database, the files and the key, and their restoration tested on a fresh installation (NFR-REC-01, NFR-REC-02).
-2. **Acceptance**: browser, mobile and right-to-left visual checks of every screen; the remaining API pagination.
+1. **Acceptance**: browser, mobile and right-to-left visual checks of every screen; the remaining API pagination; the lot's exit walkthroughs (two schools end to end, R01, R09, R10) and the permissions' security review.

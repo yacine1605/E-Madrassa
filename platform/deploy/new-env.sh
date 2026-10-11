@@ -18,6 +18,7 @@ sed -e "s#^APP_URL=.*#APP_URL=$url#" \
     -e "s#^FILES_SECRET_ACCESS_KEY=.*#FILES_SECRET_ACCESS_KEY=$(hex 32)#" \
     -e "s#^GARAGE_RPC_SECRET=.*#GARAGE_RPC_SECRET=$(hex 32)#" \
     -e "s#^GARAGE_ADMIN_TOKEN=.*#GARAGE_ADMIN_TOKEN=$(hex 32)#" \
+    -e "s#^BACKUP_PASSPHRASE=.*#BACKUP_PASSPHRASE=$(hex 24)#" \
     deploy.env.example > "$out"
 chmod 600 "$out"
 if [ "$host" != localhost ]; then

@@ -39,13 +39,13 @@ pass "requests run as school_runtime; the owner's password stays with the migrat
 pass "files are written to and read from the bundled S3-compatible storage (FR-FIC-01)"
 
 compose run --rm -T migrate php artisan platform:user direction@smoke.test --name=Direction --password='Le figuier du jardin 2026' >/dev/null
-compose run --rm -T migrate php artisan platform:create-school smoke-a "École A" --admin=direction@smoke.test >/dev/null
+compose run --rm -T migrate php artisan platform:create-school smoke-a "École A" --admin=direction@smoke.test | grep -q "Invitation sent"     || fail "the administrator's invitation was not sent"
 compose run --rm -T migrate php artisan platform:membership smoke-a direction@smoke.test >/dev/null
 token=$(curl -ksS -c "$jar" -b "$jar" "$base/api/csrf" | sed -E 's/.*"csrf_token":"([^"]+)".*/\1/')
 curl -ksS -c "$jar" -b "$jar" -H "X-CSRF-TOKEN: $token" -H 'Accept: application/json' -H 'Content-Type: application/json' \
     -d '{"login":"direction@smoke.test","password":"Le figuier du jardin 2026"}' "$base/api/session" | grep -q '"slug":"smoke-a"' \
     || fail "the school's administrator cannot sign in"
-pass "a school created by the publisher's commands, and its administrator signed in"
+pass "a school created by the publisher's commands, its administrator invited by email and signed in"
 
 i=0
 until compose logs scheduler 2>/dev/null | grep -q "platform:outbox"; do

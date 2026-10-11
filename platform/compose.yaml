@@ -143,6 +143,54 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # NFR-REC-01: every day at BACKUP_HOUR (Algeria time), the database, the files' bucket and the
+  # encryption key, encrypted with BACKUP_PASSPHRASE, BACKUP_KEEP of them kept in BACKUP_DIR.
+  # `--profile backup` starts it; restoring goes into a fresh project (DEPLOY.md).
+  backup:
+    image: ${BACKUP_IMAGE:-madrassa-platform-backup:latest}
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    profiles: [backup]
+    environment:
+      BACKUP_PROJECT: ${COMPOSE_PROJECT_NAME:-madrassa-platform}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      BACKUP_DRAIN_SECONDS: ${BACKUP_DRAIN_SECONDS:-15}
+      PGHOST: postgres
+      PGDATABASE: ${DB_DATABASE:-madrassa}
+      PGUSER: ${DB_OWNER_USERNAME:-platform_owner}
+      PGPASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD}
+      FILES_BUCKET: ${FILES_BUCKET:-madrassa-files}
+      FILES_ACCESS_KEY_ID: ${FILES_ACCESS_KEY_ID:?set FILES_ACCESS_KEY_ID}
+      FILES_SECRET_ACCESS_KEY: ${FILES_SECRET_ACCESS_KEY:?set FILES_SECRET_ACCESS_KEY}
+      GARAGE_ADMIN_URL: ${GARAGE_ADMIN_URL-http://garage:3903}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-}
+      RCLONE_CONFIG_FILES_TYPE: s3
+      RCLONE_CONFIG_FILES_PROVIDER: Other
+      RCLONE_CONFIG_FILES_ENDPOINT: ${FILES_ENDPOINT:-http://garage:3900}
+      RCLONE_CONFIG_FILES_REGION: ${FILES_REGION:-garage}
+      RCLONE_CONFIG_FILES_ACCESS_KEY_ID: ${FILES_ACCESS_KEY_ID}
+      RCLONE_CONFIG_FILES_SECRET_ACCESS_KEY: ${FILES_SECRET_ACCESS_KEY}
+      RCLONE_CONFIG_FILES_FORCE_PATH_STYLE: "true"
+      RCLONE_CONFIG_FILES_NO_CHECK_BUCKET: "true"
+    volumes:
+      - app-storage:/app-storage
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "/opt/madrassa/backup.py", "health"]
+      interval: 60s
+      timeout: 120s
+      start_period: 300s
+      retries: 3
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:

@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\AccountLinks;
+use App\Support\Console;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
@@ -98,24 +98,23 @@ Artisan::command('platform:apply-profile {slug} {profile} {--profile-version=}',
     $this->info("Profile $profile version $version applied.");
 })->purpose('Apply a profile version to a school, adding what it lacks (as platform_admin)');
 
-Artisan::command('platform:invite-admin {slug}', function (string $slug) {
-    $console = DB::connection('console');
-    $tenant = $console->table('platform.tenant')->where('slug', $slug)->first(['id', 'name']);
+Artisan::command('platform:invite-admin {slug}', function (string $slug, Console $console) {
+    $tenant = DB::connection('console')->table('platform.tenant')->where('slug', $slug)->value('id');
     if (!$tenant) { $this->error('Unknown school.'); return 1; }
-    [$token, $hash] = AccountLinks::token();
+    // As the console does: in the school's language, the reason in its journal.
     try {
-        $admin = $console->selectOne('SELECT email, name FROM platform.invite_admin(?, ?)', [$tenant->id, $hash]);
+        $sent = $console->inviteAdmin($tenant);
     } catch (QueryException $e) {
         $this->warn('No administrator awaiting activation in this school.');
         return 0;
     }
-    if (AccountLinks::send('activation', $admin->email, $admin->name, $token, $tenant->name)) {
-        $this->info('Invitation sent to '.$admin->email.' (valid 72 hours).');
+    if ($sent['delivery'] === 'sent') {
+        $this->info('Invitation sent (valid 72 hours).');
         return 0;
     }
     // FR-IAM-01: sending failed; the link goes to the administrator another way. Never logged.
     $this->warn('Sending failed. Activation link, valid 72 hours, to hand over securely:');
-    $this->line(AccountLinks::url('activation', $token));
+    $this->line($sent['activation_url']);
     return 0;
 })->purpose('Send the activation link to the administrator named when the school was created (as platform_admin)');
 

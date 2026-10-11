@@ -162,7 +162,7 @@ jobs:
       - run: docker build -f docker/backup/Dockerfile -t madrassa-backup:ci .
 
   platform-deployment:
-    name: Platform deployment (Docker Compose smoke test)
+    name: Platform deployment, backup and restore (Docker Compose)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -171,3 +171,5 @@ jobs:
       - uses: actions/checkout@v7
       - name: Build the image, deploy it in a disposable project and check it end to end
         run: sh deploy/smoke-test.sh
+      - name: Back up an installation and restore it into a fresh one
+        run: sh deploy/restore-test.sh
