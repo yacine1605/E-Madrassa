@@ -8,6 +8,7 @@ use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -16,8 +17,10 @@ final class SchoolScreen
 {
     public static function request(array $data = []): Request
     {
-        // Livewire's JSON content type belongs to its envelope, not this form payload.
-        $request = Request::create('/', 'POST', $data, server: ['REMOTE_ADDR' => request()->ip()]);
+        // Livewire's JSON content type belongs to its envelope, not this form payload. An
+        // uploaded file goes where the API receives it: among the request's files.
+        $files = array_filter($data, fn ($value) => $value instanceof UploadedFile);
+        $request = Request::create('/', 'POST', array_diff_key($data, $files), files: $files, server: ['REMOTE_ADDR' => request()->ip()]);
         $request->setUserResolver(fn () => auth()->user());
         $request->setLaravelSession(session()->driver());
         return $request;
@@ -33,26 +36,35 @@ final class SchoolScreen
         return is_array($result) ? json_decode(json_encode($result, JSON_THROW_ON_ERROR), true, 32, JSON_THROW_ON_ERROR) : [];
     }
 
-    /** @param string|list<string> $permission one of them suffices, as for the route */
+    /**
+     * @param string|list<string> $permission one of them suffices, as for the route; none for the
+     *   person's own records (tasks, notifications), which row-level security limits to them
+     */
     public static function call(string|array $permission, string $controller, string $method, array $data = [], array $parameters = []): array
     {
-        if (!collect((array) $permission)->contains(fn (string $one) => app(Permissions::class)->can($one))) throw Refusal::permissionDenied();
+        $any = (array) $permission;
+        if ($any !== [] && !collect($any)->contains(fn (string $one) => app(Permissions::class)->can($one))) throw Refusal::permissionDenied();
         return self::payload(app()->call([app($controller), $method], ['request' => self::request($data), ...$parameters]));
     }
 
-    public static function writable(string $permission): bool
+    /** @param ?string $permission none for the person's own records */
+    public static function writable(?string $permission): bool
     {
         return app(CurrentSchool::class)->mode() === 'active' && !app(CurrentSchool::class)->support()
-            && app(Permissions::class)->everywhere($permission);
+            && ($permission === null || app(Permissions::class)->everywhere($permission));
     }
 
-    /** Savepoint: a refused multi-step action rolls back, and the surrounding render still works. */
-    public static function change(string $permission, callable $change): array
+    /**
+     * Savepoint: a refused multi-step action rolls back, and the surrounding render still works.
+     *
+     * @param ?callable(array): Notification $done what to tell once done, from the result; « saved » by default
+     */
+    public static function change(?string $permission, callable $change, ?callable $done = null): array
     {
         try {
             if (!self::writable($permission)) throw Refusal::permissionDenied();
             $result = DB::transaction(fn () => self::payload($change()));
-            Notification::make()->title(__('school.saved'))->success()->send();
+            ($done ? $done($result) : Notification::make()->title(__('school.saved'))->success())->send();
             return $result;
         } catch (QueryException $e) {
             $refusal = DatabaseErrors::classify($e) ?? throw $e;

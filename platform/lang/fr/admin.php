@@ -3,6 +3,8 @@
 // The school's administration screens: settings, custom fields, support access, journal.
 return [
     'sections' => [
+        'personal' => 'Mon espace',
+        'data' => 'Imports et exports',
         'people' => 'Personnes et droits',
         'referential' => 'Référentiel',
         'administration' => 'Administration',

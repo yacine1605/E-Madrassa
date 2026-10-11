@@ -37,9 +37,13 @@ final class ImportController
         return response()->json(['data' => $this->imports->start($request->file('file'), $data['kind'], $data['options'] ?? [])], 202);
     }
 
+    /** The latest imports, each with its rows counted: in all, valid or applied, rejected. */
     public function index()
     {
-        return ['data' => DB::select('SELECT '.Imports::BATCH_COLUMNS.' FROM school.import_batch ORDER BY created_at DESC LIMIT 100')];
+        return ['data' => DB::select('SELECT '.Imports::BATCH_COLUMNS.", coalesce(c.total, 0) AS rows_total, coalesce(c.rejected, 0) AS rows_rejected,
+            coalesce(c.total - c.rejected, 0) AS rows_valid FROM school.import_batch b
+            LEFT JOIN (SELECT batch_id, count(*) AS total, count(*) FILTER (WHERE outcome = 'rejected') AS rejected FROM school.import_row GROUP BY batch_id) c
+              ON c.batch_id = b.id ORDER BY created_at DESC LIMIT 100")];
     }
 
     public function show(string $batch)

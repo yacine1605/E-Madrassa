@@ -3,6 +3,8 @@
 // The school's administration screens: settings, custom fields, support access, journal.
 return [
     'sections' => [
+        'personal' => 'فضائي',
+        'data' => 'الاستيراد والتصدير',
         'people' => 'الأشخاص والصلاحيات',
         'referential' => 'المرجع',
         'administration' => 'الإدارة',

@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 16. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 17. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 16 : 147 contrôles SQL embarqués, 153 contrôles SQL natifs avec concurrence et 140 tests PHP/PostgreSQL 16 (3 747 assertions), sans fichier `.env` local ; la migration 017 se défait et se réapplique. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 17 : 147 contrôles SQL embarqués et 145 tests PHP/PostgreSQL 16 (4 142 assertions), sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -32,11 +32,11 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | FR-REF-06 | PARTIEL | SettingController, SQL, UI/School/Settings, SchoolAdministrationPanelTest ; logo, seuils finance et créneaux planning avec leurs lots | majeur | M |
 | FR-AUD-01 | PARTIEL | AuditController, SQL, ServicesTest, UI/School/Journal, SchoolAdministrationPanelTest : filtres et détail avant/après ; objets métier futurs | majeur | M |
 | FR-I18-01 | PARTIEL | Locales, lang/fr, lang/ar, LocalizationTest, PseudoLocalizationTest ; comptes/droits/référentiel/calendrier/administration livrés, catalogues de la plateforme en arabe ; autres écrans et recette visuelle arabe à compléter | majeur | M |
-| FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest ; écran et import des entités du lot 2 | majeur | M |
-| FR-IMP-02 | PARTIEL | Exporter, ExportController, ExportTest ; écran et jeux de données métier futurs | majeur | M |
+| FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest, UI/School/Imports, SchoolServicesPanelTest : modèle, aperçu, rejets, confirmation, annulation ; import des entités du lot 2 | majeur | M |
+| FR-IMP-02 | PARTIEL | Exporter, ExportController, ExportTest, UI/School/Exports, SchoolServicesPanelTest ; jeux de données métier futurs | majeur | M |
 | FR-FIC-01 | PARTIEL | Files, FileController, FileTest ; stockage S3 de déploiement et interfaces métier | majeur | M |
-| FR-NOT-01 | PARTIEL | Outbox, NotificationController, ServicesTest ; cloche tenant et événements futurs | majeur | M |
-| FR-JOB-01 | PARTIEL | Tasks, WithinSchool, JobController, ServicesTest ; écran des tâches et supervision | majeur | M |
+| FR-NOT-01 | PARTIEL | Outbox, NotificationController, ServicesTest, UI/School/Notifications et Deliveries, SchoolServicesPanelTest : compteur des non-lues, préférences, renvoi ; événements futurs | majeur | M |
+| FR-JOB-01 | PARTIEL | Tasks, WithinSchool, JobController, ServicesTest, UI/School/Tasks, SchoolServicesPanelTest : suivi, annulation, relance, téléchargement ; supervision d'exploitation | majeur | M |
 | FR-PDF-01 | PARTIEL | Pdf, vues/pdf, PdfTest ; modèles métier et recette visuelle arabe | majeur | M |
 | FR-ELV-01 | ABSENT | platform : fiche élève à créer au lot 2 | majeur | L |
 | FR-ELV-02 | ABSENT | platform : responsables et liens à créer au lot 2 | majeur | M |
@@ -168,8 +168,9 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 1. **Lot 1, incrément 14 livré** : entrée du panneau tenant, sélection sûre d'école, comptes/rôles/assignations, sécurité personnelle et bannière support ; tests d'isolation, permissions, séparation, suspension, expiration, MFA et pseudo-localisation. Les actions réutilisent les validations et fonctions SQL existantes. Les refus SQL sont isolés par savepoint pour laisser la transaction du panneau utilisable. Les anciennes applications ne sont pas modifiées.
 2. **Lot 1, incrément 15 livré** : types et nœuds du référentiel, catalogue matières/modules, années et périodes ; libellés FR ou AR, parents compatibles, archivage, historique, suppression des matières inutilisées, dates et clôture définitive. Recherche normalisée, versions optimistes et contrôles de permission/isolation repris dans les écrans. Les listes paginent l'affichage ; les API de catalogue chargent encore toutes les lignes.
 3. **Lot 1, incrément 16 livré** : paramètres, champs personnalisés, consentements support et journal ; libellés arabes de tous les catalogues de la plateforme.
-4. **Lot 1, suite** : tâches, notifications, imports/exports ; activation/récupération publiques et sites. Puis Docker/Compose, sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
-5. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-6. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-7. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-8. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+4. **Lot 1, incrément 17 livré** : mes tâches, notifications et préférences, e-mails non envoyés, imports et exports à l'écran.
+5. **Lot 1, suite** : activation/récupération publiques et sites. Puis Docker/Compose, sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
+6. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+7. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+8. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+9. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

@@ -288,7 +288,21 @@ BR-18: modules, plans, permissions, role templates and settings were labelled in
 
 Validation on 11 October 2026: 153 native PostgreSQL 16 checks including concurrency, 147 embedded checks, the full PHP suite (140 tests, 3,747 assertions); migration 017 rolls back and applies again.
 
+## Increment 17: tasks, notifications, imports and exports on screen (W1.7, continued)
+
+| Path | SRS | Behavior |
+|---|---|---|
+| `/school/tasks` | FR-JOB-01 | The person's own background jobs, refreshed while open: progress, message, cancellation, retry after failure, the file of a finished export |
+| `/school/notifications` | FR-NOT-01 | The person's notifications, the unread ones counted on the menu entry; marked read one by one or all at once; which events also come by email |
+| `/school/deliveries` | FR-NOT-01 AC1 | Emails that failed five times, with their reason, sent again on request. Requires `tenant.settings.manage` |
+| `/school/imports` | FR-IMP-01 | Templates, a file previewed without writing anything, its rejected rows with their cause and the report, confirmation, undo. Each kind of data needs the permission that creates it on screen |
+| `/school/exports` | FR-IMP-02 | CSV, Excel or PDF of what the person may read on screen, in the language chosen, with its filters; ready at once, or in the background beyond 2,000 rows; each file downloadable by its author for 7 days |
+
+Tasks and notifications need no permission: row-level security shows each person their own. A read-only school or a support session still changes nothing there; an operator under consent follows the imports without starting one. `GET /api/imports` now counts each import's rows (in all, valid, rejected); a file chosen on screen reaches the import controller as an upload, exactly as through the API.
+
+Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (145 tests, 4,142 assertions) and the 147 embedded SQL checks; no schema change.
+
 ## Next increments of lot 1
 
-1. **The remaining school's screens**: tasks and notifications (bell, preferences, failed deliveries), imports and exports; then public invitation activation and password recovery, and sites. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
+1. **Public pages**: invitation activation and password recovery in the browser; the sites screen. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).
