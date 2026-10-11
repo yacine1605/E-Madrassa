@@ -166,7 +166,11 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 | FR-IAM-05 | Assigning a sensitive permission (by role or by adding it to an assigned role) notifies the holders of `audit.log.read` for the whole school, the author aside |
 | NFR-SEC-06 | The recovery link is queued, encrypted in the queue, and the answer comes at once whether the address is known or not |
 
-Left for the second part of W1.6: the import engine with files, preview and rollback (FR-IMP-01), exports (FR-IMP-02).
+Left for the second part of W1.6: the import engine with files, preview and rollback (FR-IMP-01).
+
+### Exports (FR-IMP-02)
+
+`POST /api/exports` with a kind (`config/platform.php`, `exports`: an `App\Exports\Dataset`), a format (CSV, XLSX, PDF), filters and a language. An export needs `export.job.create` and the permission that reads the data on screen; a column may require a permission of its own, left out otherwise (AC1: no salary column for whoever cannot see salaries). Cells that a spreadsheet would read as formulas become text (AC2). CSV in UTF-8 with its mark and semicolons; Excel right-to-left in Arabic; PDF through the list template. Up to 2 000 rows the file is ready at once, beyond a background job makes it and notifies its author. Each export is logged (`school.export_log`: author, kind, filters, columns, rows, file), read by its author and by the journal's readers; its file is the author's and leaves storage after seven days.
 
 ### Files (FR-FIC-01)
 

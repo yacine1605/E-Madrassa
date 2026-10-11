@@ -29,7 +29,15 @@ return [
     // FR-JOB-01: the kinds of school jobs and the task that runs each.
     'tasks' => [
         'accounts.import' => App\Tasks\ImportAccounts::class,
+        'exports.generate' => App\Tasks\GenerateExport::class,
     ],
+
+    // FR-IMP-02: what can be exported, and from how many rows an export runs in the background.
+    'exports' => [
+        'accounts' => App\Exports\AccountsExport::class,
+        'referential' => App\Exports\ReferentialExport::class,
+    ],
+    'export_background_rows' => 2000,
 
     // Activation and recovery links point to the front end; the token travels in the fragment,
     // which browsers never send to a server or put in a Referer header.

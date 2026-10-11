@@ -72,6 +72,8 @@ GRANT SELECT, INSERT (tenant_id, category, storage_key, original_name, file_type
 GRANT UPDATE (owner_type, owner_id, archived_at, version) ON school.file_object TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.file_categories(text), school.storage_use(uuid), school.file_for_link(uuid, uuid),
   platform.expired_files(integer), platform.mark_purged(uuid) TO school_runtime;
+-- Export log (012): written by the author of each export, never changed.
+GRANT SELECT, INSERT (tenant_id, user_id, kind, format, filters, columns, row_count, file_id) ON school.export_log TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;

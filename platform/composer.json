@@ -11,6 +11,7 @@
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.0",
         "mpdf/mpdf": "^8.2",
+        "openspout/openspout": "^4.28",
         "pragmarx/google2fa": "^8.0"
     },
     "require-dev": {

@@ -910,6 +910,23 @@ await check('a signed link reaches a file still in storage; expired exports are 
   assert.equal((await sql('SELECT * FROM school.file_for_link($1, $2)', [a, exported])).rows.length, 0);
 });
 
+// Export log (FR-IMP-02)
+await check('every export is logged by its author, read by the journal\'s readers, and never changed (FR-IMP-02)', async () => {
+  await as('school_runtime', a, 8);
+  const exported = (await first(FILE, [a, 'export', 'comptes.csv', 'csv', 10])).id;
+  const LOG = `INSERT INTO school.export_log (tenant_id, user_id, kind, format, filters, columns, row_count, file_id)
+    VALUES ($1, $2, 'accounts', 'csv', '{"status": "active"}', '{name,email}', 12, $3) RETURNING id`;
+  const log = (await first(LOG, [a, 8, exported])).id;
+  await rejects(LOG, [a, 1, exported], '42501');
+  await rejects("UPDATE school.export_log SET row_count = 0 WHERE id = $1", [log], '42501');
+  await as('school_runtime', a, 1);
+  assert.equal(await count('SELECT count(*) n FROM school.export_log WHERE id = $1', [log]), 1, 'an administrator reads the journal');
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.export_log'), 0);
+  await as(null);
+  await rejects('DELETE FROM school.export_log WHERE id = $1', [log], '23514', 'immutable_record');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));

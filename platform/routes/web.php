@@ -6,6 +6,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
@@ -72,6 +73,11 @@ Route::prefix('api')->group(function () {
             });
 
             Route::get('audit', [AuditController::class, 'index'])->middleware('permission:audit.log.read');
+
+            Route::middleware('permission:export.job.create')->group(function () {
+                Route::post('exports', [ExportController::class, 'store']);
+                Route::get('exports', [ExportController::class, 'index']);
+            });
 
             Route::middleware(FileController::WRITERS)->group(function () {
                 Route::post('files', [FileController::class, 'store']);
