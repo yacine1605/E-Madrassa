@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Middleware\RequirePermission;
+use App\Exceptions\Refusal;
 use App\Support\CurrentSchool;
 use App\Support\Permissions;
 use Illuminate\Http\Request;
@@ -31,7 +31,7 @@ final class SiteController
     public function store(Request $request)
     {
         // A new site is outside any site scope: only a grant for the whole school creates one.
-        if (!$this->permissions->everywhere('site.site.manage')) abort(RequirePermission::denied());
+        if (!$this->permissions->everywhere('site.site.manage')) throw Refusal::permissionDenied();
         $data = $request->validate($this->labelRules() + ['code' => ['required', 'string', 'regex:/^[A-Za-z0-9_-]{1,40}$/']]);
         $row = DB::selectOne('INSERT INTO school.site (tenant_id, code, labels) VALUES (?, ?, ?::jsonb) RETURNING '.self::COLUMNS,
             [$this->school->id(), $data['code'], json_encode($this->labels($data), JSON_THROW_ON_ERROR)]);
@@ -64,7 +64,7 @@ final class SiteController
     private function inScope(string $site): void
     {
         $sites = $this->permissions->sites('site.site.manage');
-        if ($sites !== null && !in_array($this->uuid($site), $sites, true)) abort(RequirePermission::denied());
+        if ($sites !== null && !in_array($this->uuid($site), $sites, true)) throw Refusal::permissionDenied();
     }
 
     private function labelRules(): array

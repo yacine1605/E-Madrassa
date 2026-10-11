@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\Refusal;
 use App\Http\Middleware\AccountState;
 use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequirePermission;
@@ -23,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // The application is an API for its own front end: errors are always JSON.
         $exceptions->shouldRenderJsonWhen(fn () => true);
         $exceptions->render(fn (QueryException $e) => DatabaseErrors::response($e));
+        $exceptions->render(fn (Refusal $e) => response()->json(['message' => $e->getMessage(), 'code' => $e->reason, ...$e->extra], $e->status));
+        $exceptions->dontReport(Refusal::class);
         // A refusal the schema enforces is expected; any other database error is a fault and is logged.
         $exceptions->dontReportWhen(fn (Throwable $e) => $e instanceof QueryException && DatabaseErrors::classify($e) !== null);
     })->create();

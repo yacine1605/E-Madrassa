@@ -74,6 +74,14 @@ GRANT EXECUTE ON FUNCTION school.file_categories(text), school.storage_use(uuid)
   platform.expired_files(integer), platform.mark_purged(uuid) TO school_runtime;
 -- Export log (012): written by the author of each export, never changed.
 GRANT SELECT, INSERT (tenant_id, user_id, kind, format, filters, columns, row_count, file_id) ON school.export_log TO school_runtime;
+-- Imports (013): batches and their rows, worked by their author; imported accounts nobody
+-- used yet are discarded only through the definer function.
+GRANT SELECT, INSERT (tenant_id, user_id, kind, file_id, options) ON school.import_batch TO school_runtime;
+GRANT UPDATE (status, error_message) ON school.import_batch TO school_runtime;
+GRANT SELECT, INSERT (tenant_id, batch_id, line, external_ref, data, outcome, action, error_code, error_message, target_type, target_id, previous)
+  ON school.import_row TO school_runtime;
+GRANT UPDATE (outcome, action, error_code, error_message, target_type, target_id, previous) ON school.import_row TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.discard_account(bigint) TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
@@ -99,6 +107,7 @@ GRANT SELECT, INSERT ON school.notification TO platform_provisioner;
 GRANT SELECT, INSERT, UPDATE, DELETE ON school.outbox TO platform_provisioner;
 GRANT SELECT ON school.notification_preference TO platform_provisioner;
 GRANT SELECT, UPDATE ON school.file_object TO platform_provisioner;
+GRANT DELETE ON school.membership, public.users, public.account_token TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.label_key(text), school.valid_labels(jsonb) TO platform_provisioner;
 GRANT SELECT, INSERT ON public.users TO platform_provisioner;
 GRANT UPDATE (name, email, password, must_change_password, password_changed_at, remember_token, updated_at) ON public.users TO platform_provisioner;
@@ -154,3 +163,4 @@ ALTER FUNCTION school.storage_use(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.file_for_link(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.expired_files(integer) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.mark_purged(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.discard_account(bigint) OWNER TO platform_provisioner;

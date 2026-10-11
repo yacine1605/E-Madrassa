@@ -64,6 +64,7 @@ final class DatabaseErrors
         'tenant_required' => 'Aucun établissement choisi.',
         'file_type_refused' => 'Ce type de fichier n’est pas accepté ici.',
         'file_too_large' => 'Ce fichier dépasse la taille permise par l’établissement.',
+        'dependent_operation' => 'Une opération saisie depuis dépend de cet enregistrement.',
         'storage_quota_exceeded' => 'L’espace de stockage de l’établissement est plein : archivez des fichiers ou augmentez l’abonnement.',
     ];
 

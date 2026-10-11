@@ -8,6 +8,7 @@ use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
@@ -73,6 +74,19 @@ Route::prefix('api')->group(function () {
             });
 
             Route::get('audit', [AuditController::class, 'index'])->middleware('permission:audit.log.read');
+
+            Route::middleware('permission:import.job.create')->group(function () {
+                Route::get('imports/templates/{kind}', [ImportController::class, 'template']);
+                Route::post('imports', [ImportController::class, 'store']);
+                Route::post('imports/{batch}/confirm', [ImportController::class, 'confirm']);
+                Route::post('imports/{batch}/rollback', [ImportController::class, 'rollback']);
+            });
+            Route::middleware('permission:import.job.create,import.job.read')->group(function () {
+                Route::get('imports', [ImportController::class, 'index']);
+                Route::get('imports/{batch}', [ImportController::class, 'show']);
+                Route::get('imports/{batch}/rows', [ImportController::class, 'rows']);
+                Route::get('imports/{batch}/report', [ImportController::class, 'report']);
+            });
 
             Route::middleware('permission:export.job.create')->group(function () {
                 Route::post('exports', [ExportController::class, 'store']);

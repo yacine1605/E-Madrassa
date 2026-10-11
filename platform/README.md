@@ -166,7 +166,6 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 | FR-IAM-05 | Assigning a sensitive permission (by role or by adding it to an assigned role) notifies the holders of `audit.log.read` for the whole school, the author aside |
 | NFR-SEC-06 | The recovery link is queued, encrypted in the queue, and the answer comes at once whether the address is known or not |
 
-Left for the second part of W1.6: the import engine with files, preview and rollback (FR-IMP-01).
 
 ### Exports (FR-IMP-02)
 
@@ -180,7 +179,13 @@ Left for the second part of W1.6: the import engine with files, preview and roll
 
 `App\Support\Pdf` renders a view of `resources/views/pdf` with mPDF: DejaVu Sans and XB Riyaz embedded, Arabic letters joined and laid out right to left, the school's name and receipt contacts in the header, the reference and generation time fixed by the caller in the footer with the page numbers. `App\Support\Money` writes amounts from whole centimes with no-break spaces between digit groups, so that an Arabic line never shows "500,50 12". Tests read the documents back with poppler (`pdftotext`, `pdffonts`); the PHP `gd` extension is required by mPDF. A receipt and a list template are ready for finance (lot 3) and exports. Security alerts (NFR-SEC-07) come with the console's supervision (FR-PLT-05).
 
+### Imports (FR-IMP-01, TST-14)
+
+`GET /api/imports/templates/{kind}` gives the template (CSV or Excel, the columns' codes on the first line); `POST /api/imports` keeps the file (category `import`) and previews it in the background: every row is validated, then applied for real in a transaction that is rolled back, so the preview finds every refusal, the database's included, and writes no business data (AC3, the "reprise à blanc"). Each refused row has its line and cause (AC2), also as a downloadable report; references are found by code, never created. `POST /api/imports/{id}/confirm` applies the valid rows by batches of 100, each committed on its own; rows are found by their stable reference, so the same file imported again duplicates nothing (AC1). `POST /api/imports/{id}/rollback` undoes a complete import, last row first, all or nothing, and refuses while something done since depends on it; an imported account is removed only if nobody has used it (`school.discard_account`). Kinds: `accounts` and `referential` (`config/platform.php`, `imports`: an `App\Imports\Importer`); students, staff, groups, payments and the rest join with their modules.
+
+A refusal that must undo what the request already wrote is thrown as `App\Exceptions\Refusal`, never as `HttpResponseException`, which the router answers on the spot without rolling the transaction back.
+
 ## Next increments of lot 1
 
-1. **Shared services, part 2** (W1.6), **console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+1. **Console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).

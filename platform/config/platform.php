@@ -30,6 +30,14 @@ return [
     'tasks' => [
         'accounts.import' => App\Tasks\ImportAccounts::class,
         'exports.generate' => App\Tasks\GenerateExport::class,
+        'imports.preview' => App\Tasks\PreviewImport::class,
+        'imports.run' => App\Tasks\RunImport::class,
+    ],
+
+    // FR-IMP-01: what can be imported from a file.
+    'imports' => [
+        'accounts' => App\Imports\AccountsImporter::class,
+        'referential' => App\Imports\ReferentialImporter::class,
     ],
 
     // FR-IMP-02: what can be exported, and from how many rows an export runs in the background.

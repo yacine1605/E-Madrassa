@@ -927,6 +927,37 @@ await check('every export is logged by its author, read by the journal\'s reader
   await rejects('DELETE FROM school.export_log WHERE id = $1', [log], '23514', 'immutable_record');
 });
 
+// Imports (FR-IMP-01)
+await check('an import batch is its author\'s, moves forward only, and its rows follow it (FR-IMP-01)', async () => {
+  await as('school_runtime', a, 1);
+  const original = (await first(FILE, [a, 'import', 'comptes.csv', 'csv', 10])).id;
+  const batch = (await first("INSERT INTO school.import_batch (tenant_id, user_id, kind, file_id) VALUES ($1, 1, 'accounts', $2) RETURNING id", [a, original])).id;
+  await sql("INSERT INTO school.import_row (tenant_id, batch_id, line, external_ref, data, outcome, action) VALUES ($1, $2, 1, 'EL-1', '{}', 'valid', 'create')", [a, batch]);
+  await rejects("INSERT INTO school.import_row (tenant_id, batch_id, line, data, outcome) VALUES ($1, $2, 2, '{}', 'rejected')", [a, batch], '23514');
+  await rejects("UPDATE school.import_batch SET status = 'imported' WHERE id = $1", [batch], '23514', 'status_invalid');
+  await sql("UPDATE school.import_batch SET status = 'previewed' WHERE id = $1", [batch]);
+  assert.equal((await first('SELECT previewed_at IS NOT NULL AS p FROM school.import_batch WHERE id = $1', [batch])).p, true);
+  await as('school_runtime', a, 8);
+  assert.equal(await count('SELECT count(*) n FROM school.import_batch WHERE id = $1', [batch]), 1, 'import.job.read follows every import');
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.import_row'), 0);
+});
+await check('undoing an imported account removes only an account nobody has used (FR-IMP-01 rollback)', async () => {
+  await as('school_runtime', a, 1);
+  const fresh = await first(CREATE_ACCOUNT, ['Importé', null, 'importe.1', 'IMP-1', null]);
+  const used = await first(CREATE_ACCOUNT, ['Utilisé', 'utilise@example.test', null, 'IMP-2', null]);
+  await assign(used.id, 'teacher');
+  await rejects('SELECT school.discard_account($1)', [used.id], '23514', 'dependent_operation');
+  await rejects('SELECT school.discard_account(3)', [], '23514', 'dependent_operation');
+  await sql('SELECT school.discard_account($1)', [fresh.id]);
+  await as(null);
+  assert.equal(await count('SELECT count(*) n FROM public.users WHERE id = $1', [fresh.id]), 0);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND action = 'DISCARD'", [a]), 1);
+  await rejects('DELETE FROM school.membership WHERE tenant_id = $1 AND user_id = $2', [a, used.id], '23514', 'immutable_record');
+  await as('school_runtime', a, 7);
+  await rejects('SELECT school.discard_account($1)', [used.id], '42501', 'permission_denied');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));
