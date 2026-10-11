@@ -5,6 +5,8 @@
 # Usage: sh deploy/smoke-test.sh   (removes its project and volumes afterwards)
 set -eu
 cd "$(dirname "$0")/.."
+# Git Bash on Windows would rewrite container paths such as /backups; no effect elsewhere.
+export MSYS_NO_PATHCONV=1
 project=madrassa-smoke
 env_file=$(mktemp)
 rm -f "$env_file"

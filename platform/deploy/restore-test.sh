@@ -5,6 +5,8 @@
 # Usage: sh deploy/restore-test.sh   (removes both projects and the backups afterwards)
 set -eu
 cd "$(dirname "$0")/.."
+# Git Bash on Windows would rewrite container paths such as /backups; no effect elsewhere.
+export MSYS_NO_PATHCONV=1
 work=.restore-test
 rm -rf "$work"
 mkdir -p "$work/backups"
@@ -23,6 +25,8 @@ settle madrassa-restore-b "$env_b" 18743 18280
 a() { docker compose -p madrassa-restore-a --env-file "$env_a" "$@"; }
 b() { docker compose -p madrassa-restore-b --env-file "$env_b" "$@"; }
 cleanup() {
+    # The backups belong to the container's root, and are readable by it only: removed from inside.
+    a run --rm -T --no-deps --entrypoint sh backup -c 'rm -rf /backups/* /backups/.[!.]*' >/dev/null 2>&1 || true
     a --profile backup down -v --remove-orphans >/dev/null 2>&1 || true
     b --profile backup down -v --remove-orphans >/dev/null 2>&1 || true
     rm -rf "$work"
@@ -51,7 +55,9 @@ pass "an installation with a school, its administrator and a file"
 a build backup >/dev/null 2>&1
 name=$(a run --rm -T backup backup | sed -n 's/.*"backup": "\([^"]*\)".*/\1/p')
 [ -n "$name" ] || fail "no backup made"
-[ -z "$(ls "$work/backups/$name" | grep -v -e '\.gpg$' -e '^manifest\.json$')" ] || fail "an archive is kept unencrypted"
+listing=$(a run --rm -T --no-deps --entrypoint ls backup "/backups/$name") || fail "the backup cannot be listed"
+[ "$(printf '%s\n' $listing | sort | tr '\n' ' ')" = "database.dump.gpg key.tar.gz.gpg manifest.json objects.tar.gz.gpg " ] \
+    || fail "the backup holds something other than its encrypted archives and manifest: $listing"
 a run --rm -T backup verify "$name" >/dev/null || fail "the backup does not verify"
 signs_in 18643 || fail "the installation stayed in maintenance after the backup"
 pass "an encrypted backup, verified, and the installation back in service (NFR-REC-01)"
