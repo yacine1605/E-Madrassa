@@ -144,8 +144,8 @@ final class SchoolPanelTest extends TestCase
         $this->within($school, $admin, function () use ($school) {
             Livewire::test(Accounts::class)->callTableAction('create', data: ['name' => 'Nouveau compte', 'email' => 'new-'.$school->slug.'@example.test', 'method' => 'link'])
                 ->assertNotified(__('school.invitation_sent'));
-            $created = DB::table('users')->where('email', 'new-'.$school->slug.'@example.test')->first();
-            $this->assertSame('invited', DB::table('school.membership')->where('user_id', $created->id)->value('status'));
+            $created = DB::table('users')->where('email', 'new-'.$school->slug.'@example.test')->value('id');
+            $this->assertSame('invited', DB::table('school.membership')->where('user_id', $created)->value('status'));
         });
         $target = $this->account('target');
         $this->member($school, $target);

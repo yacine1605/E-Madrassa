@@ -13,7 +13,7 @@ sed -e "s#^APP_URL=.*#APP_URL=$url#" \
     -e "s#^SITE_ADDRESS=.*#SITE_ADDRESS=$host#" \
     -e "s#^DB_OWNER_PASSWORD=.*#DB_OWNER_PASSWORD=$(hex 24)#" \
     -e "s#^DB_RUNTIME_PASSWORD=.*#DB_RUNTIME_PASSWORD=$(hex 24)#" \
-    -e "s#^DB_CONSOLE_PASSWORD=.*#DB_CONSOLE_PASSWORD=$(hex 24)#" \
+    -e "s#^DB_CONSOLE_PASSWORD=.*#DB_CONSOLE_PASSWORD=$(hex 24)#"     -e "s#^DB_AUTH_PASSWORD=.*#DB_AUTH_PASSWORD=$(hex 24)#" \
     -e "s#^REDIS_PASSWORD=.*#REDIS_PASSWORD=$(hex 24)#" \
     -e "s#^FILES_ACCESS_KEY_ID=.*#FILES_ACCESS_KEY_ID=GK$(hex 12)#" \
     -e "s#^FILES_SECRET_ACCESS_KEY=.*#FILES_SECRET_ACCESS_KEY=$(hex 32)#" \

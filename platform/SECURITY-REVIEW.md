@@ -6,7 +6,7 @@ Method: the code and the grants were read layer by layer, and every property tha
 
 ## The layers of a request
 
-A school's request crosses these layers in order; each one refuses on its own, without counting on the next.
+A school's request crosses these layers in order; each one refuses on its own, without counting on the next. Row-level security, though, relies on the context the application gives the database (F7).
 
 | Layer | What it enforces | Where | Tests |
 |---|---|---|---|
@@ -18,7 +18,7 @@ A school's request crosses these layers in order; each one refuses on its own, w
 | Permission | One of the route's permissions, held through an active assignment, checked again at every request (a withdrawn permission is refused at once) | `permission:` middleware, `RequirePermission` | `PermissionCoverageTest`, `AuthorizationTest` |
 | Module | A school's module turned off answers `module_disabled`, its menu disappears | `module:` middleware, `RequireModule` | `SchoolPanelTest`, `LotOneWalkthroughTest` (R09) |
 | Scope | The controller narrows to the assignment's scope (site, level); a record of another school answers 404 | Controllers, `CurrentSchool`; `WithinSchool` for the jobs | `AuthorizationTest`, `SchoolReferencePanelTest` |
-| Database | The application connects as `school_runtime`: no ownership, no `BYPASSRLS`, row-level security forced on every school table, column-level grants, no deletion of a business record. Triggers refuse what a bug could still attempt: a permission granted by someone who does not hold it, an assignment to oneself, the last administrator removed, writes in a read-only school, a change to the journal | `database/schema/`, `deploy/roles.sql` | `tests/sql/database.mjs` |
+| Database | The application connects as `school_runtime`: no ownership, no `BYPASSRLS`, row-level security forced on every school table, column-level grants, no deletion of a business record, no password hash, MFA secret or recovery code (those are `platform_auth`'s, the sign-in's role). Triggers refuse what a bug could still attempt: a permission granted by someone who does not hold it, an assignment to oneself, the last administrator removed, writes in a read-only school, a change to the journal | `database/schema/`, `deploy/roles.sql` | `tests/sql/database.mjs` |
 
 Accounts, memberships, account links and schools are written only by functions owned by `platform_provisioner`, which cannot sign in. A school's functions check the caller's permission in the school; the publisher's functions are granted to the console's role only, and that grant is their only guard. The publisher's console connects as `platform_admin`, which has no privilege on the `school` schema: a school's data is reached only through a support consent (FR-PLT-04).
 
@@ -173,12 +173,13 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 |---|---|
 | Every table of the `school` schema forces row-level security, even on its owner | `tests/sql/database.mjs`, Security review |
 | No function of the `school` and `platform` schemas is executable by everyone; each function running with its owner's rights belongs to `platform_provisioner` | `tests/sql/database.mjs`, Security review |
-| `school_runtime` and `platform_admin` are not superusers, do not bypass row-level security, create neither roles nor databases, and own no table or function | `tests/sql/database.mjs`, Security review |
+| `school_runtime`, `platform_admin` and `platform_auth` are not superusers, do not bypass row-level security, create neither roles nor databases, and own no table or function | `tests/sql/database.mjs`, Security review |
 | Every school route declares a permission, except those that describe the session or the person's own records | `PermissionCoverageTest` |
 | Every page of the school's panel declares a permission, except the person's own pages (home, tasks, notifications, choice of school, credentials); Livewire's updates go through the same checks | `PermissionCoverageTest` |
 | No application code names a role: it asks for permissions (P4) | `PermissionCoverageTest` |
 | This review's matrix is the code's | `PermissionCoverageTest` |
 | A school's application cannot create a school, make an account, archive a school or read the publisher's supervision | `tests/sql/database.mjs`, Security review |
+| A school's application reads no password hash, MFA secret or recovery code, and changes none; the sign-in's role reaches those and nothing else | `tests/sql/database.mjs`, Security review; `AuthenticationTest` |
 | Two schools created from the console never see each other's people, through the API or the screens | `LotOneWalkthroughTest`, `SchoolIsolationTest`, `tests/sql/database.mjs` (isolation) |
 | What a person may not see on screen, they may not export | `LotOneWalkthroughTest` (R01), `ExportTest` |
 | No permission granted by someone who does not hold it; no assignment to oneself; the last administrator kept; segregation of duties | `tests/sql/database.mjs` (roles), `AuthorizationTest` |
@@ -195,11 +196,12 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | # | Finding | Severity | State |
 |---|---|---|---|
 | F1 | Every function was executable by everyone | High | Fixed in this review |
-| F2 | `school_runtime` reads every person's credentials | Medium | Open, lot 2 |
-| F3 | `school_runtime` may change the credential columns of any person | Medium | Open, lot 2 |
+| F2 | `school_runtime` read every person's credentials | Medium | Fixed in increment 25 |
+| F3 | `school_runtime` could change the credential columns of any person | Medium | Fixed in increment 25 |
 | F4 | No Content Security Policy | Medium | Open, lot 2 |
 | F5 | Redis had no password | Low | Fixed in increment 24 |
 | F6 | Firefox and Safari were not tested | Low | Fixed in increment 24 |
+| F7 | Row-level security trusts the context the application sets | Medium | Open, lot 2 |
 
 ### F1. Every function was executable by everyone (fixed)
 
@@ -209,17 +211,17 @@ These functions check no caller: their grant was meant to be their only guard. I
 
 Fix: `deploy/roles.sql` takes `EXECUTE` back from `PUBLIC` on every function of both schemas, then grants each function to the roles that need it. It runs on every deployment, so a function added later is closed too. The SQL suite now checks that no function is executable by everyone, and that a school's application cannot call the publisher's functions.
 
-### F2. `school_runtime` reads every person's credentials
+### F2. `school_runtime` read every person's credentials (fixed)
 
-`public.users` has no row-level security, and `school_runtime` may read all its columns: every person's password hash (Argon2id) and MFA secret (encrypted with the application key, which the database does not hold), in every school. The application reads only what it needs, but an SQL injection would expose every hash.
+`public.users` has no row-level security, and `school_runtime` could read all its columns: every person's password hash (Argon2id) and MFA secret (encrypted with the application key, which the database does not hold), in every school. The application read only what it needed, but an SQL injection would have exposed every hash.
 
-To do (lot 2): sign-in reads the hash of one login through a function running with the provisioner's rights; `school_runtime` then reads `public.users` without `password`, `mfa_secret` and `remember_token`, and only the people of its school.
+### F3. `school_runtime` could change the credential columns of any person (fixed)
 
-### F3. `school_runtime` may change the credential columns of any person
+`school_runtime` could update `password`, `mfa_secret` and the columns around them on every row of `public.users`. The application changed them only for the person signed in and at sign-in; the database did not confine them.
 
-`school_runtime` may update `password`, `mfa_secret` and the columns around them on every row of `public.users`. The application changes them only for the person signed in (their password, their MFA) and at sign-in and sign-out (the last TOTP step accepted, the remember token). An administrator's reset goes through `school.reset_password`, which checks the permission and the membership. The database does not itself confine these updates to the person.
+Fix of F2 and F3 (increment 25): a fourth role, `platform_auth`, is the only one that reads or writes the credentials: password hashes, MFA secrets, the last TOTP step and the recovery codes (`018_credentials.sql`, `deploy/roles.sql`). It has no other column of a person, no table of the platform or of a school, and no function. The application uses it through one class, `App\Support\Credentials`, called by the sign-in, the MFA challenge and the person's own password and MFA, and by `CredentialsUserProvider` for the console's sign-in. `school_runtime` keeps a person's name, email, language, and whether they have a password and MFA; an administrator's reset still goes through `school.reset_password`. No "remember me" is offered any more: a session ends at its time limits, and no token outlives it.
 
-To do (lot 2), with F2: the sign-in steps through functions, then a row-level policy limiting `school_runtime`'s updates of `public.users` to the person whose request it is.
+What remains: `school_runtime` still reads every person's name and email, not only its school's people, since the person signed in is read before a school is chosen. Confining that by row-level security waits for F7.
 
 ### F4. No Content Security Policy
 
@@ -238,6 +240,14 @@ Fix (increment 24): Redis asks for `REDIS_PASSWORD`, written by `deploy/new-env.
 The browser acceptance ran on Chromium only. The server's checks do not depend on the browser, but the screens' behaviour may.
 
 Fix (increment 24): `deploy/acceptance-test.sh` runs every screen in Chromium, Firefox and WebKit, Safari's engine (`BROWSERS`); CI runs the three side by side. All 324 screens pass: 108 in each browser.
+
+### F7. Row-level security trusts the context the application sets
+
+The database learns the school and the person of a request from two settings, `app.tenant_id` and `app.user_id`, which the application sets at the start of each transaction (`CurrentSchool::enter`). Any SQL running as `school_runtime` may set them too. An SQL injection could therefore name another school and read its rows, or name an administrator and pass the permission checks of the functions running with their owner's rights, which read the same settings. Row-level security stops a query that forgets its school; it does not stop an injection.
+
+What stands against an injection today: every query is parameterised, and the roles' privileges, which no SQL can widen: the credentials (F2, F3), the publisher's functions (F1), no deletion of business records, no write to the journal.
+
+To do (lot 2): a context the database can check. The application signs the school, the person and the request with a key `school_runtime` cannot read; `school.tenant()` and `school.actor()` answer only for a signed context, checked once per transaction. Its cost on every request is to be measured first.
 
 ## Outside this review
 

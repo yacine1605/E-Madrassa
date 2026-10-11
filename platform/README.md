@@ -19,6 +19,7 @@ The project rule applies: in each lot, a rule's invariant and its test come befo
 |---|---|---|
 | `school_runtime` | The schools' application (web requests, jobs) | Its own school's data only, through row-level security; no ownership, no `BYPASSRLS`, no deletion, no membership or audit writes |
 | `platform_admin` | The publisher console | Platform data and functions only; **no privilege on the `school` schema**, so no school data without consent (FR-PLT-04) |
+| `platform_auth` | The sign-in, the person's own password and MFA (`App\Support\Credentials`) | Password hashes, MFA secrets and recovery codes, which no other role reads; nothing else |
 | `platform_provisioner` | Nobody: owns the `SECURITY DEFINER` functions | Exactly the writes those functions need; cannot log in |
 
 The migration owner is used for migrations only. It must be a superuser or a member of `platform_provisioner`: a later migration may replace a function the provisioner owns (006 replaces `platform.create_tenant`).
@@ -379,7 +380,18 @@ The smoke and acceptance tests also run from Git Bash on Windows, in a folder wh
 
 The screens' font, Inter, has no Arabic letters: Arabic is shown in the system's font, which differs between browsers (a serif in WebKit on Windows). Whether to ship an Arabic font is for the review of the Arabic labels.
 
-## Next increments of lot 1
+## Increment 25 (lot 2): credentials apart
 
-1. **Last exit item**: a native speaker's review of the Arabic labels, on the acceptance screenshots (CI artifacts `platform-screens-*`), with the choice of an Arabic font.
-2. **Lot 2** opens with findings F2 to F4: the credentials of `public.users`, out of the school application's reach, and a Content Security Policy.
+The first increment of lot 2 closes findings F2 and F3 of [SECURITY-REVIEW.md](SECURITY-REVIEW.md). A fourth database role, `platform_auth`, is the only one that reads or writes the credentials: password hashes, MFA secrets, the last TOTP step, recovery codes (`018_credentials.sql`). The schools' application, `school_runtime`, sees a person's name, email, language, and whether they have a password and MFA: an SQL injection in a school's screen reads no credential and writes none directly (F7 says what it could still do). The application uses the new role through `App\Support\Credentials` only: the sign-in, the MFA challenge, the person's own password and MFA, and the console's sign-in (`CredentialsUserProvider`). The `User` model reads only the columns `school_runtime` may read. "Remember me" is gone from the console: a session ends at its time limits.
+
+Deployments need `DB_AUTH_PASSWORD` in their `deploy.env` (DEPLOY.md, Updates); `deploy/new-env.sh` writes it.
+
+The review also gained F7: row-level security learns the school and the person from settings that any SQL of `school_runtime` can set, so it stops a query that forgets its school, not an SQL injection. Its fix, a context the database checks, comes later in lot 2.
+
+## Next increments of lot 2
+
+1. **F4**: a Content Security Policy, report-only across the browser acceptance first, then enforced.
+2. **F7**: a request context signed by the application and checked by the database, after measuring its cost.
+3. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
+
+Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

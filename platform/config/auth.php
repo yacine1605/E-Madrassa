@@ -62,8 +62,9 @@ return [
     */
 
     'providers' => [
+        // The password is checked through platform_auth (App\Support\CredentialsUserProvider).
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'credentials',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

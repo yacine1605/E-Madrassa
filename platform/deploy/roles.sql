@@ -2,6 +2,7 @@
 -- Passwords are set apart (ALTER ROLE ... PASSWORD), never in this file.
 ALTER ROLE school_runtime LOGIN;
 ALTER ROLE platform_admin LOGIN;
+ALTER ROLE platform_auth LOGIN;
 
 -- A function runs only where this file grants it, never for everyone. PostgreSQL grants EXECUTE
 -- to PUBLIC on every new function, and a per-schema default privilege cannot take that back
@@ -14,13 +15,14 @@ REVOKE ALL ON ALL PROCEDURES IN SCHEMA school FROM PUBLIC;
 -- Schools' application: its own school's data only, through RLS. No table ownership,
 -- no BYPASSRLS, no memberships or audit entries written directly, no deletion.
 GRANT USAGE ON SCHEMA school, platform TO school_runtime;
-GRANT SELECT ON public.users TO school_runtime;
--- Sign-in and the person's own credentials: password change, MFA enrolment, recovery codes.
--- Accounts, memberships and links are written by the definer functions only (007).
-GRANT UPDATE (password, remember_token, updated_at, must_change_password, password_changed_at, mfa_secret, mfa_enabled_at, mfa_last_step)
-  ON public.users TO school_runtime;
-GRANT SELECT (user_id, code_hash, used_at), INSERT, DELETE ON public.mfa_recovery_code TO school_runtime;
-GRANT UPDATE (used_at) ON public.mfa_recovery_code TO school_runtime;
+-- A person as the schools see them: no password hash, MFA secret or recovery code (018,
+-- findings F2 and F3). Revoked first, so that a deployment also takes back what an older one
+-- granted; the person changes only their language. Accounts, memberships and links are
+-- written by the definer functions only (007).
+REVOKE ALL ON public.users, public.mfa_recovery_code FROM school_runtime;
+GRANT SELECT (id, name, email, email_verified_at, locale, must_change_password, password_changed_at, mfa_enabled_at, has_password,
+  created_at, updated_at) ON public.users TO school_runtime;
+GRANT UPDATE (locale, updated_at) ON public.users TO school_runtime;
 GRANT SELECT ON school.membership, school.audit_log TO school_runtime;
 GRANT SELECT, INSERT ON school.site TO school_runtime;
 GRANT UPDATE (labels, version, archived_at) ON school.site TO school_runtime;
@@ -94,13 +96,21 @@ GRANT EXECUTE ON FUNCTION school.discard_account(bigint) TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, include_sensitive, reason, starts_at, expires_at) ON school.support_grant TO school_runtime;
 GRANT UPDATE (revoked_at, version) ON school.support_grant TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.support_grant_in_use(), school.log_support_access(text) TO school_runtime;
--- Languages (016): the person chooses their own; the rule resolving it, the search key.
-GRANT UPDATE (locale) ON public.users TO school_runtime;
+-- Languages (016): the person chooses their own (granted above); the rule resolving it, the search key.
 GRANT EXECUTE ON FUNCTION platform.locale_for(bigint, uuid), school.search_key(text) TO school_runtime;
 -- Settings: a school stores the values it changes, within the catalog's bounds.
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
 GRANT UPDATE (value, version, archived_at) ON school.setting TO school_runtime;
+
+-- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
+-- schema of the platform's, no function, no other column of a person.
+REVOKE ALL ON public.users, public.mfa_recovery_code FROM platform_auth;
+GRANT SELECT (id, password, mfa_secret, mfa_enabled_at, mfa_last_step) ON public.users TO platform_auth;
+GRANT UPDATE (password, must_change_password, password_changed_at, mfa_secret, mfa_enabled_at, mfa_last_step, updated_at)
+  ON public.users TO platform_auth;
+GRANT SELECT, INSERT, DELETE ON public.mfa_recovery_code TO platform_auth;
+GRANT UPDATE (used_at) ON public.mfa_recovery_code TO platform_auth;
 
 -- Publisher console: platform data and its functions only. No privilege at all on the
 -- `school` schema, so no school data without the school's consent (FR-PLT-04 AC1).

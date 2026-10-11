@@ -29,7 +29,7 @@ final class Accounts
     {
         [$token, $hash] = AccountLinks::token();
         DB::select('SELECT school.issue_activation(?, ?)', [$user, $hash]);
-        $person = DB::selectOne('SELECT name, email, password IS NULL AS fresh FROM public.users WHERE id = ?', [$user]);
+        $person = DB::selectOne('SELECT name, email, NOT has_password AS fresh FROM public.users WHERE id = ?', [$user]);
         $school = DB::selectOne('SELECT name FROM platform.tenant WHERE id = ?', [$this->school->id()])->name;
         $locale = Locales::of($user, $this->school->id());
         if ($person->email && AccountLinks::send('activation', $person->email, $person->name, $token, $locale, $school)) return ['delivery' => 'sent'];

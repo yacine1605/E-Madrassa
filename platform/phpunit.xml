@@ -33,6 +33,8 @@
         <env name="DB_PASSWORD" value="runtime-test-only"/>
         <env name="DB_CONSOLE_USERNAME" value="platform_admin"/>
         <env name="DB_CONSOLE_PASSWORD" value="console-test-only"/>
+        <env name="DB_AUTH_USERNAME" value="platform_auth"/>
+        <env name="DB_AUTH_PASSWORD" value="auth-test-only"/>
         <env name="DB_OWNER_USERNAME" value="ci_admin"/>
         <env name="DB_OWNER_PASSWORD" value="ci_admin"/>
         <env name="DB_SSLMODE" value="disable"/>

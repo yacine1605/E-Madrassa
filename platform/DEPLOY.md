@@ -18,7 +18,7 @@ One Compose project per installation: the shared SaaS, or a school's dedicated i
 
 The database, Redis and the storage are on the internal `data` network: no way out to the internet, and no way in but from the application's services (`app`, `worker`, `scheduler`, `migrate`, `backup`). The proxy cannot reach them.
 
-The database owner's password reaches `migrate` only. Requests and jobs connect as `school_runtime` (row-level security), the console as `platform_admin` (no school data); neither owns a table nor bypasses row-level security. The application's encryption key is created on the first start and kept on the storage volume, with the data it protects.
+The database owner's password reaches `migrate` only. Requests and jobs connect as `school_runtime` (row-level security), the console as `platform_admin` (no school data), the sign-in as `platform_auth` (passwords and MFA secrets, which the other two cannot read); none owns a table or bypasses row-level security. The application's encryption key is created on the first start and kept on the storage volume, with the data it protects.
 
 ## First start
 
@@ -61,7 +61,7 @@ git pull
 docker compose --env-file deploy.env up -d --build --wait
 ```
 
-`migrate` applies the new migrations and privileges before the application restarts. When Compose answers `set REDIS_PASSWORD`, the `deploy.env` predates Redis's password: add one with `echo "REDIS_PASSWORD=$(openssl rand -hex 24)" >> deploy.env`, then update again. Every migration has its reverse (`php artisan migrate:rollback --database=owner`, in `migrate`).
+`migrate` applies the new migrations and privileges before the application restarts. When Compose answers `set REDIS_PASSWORD` or `set DB_AUTH_PASSWORD`, the `deploy.env` predates that secret: add it with `echo "REDIS_PASSWORD=$(openssl rand -hex 24)" >> deploy.env` (or `DB_AUTH_PASSWORD=`), then update again. Every migration has its reverse (`php artisan migrate:rollback --database=owner`, in `migrate`).
 
 ## Checking an installation
 

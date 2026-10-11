@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Support\Credentials;
+use App\Support\CredentialsUserProvider;
 use App\Support\CurrentSchool;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,6 +17,7 @@ final class PlatformServiceProvider extends ServiceProvider
     private const CONNECTIONS = [
         'pgsql' => 'DB_',            // school_runtime: schools' requests and jobs, under RLS
         'console' => 'DB_CONSOLE_',  // platform_admin: publisher console, no school data
+        'auth' => 'DB_AUTH_',        // platform_auth: passwords and MFA secrets only (App\Support\Credentials)
         'owner' => 'DB_OWNER_',      // migration owner: migrations and provisioning commands only
     ];
 
@@ -34,6 +38,7 @@ final class PlatformServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Auth::provider('credentials', fn ($app, array $config) => new CredentialsUserProvider($app['hash'], $config['model'], $app->make(Credentials::class)));
         // Flood limits before sign-in (NFR-SEC-05); the lockout of FR-IAM-02 is LoginThrottle's.
         RateLimiter::for('public', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
         RateLimiter::for('recovery', fn (Request $request) => [

@@ -4,19 +4,19 @@ namespace App\Support;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
 use PragmaRX\Google2FA\Google2FA;
 
 /**
  * TOTP (RFC 6238) and single-use recovery codes (FR-IAM-02). The secret is stored encrypted
- * with the application key; a code is never accepted twice; recovery codes are kept hashed.
+ * with the application key; a code is never accepted twice; recovery codes are kept hashed;
+ * all of them through `platform_auth` (Credentials).
  */
 final class MultiFactor
 {
     private const RECOVERY_CODES = 8;
     private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-    public function __construct(private Google2FA $totp) {}
+    public function __construct(private Google2FA $totp, private Credentials $credentials) {}
 
     public function newSecret(): string
     {
@@ -41,19 +41,16 @@ final class MultiFactor
     /** Checks the user's code and records its step, so that it cannot be replayed. */
     public function verify(User $user, string $code): bool
     {
-        $step = $this->check(Crypt::decryptString($user->mfa_secret), $code, $user->mfa_last_step);
-        if ($step === null) return false;
+        $mfa = $this->credentials->mfa($user->id);
+        if (!$mfa?->secret) return false;
+        $step = $this->check(Crypt::decryptString($mfa->secret), $code, $mfa->last_step);
         // Recorded only if no other request used this step or a later one meanwhile.
-        if (DB::update('UPDATE public.users SET mfa_last_step = ? WHERE id = ? AND (mfa_last_step IS NULL OR mfa_last_step < ?)',
-            [$step, $user->id, $step]) !== 1) return false;
-        $user->forceFill(['mfa_last_step' => $step])->syncOriginalAttribute('mfa_last_step');
-        return true;
+        return $step !== null && $this->credentials->recordStep($user->id, $step);
     }
 
     public function useRecoveryCode(User $user, string $code): bool
     {
-        return DB::update('UPDATE public.mfa_recovery_code SET used_at = now() WHERE user_id = ? AND code_hash = ? AND used_at IS NULL',
-            [$user->id, self::hash($code)]) === 1;
+        return $this->credentials->useRecoveryCode($user->id, self::hash($code));
     }
 
     /** Eight new single-use codes, `XXXXX-XXXXX`. */
@@ -72,13 +69,8 @@ final class MultiFactor
     public function enable(User $user, string $secret, int $step): array
     {
         $codes = self::recoveryCodes();
-        DB::transaction(function () use ($user, $secret, $step, $codes) {
-            $user->forceFill(['mfa_secret' => Crypt::encryptString($secret), 'mfa_enabled_at' => now(), 'mfa_last_step' => $step])->save();
-            DB::delete('DELETE FROM public.mfa_recovery_code WHERE user_id = ?', [$user->id]);
-            foreach ($codes as $code) {
-                DB::insert('INSERT INTO public.mfa_recovery_code (user_id, code_hash) VALUES (?, ?)', [$user->id, self::hash($code)]);
-            }
-        });
+        $this->credentials->setMfa($user->id, Crypt::encryptString($secret), $step, array_map(self::hash(...), $codes));
+        $user->forceFill(['mfa_enabled_at' => now()])->syncOriginalAttribute('mfa_enabled_at');
         return $codes;
     }
 

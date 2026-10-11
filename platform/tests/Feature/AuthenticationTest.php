@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Mail\AccountLink;
+use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
@@ -34,6 +37,34 @@ final class AuthenticationTest extends TestCase
         $this->postJson('/api/session', ['login' => $account['email'], 'password' => $account['password']])->assertStatus(429);
         $this->travel(2)->minutes();
         $this->signIn($account)->assertOk();
+    }
+
+    public function test_the_schools_application_reads_no_credential_yet_sign_in_and_password_change_work(): void
+    {
+        $school = $this->school();
+        $account = $this->account('user');
+        $this->member($school, $account);
+        // SECURITY-REVIEW.md, F2 and F3: school_runtime sees no hash, secret or code, and changes none.
+        foreach (['SELECT password FROM public.users WHERE id = ?', 'SELECT mfa_secret FROM public.users WHERE id = ?',
+            'SELECT code_hash FROM public.mfa_recovery_code WHERE user_id = ?', "UPDATE public.users SET password = 'x' WHERE id = ?"] as $sql) {
+            try {
+                DB::statement($sql, [$account['id']]);
+                $this->fail("Allowed to school_runtime: $sql");
+            } catch (QueryException $e) {
+                $this->assertSame('42501', $e->getCode());
+            }
+        }
+        $person = User::findOrFail($account['id'])->fresh();
+        $this->assertSame(User::COLUMNS, array_keys($person->getAttributes()));
+        $this->assertTrue($person->has_password);
+
+        $this->signIn($account)->assertOk();
+        $fresh = 'Un autre figuier 2027';
+        $this->putJson('/api/account/password', ['current_password' => $account['password'], 'password' => $fresh, 'password_confirmation' => $fresh])
+            ->assertNoContent();
+        $this->deleteJson('/api/session');
+        $this->postJson('/api/session', ['login' => $account['email'], 'password' => $account['password']])->assertUnauthorized();
+        $this->signIn($account, $fresh)->assertOk();
     }
 
     public function test_an_unknown_account_gets_the_same_answer_as_a_wrong_password(): void

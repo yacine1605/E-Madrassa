@@ -24,7 +24,7 @@ Artisan::command('platform:roles', function () {
     $owner = DB::connection('owner');
     $owner->unprepared(file_get_contents(base_path('deploy/roles.sql')));
     // Passwords come from the environment, never from a file in the repository.
-    foreach (['school_runtime' => env('DB_PASSWORD'), 'platform_admin' => env('DB_CONSOLE_PASSWORD')] as $role => $password) {
+    foreach (['school_runtime' => env('DB_PASSWORD'), 'platform_admin' => env('DB_CONSOLE_PASSWORD'), 'platform_auth' => env('DB_AUTH_PASSWORD')] as $role => $password) {
         if ($password) $owner->statement('ALTER ROLE '.$role.' PASSWORD '.$owner->getPdo()->quote($password));
     }
     $this->info('Roles and privileges applied.');

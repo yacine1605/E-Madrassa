@@ -13,12 +13,15 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use SensitiveParameter;
+use App\Support\Credentials;
 use App\Support\SchoolMemberships;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * A person: one sign-in, possibly in several schools, possibly an operator of the publisher's
  * console. Their MFA is the same everywhere: the secret encrypted in `mfa_secret`, the recovery
- * codes hashed in `public.mfa_recovery_code` (FR-IAM-02).
+ * codes hashed in `public.mfa_recovery_code` (FR-IAM-02). The model holds what the schools'
+ * application may read; the credentials go through App\Support\Credentials (SECURITY-REVIEW.md, F2).
  */
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
@@ -28,8 +31,24 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /** @var list<string> */
     protected $fillable = ['name', 'email', 'password'];
 
+    /** The columns `school_runtime` may read (deploy/roles.sql): never a password hash, an MFA secret or a token. */
+    public const COLUMNS = ['id', 'name', 'email', 'email_verified_at', 'locale', 'must_change_password', 'password_changed_at',
+        'mfa_enabled_at', 'has_password', 'created_at', 'updated_at'];
+
     /** @var list<string> */
     protected $hidden = ['password', 'remember_token', 'mfa_secret', 'mfa_last_step'];
+
+    /** No "remember me" (CredentialsUserProvider): no token to read or write. */
+    public function getRememberTokenName(): string
+    {
+        return '';
+    }
+
+    /** Every query of the model, with or without scopes (fresh, refresh), reads those columns unless it names its own. */
+    public function newModelQuery(): Builder
+    {
+        return parent::newModelQuery()->select(array_map(fn ($column) => $this->qualifyColumn($column), self::COLUMNS));
+    }
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -61,14 +80,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function getAppAuthenticationSecret(): ?string
     {
-        return $this->mfa_secret ? Crypt::decryptString($this->mfa_secret) : null;
+        $secret = app(Credentials::class)->mfa($this->id)?->secret;
+        return $secret ? Crypt::decryptString($secret) : null;
     }
 
     public function saveAppAuthenticationSecret(#[SensitiveParameter] ?string $secret): void
     {
-        $this->forceFill(['mfa_secret' => $secret === null ? null : Crypt::encryptString($secret), 'mfa_enabled_at' => $secret === null ? null : now(),
-            'mfa_last_step' => null])->save();
-        if ($secret === null) DB::delete('DELETE FROM public.mfa_recovery_code WHERE user_id = ?', [$this->id]);
+        app(Credentials::class)->setMfa($this->id, $secret === null ? null : Crypt::encryptString($secret));
+        $this->forceFill(['mfa_enabled_at' => $secret === null ? null : now()])->syncOriginalAttribute('mfa_enabled_at');
     }
 
     public function getAppAuthenticationHolderName(): string
@@ -79,16 +98,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /** The hashes of the codes not yet used. */
     public function getAppAuthenticationRecoveryCodes(): ?array
     {
-        $codes = array_column(DB::select('SELECT code_hash FROM public.mfa_recovery_code WHERE user_id = ? AND used_at IS NULL', [$this->id]), 'code_hash');
-        return $codes ?: null;
+        return app(Credentials::class)->recoveryCodes($this->id) ?: null;
     }
 
     /** @param array<string>|null $codes hashes made by MultiFactor::hash() */
     public function saveAppAuthenticationRecoveryCodes(#[SensitiveParameter] ?array $codes): void
     {
-        DB::transaction(function () use ($codes) {
-            DB::delete('DELETE FROM public.mfa_recovery_code WHERE user_id = ?', [$this->id]);
-            foreach ($codes ?? [] as $hash) DB::insert('INSERT INTO public.mfa_recovery_code (user_id, code_hash) VALUES (?, ?)', [$this->id, $hash]);
-        });
+        app(Credentials::class)->setRecoveryCodes($this->id, array_values($codes ?? []));
     }
 }

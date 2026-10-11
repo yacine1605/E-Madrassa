@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\Refusal;
 use App\Models\User;
+use App\Support\Credentials;
 use App\Support\LoginThrottle;
 use App\Support\MultiFactor;
 use App\Support\SchoolMemberships;
@@ -24,6 +25,8 @@ final class SessionController
 {
     private static ?string $decoy = null;
 
+    public function __construct(private Credentials $credentials) {}
+
     public function login(Request $request, LoginThrottle $throttle)
     {
         $data = $request->validate(['login' => 'required|string|max:200', 'password' => 'required|string|max:200',
@@ -34,9 +37,10 @@ final class SessionController
 
         $id = DB::selectOne('SELECT platform.find_login(?, ?) AS id', [$data['login'], $school])->id;
         $user = $id ? User::find($id) : null;
+        $hash = $user ? $this->credentials->passwordHash($user->id) : null;
         // The same work and the same answer whether the account exists, has no password yet, or the password is wrong.
-        $valid = Hash::check($data['password'], $user?->password ?: (self::$decoy ??= Hash::make(Str::random(40))));
-        if (!$user?->password || !$valid) {
+        $valid = Hash::check($data['password'], $hash ?: (self::$decoy ??= Hash::make(Str::random(40))));
+        if (!$hash || !$valid) {
             $throttle->failed($key, $request->ip());
             return Refusal::response('invalid_credentials', 401);
         }

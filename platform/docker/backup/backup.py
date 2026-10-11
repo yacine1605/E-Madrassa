@@ -26,8 +26,8 @@ PROJECT = os.environ.get('BACKUP_PROJECT', 'madrassa-platform')
 BUCKET = os.environ.get('FILES_BUCKET', 'madrassa-files')
 ALGERIA = dt.timezone(dt.timedelta(hours=1))
 ARCHIVES = ('database.dump', 'key.tar.gz', 'objects.tar.gz')
-# The roles the schema's privileges name (001_foundation.sql); a fresh database lacks them.
-ROLES = {'school_runtime': 'NOBYPASSRLS', 'platform_admin': 'NOBYPASSRLS', 'platform_provisioner': 'BYPASSRLS'}
+# The roles the schema's privileges name (001_foundation.sql, 018_credentials.sql); a fresh database lacks them.
+ROLES = {'school_runtime': 'NOBYPASSRLS', 'platform_admin': 'NOBYPASSRLS', 'platform_provisioner': 'BYPASSRLS', 'platform_auth': 'NOBYPASSRLS'}
 
 
 def sql(query):

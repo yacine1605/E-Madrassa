@@ -1063,11 +1063,36 @@ await check('no function of the schemas is executable by everyone; the restricte
   assert.deepEqual((await sql(`SELECT n.nspname || '.' || p.proname AS f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname IN ('school', 'platform') AND has_function_privilege('public', p.oid, 'EXECUTE') ORDER BY 1`)).rows, []);
   assert.deepEqual((await sql(`SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles
-    WHERE rolname IN ('school_runtime', 'platform_admin') ORDER BY 1`)).rows.map(r => [r.rolname, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb]),
-    [['platform_admin', false, false, false, false], ['school_runtime', false, false, false, false]]);
+    WHERE rolname IN ('school_runtime', 'platform_admin', 'platform_auth') ORDER BY 1`)).rows.map(r => [r.rolname, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb]),
+    [['platform_admin', false, false, false, false], ['platform_auth', false, false, false, false], ['school_runtime', false, false, false, false]]);
   assert.equal(await count(`SELECT count(*) n FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace
-    WHERE pg_get_userbyid(c.relowner) IN ('school_runtime', 'platform_admin')`), 0);
-  assert.equal(await count(`SELECT count(*) n FROM pg_proc p WHERE pg_get_userbyid(p.proowner) IN ('school_runtime', 'platform_admin')`), 0);
+    WHERE pg_get_userbyid(c.relowner) IN ('school_runtime', 'platform_admin', 'platform_auth')`), 0);
+  assert.equal(await count(`SELECT count(*) n FROM pg_proc p WHERE pg_get_userbyid(p.proowner) IN ('school_runtime', 'platform_admin', 'platform_auth')`), 0);
+});
+await check("a school's application reads no password, MFA secret or recovery code, and changes none (F2, F3)", async () => {
+  await as('school_runtime', a, 1);
+  for (const column of ['password', 'mfa_secret', 'mfa_last_step', 'remember_token'])
+    await rejects(`SELECT ${column} FROM public.users WHERE id = 1`, [], '42501');
+  await rejects('SELECT * FROM public.users WHERE id = 1', [], '42501');
+  await rejects('SELECT * FROM public.mfa_recovery_code', [], '42501');
+  await rejects("UPDATE public.users SET password = 'pirate' WHERE id = 3", [], '42501');
+  await rejects('UPDATE public.users SET mfa_secret = NULL, mfa_enabled_at = NULL WHERE id = 1', [], '42501');
+  await rejects('DELETE FROM public.mfa_recovery_code WHERE user_id = 1', [], '42501');
+  // What it needs: who the person is, whether they have chosen a password, their language.
+  assert.deepEqual(await first('SELECT name, has_password FROM public.users WHERE id = 3'), { name: 'Person 3', has_password: true });
+});
+await check("the sign-in's role reads and changes the credentials, and nothing else", async () => {
+  await as('platform_auth', null, null);
+  assert.equal((await first('SELECT password FROM public.users WHERE id = 3')).password, 'hash');
+  assert.equal((await sql('UPDATE public.users SET mfa_last_step = 7 WHERE id = 3 AND (mfa_last_step IS NULL OR mfa_last_step < 7) RETURNING id')).rows.length, 1);
+  assert.equal(await count('SELECT count(*) n FROM public.mfa_recovery_code WHERE user_id = 3'), 0);
+  await rejects('SELECT name FROM public.users WHERE id = 3', [], '42501');
+  await rejects("UPDATE public.users SET email = 'pirate@example.test' WHERE id = 3", [], '42501');
+  await rejects('SELECT * FROM school.membership', [], '42501');
+  await rejects('SELECT * FROM platform.tenant', [], '42501');
+  await rejects("SELECT platform.ensure_user('intrus@example.test', 'Intrus')", [], '42501');
+  await as(null);
+  await sql('UPDATE public.users SET mfa_last_step = NULL WHERE id = 3');
 });
 await check('a school\'s application cannot call the publisher\'s functions: no school created, no account made, no school archived', async () => {
   await as('school_runtime', a, 1);

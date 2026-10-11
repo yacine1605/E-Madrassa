@@ -29,6 +29,9 @@ x-application: &application
   DB_PASSWORD: ${DB_RUNTIME_PASSWORD:?set DB_RUNTIME_PASSWORD}
   DB_CONSOLE_USERNAME: platform_admin
   DB_CONSOLE_PASSWORD: ${DB_CONSOLE_PASSWORD:?set DB_CONSOLE_PASSWORD}
+  # Passwords and MFA secrets: the sign-in's role, the only one that reads them (SECURITY-REVIEW.md, F2).
+  DB_AUTH_USERNAME: platform_auth
+  DB_AUTH_PASSWORD: ${DB_AUTH_PASSWORD:?set DB_AUTH_PASSWORD}
   SESSION_DRIVER: redis
   SESSION_SECURE_COOKIE: "true"
   SESSION_LIFETIME: "720"

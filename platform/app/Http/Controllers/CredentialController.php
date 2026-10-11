@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\Refusal;
 use App\Rules\StrongPassword;
+use App\Support\Credentials;
 use App\Support\MultiFactor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 /** The signed-in person's own credentials: password and MFA (FR-IAM-02). Outside any school. */
 final class CredentialController
 {
+    public function __construct(private Credentials $credentials) {}
+
     public function password(Request $request)
     {
         $user = $request->user();
@@ -26,11 +29,12 @@ final class CredentialController
             'current_password' => 'required|string|max:200',
             'password' => ['required', 'string', 'confirmed', 'different:current_password', new StrongPassword([$user->name, $user->email, $username])],
         ]);
-        if (!Hash::check($data['current_password'], $user->password)) {
+        if (!Hash::check($data['current_password'], (string) $this->credentials->passwordHash($user->id))) {
             throw ValidationException::withMessages(['current_password' => __('errors.current_password_wrong')]);
         }
-        // Hashed with Argon2id by the model's cast (NFR-SEC-02).
-        $user->forceFill(['password' => $data['password'], 'must_change_password' => false, 'password_changed_at' => now(), 'remember_token' => null])->save();
+        // Hashed with Argon2id (NFR-SEC-02).
+        $this->credentials->setPassword($user->id, Hash::make($data['password']));
+        $user->forceFill(['must_change_password' => false, 'password_changed_at' => now()])->syncOriginal();
         $request->session()->regenerate();
         return response()->noContent();
     }
