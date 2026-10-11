@@ -3,9 +3,11 @@
 use App\Support\AccountLinks;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Client\ConnectionException;
 use App\Support\Outbox;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +26,38 @@ Artisan::command('platform:roles', function () {
     }
     $this->info('Roles and privileges applied.');
 })->purpose('Apply deploy/roles.sql and the role passwords (as the database owner)');
+
+// Deployment (DEPLOY.md): the bundled Garage storage gets its layout, the school files' bucket
+// and the application's key, allowed on that bucket only. Safe to run again; nothing to do when
+// the deployment uses another S3 provider.
+Artisan::command('platform:storage', function () {
+    $admin = env('GARAGE_ADMIN_URL');
+    if (!$admin) {
+        $this->info('S3 storage provided outside this deployment: nothing to prepare.');
+        return 0;
+    }
+    $http = Http::baseUrl($admin)->withToken((string) env('GARAGE_ADMIN_TOKEN'))->acceptJson()
+        ->retry(30, 1000, fn ($e) => $e instanceof ConnectionException, throw: false); // Garage may still be starting
+    $node = $http->get('/v2/GetClusterStatus')->throw()->json('nodes.0.id');
+    if ($http->get('/v2/GetClusterLayout')->throw()->json('version') === 0) {
+        $http->post('/v2/UpdateClusterLayout', ['roles' => [['id' => $node, 'zone' => 'local', 'tags' => [],
+            'capacity' => (int) env('GARAGE_CAPACITY_BYTES', 100 * 1024 ** 3)]]])->throw();
+        $http->post('/v2/ApplyClusterLayout', ['version' => 1])->throw();
+    }
+    [$key, $secret, $bucket] = [(string) env('AWS_ACCESS_KEY_ID'), (string) env('AWS_SECRET_ACCESS_KEY'), (string) env('AWS_BUCKET')];
+    if (!preg_match('/^GK[0-9a-f]{24}$/', $key) || !preg_match('/^[0-9a-f]{64}$/', $secret)) {
+        $this->error('AWS_ACCESS_KEY_ID must be GK and 24 hexadecimal digits, AWS_SECRET_ACCESS_KEY 64 hexadecimal digits (DEPLOY.md).');
+        return 1;
+    }
+    if ($http->get('/v2/GetKeyInfo', ['id' => $key])->failed()) {
+        $http->post('/v2/ImportKey', ['accessKeyId' => $key, 'secretAccessKey' => $secret, 'name' => 'madrassa'])->throw();
+    }
+    $found = $http->get('/v2/GetBucketInfo', ['globalAlias' => $bucket]);
+    $id = $found->successful() ? $found->json('id') : $http->post('/v2/CreateBucket', ['globalAlias' => $bucket])->throw()->json('id');
+    $http->post('/v2/AllowBucketKey', ['bucketId' => $id, 'accessKeyId' => $key,
+        'permissions' => ['read' => true, 'write' => true, 'owner' => false]])->throw();
+    $this->info('Storage ready: bucket '.$bucket.'.');
+})->purpose('Prepare the bundled Garage storage: layout, bucket, application key (deployment)');
 
 Artisan::command('platform:user {email} {--name=} {--password=}', function (string $email) {
     $password = $this->option('password') ?: Str::password(16);

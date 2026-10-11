@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['account' => AccountState::class, 'school' => SchoolContext::class, 'module' => RequireModule::class, 'permission' => RequirePermission::class]);
         $middleware->web(append: [Localize::class, LivewireTransaction::class]);
+        // Behind the deployment's TLS proxy (DEPLOY.md): the client's address and scheme come from its headers.
+        if ($proxies = env('TRUSTED_PROXIES')) $middleware->trustProxies(at: explode(',', $proxies));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The API answers in JSON; the consoles' pages keep their redirects and error pages.

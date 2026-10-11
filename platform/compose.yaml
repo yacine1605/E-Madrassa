@@ -1,0 +1,195 @@
+# The platform's deployment (DEPLOY.md): `docker compose --env-file deploy.env up -d --build`.
+# Only the TLS proxy faces the network. The database owner's password reaches the one-shot
+# `migrate` service only; requests, jobs and the schedule run as the restricted roles.
+name: ${COMPOSE_PROJECT_NAME:-madrassa-platform}
+
+x-database: &database
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: ${DB_DATABASE:-madrassa}
+  DB_SSLMODE: disable
+
+x-application: &application
+  <<: *database
+  APP_NAME: Madrassa
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: ${APP_URL:?set APP_URL}
+  APP_KEY: ${APP_KEY:-}
+  APP_LOCALE: fr
+  APP_FALLBACK_LOCALE: fr
+  APP_MAINTENANCE_DRIVER: file
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  HASH_DRIVER: argon2id
+  # The schools' requests and jobs (RLS), and the publisher's console (no school data).
+  DB_USERNAME: school_runtime
+  DB_PASSWORD: ${DB_RUNTIME_PASSWORD:?set DB_RUNTIME_PASSWORD}
+  DB_CONSOLE_USERNAME: platform_admin
+  DB_CONSOLE_PASSWORD: ${DB_CONSOLE_PASSWORD:?set DB_CONSOLE_PASSWORD}
+  SESSION_DRIVER: redis
+  SESSION_SECURE_COOKIE: "true"
+  SESSION_LIFETIME: "720"
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+  PLATFORM_FRONT_URL: ${APP_URL}/school
+  PLATFORM_DEDICATED_SCHOOL: ${PLATFORM_DEDICATED_SCHOOL:-}
+  PLATFORM_MFA_ISSUER: ${PLATFORM_MFA_ISSUER:-Madrassa}
+  # FR-FIC-01: the schools' files in S3-compatible storage, the bundled Garage by default.
+  FILES_DRIVER: s3
+  AWS_ACCESS_KEY_ID: ${FILES_ACCESS_KEY_ID:?set FILES_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${FILES_SECRET_ACCESS_KEY:?set FILES_SECRET_ACCESS_KEY}
+  AWS_DEFAULT_REGION: ${FILES_REGION:-garage}
+  AWS_BUCKET: ${FILES_BUCKET:-madrassa-files}
+  AWS_ENDPOINT: ${FILES_ENDPOINT:-http://garage:3900}
+  AWS_USE_PATH_STYLE_ENDPOINT: "true"
+  # OD-12: the provider is the school's choice; `log` keeps emails in the logs until it is made.
+  MAIL_MAILER: ${MAIL_MAILER:-log}
+  MAIL_SCHEME: ${MAIL_SCHEME:-}
+  MAIL_HOST: ${MAIL_HOST:-}
+  MAIL_PORT: ${MAIL_PORT:-587}
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@example.com}
+  MAIL_FROM_NAME: Madrassa
+
+services:
+  # The schema, the roles' privileges and passwords, the files' bucket; then it stops.
+  migrate:
+    image: ${IMAGE:-madrassa-platform:latest}
+    build: .
+    command: ["madrassa-migrate"]
+    environment:
+      <<: *application
+      MADRASSA_CREATES_KEY: "true"
+      DB_OWNER_USERNAME: ${DB_OWNER_USERNAME:-platform_owner}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD}
+      GARAGE_ADMIN_URL: ${GARAGE_ADMIN_URL-http://garage:3903}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-}
+    volumes:
+      - app-storage:/var/www/html/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ${IMAGE:-madrassa-platform:latest}
+    environment: *application
+    volumes:
+      - app-storage:/var/www/html/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # Imports, exports, previews: background jobs never run inside a request (FR-JOB-01).
+  worker:
+    image: ${IMAGE:-madrassa-platform:latest}
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--max-time=3600"]
+    environment: *application
+    volumes:
+      - app-storage:/var/www/html/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The email outbox every minute, the purge of expired files every day (routes/console.php).
+  scheduler:
+    image: ${IMAGE:-madrassa-platform:latest}
+    command: ["php", "artisan", "schedule:work"]
+    environment: *application
+    volumes:
+      - app-storage:/var/www/html/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # NFR-SEC-01: HTTPS only, HSTS; certificates from Let's Encrypt for a public name, from
+  # Caddy's local authority for `localhost`.
+  proxy:
+    image: caddy:2.10-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-madrassa}
+      POSTGRES_USER: ${DB_OWNER_USERNAME:-platform_owner}
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # S3-compatible storage for the schools' files, on its own volume (ARC-07).
+  garage:
+    image: dxflrs/garage:v2.1.0
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-}
+    volumes:
+      - ./docker/garage.toml:/etc/garage.toml:ro
+      - garage-data:/var/lib/garage
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+  postgres-data:
+  redis-data:
+  garage-data:
+  caddy-data:
+  caddy-config:

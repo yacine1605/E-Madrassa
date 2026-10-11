@@ -1,0 +1,6 @@
+# Files run or read inside Linux containers keep Unix line endings on every checkout, Windows included.
+*.sh text eol=lf
+Dockerfile text eol=lf
+compose.yaml text eol=lf
+deploy.env.example text eol=lf
+docker/** text eol=lf

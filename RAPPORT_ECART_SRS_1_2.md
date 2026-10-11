@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 18. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 19. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 18 : 147 contrôles SQL embarqués et 149 tests PHP/PostgreSQL 16 (4 282 assertions), sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 19 : déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh` (aussi en CI) ; 147 contrôles SQL embarqués et 149 tests PHP/PostgreSQL 16, sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -34,7 +34,7 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | FR-I18-01 | PARTIEL | Locales, lang/fr, lang/ar, LocalizationTest, PseudoLocalizationTest ; comptes/droits/référentiel/calendrier/administration livrés, catalogues de la plateforme en arabe ; autres écrans et recette visuelle arabe à compléter | majeur | M |
 | FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest, UI/School/Imports, SchoolServicesPanelTest : modèle, aperçu, rejets, confirmation, annulation ; import des entités du lot 2 | majeur | M |
 | FR-IMP-02 | PARTIEL | Exporter, ExportController, ExportTest, UI/School/Exports, SchoolServicesPanelTest ; jeux de données métier futurs | majeur | M |
-| FR-FIC-01 | PARTIEL | Files, FileController, FileTest ; stockage S3 de déploiement et interfaces métier | majeur | M |
+| FR-FIC-01 | PARTIEL | Files, FileController, FileTest, stockage S3 Garage du déploiement (smoke-test) ; interfaces métier des lots suivants | majeur | M |
 | FR-NOT-01 | PARTIEL | Outbox, NotificationController, ServicesTest, UI/School/Notifications et Deliveries, SchoolServicesPanelTest : compteur des non-lues, préférences, renvoi ; événements futurs | majeur | M |
 | FR-JOB-01 | PARTIEL | Tasks, WithinSchool, JobController, ServicesTest, UI/School/Tasks, SchoolServicesPanelTest : suivi, annulation, relance, téléchargement ; supervision d'exploitation | majeur | M |
 | FR-PDF-01 | PARTIEL | Pdf, vues/pdf, PdfTest ; modèles métier et recette visuelle arabe | majeur | M |
@@ -124,7 +124,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-PERF-03 | ABSENT | 50 tenants/25 000 élèves à mesurer après lot 2 | majeur | L |
 | NFR-PERF-04 | PARTIEL | Jobs et exports >2 000 ; certaines API listent encore tout, pagination à compléter | majeur | M |
 | NFR-PERF-05 | ABSENT | Poids compressé des pages à mesurer | mineur | M |
-| NFR-SEC-01 | PARTIEL | Config session ; TLS/HSTS dépend du futur déploiement platform | majeur | M |
+| NFR-SEC-01 | PARTIEL | Proxy Caddy : HTTPS seul, HSTS, cookies sécurisés, proxys de confiance (platform/compose.yaml, smoke-test) ; TLS entre conteneurs non requis sur le réseau privé, à revoir en multi-hôte | majeur | S |
 | NFR-SEC-02 | PARTIEL | Argon2id et variables d'environnement ; rotation en exploitation à documenter | majeur | M |
 | NFR-SEC-03 | PARTIEL | CSRF, Blade, SQL paramétré, fichiers et exports testés ; CSP à compléter | majeur | M |
 | NFR-SEC-04 | PARTIEL | PermissionCoverageTest, SchoolPanelTest, SchoolReferencePanelTest : permissions retirées, IDs étrangers et onglets périmés refusés ; étendre aux écrans et lots futurs | bloquant | M |
@@ -140,7 +140,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-REC-01 | ABSENT | Déploiement platform et sauvegarde séparée à créer | bloquant | L |
 | NFR-REC-02 | ABSENT | Restauration base+fichiers platform à tester | bloquant | M |
 | NFR-REC-03 | ABSENT | Validation RPO par la finance requise hors code | majeur | S |
-| NFR-OPS-01 | PARTIEL | CI migrations et request_id ; environnements et procédures à compléter | majeur | L |
+| NFR-OPS-01 | PARTIEL | CI migrations, request_id, déploiement Compose et DEPLOY.md ; supervision et environnements de recette à compléter | majeur | M |
 | NFR-DATA-01 | PARTIEL | Aucun cloud imposé ; résidence des services à vérifier au déploiement | bloquant | M |
 | NFR-DATA-02 | ABSENT | Validation juridique OD-08 hors code | bloquant | L |
 | NFR-DATA-03 | ABSENT | Politique OD-07, purge et anonymisation à créer | majeur | L |
@@ -156,7 +156,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-I18N-01 | PARTIEL | FR/AR et pseudo-localisation console/comptes/droits/référentiel/calendrier/administration ; autres écrans tenant et recette visuelle, anglais ultérieur | majeur | M |
 | NFR-I18N-02 | PARTIEL | PdfTest, polices embarquées ; documents métier et recette visuelle | majeur | M |
 | NFR-I18N-03 | PARTIEL | search_key arabe/latin testé ; translittération non généralisée | mineur | M |
-| NFR-PORT-01 | PARTIEL | Configuration portable et S3 ; Docker/Compose platform absent | majeur | M |
+| NFR-PORT-01 | PARTIEL | Image Docker et Compose de platform (app, worker, scheduler, migrations, PostgreSQL, Redis, Garage, Caddy) ; hébergement réel à valider | majeur | S |
 | NFR-PORT-02 | PARTIEL | Socle PHP/SQL sans GPU ; vérifier futurs processus | mineur | S |
 | NFR-MNT-01 | PARTIEL | CI SQL/PHP/migrations ; analyse statique et audit dépendances à ajouter | majeur | M |
 | NFR-MNT-02 | PARTIEL | Tests des invariants fondations ; lots 2–4 non réalisés | bloquant | L |
@@ -170,8 +170,9 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 3. **Lot 1, incrément 16 livré** : paramètres, champs personnalisés, consentements support et journal ; libellés arabes de tous les catalogues de la plateforme.
 4. **Lot 1, incrément 17 livré** : mes tâches, notifications et préférences, e-mails non envoyés, imports et exports à l'écran.
 5. **Lot 1, incrément 18 livré** : activation et récupération dans le navigateur, sites selon leur module.
-6. **Lot 1, suite** : Docker/Compose, sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
-7. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-8. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-9. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-10. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+6. **Lot 1, incrément 19 livré** : déploiement Docker Compose (HTTPS, rôles restreints, stockage S3, worker, planificateur), vérifié en CI.
+7. **Lot 1, suite** : sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
+8. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+9. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+10. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+11. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

@@ -314,7 +314,21 @@ Links now point to the panel: `PLATFORM_FRONT_URL` defaults to `APP_URL/school`.
 
 Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (149 tests, 4,282 assertions) and the 147 embedded SQL checks; no schema change.
 
+## Increment 19: deployment (Docker Compose)
+
+`Dockerfile`, `compose.yaml` and [DEPLOY.md](DEPLOY.md): one Compose project per installation.
+
+| SRS | Covered |
+|---|---|
+| NFR-SEC-01 | Caddy alone faces the network: HTTPS for every connection, HSTS, certificates from Let's Encrypt or its own authority for `localhost`; secure session cookies; the application trusts the proxy's headers for the client's address and scheme |
+| P4, NFR-TEN-01 | A one-shot `migrate` service runs the migrations as the database owner, then `deploy/roles.sql` and the roles' passwords; requests and jobs connect as `school_runtime`, the console as `platform_admin`. The owner's password never reaches the running services |
+| FR-FIC-01, ARC-07 | The schools' files in Garage, S3-compatible, on its own volume, with an access key allowed on the files' bucket only (`platform:storage`); any other S3 provider by configuration. MinIO no longer publishes public images |
+| FR-JOB-01, FR-NOT-01 | A queue worker, and a scheduler for the email outbox and the purge of expired files |
+| NFR-PORT-01 | PHP 8.3 and Apache, PostgreSQL 16, Redis 7; the encryption key created on the first start and kept with the data on the storage volume |
+
+`deploy/new-env.sh` writes a deployment's settings with fresh secrets; `deploy/smoke-test.sh` deploys the image in a disposable project and checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the files' storage, a school created and signed in to, the scheduler and the worker. CI runs it on every change.
+
 ## Next increments of lot 1
 
-1. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups and their restoration).
+1. **Backups**: encrypted backups of the database, the files and the key, and their restoration tested on a fresh installation (NFR-REC-01, NFR-REC-02).
 2. **Acceptance**: browser, mobile and right-to-left visual checks of every screen; the remaining API pagination.

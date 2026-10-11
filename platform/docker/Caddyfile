@@ -1,0 +1,9 @@
+# NFR-SEC-01: TLS for every connection, HSTS, then the application on the private network.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	reverse_proxy app:80
+}
