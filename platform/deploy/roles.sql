@@ -3,6 +3,14 @@
 ALTER ROLE school_runtime LOGIN;
 ALTER ROLE platform_admin LOGIN;
 
+-- A function runs only where this file grants it, never for everyone. PostgreSQL grants EXECUTE
+-- to PUBLIC on every new function, and a per-schema default privilege cannot take that back
+-- (001's did nothing): without this, the restricted roles could call every function of the
+-- schemas they use, the publisher's definer functions included. Applied again on every
+-- deployment, so that a function added later is closed too (SECURITY-REVIEW.md).
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA platform, school FROM PUBLIC;
+REVOKE ALL ON ALL PROCEDURES IN SCHEMA school FROM PUBLIC;
+
 -- Schools' application: its own school's data only, through RLS. No table ownership,
 -- no BYPASSRLS, no memberships or audit entries written directly, no deletion.
 GRANT USAGE ON SCHEMA school, platform TO school_runtime;

@@ -99,6 +99,9 @@ jobs:
       # pdftotext and pdffonts read the generated PDFs back (FR-PDF-01, TST-17).
       - run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
       - run: composer install --prefer-dist --no-interaction --no-progress
+      # NFR-SEC-08: no dependency with a published vulnerability.
+      - name: Dependency audit
+        run: composer audit --locked --no-interaction
       - name: Integration tests under the restricted database roles
         run: |
           cp .env.example .env

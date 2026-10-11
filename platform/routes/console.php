@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -60,6 +61,33 @@ Artisan::command('platform:storage', function () {
         'permissions' => ['read' => true, 'write' => true, 'owner' => false]])->throw();
     $this->info('Storage ready: bucket '.$bucket.'.');
 })->purpose('Prepare the bundled Garage storage: layout, bucket, application key (deployment)');
+
+// The security review's access matrix (SECURITY-REVIEW.md): every route of the API and every
+// screen, with who may reach it. PermissionCoverageTest keeps the review's copy up to date.
+Artisan::command('platform:access-matrix', function () {
+    $rows = [];
+    foreach (Route::getRoutes() as $route) {
+        $uri = $route->uri();
+        if (!preg_match('#^(api|school|console)(/|$)#', $uri) || str_contains($uri, 'livewire')) continue;
+        $middleware = array_filter($route->gatherMiddleware(), 'is_string');
+        $declared = fn (string $prefix) => implode(', ', array_map(fn ($m) => str_replace(',', ', ', substr($m, strlen($prefix))),
+            array_filter($middleware, fn ($m) => str_starts_with($m, $prefix))));
+        $access = match (true) {
+            str_starts_with($uri, 'console') => in_array(\Filament\Http\Middleware\Authenticate::class, $middleware, true) ? 'operator, MFA' : 'public',
+            in_array($route->getName(), \App\Http\Middleware\SchoolPanelContext::PERSONAL, true) => 'signed in',
+            in_array('school', $middleware, true) || in_array(\App\Http\Middleware\SchoolPanelContext::class, $middleware, true) => 'member of the school',
+            in_array('signed', $middleware, true) => 'signed link',
+            in_array('auth', $middleware, true) || in_array(\Filament\Http\Middleware\Authenticate::class, $middleware, true) => 'signed in',
+            default => 'public',
+        };
+        $permission = $declared('permission:');
+        if ($access === 'member of the school' && $permission === '') $permission = '(own records)';
+        $rows[] = sprintf('| %s | `/%s` | %s | %s | %s |', implode(' ', array_diff($route->methods(), ['HEAD'])), $uri, $access,
+            $permission === '' ? '' : ($permission === '(own records)' ? $permission : '`'.$permission.'`'), $declared('module:'));
+    }
+    sort($rows);
+    $this->line("| Method | Path | Access | Permission (one of) | Module |\n|---|---|---|---|---|\n".implode("\n", array_unique($rows)));
+})->purpose('Print the access matrix of the API and the screens (SECURITY-REVIEW.md)');
 
 Artisan::command('platform:user {email} {--name=} {--password=} {--mfa}', function (string $email, MultiFactor $authenticator) {
     $email = mb_strtolower($email);

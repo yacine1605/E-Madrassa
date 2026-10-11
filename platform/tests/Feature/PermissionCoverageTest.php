@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use RecursiveDirectoryIterator;
@@ -15,6 +16,8 @@ final class PermissionCoverageTest extends TestCase
     private const OPEN = ['GET api/school', 'GET api/me'];
     /** The person's own jobs and notifications, which row-level security alone decides (tested in tests/sql). */
     private const PERSONAL = ['api/jobs', 'api/notifications'];
+    /** The panel's pages of the person's own home, tasks and notifications. */
+    private const OWN_PAGES = ['school', 'school/home', 'school/tasks', 'school/notifications'];
 
     public function test_school_panel_pages_declare_permissions_and_persist_the_school_context(): void
     {
@@ -33,6 +36,18 @@ final class PermissionCoverageTest extends TestCase
             $this->assertNotNull($route);
             $this->assertContains('permission:'.$permission, $route->gatherMiddleware());
         }
+        // Every other page of the panel too, as it is added: only the person's own pages go without.
+        $missing = [];
+        $pages = 0;
+        foreach (Route::getRoutes() as $route) {
+            $middleware = $route->gatherMiddleware();
+            if (!in_array(\App\Http\Middleware\SchoolPanelContext::class, $middleware, true)) continue;
+            $pages++;
+            if (in_array($route->getName(), \App\Http\Middleware\SchoolPanelContext::PERSONAL, true) || in_array($route->uri(), self::OWN_PAGES, true)) continue;
+            if (!array_filter($middleware, fn ($m) => is_string($m) && str_starts_with($m, 'permission:'))) $missing[] = $route->uri();
+        }
+        $this->assertGreaterThan(15, $pages);
+        $this->assertSame([], $missing, 'School pages without a permission.');
     }
 
     public function test_application_code_never_names_a_role(): void
@@ -73,5 +88,14 @@ final class PermissionCoverageTest extends TestCase
         }
         $this->assertGreaterThan(10, $checked);
         $this->assertSame([], $missing, 'School routes without a permission.');
+    }
+
+    public function test_the_security_review_lists_every_route_with_who_may_reach_it(): void
+    {
+        $this->assertSame(0, Artisan::call('platform:access-matrix'));
+        $generated = trim(Artisan::output());
+        $review = str_replace("\r\n", "\n", file_get_contents(base_path('SECURITY-REVIEW.md')));
+        $this->assertSame(1, preg_match('/<!-- access-matrix -->\n(.*)\n<!-- \/access-matrix -->/s', $review, $listed));
+        $this->assertSame($generated, trim($listed[1]), 'SECURITY-REVIEW.md: paste the output of `php artisan platform:access-matrix` between its markers.');
     }
 }

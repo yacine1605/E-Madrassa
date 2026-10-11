@@ -10,13 +10,13 @@ use Symfony\Component\HttpFoundation\Response;
 /** Runs both the first page and every verified Livewire update in the server-selected school. */
 final class SchoolPanelContext
 {
+    /** The personal pages, which must work before choosing a school, changing a provisional
+     * password or enrolling in MFA. Their handlers never read a school's tables. */
+    public const PERSONAL = ['filament.school.pages.choose-school', 'filament.school.pages.credentials', 'filament.school.auth.logout'];
+
     public function handle(Request $request, Closure $next): Response
     {
-        // These personal pages must work before selecting a school, changing a provisional
-        // password or enrolling in MFA. Their handlers never read school business tables.
-        if ($request->routeIs('filament.school.pages.choose-school', 'filament.school.pages.credentials', 'filament.school.auth.logout')) {
-            return $next($request);
-        }
+        if ($request->routeIs(...self::PERSONAL)) return $next($request);
         if (!$request->session()->has('school.tenant')) return redirect('/school/choose-school');
         $response = app(SchoolContext::class)->handle($request, $next);
         if ($response->getStatusCode() < 400) return $response;

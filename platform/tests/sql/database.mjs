@@ -1046,6 +1046,37 @@ await check('the school sees every consent, the console their dates and use, nev
   assert.deepEqual(listed.find(r => r.reason === 'Ticket 1042 : import bloqué'), { reason: 'Ticket 1042 : import bloqué', c: 1 });
 });
 
+// Security review (SECURITY-REVIEW.md): what holds for every table and function, present and future
+await check('every table of a school forces row-level security, even on its owner (BR-01, NFR-TEN-01)', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'school' AND c.relkind = 'r' AND NOT (c.relrowsecurity AND c.relforcerowsecurity) ORDER BY 1`)).rows, []);
+});
+await check('every function running with its owner\'s rights belongs to the provisioner, never to the migrations\' owner', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT n.nspname || '.' || p.proname AS f, pg_get_userbyid(p.proowner) AS owner FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('school', 'platform') AND p.prosecdef
+      AND pg_get_userbyid(p.proowner) <> 'platform_provisioner' ORDER BY 1`)).rows, []);
+});
+await check('no function of the schemas is executable by everyone; the restricted roles own nothing and bypass nothing', async () => {
+  await as(null);
+  assert.deepEqual((await sql(`SELECT n.nspname || '.' || p.proname AS f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname IN ('school', 'platform') AND has_function_privilege('public', p.oid, 'EXECUTE') ORDER BY 1`)).rows, []);
+  assert.deepEqual((await sql(`SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles
+    WHERE rolname IN ('school_runtime', 'platform_admin') ORDER BY 1`)).rows.map(r => [r.rolname, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb]),
+    [['platform_admin', false, false, false, false], ['school_runtime', false, false, false, false]]);
+  assert.equal(await count(`SELECT count(*) n FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace
+    WHERE pg_get_userbyid(c.relowner) IN ('school_runtime', 'platform_admin')`), 0);
+  assert.equal(await count(`SELECT count(*) n FROM pg_proc p WHERE pg_get_userbyid(p.proowner) IN ('school_runtime', 'platform_admin')`), 0);
+});
+await check('a school\'s application cannot call the publisher\'s functions: no school created, no account made, no school archived', async () => {
+  await as('school_runtime', a, 1);
+  await rejects(CREATE, [uuid(), 'intruse', 'Intruse', 'fr', 'essential', today, null, 1, 1, 'MAIN', null, null, null], '42501');
+  await rejects("SELECT platform.ensure_user('intrus@example.test', 'Intrus')", [], '42501');
+  await rejects("SELECT platform.set_tenant_status($1, 'archived', 'Intrusion')", [a], '42501');
+  await rejects('SELECT * FROM platform.supervision()', [], '42501');
+});
+
 // Languages (FR-I18-01, NFR-I18N-01)
 await as('school_runtime', a, 1);
 const locale = async (user, tenant) => (await first('SELECT platform.locale_for($1, $2) AS l', [user, tenant])).l;

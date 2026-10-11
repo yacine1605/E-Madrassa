@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 22. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 23. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 22 : 151 tests PHP/PostgreSQL 16 ; 108 écrans vérifiés dans un navigateur, en français et en arabe, sur ordinateur et téléphone (`platform/deploy/acceptance-test.sh`, en CI) ; déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; 147 contrôles SQL embarqués et 150 tests PHP/PostgreSQL 16, sans fichier `.env` local. Les 153 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 16 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 23 : 156 tests PHP/PostgreSQL 16 et 151 contrôles SQL embarqués, sans fichier `.env` local ; 108 écrans vérifiés dans un navigateur, en français et en arabe, sur ordinateur et téléphone (`platform/deploy/acceptance-test.sh`, en CI) ; déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; contrôles SQL natifs avec concurrence en CI sur PostgreSQL 16. La revue de sécurité du lot 1 est dans `platform/SECURITY-REVIEW.md`. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -14,7 +14,7 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 
 | ID | Statut | Preuves et complément nécessaire | Risque | Effort |
 |---|---|---|---|---|
-| FR-PLT-01 | PARTIEL | SQL, UI/Console, ConsoleTest : création, invitation, états ; recette de bout en bout à terminer | majeur | M |
+| FR-PLT-01 | PARTIEL | SQL, UI/Console, ConsoleTest, LotOneWalkthroughTest : deux établissements créés depuis la console, activés et utilisés de bout en bout ; recette utilisateur à terminer | majeur | S |
 | FR-PLT-02 | PARTIEL | SQL, ConsoleTest : dépendances, quotas de stockage, lecture seule ; quota élèves avec lot 2 | majeur | M |
 | FR-PLT-03 | PARTIEL | SQL, ReferentialTest : profils versionnés ; validation des libellés métier OD-13 | mineur | S |
 | FR-PLT-04 | PARTIEL | SupportTest, SchoolPanelTest, SchoolAdministrationPanelTest, UI/School/SupportAccess : consentement, retrait, consultations, lecture seule et bannière ; recette utilisateur à terminer | majeur | S |
@@ -126,15 +126,15 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-PERF-05 | ABSENT | Poids compressé des pages à mesurer | mineur | M |
 | NFR-SEC-01 | PARTIEL | Proxy Caddy : HTTPS seul, HSTS, cookies sécurisés, proxys de confiance (platform/compose.yaml, smoke-test) ; TLS entre conteneurs non requis sur le réseau privé, à revoir en multi-hôte | majeur | S |
 | NFR-SEC-02 | PARTIEL | Argon2id et variables d'environnement ; rotation en exploitation à documenter | majeur | M |
-| NFR-SEC-03 | PARTIEL | CSRF, Blade, SQL paramétré, fichiers et exports testés ; CSP à compléter | majeur | M |
-| NFR-SEC-04 | PARTIEL | PermissionCoverageTest, SchoolPanelTest, SchoolReferencePanelTest : permissions retirées, IDs étrangers et onglets périmés refusés ; étendre aux écrans et lots futurs | bloquant | M |
+| NFR-SEC-03 | PARTIEL | CSRF, Blade, SQL paramétré, fichiers et exports testés ; aucun HTML brut à l'écran ; CSP à compléter au lot 2 (constat F4 de `platform/SECURITY-REVIEW.md`) | majeur | M |
+| NFR-SEC-04 | PARTIEL | Revue de sécurité du lot 1 (`platform/SECURITY-REVIEW.md`) : matrice d'accès de chaque route et écran, générée par `platform:access-matrix` et vérifiée par PermissionCoverageTest ; SchoolPanelTest, SchoolReferencePanelTest : permissions retirées, IDs étrangers et onglets périmés refusés ; constats F2 et F3 (identifiants lisibles et modifiables par `school_runtime`) au lot 2 | bloquant | M |
 | NFR-SEC-05 | PARTIEL | LoginThrottle, SchoolLogin, pages d'activation et de récupération limitées comme l'API, tests ; revue d'exploitation | majeur | S |
 | NFR-SEC-06 | PARTIEL | Refusal, DatabaseErrors, liens chiffrés ; revue exploitation/logs à terminer | majeur | M |
 | NFR-SEC-07 | PARTIEL | Audit droits et verrouillage ; alertes anormales non livrées | majeur | M |
-| NFR-SEC-08 | ABSENT | Pas de job d'audit dépendances dans CI | majeur | S |
+| NFR-SEC-08 | PARTIEL | `composer audit --locked` dans la CI à chaque envoi (job PHP de platform) ; images Docker pas encore analysées | mineur | S |
 | NFR-SEC-09 | PARTIEL | Sauvegardes de platform chiffrées (GnuPG AES-256), phrase secrète hors des archives, contrôles d'intégrité (platform/docker/backup) ; copie hors site à organiser par l'exploitant | majeur | S |
-| NFR-TEN-01 | PARTIEL | SQL, deploy/roles.sql, tests ; revalider pour toute nouvelle table | bloquant | M |
-| NFR-TEN-02 | PARTIEL | SchoolIsolationTest, fichiers/exports/jobs, SchoolPanelTest, SchoolReferencePanelTest ; étendre aux autres écrans | bloquant | M |
+| NFR-TEN-01 | PARTIEL | SQL, deploy/roles.sql, tests ; RLS forcée vérifiée sur toute table `school`, présente et future, fonctions fermées à PUBLIC (tests/sql, revue de sécurité) ; Redis sans mot de passe (constat F5) | bloquant | S |
+| NFR-TEN-02 | PARTIEL | SchoolIsolationTest, LotOneWalkthroughTest (deux établissements, API et écrans), fichiers/exports/jobs, SchoolPanelTest, SchoolReferencePanelTest ; étendre aux écrans des lots suivants | bloquant | M |
 | NFR-TEN-03 | PARTIEL | CurrentSchool, WithinSchool, Files ; déploiement et prochains modules | bloquant | M |
 | NFR-AVL-01 | ABSENT | SLO et mesure d'exploitation à contractualiser | majeur | M |
 | NFR-REC-01 | PARTIEL | Sauvegarde quotidienne de la base, du bucket et de la clé, 14 conservées, santé du service (DEPLOY.md) ; copie hors site et RPO à valider en exploitation | bloquant | S |
@@ -174,8 +174,9 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 7. **Lot 1, incrément 20 livré** : sauvegardes chiffrées et restauration vérifiée dans une installation neuve, en CI.
 8. **Lot 1, incrément 21 livré** : recette de chaque écran dans un navigateur, en français et en arabe, ordinateur et téléphone, en CI.
 9. **Lot 1, incrément 22 livré** : pagination des listes qui grandissent, dans l'API et à l'écran, avec recherche tolérante.
-10. **Lot 1, suite** : parcours de sortie (deux établissements de bout en bout, R01, R09, R10), revue de sécurité des permissions, Firefox et Safari, relecture des libellés arabes par un locuteur natif. Le lot 1 ne peut pas être déclaré terminé avant ces points.
-11. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-12. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-13. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-14. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+10. **Lot 1, incrément 23 livré** : parcours de sortie (deux établissements créés depuis la console et utilisés de bout en bout, R01, R09, R10) ; revue de sécurité des permissions (`platform/SECURITY-REVIEW.md`), qui a fermé à PUBLIC toutes les fonctions des schémas ; audit des dépendances en CI.
+11. **Lot 1, suite** : Firefox et Safari, relecture des libellés arabes par un locuteur natif, mot de passe de Redis (constat F5). Le lot 1 ne peut pas être déclaré terminé avant ces points.
+12. **Lot 2** : d'abord les constats F2 à F4 de la revue de sécurité (identifiants de `public.users`, CSP) ; ensuite schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+13. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+14. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+15. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

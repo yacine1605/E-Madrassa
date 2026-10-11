@@ -358,6 +358,13 @@ The lists that grow with use come by pages of 25 by default and 100 at most, wit
 
 The small catalogs (types, subjects, years, roles, custom fields, sites, settings, permissions) stay whole: a school has a few dozen of each.
 
+## Increment 23: exit of lot 1
+
+The lot's walkthroughs run as tests, each step through the API or the screens a person uses, under the restricted roles (`LotOneWalkthroughTest`): two schools created from the console, activated and run end to end without ever meeting (TST-01); R01, an account invited, given a role, suspended and recovered, its exports bound by the same rights as its screens; R09, a module turned off leaving neither menu nor API, and its data back when turned on; R10, a school and a centre on the same code, each with its own referential.
+
+The permissions' security review is in [SECURITY-REVIEW.md](SECURITY-REVIEW.md): the layers a request crosses, the access matrix of every route and screen (`php artisan platform:access-matrix`, which `PermissionCoverageTest` keeps equal to the review's copy), what the tests keep true for later lots, and the findings. One was fixed here: every function of the schemas was executable by everyone, so a school's application could call the publisher's functions; `deploy/roles.sql` now takes that back on every deployment, and the SQL suite checks it. CI also audits the PHP dependencies (`composer audit`).
+
 ## Next increments of lot 1
 
-1. **Exit of the lot**: the walkthroughs (two schools end to end, R01, R09, R10) and the permissions' security review; Firefox and Safari; a native speaker's review of the Arabic labels.
+1. **Remaining exit items**: Firefox and Safari; a native speaker's review of the Arabic labels; Redis's password (finding F5).
+2. **Lot 2** opens with findings F2 to F4: the credentials of `public.users`, out of the school application's reach, and a Content Security Policy.
