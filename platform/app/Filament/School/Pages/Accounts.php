@@ -22,6 +22,7 @@ final class Accounts extends SchoolPage implements HasTable
     use InteractsWithTable;
 
     protected static bool $isDiscovered = true;
+    protected static ?string $section = 'people';
     protected static array $permissions = ['user.account.read'];
     protected static ?int $navigationSort = 10;
     protected static string|array $routeMiddleware = 'permission:user.account.read';

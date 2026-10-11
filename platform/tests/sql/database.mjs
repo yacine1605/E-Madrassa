@@ -1062,7 +1062,15 @@ await check('a person\'s language comes first, if the school offers it; then the
   await sql("UPDATE school.setting SET value = '[\"fr\", \"ar\"]' WHERE tenant_id = $1 AND key = 'locale.languages'", [a]);
   await sql('UPDATE public.users SET locale = NULL WHERE id = 1');
 });
-await check('a language is French, Arabic or English', () => rejects("UPDATE public.users SET locale = 'de' WHERE id = 1", [], '23514'));
+await check('every catalog of the platform is labelled in French and Arabic, and so are the roles schools copied (BR-18)', async () => {
+  await as(null);
+  for (const table of ['module', 'plan', 'permission', 'role_template', 'setting_definition', 'notification_event', 'file_category', 'profile']) {
+    assert.equal(await count(`SELECT count(*) n FROM platform.${table} WHERE NOT (labels ? 'fr' AND labels ? 'ar')`), 0, table);
+  }
+  assert.equal(await count("SELECT count(*) n FROM school.role WHERE template_code IS NOT NULL AND NOT labels ? 'ar'"), 0);
+  await as('school_runtime', a, 1);
+});
+await check('a language is French, Arabic or English',() => rejects("UPDATE public.users SET locale = 'de' WHERE id = 1", [], '23514'));
 await check('Arabic-Indic digits are a school\'s choice, off by default (FR-I18-01)', async () => {
   assert.equal((await first("SELECT school.setting_value('locale.arabic_digits') AS v")).v, false);
   await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'locale.arabic_digits', '\"oui\"')", [a], '23514', 'setting_invalid');

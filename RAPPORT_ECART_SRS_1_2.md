@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 et 15. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 16. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 15 : 146 contrôles SQL embarqués et 134 tests PHP/PostgreSQL 16 (3 144 assertions), sans fichier `.env` local. Les 152 contrôles SQL natifs avec concurrence ont été exécutés à l'incrément 14 ; aucun schéma SQL n'a changé depuis. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 16 : 147 contrôles SQL embarqués, 153 contrôles SQL natifs avec concurrence et 140 tests PHP/PostgreSQL 16 (3 747 assertions), sans fichier `.env` local ; la migration 017 se défait et se réapplique. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -17,7 +17,7 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | FR-PLT-01 | PARTIEL | SQL, UI/Console, ConsoleTest : création, invitation, états ; recette de bout en bout à terminer | majeur | M |
 | FR-PLT-02 | PARTIEL | SQL, ConsoleTest : dépendances, quotas de stockage, lecture seule ; quota élèves avec lot 2 | majeur | M |
 | FR-PLT-03 | PARTIEL | SQL, ReferentialTest : profils versionnés ; validation des libellés métier OD-13 | mineur | S |
-| FR-PLT-04 | PARTIEL | SupportTest, SchoolPanelTest : consentement API, lecture seule et bannière ; écran tenant de gestion des consentements à créer | majeur | M |
+| FR-PLT-04 | PARTIEL | SupportTest, SchoolPanelTest, SchoolAdministrationPanelTest, UI/School/SupportAccess : consentement, retrait, consultations, lecture seule et bannière ; recette utilisateur à terminer | majeur | S |
 | FR-PLT-05 | PARTIEL | UI/Console/Supervision, ConsoleTest : comptages ; supervision et alertes d'exploitation à compléter | majeur | M |
 | FR-IAM-01 | PARTIEL | AccountController, UI/School/Accounts, AccountTest, SchoolPanelTest : cycle de vie ; formulaires publics d'activation/récupération à créer | majeur | M |
 | FR-IAM-02 | PARTIEL | SessionController, CredentialController, SchoolLogin, Credentials : connexion, MFA, verrouillage et mot de passe provisoire ; recette navigateur à terminer | majeur | M |
@@ -27,11 +27,11 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | FR-REF-01 | PARTIEL | ReferentialController, UI/School/ReferenceTypes, ReferentialTest, SchoolReferencePanelTest ; recette utilisateur à terminer | majeur | S |
 | FR-REF-02 | PARTIEL | ReferentialController, UI/School/ReferenceNodes, SchoolReferencePanelTest ; références des lots suivants et recette utilisateur | majeur | M |
 | FR-REF-03 | PARTIEL | SubjectController, UI/School/Subjects, SchoolReferencePanelTest ; utilisation par programmes au lot 2 et recette utilisateur | majeur | M |
-| FR-REF-04 | PARTIEL | CustomFieldController, SQL ; interface et validation des futurs dossiers | majeur | M |
+| FR-REF-04 | PARTIEL | CustomFieldController, SQL, UI/School/CustomFields, SchoolAdministrationPanelTest ; saisie des valeurs avec les dossiers du lot 2 | majeur | M |
 | FR-REF-05 | PARTIEL | CalendarController, UI/School/Years et Periods, SchoolReferencePanelTest ; clôture des dossiers futurs au lot 2 | majeur | M |
-| FR-REF-06 | PARTIEL | SettingController, SQL ; interface, seuils finance et créneaux planning | majeur | M |
-| FR-AUD-01 | PARTIEL | AuditController, SQL, ServicesTest ; écran journal absent, objets métier futurs | majeur | M |
-| FR-I18-01 | PARTIEL | Locales, lang/fr, lang/ar, LocalizationTest, PseudoLocalizationTest ; comptes/droits/référentiel/calendrier livrés, autres écrans et recette visuelle arabe à compléter | majeur | M |
+| FR-REF-06 | PARTIEL | SettingController, SQL, UI/School/Settings, SchoolAdministrationPanelTest ; logo, seuils finance et créneaux planning avec leurs lots | majeur | M |
+| FR-AUD-01 | PARTIEL | AuditController, SQL, ServicesTest, UI/School/Journal, SchoolAdministrationPanelTest : filtres et détail avant/après ; objets métier futurs | majeur | M |
+| FR-I18-01 | PARTIEL | Locales, lang/fr, lang/ar, LocalizationTest, PseudoLocalizationTest ; comptes/droits/référentiel/calendrier/administration livrés, catalogues de la plateforme en arabe ; autres écrans et recette visuelle arabe à compléter | majeur | M |
 | FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest ; écran et import des entités du lot 2 | majeur | M |
 | FR-IMP-02 | PARTIEL | Exporter, ExportController, ExportTest ; écran et jeux de données métier futurs | majeur | M |
 | FR-FIC-01 | PARTIEL | Files, FileController, FileTest ; stockage S3 de déploiement et interfaces métier | majeur | M |
@@ -111,7 +111,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | BR-15 | ABSENT | Clôture financière au lot 3 | bloquant | L |
 | BR-16 | PARTIEL | Refus SQL explicites, DatabaseErrors ; invariants métier futurs | bloquant | L |
 | BR-17 | PARTIEL | Tokens hachés, messages sans SQL ; rétention et anonymisation absentes | majeur | L |
-| BR-18 | PARTIEL | Codes SQL immuables et labels FR/AR ; futurs catalogues | majeur | M |
+| BR-18 | PARTIEL | Codes SQL immuables, labels FR/AR de tous les catalogues de la plateforme (017) et rôles copiés ; futurs catalogues | majeur | M |
 | BR-19 | PARTIEL | Notifications sans détails sensibles ; publication planning future | majeur | M |
 | BR-20 | PARTIEL | RequireModule, Permissions, jobs ; menus tenant et calculs futurs | bloquant | M |
 
@@ -150,10 +150,10 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-UX-01 | PARTIEL | Console et panneau école Filament ; autres écrans et recette utilisateur à terminer | majeur | L |
 | NFR-UX-02 | PARTIEL | Composants Filament ; tests visuels mobile/tablette à faire | majeur | M |
 | NFR-UX-03 | PARTIEL | Composants accessibles ; audit clavier/contraste AA à faire | majeur | M |
-| NFR-UX-04 | PARTIEL | Catalogues d'erreur, confirmations console/comptes/droits/référentiel/calendrier ; autres interfaces tenant à créer | majeur | M |
+| NFR-UX-04 | PARTIEL | Catalogues d'erreur, confirmations console/comptes/droits/référentiel/calendrier/administration ; autres interfaces tenant à créer | majeur | M |
 | NFR-UX-05 | PARTIEL | Validation et notifications existantes ; interruptions UI à éprouver | mineur | M |
 | NFR-COMP-01 | ABSENT | Matrice de navigateurs non exécutée | majeur | M |
-| NFR-I18N-01 | PARTIEL | FR/AR et pseudo-localisation console/comptes/droits/référentiel/calendrier ; autres écrans tenant et recette visuelle, anglais ultérieur | majeur | M |
+| NFR-I18N-01 | PARTIEL | FR/AR et pseudo-localisation console/comptes/droits/référentiel/calendrier/administration ; autres écrans tenant et recette visuelle, anglais ultérieur | majeur | M |
 | NFR-I18N-02 | PARTIEL | PdfTest, polices embarquées ; documents métier et recette visuelle | majeur | M |
 | NFR-I18N-03 | PARTIEL | search_key arabe/latin testé ; translittération non généralisée | mineur | M |
 | NFR-PORT-01 | PARTIEL | Configuration portable et S3 ; Docker/Compose platform absent | majeur | M |
@@ -167,8 +167,9 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 
 1. **Lot 1, incrément 14 livré** : entrée du panneau tenant, sélection sûre d'école, comptes/rôles/assignations, sécurité personnelle et bannière support ; tests d'isolation, permissions, séparation, suspension, expiration, MFA et pseudo-localisation. Les actions réutilisent les validations et fonctions SQL existantes. Les refus SQL sont isolés par savepoint pour laisser la transaction du panneau utilisable. Les anciennes applications ne sont pas modifiées.
 2. **Lot 1, incrément 15 livré** : types et nœuds du référentiel, catalogue matières/modules, années et périodes ; libellés FR ou AR, parents compatibles, archivage, historique, suppression des matières inutilisées, dates et clôture définitive. Recherche normalisée, versions optimistes et contrôles de permission/isolation repris dans les écrans. Les listes paginent l'affichage ; les API de catalogue chargent encore toutes les lignes.
-3. **Lot 1, suite** : activation/récupération publiques, champs personnalisés, paramètres ; journal, tâches, notifications, imports/exports et consentements support. Puis Docker/Compose, sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
-4. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-5. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-6. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-7. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+3. **Lot 1, incrément 16 livré** : paramètres, champs personnalisés, consentements support et journal ; libellés arabes de tous les catalogues de la plateforme.
+4. **Lot 1, suite** : tâches, notifications, imports/exports ; activation/récupération publiques et sites. Puis Docker/Compose, sauvegarde/restauration, tests visuels RTL, pagination et sécurité d'exploitation. Le lot 1 ne peut pas être déclaré terminé aujourd'hui.
+5. **Lot 2** : commencer par schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+6. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+7. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+8. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

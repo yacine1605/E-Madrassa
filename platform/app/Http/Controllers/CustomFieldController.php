@@ -79,8 +79,9 @@ final class CustomFieldController
     private function options(array $data): ?string
     {
         if (empty($data['options'])) return null;
+        // A list, whatever keys the form gave its items.
         return json_encode(array_map(fn ($option) => ['code' => $option['code'], 'labels' => json_decode($this->labels($option['labels']), true)],
-            $data['options']), JSON_THROW_ON_ERROR);
+            array_values($data['options'])), JSON_THROW_ON_ERROR);
     }
 
     private function find(string $id): array

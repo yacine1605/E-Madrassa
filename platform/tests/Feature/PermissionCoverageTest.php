@@ -25,7 +25,8 @@ final class PermissionCoverageTest extends TestCase
         $this->assertContains(\App\Http\Middleware\RequirePermission::class, $persistent);
         foreach (['accounts' => 'user.account.read', 'roles' => 'role.definition.manage', 'assignments' => 'role.assignment.manage',
             'reference-types' => 'referential.node.read', 'reference-nodes' => 'referential.node.read', 'subjects' => 'referential.node.read',
-            'years' => 'referential.node.read', 'periods' => 'referential.node.read'] as $slug => $permission) {
+            'years' => 'referential.node.read', 'periods' => 'referential.node.read', 'custom-fields' => 'referential.node.read',
+            'settings' => 'tenant.settings.manage', 'support-access' => 'support.access.grant,audit.log.read', 'journal' => 'audit.log.read'] as $slug => $permission) {
             $route = Route::getRoutes()->getByName('filament.school.pages.'.$slug);
             $this->assertNotNull($route);
             $this->assertContains('permission:'.$permission, $route->gatherMiddleware());

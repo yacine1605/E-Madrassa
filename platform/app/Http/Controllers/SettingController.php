@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
 /** School settings (FR-REF-06 base): the catalog's keys, with the school's value or the default. Bounds are the database's. */
 final class SettingController
 {
-    private const SELECT = 'SELECT d.key, d.value_type, d.min_value, d.max_value, d.labels, d.default_value,
-        school.setting_value(d.key) AS value, s.version FROM platform.setting_definition d
+    private const SELECT = 'SELECT d.key, d.value_type, d.min_value, d.max_value, array_to_json(d.allowed_values) AS allowed_values, d.labels,
+        d.default_value, school.setting_value(d.key) AS value, s.version FROM platform.setting_definition d
         LEFT JOIN school.setting s ON s.tenant_id = ? AND s.key = d.key';
 
     public function __construct(private CurrentSchool $school) {}
@@ -34,6 +34,7 @@ final class SettingController
     {
         return [...(array) $row,
             'labels' => json_decode($row->labels, true, 4, JSON_THROW_ON_ERROR),
+            'allowed_values' => $row->allowed_values === null ? null : json_decode($row->allowed_values, true, 2, JSON_THROW_ON_ERROR),
             'default_value' => json_decode($row->default_value, false, 4, JSON_THROW_ON_ERROR),
             'value' => json_decode($row->value, false, 4, JSON_THROW_ON_ERROR)];
     }

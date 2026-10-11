@@ -271,7 +271,24 @@ Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite passes with 134 
 
 The SRS source document is unchanged. Custom fields, school settings and the remaining shared-service screens are still to implement; browser/mobile acceptance and visual RTL checks remain pending.
 
+## Increment 16: the school's administration (W1.7, continued)
+
+The panel's menu now groups its pages: people and rights, referential, administration.
+
+| Path | SRS | Behavior |
+|---|---|---|
+| `/school/settings` | FR-REF-06 | Each setting with its value and default, edited with the field its type calls for (number within bounds, switch, text, days, languages, file types); the database still checks every value. Requires `tenant.settings.manage` |
+| `/school/custom-fields` | FR-REF-04 | Fields of students, guardians, staff and leads: permanent key and type, French or Arabic labels, list values added but never removed, obligation, sensitivity, order, archival with a reason, stale edits refused |
+| `/school/support-access` | FR-PLT-04 | The school's consents: granted for 72 hours at most, sensitive data apart, withdrawn at any time, each with its consultations and a link to them in the journal. Readable with `support.access.grant` or `audit.log.read`; an operator under consent sees it read-only |
+| `/school/journal` | FR-AUD-01 | Newest first, by numbered pages; filters by domain, object, action, period and object; each entry's detail with the fields changed, before and after, reason, request and address. Row-level security still decides which domains each reader sees |
+
+`GET /api/audit` also takes `page` (numbered pages) beside its cursor; `GET /api/settings` gives each setting's `allowed_values`. Custom field list values are stored as a list whatever keys a form gives them.
+
+BR-18: modules, plans, permissions, role templates and settings were labelled in French only. Migration 017 adds their Arabic labels, and the same label to each school's roles copied from a template and not renamed since; an SQL check keeps every platform catalog in both languages.
+
+Validation on 11 October 2026: 153 native PostgreSQL 16 checks including concurrency, 147 embedded checks, the full PHP suite (140 tests, 3,747 assertions); migration 017 rolls back and applies again.
+
 ## Next increments of lot 1
 
-1. **The remaining school's screens** in Filament: invitation activation and password recovery, custom fields, settings, imports and exports, journal, tasks, notifications and support consents. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
+1. **The remaining school's screens**: tasks and notifications (bell, preferences, failed deliveries), imports and exports; then public invitation activation and password recovery, and sites. Complete browser/mobile/RTL acceptance checks and the remaining API pagination.
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, scheduler, S3-compatible storage, encrypted backups).

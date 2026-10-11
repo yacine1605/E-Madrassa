@@ -22,6 +22,7 @@ final class Roles extends SchoolPage implements HasTable
     use InteractsWithTable;
 
     protected static bool $isDiscovered = true;
+    protected static ?string $section = 'people';
     protected static array $permissions = ['role.definition.manage'];
     protected static ?int $navigationSort = 20;
     protected static string|array $routeMiddleware = 'permission:role.definition.manage';

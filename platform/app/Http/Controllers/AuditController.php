@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * The school's journal (FR-AUD-01), read-only: no route changes an entry (AC2). Row-level
  * security shows each reader the domains they may read; filters by person, object and period,
- * newest first, by pages that hold even while entries are added.
+ * newest first, by pages that hold even while entries are added (`before`), or numbered for the
+ * school's screen (`page`).
  */
 final class AuditController
 {
@@ -24,6 +25,7 @@ final class AuditController
             'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
             'before' => 'nullable|string|max:100',
             'limit' => 'nullable|integer|min:1|max:200',
+            'page' => 'nullable|integer|min:1|max:10000',
         ]);
         $where = [];
         $bindings = [];
@@ -36,11 +38,12 @@ final class AuditController
             $where[] = '(a.occurred_at, a.id) < (?::timestamptz, ?::uuid)';
             array_push($bindings, $cursor[1], $cursor[2]);
         }
-        $limit = $data['limit'] ?? 50;
+        $limit = (int) ($data['limit'] ?? 50);
+        $offset = isset($data['page']) ? ((int) $data['page'] - 1) * $limit : 0;
         $rows = DB::select('SELECT a.id, a.occurred_at, a.actor_id, u.name AS actor_name, a.action, a.object_type, d.domain, a.object_id,
                 a.changed_fields, a.before, a.after, a.reason, a.request_id, a.ip, a.linked_operation_id
             FROM school.audit_log a JOIN platform.audit_domain d ON d.object_type = a.object_type LEFT JOIN public.users u ON u.id = a.actor_id'
-            .($where ? ' WHERE '.implode(' AND ', $where) : '').' ORDER BY a.occurred_at DESC, a.id DESC LIMIT '.($limit + 1), $bindings);
+            .($where ? ' WHERE '.implode(' AND ', $where) : '').' ORDER BY a.occurred_at DESC, a.id DESC LIMIT '.($limit + 1).' OFFSET '.$offset, $bindings);
         $more = count($rows) > $limit;
         $rows = array_slice($rows, 0, $limit);
         $last = end($rows);

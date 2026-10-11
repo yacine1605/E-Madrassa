@@ -33,9 +33,10 @@ final class SchoolScreen
         return is_array($result) ? json_decode(json_encode($result, JSON_THROW_ON_ERROR), true, 32, JSON_THROW_ON_ERROR) : [];
     }
 
-    public static function call(string $permission, string $controller, string $method, array $data = [], array $parameters = []): array
+    /** @param string|list<string> $permission one of them suffices, as for the route */
+    public static function call(string|array $permission, string $controller, string $method, array $data = [], array $parameters = []): array
     {
-        if (!app(Permissions::class)->can($permission)) throw Refusal::permissionDenied();
+        if (!collect((array) $permission)->contains(fn (string $one) => app(Permissions::class)->can($one))) throw Refusal::permissionDenied();
         return self::payload(app()->call([app($controller), $method], ['request' => self::request($data), ...$parameters]));
     }
 

@@ -25,6 +25,7 @@ final class Assignments extends SchoolPage implements HasTable
     use InteractsWithTable;
 
     protected static bool $isDiscovered = true;
+    protected static ?string $section = 'people';
     protected static array $permissions = ['role.assignment.manage'];
     protected static ?int $navigationSort = 30;
     protected static string|array $routeMiddleware = 'permission:role.assignment.manage';

@@ -136,9 +136,10 @@ final class PseudoLocalizationTest extends TestCase
         $this->member($school, $admin);
         $this->signIn($admin)->assertOk();
         $data = ['Madrassa', $admin['email'], 'admin', 'A', 'MAIN', 'tenant_admin', 'accountant', 'stock_manager', 'teacher', 'student', 'parent',
-            'direction', 'academic_hr', 'supervisor', 'front_office', ...array_values(Locales::NAMES),
+            'direction', 'academic_hr', 'supervisor', 'front_office', ...array_values(Locales::NAMES), Locales::NAMES['fr'].', '.Locales::NAMES['ar'],
             'École '.$school->slug, $school->slug];
-        $data = [...$data, ...array_column(DB::connection('owner')->select("SELECT labels ->> 'fr' AS l FROM school.role WHERE tenant_id = ?", [$school->id]), 'l')];
+        $data = [...$data, ...array_column(DB::connection('owner')->select("SELECT labels ->> 'fr' AS l FROM school.role WHERE tenant_id = ?
+            UNION ALL SELECT labels ->> 'fr' FROM platform.setting_definition", [$school->id]), 'l')];
         foreach (['node_type', 'ref_node', 'subject'] as $table) {
             $rows = DB::connection('owner')->select('SELECT code, labels FROM school.'.$table.' WHERE tenant_id = ?', [$school->id]);
             foreach ($rows as $row) {
@@ -146,7 +147,9 @@ final class PseudoLocalizationTest extends TestCase
                 $data = [...$data, $row->code, ...$labels, ...array_map(fn ($label) => $row->code.' · '.$label, $labels)];
             }
         }
-        foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods'] as $page) {
+        foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods',
+            'custom-fields', 'settings', 'support-access', 'journal'] as $page) {
+            $data = array_map(fn ($text) => trim((string) $text, self::PUNCTUATION), $data);
             $unmarked = array_values(array_diff($this->visibleTexts($this->get('/school/'.$page)->assertOk()->getContent()), $data));
             $this->assertSame([], $unmarked, "Text outside the catalogs on /school/$page.");
         }

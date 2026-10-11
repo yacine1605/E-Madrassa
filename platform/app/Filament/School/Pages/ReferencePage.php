@@ -15,6 +15,7 @@ abstract class ReferencePage extends SchoolPage implements HasTable
     use InteractsWithTable;
 
     protected static array $permissions = ['referential.node.read'];
+    protected static ?string $section = 'referential';
     protected static string|array $routeMiddleware = 'permission:referential.node.read';
     protected string $view = 'filament.school.table';
 
