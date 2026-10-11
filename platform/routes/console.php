@@ -115,3 +115,16 @@ Artisan::command('platform:purge-files {--limit=500}', function () {
 })->purpose('Remove expired temporary files from storage (as school_runtime)');
 
 Schedule::command('platform:purge-files')->daily()->withoutOverlapping();
+
+Artisan::command('platform:operator {email} {--revoke}', function (string $email) {
+    $owner = DB::connection('owner');
+    $user = $owner->table('users')->where('email', mb_strtolower($email))->value('id');
+    if (!$user) { $this->error('Unknown account: create it first with platform:user.'); return 1; }
+    if ($this->option('revoke')) {
+        $owner->update('UPDATE platform.operator SET revoked_at = now() WHERE user_id = ? AND revoked_at IS NULL', [$user]);
+        $this->info('Console access revoked.');
+        return 0;
+    }
+    $owner->statement('INSERT INTO platform.operator (user_id) VALUES (?) ON CONFLICT (user_id) DO UPDATE SET revoked_at = NULL', [$user]);
+    $this->info('Console operator: '.mb_strtolower($email).'. MFA is set up at the first sign-in, on /console.');
+})->purpose('Give or revoke access to the publisher console (as the database owner)');

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,10 +25,13 @@ final class AccountState
             Auth::guard('web')->logout();
             $session->invalidate();
             $session->regenerateToken();
+            // The API answers; a page of the console goes back to its sign-in.
+            if (!$request->expectsJson()) return redirect()->guest(Filament::getCurrentPanel()?->getLoginUrl() ?? '/');
             return response()->json(['message' => 'Votre session a expiré. Reconnectez-vous.', 'code' => 'session_expired'], 401);
         }
         $session->put('auth.seen_at', $now);
         if ($request->user()->must_change_password && !$request->routeIs('account.password')) {
+            if (!$request->expectsJson()) abort(403, 'Choisissez un nouveau mot de passe avant de continuer.');
             return response()->json(['message' => 'Choisissez un nouveau mot de passe avant de continuer.', 'code' => 'password_change_required'], 403);
         }
         return $next($request);

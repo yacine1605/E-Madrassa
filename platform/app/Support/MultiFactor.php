@@ -56,8 +56,8 @@ final class MultiFactor
             [$user->id, self::hash($code)]) === 1;
     }
 
-    /** Turns MFA on with a confirmed secret; returns the recovery codes, shown once. */
-    public function enable(User $user, string $secret, int $step): array
+    /** Eight new single-use codes, `XXXXX-XXXXX`. */
+    public static function recoveryCodes(): array
     {
         $codes = [];
         for ($i = 0; $i < self::RECOVERY_CODES; $i++) {
@@ -65,6 +65,13 @@ final class MultiFactor
             for ($j = 0; $j < 10; $j++) $raw .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
             $codes[] = substr($raw, 0, 5).'-'.substr($raw, 5);
         }
+        return $codes;
+    }
+
+    /** Turns MFA on with a confirmed secret; returns the recovery codes, shown once. */
+    public function enable(User $user, string $secret, int $step): array
+    {
+        $codes = self::recoveryCodes();
         DB::transaction(function () use ($user, $secret, $step, $codes) {
             $user->forceFill(['mfa_secret' => Crypt::encryptString($secret), 'mfa_enabled_at' => now(), 'mfa_last_step' => $step])->save();
             DB::delete('DELETE FROM public.mfa_recovery_code WHERE user_id = ?', [$user->id]);
@@ -75,7 +82,7 @@ final class MultiFactor
         return $codes;
     }
 
-    private static function hash(string $code): string
+    public static function hash(string $code): string
     {
         return hash('sha256', strtoupper(preg_replace('/[\s-]+/', '', $code)));
     }

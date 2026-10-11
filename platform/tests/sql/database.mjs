@@ -958,6 +958,27 @@ await check('undoing an imported account removes only an account nobody has used
   await rejects('SELECT school.discard_account($1)', [used.id], '42501', 'permission_denied');
 });
 
+// Console (W1.2, FR-PLT-01, FR-PLT-05)
+await check('the console names a first administrator by email, creating the person once (FR-PLT-01)', async () => {
+  await as('platform_admin', null, 6);
+  const id = (await first("SELECT platform.ensure_user(' Direction@Ecole-E.dz ', 'Direction E') AS u")).u;
+  assert.equal((await first("SELECT platform.ensure_user('direction@ecole-e.dz', 'Autre nom') AS u")).u, id);
+  assert.equal(Number((await first("SELECT platform.ensure_user('user1@example.test', 'Ignored') AS u")).u), 1);
+  await rejects("SELECT platform.ensure_user('nouveau@ecole.dz', '')", [], '23514', 'name_required');
+  await rejects("INSERT INTO public.users (name, email) VALUES ('x', 'x@x.dz')", [], '42501');
+  await as(null);
+  assert.deepEqual(await first('SELECT name, password FROM public.users WHERE id = $1', [id]), { name: 'Direction E', password: null });
+});
+await check('supervision counts each school\'s activity without showing any of its data (FR-PLT-05)', async () => {
+  await as('platform_admin', null, 6);
+  const row = await first("SELECT * FROM platform.supervision() WHERE slug = 'ecole-a'");
+  assert.equal(row.status, 'active');
+  assert.ok(row.members >= 5 && Number(row.storage_used) > 0 && Number(row.storage_quota) === 1024 * 1048576 && row.modules >= 5);
+  assert.deepEqual(Object.keys(row).sort(), ['emails_failed', 'jobs_active', 'jobs_failed', 'last_activity', 'members', 'mode', 'modules', 'name',
+    'plan', 'slug', 'status', 'storage_quota', 'storage_used', 'tenant_id', 'valid_until']);
+  await rejects('SELECT count(*) FROM school.membership', [], '42501');
+});
+
 // School modes (FR-PLT-01, FR-PLT-02 AC3)
 await as('platform_admin', null, 6);
 await check('a suspension needs a reason', () => rejects("SELECT platform.set_tenant_status($1, 'suspended', '')", [b], '23514', 'reason_required'));

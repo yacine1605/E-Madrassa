@@ -56,6 +56,8 @@ php artisan platform:create-school ecole-a "École A" --plan=essential --admin=d
 php artisan platform:create-school centre-b "Centre B" --profile=training_center
 php artisan platform:invite-admin ecole-a   # a new link, if the first one expired (72 h)
 php artisan platform:apply-profile ecole-a private_school_dz   # a newer profile version, only on request: adds, never overwrites
+php artisan platform:operator support@editeur.dz   # access to the publisher's console, /console (--revoke to withdraw)
+php artisan filament:assets                         # the console's styles and scripts, on every deployment
 ```
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
@@ -185,7 +187,21 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 
 A refusal that must undo what the request already wrote is thrown as `App\Exceptions\Refusal`, never as `HttpResponseException`, which the router answers on the spot without rolling the transaction back.
 
+## Increment 11: the publisher's console (W1.2, first part)
+
+139 invariants on PostgreSQL 16, 90 integration tests (11 October 2026). The user interface is Filament 5; the console is its panel at `/console`.
+
+| SRS | Covered |
+|---|---|
+| FR-PLT-01 | A school created from one form (name, permanent slug, profile, plan, language, first administrator's email, subscription): its site, profile, modules and invited administrator (AC1); sent twice, one school (AC3); suspended, reactivated, archived with a reason, recorded in the school's journal with the operator as author; a suspended school closes (AC2); invitation sent again, or its link shown when sending fails |
+| FR-PLT-02, FR-PLT-03 | Modules (dependencies kept), subscription and quotas, a newer profile version applied on request |
+| FR-PLT-05 | Supervision: per school, modules, active accounts, storage against quota, jobs, failed emails, last change; counts only, no school data |
+| FR-IAM-02 | Operators (`platform.operator`, the `super_admin`) sign in with compulsory MFA (Filament's, on the platform's own secret and recovery codes), progressive lockout, session limits |
+| FR-PLT-04 AC1 | The console reads through `platform_admin`, which has no privilege on school data |
+
+Left for the second part: support access with the school's consent (FR-PLT-04).
+
 ## Next increments of lot 1
 
-1. **Console** (W1.2), with Arabic and right-to-left from the first screen (W1.7).
+1. **Support access** (FR-PLT-04), then the school's screens in Filament, in French and Arabic, right to left (W1.7).
 2. **Deployment**: Docker image and Compose file for this application, on the model of the current one (restricted role at start-up, worker, encrypted backups).
