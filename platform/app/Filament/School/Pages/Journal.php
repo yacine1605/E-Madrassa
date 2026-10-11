@@ -58,7 +58,7 @@ final class Journal extends SchoolPage implements HasTable
             TextColumn::make('action')->label(__('admin.action'))->badge()->formatStateUsing(fn (string $state) => self::named('actions', $state)),
             TextColumn::make('object_type')->label(__('admin.object'))->formatStateUsing(fn (string $state) => self::named('objects', $state)),
             TextColumn::make('changes')->label(__('admin.changed_fields'))->wrap()
-                ->state(fn (array $record) => implode(', ', array_map(fn ($field) => self::named('fields', $field), array_keys($record['after'] ?? [])))),
+                ->state(fn (array $record) => Formats::list(array_map(fn ($field) => self::named('fields', $field), array_keys($record['after'] ?? [])))),
             TextColumn::make('reason')->label(__('admin.reason'))->limit(60),
         ])->filters([
             SelectFilter::make('domain')->label(__('admin.domain'))->options(__('admin.domains')),

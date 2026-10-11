@@ -102,6 +102,6 @@ final class Assignments extends SchoolPage implements HasTable
     private function scopeLabels(array $record): string
     {
         $options = $this->scopeOptions($record['scope_type'], true);
-        return implode(', ', array_map(fn ($id) => $options[$id] ?? $id, $record['scope_ids'] ?? []));
+        return Formats::list(array_map(fn ($id) => $options[$id] ?? $id, $record['scope_ids'] ?? []));
     }
 }

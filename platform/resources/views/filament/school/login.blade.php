@@ -4,8 +4,11 @@
         <x-filament::button type="submit" wire:loading.attr="disabled">{{ __('school.sign_in') }}</x-filament::button>
         @if ($this->pending())
             <x-filament::button color="gray" wire:click="restart">{{ __('school.restart_login') }}</x-filament::button>
-        @else
-            <x-filament::link href="/school/recovery">{{ __('account.forgot') }}</x-filament::link>
         @endif
     </form>
+    @unless ($this->pending())
+        <div class="mt-6 text-center">
+            <x-filament::link href="/school/recovery">{{ __('account.forgot') }}</x-filament::link>
+        </div>
+    @endunless
 </x-filament-panels::page.simple>

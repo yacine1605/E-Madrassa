@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\User;
 use App\Support\Console;
+use App\Support\MultiFactor;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
@@ -59,13 +61,22 @@ Artisan::command('platform:storage', function () {
     $this->info('Storage ready: bucket '.$bucket.'.');
 })->purpose('Prepare the bundled Garage storage: layout, bucket, application key (deployment)');
 
-Artisan::command('platform:user {email} {--name=} {--password=}', function (string $email) {
+Artisan::command('platform:user {email} {--name=} {--password=} {--mfa}', function (string $email, MultiFactor $authenticator) {
+    $email = mb_strtolower($email);
     $password = $this->option('password') ?: Str::password(16);
-    DB::connection('owner')->table('users')->updateOrInsert(['email' => mb_strtolower($email)],
+    DB::connection('owner')->table('users')->updateOrInsert(['email' => $email],
         ['name' => $this->option('name') ?: $email, 'password' => Hash::make($password), 'updated_at' => now(), 'created_at' => now()]);
-    $this->info('Account ready: '.mb_strtolower($email));
+    $this->info('Account ready: '.$email);
     if (!$this->option('password')) $this->warn('Temporary password, shown once: '.$password);
-})->purpose('Create or reset an account (as the database owner)');
+    // FR-IAM-02: an account with MFA from the start, e.g. an operator of the console.
+    if ($this->option('mfa')) {
+        $secret = $authenticator->newSecret();
+        $codes = $authenticator->enable(User::query()->where('email', $email)->firstOrFail(), $secret, 0);
+        $this->warn('MFA secret, shown once, for an authenticator application: '.$secret);
+        $this->line($authenticator->uri($secret, $email));
+        $this->warn('Recovery codes, shown once: '.implode(' ', $codes));
+    }
+})->purpose('Create or reset an account, with MFA if asked (as the database owner)');
 
 Artisan::command('platform:create-school {slug} {name} {--plan=essential} {--profile=private_school_dz} {--locale=fr} {--admin=} {--site-code=MAIN}
     {--site-name=} {--students=500} {--storage=1024} {--until=}', function (string $slug, string $name) {

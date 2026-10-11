@@ -90,10 +90,13 @@ final class SchoolPanelTest extends TestCase
     {
         [$school, $admin] = $this->admin();
         Filament::setCurrentPanel(Filament::getPanel('school'));
-        $form = Livewire::test(SchoolLogin::class)->fillForm(['login' => $admin['email'], 'password' => $admin['password']])->call('authenticate');
+        Livewire::test(SchoolLogin::class)->fillForm(['login' => $admin['email'], 'password' => $admin['password']])->call('authenticate')
+            ->assertRedirect('/school/login');
         $this->assertGuest();
         $this->assertSame($admin['id'], session('auth.pending.user'));
-        $form->fillForm(['code' => $this->totp($admin)])->call('authenticate')->assertRedirect('/school/home');
+        // The page that comes back asks for the code, and only for it.
+        $this->get('/school/login')->assertOk()->assertSee(__('school.mfa_code'))->assertDontSee(__('school.login'));
+        Livewire::test(SchoolLogin::class)->fillForm(['code' => $this->totp($admin)])->call('authenticate')->assertRedirect('/school/home');
         $this->assertAuthenticatedAs(User::findOrFail($admin['id']));
         $this->assertSame($school->id, session('school.tenant'));
         $this->deleteJson('/api/session');

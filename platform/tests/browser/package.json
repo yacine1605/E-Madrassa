@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "description": "Browser acceptance of the platform's screens (deploy/acceptance-test.sh). Install with: npm install --prefix tests/browser",
+  "type": "module",
+  "devDependencies": {"playwright": "1.63.0"}
+}

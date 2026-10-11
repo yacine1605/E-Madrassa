@@ -6,4 +6,5 @@ return [
     'datetime' => 'd/m/Y H:i',
     'currency' => 'د.ج',
     'megabytes' => ':value م.ب',
+    'list_separator' => '، ',
 ];

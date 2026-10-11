@@ -46,7 +46,8 @@ final class SchoolLogin extends SimplePage
             $method = $this->pending() ? 'mfa' : 'login';
             $result = SchoolScreen::payload(app()->call([app(SessionController::class), $method], ['request' => SchoolScreen::request($data)]));
             $this->data = [];
-            if ($result['mfa_required'] ?? false) { $this->form->fill(); return; }
+            // The form is built once per request: the page comes again, with the code's field.
+            if ($result['mfa_required'] ?? false) { $this->redirect('/school/login'); return; }
             $this->redirect(($result['password_change_required'] ?? false) ? '/school/credentials' : '/school/home');
         } catch (Refusal $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
@@ -59,6 +60,6 @@ final class SchoolLogin extends SimplePage
     public function restart(): void
     {
         session()->forget('auth.pending');
-        $this->form->fill();
+        $this->redirect('/school/login');
     }
 }

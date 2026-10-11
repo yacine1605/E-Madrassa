@@ -25,3 +25,6 @@ Thumbs.db
 /deploy.env
 /backups
 /.restore-test
+/tests/browser/node_modules
+/.acceptance
+/.acceptance.env

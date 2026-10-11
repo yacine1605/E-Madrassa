@@ -30,6 +30,12 @@ final class Formats
         return self::digits(number_format($value, $decimals, ',', "\u{00A0}"), $locale, $arabicDigits);
     }
 
+    /** Items one after the other, with the language's comma: « ، » in Arabic. */
+    public static function list(array $items): string
+    {
+        return implode(__('formats.list_separator'), $items);
+    }
+
     public static function digits(string $text, ?string $locale = null, bool $arabicDigits = false): string
     {
         return $arabicDigits && ($locale ?? app()->getLocale()) === 'ar' ? strtr($text, array_combine(range(0, 9), self::ARABIC_INDIC)) : $text;

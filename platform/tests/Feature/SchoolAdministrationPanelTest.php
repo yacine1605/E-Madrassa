@@ -55,8 +55,12 @@ final class SchoolAdministrationPanelTest extends TestCase
                 ->callTableAction('edit', 'calendar.open_days', data: ['value' => ['0', '1', '2', '3', '6']])->assertNotified(__('school.saved'))
                 ->callTableAction('edit', 'locale.arabic_digits', data: ['value' => true])->assertNotified(__('school.saved'))
                 ->callTableAction('edit', 'files.types', data: ['value' => ['pdf', 'png']])->assertNotified(__('school.saved'))
-                ->callTableAction('edit', 'identity.phone', data: ['value' => '+213 21 00 00 00'])->assertNotified(__('school.saved'));
+                ->callTableAction('edit', 'identity.phone', data: ['value' => '+213 21 00 00 00'])->assertNotified(__('school.saved'))
+                // A day of the week is chosen by its name, kept as its number.
+                ->callTableAction('edit', 'calendar.first_day_of_week', data: ['value' => '6'])->assertNotified(__('school.saved'));
         });
+        $this->assertSame(6, $this->value($school, 'calendar.first_day_of_week'));
+        $this->get('/school/settings')->assertSee(__('admin.days.6'));
         $this->assertSame(45, $this->value($school, 'session.idle_minutes'));
         $this->assertSame([0, 1, 2, 3, 6], $this->value($school, 'calendar.open_days'));
         $this->assertTrue($this->value($school, 'locale.arabic_digits'));

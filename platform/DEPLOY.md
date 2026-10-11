@@ -97,4 +97,6 @@ docker compose --env-file recovery.env up -d --build --wait
 
 The restoration prepares the bucket, recreates the database roles, restores the database in one transaction and checks every table's row count, then the files (their number and size checked) and the encryption key. The new installation keeps its own passwords: `migrate` sets them again with the roles' privileges when it starts. Sessions are not kept: people sign in again.
 
+`sh deploy/acceptance-test.sh` opens every screen of a disposable installation in a browser, in French and Arabic, on a desktop and a phone, and keeps a screenshot of each in `.acceptance/` (`BROWSER_CHANNEL=msedge` uses an installed Edge; otherwise Playwright's Chromium). CI runs it too.
+
 `sh deploy/restore-test.sh` does all of this between two disposable installations and checks that the school, its administrator's sign-in, a file and the key come back; CI runs it on every change.

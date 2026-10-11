@@ -8,6 +8,7 @@ use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Component;
@@ -36,8 +37,8 @@ final class Settings extends SchoolPage implements HasTable
         return $table->records(fn () => collect(SchoolScreen::call('tenant.settings.manage', SettingController::class, 'index')['data'])->keyBy('key')->all())
             ->paginated(false)->columns([
                 TextColumn::make('labels')->label(__('admin.setting'))->state(fn (array $record) => Locales::label($record['labels'])),
-                TextColumn::make('value')->label(__('admin.value'))->state(fn (array $record) => self::shown($record, $record['value'])),
-                TextColumn::make('default_value')->label(__('admin.default'))->state(fn (array $record) => self::shown($record, $record['default_value'])),
+                TextColumn::make('value')->label(__('admin.value'))->wrap()->state(fn (array $record) => self::shown($record, $record['value'])),
+                TextColumn::make('default_value')->label(__('admin.default'))->wrap()->state(fn (array $record) => self::shown($record, $record['default_value'])),
             ])->recordActions([
                 Action::make('edit')->label(__('school.edit'))->visible(fn () => $this->writable('tenant.settings.manage'))
                     ->fillForm(fn (array $record) => ['value' => $record['value']])
@@ -52,6 +53,7 @@ final class Settings extends SchoolPage implements HasTable
     private static function field(array $record): Component
     {
         $label = Locales::label($record['labels']);
+        if (self::isDay($record)) return Select::make('value')->label($label)->options(__('admin.days'))->required();
         return match ($record['value_type']) {
             'integer' => TextInput::make('value')->label($label)->numeric()->integer()->required()
                 ->minValue($record['min_value'])->maxValue($record['max_value'])
@@ -81,14 +83,21 @@ final class Settings extends SchoolPage implements HasTable
 
     private static function shown(array $record, mixed $value): string
     {
+        if (self::isDay($record)) return __('admin.days.'.$value);
         return match ($record['value_type']) {
             'integer' => Formats::number((int) $value),
             'boolean' => __($value ? 'admin.yes' : 'admin.no'),
             'text' => $value === '' || $value === null ? '—' : (string) $value,
-            'day_set' => implode(', ', array_map(fn ($day) => __('admin.days.'.$day), $value)),
-            'language_set' => implode(', ', array_map(fn ($locale) => Locales::NAMES[$locale] ?? $locale, $value)),
-            'code_set' => implode(', ', array_map(fn ($code) => self::code($record, $code), $value)),
+            'day_set' => Formats::list(array_map(fn ($day) => __('admin.days.'.$day), $value)),
+            'language_set' => Formats::list(array_map(fn ($locale) => Locales::NAMES[$locale] ?? $locale, $value)),
+            'code_set' => Formats::list(array_map(fn ($code) => self::code($record, $code), $value)),
         };
+    }
+
+    /** A day of the week, held as its number (0, Sunday, to 6): shown and chosen by its name. */
+    private static function isDay(array $record): bool
+    {
+        return $record['key'] === 'calendar.first_day_of_week';
     }
 
     private static function code(array $record, string $code): string

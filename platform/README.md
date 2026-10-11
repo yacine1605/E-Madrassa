@@ -340,6 +340,18 @@ Validation on 11 October 2026: the full PHP/PostgreSQL 16 suite (149 tests, 4,28
 
 Fixed on the way: `platform:invite-admin` passed the school's name where `AccountLinks::send` expects the language since increment 13, so the command's invitations failed; it now invites exactly as the console does, and the smoke test checks the email leaves.
 
+## Increment 21: every screen in a browser
+
+`deploy/acceptance-test.sh` deploys a disposable installation, gives it a school whose administrator and a console operator have MFA (`platform:user --mfa`), signs both in through their real pages, then opens every screen (the school's 20 pages, the console's 3, the 4 pages before sign-in) in French and Arabic, on a desktop and a phone: 108 screens. Each one must load, read right to left in Arabic, overflow nothing sideways, show no raw catalog key and raise no script error. A screenshot of each is kept in `.acceptance/` (in CI, the `platform-screens` artifact) for a person to review.
+
+| SRS | Covered |
+|---|---|
+| FR-I18-01 AC1, NFR-UX-02 | Every lot 1 screen usable in Arabic, right to left, on a desktop and a phone |
+| NFR-COMP-01 | Chromium: Chrome in CI, Edge locally (`BROWSER_CHANNEL=msedge`); Firefox and Safari still to run |
+| FR-IAM-02 | The school's sign-in with MFA, as a person goes through it |
+
+Found and fixed on the way: after the password, the school's sign-in page kept its first fields and never showed the code's until reloaded (the form is built once per request); it now comes again with the code's field. Lists use the language's comma (« ، » in Arabic), the first day of the week is named and chosen as a day, long settings wrap instead of pushing their action off the screen, and the forgotten password link stands on its own line.
+
 ## Next increments of lot 1
 
-1. **Acceptance**: browser, mobile and right-to-left visual checks of every screen; the remaining API pagination; the lot's exit walkthroughs (two schools end to end, R01, R09, R10) and the permissions' security review.
+1. **Exit of the lot**: the walkthroughs (two schools end to end, R01, R09, R10), the permissions' security review, the remaining API pagination; Firefox and Safari; a native speaker's review of the Arabic labels.
