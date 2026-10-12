@@ -102,7 +102,8 @@ Artisan::command('platform:user {email} {--name=} {--password=} {--mfa}', functi
     // FR-IAM-02: an account with MFA from the start, e.g. an operator of the console.
     if ($this->option('mfa')) {
         $secret = $authenticator->newSecret();
-        $codes = $authenticator->enable(User::query()->where('email', $email)->firstOrFail(), $secret, 0);
+        // Read as the owner: outside any school, the application's role reads nobody (SECURITY-REVIEW.md, F2).
+        $codes = $authenticator->enable(User::on('owner')->where('email', $email)->firstOrFail(), $secret, 0);
         $this->warn('MFA secret, shown once, for an authenticator application: '.$secret);
         $this->line($authenticator->uri($secret, $email));
         $this->warn('Recovery codes, shown once: '.implode(' ', $codes));

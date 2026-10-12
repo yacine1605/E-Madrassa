@@ -8,8 +8,10 @@ use App\Filament\Console\Resources\TenantResource\Pages\ListTenants;
 use App\Mail\AccountLink;
 use App\Models\Console\Tenant;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -132,6 +134,16 @@ final class ConsoleTest extends TestCase
         // FR-PLT-05: the school and its numbers, never its people.
         $this->get('/console/supervision')->assertOk()->assertSee($school->slug)->assertSee('Comptes actifs')
             ->assertDontSee($secret['email'])->assertDontSee('eleve-confidentiel');
+    }
+
+    /** The deployment's commands make the first operator, with MFA (DEPLOY.md, first start). */
+    public function test_the_commands_make_an_operator_with_mfa(): void
+    {
+        $email = 'operateur-'.Str::lower(Str::random(8)).'@example.test';
+        $this->assertSame(0, Artisan::call('platform:user', ['email' => $email, '--password' => 'Secret-'.Str::random(12), '--mfa' => true]));
+        $this->assertMatchesRegularExpression('/authenticator application: [A-Z2-7]{16,}/', Artisan::output());
+        $this->assertSame(0, Artisan::call('platform:operator', ['email' => $email]));
+        $this->assertNotNull(DB::connection('owner')->table('users')->where('email', $email)->value('mfa_enabled_at'));
     }
 
     /** Before any school the database shows nobody: the sign-in finds the operator through platform.find_login (F2). */
