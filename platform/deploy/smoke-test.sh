@@ -52,6 +52,9 @@ pass "the database, Redis and the storage are out of the proxy's reach; Redis as
 [ "$(compose exec -T app php artisan tinker --execute="Storage::disk('files')->put('smoke/check.txt', 'ok'); echo Storage::disk('files')->get('smoke/check.txt');")" = ok ] \
     || fail "the files' storage does not answer"
 pass "files are written to and read from the bundled S3-compatible storage (FR-FIC-01)"
+compose exec -T app php -r 'exit((imagetypes() & IMG_JPEG) && (imagetypes() & IMG_PNG) && (imagetypes() & IMG_WEBP) ? 0 : 1);' \
+    || fail "the image cannot read JPEG, PNG and WebP photos"
+pass "pupils' photos are read in JPEG, PNG and WebP (FR-ELV-01)"
 
 compose run --rm -T migrate php artisan platform:user direction@smoke.test --name=Direction --password='Le figuier du jardin 2026' >/dev/null
 compose run --rm -T migrate php artisan platform:create-school smoke-a "École A" --admin=direction@smoke.test | grep -q "Invitation sent"     || fail "the administrator's invitation was not sent"

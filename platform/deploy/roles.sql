@@ -113,6 +113,8 @@ GRANT INSERT (tenant_id, matricule, last_name_ar, first_name_ar, last_name_lat, 
   email, address, status, status_reason, origin_school, custom, external_ref) ON school.student TO school_runtime;
 GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date, birth_place, gender, phone, email, address, status,
   status_reason, origin_school, custom, version, archived_at) ON school.student TO school_runtime;
+-- A pupil's photo (026): two files the database accepts as theirs; it retires the previous ones.
+GRANT UPDATE (photo_file_id, photo_thumb_file_id) ON school.student TO school_runtime;
 GRANT INSERT (tenant_id, last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom, external_ref)
   ON school.guardian TO school_runtime;
 GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom, version, archived_at)
@@ -216,6 +218,10 @@ ALTER FUNCTION school.discard_student(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.discard_guardian(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.discard_guardian_link(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.discard_enrollment(uuid) OWNER TO platform_provisioner;
+-- A pupil's photo (026): its files checked whatever the writer may read, the previous ones retired.
+GRANT EXECUTE ON FUNCTION school.setting_value(text) TO platform_provisioner;
+ALTER FUNCTION school.check_student_photo() OWNER TO platform_provisioner;
+ALTER FUNCTION school.retire_student_photo() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

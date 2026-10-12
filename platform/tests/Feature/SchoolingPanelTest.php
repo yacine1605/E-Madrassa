@@ -7,8 +7,11 @@ use App\Filament\School\Pages\Programs;
 use App\Filament\School\Pages\Students;
 use App\Filament\School\Pages\StudentSheet;
 use App\Support\CurrentSchool;
+use App\Support\InitialsAvatar;
 use Filament\Facades\Filament;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -257,6 +260,43 @@ final class SchoolingPanelTest extends TestCase
                 ->assertActionHidden('edit')->assertActionHidden('status')->assertTableActionHidden('link')
                 ->callAction('archive', data: ['reason' => 'Dossier clos'])->assertNotified(__('school.saved'));
             Livewire::test(Students::class)->assertCanNotSeeTableRecords([$pupils[1]])->filterTable('archived', true)->assertCanSeeTableRecords([$pupils[1]]);
+        });
+    }
+
+    public function test_the_sheet_shows_the_photo_or_the_initials_and_adds_replaces_and_removes_the_photo(): void
+    {
+        Storage::fake('files');
+        [$school, $manager] = $this->setting();
+        $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Amine', 'birth_date' => '2012-05-01'])->assertCreated()->json('data.id');
+        $image = imagecreatetruecolor(400, 300);
+        imagefill($image, 0, 0, imagecolorallocate($image, 30, 120, 60));
+        $stream = fopen('php://memory', 'w+b');
+        imagejpeg($image, $stream);
+        rewind($stream);
+        $jpeg = stream_get_contents($stream);
+        $this->within($school, $manager, function () use ($pupil, $jpeg) {
+            // FR-ELV-01: without a photo, the pupil's initials, drawn here.
+            Livewire::withQueryParams(['student' => $pupil])->test(StudentSheet::class)->assertSee(InitialsAvatar::of('Benali Amine'), false)
+                ->assertActionVisible('photo')->assertActionHidden('removePhoto')
+                ->callAction('photo', data: ['photo' => UploadedFile::fake()->createWithContent('amine.jpg', $jpeg), 'square' => true])
+                ->assertNotified(__('school.saved'))->assertSee('/api/students/'.$pupil.'/photo?size=thumb&amp;v=2', false)
+                ->assertSeeText(__('schooling.change_photo'))->assertActionVisible('removePhoto')
+                ->callAction('photo', data: ['photo' => UploadedFile::fake()->createWithContent('amine.pdf', "%PDF-1.4\n%%EOF\n"), 'square' => true])
+                ->assertHasActionErrors(['photo']);
+        });
+        $this->assertSame(2, DB::connection('owner')->table('school.student')->where('id', $pupil)->value('version'));
+        $this->assertCount(2, Storage::disk('files')->allFiles());
+        $this->within($school, $manager, function () use ($pupil) {
+            Livewire::withQueryParams(['student' => $pupil])->test(StudentSheet::class)->callAction('removePhoto')->assertNotified(__('school.saved'))
+                ->assertSee(InitialsAvatar::of('Benali Amine'), false)->assertActionHidden('removePhoto');
+        });
+        // The image is gone for good once the change is committed (BR-17).
+        $this->assertSame([], Storage::disk('files')->allFiles());
+        // A school that turned photos off offers none, and a reader who may not change the record gets no photo action.
+        DB::connection('owner')->table('school.setting')->insert(['tenant_id' => $school->id, 'key' => 'student.photo.enabled', 'value' => 'false',
+            'created_at' => now(), 'updated_at' => now()]);
+        $this->within($school, $manager, function () use ($pupil) {
+            Livewire::withQueryParams(['student' => $pupil])->test(StudentSheet::class)->assertActionHidden('photo')->assertActionHidden('removePhoto');
         });
     }
 

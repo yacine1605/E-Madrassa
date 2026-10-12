@@ -614,9 +614,34 @@ Undone, an import puts back what it changed and deletes what it created, last ro
 
 The 500 pupils, their guardians and enrolments, previewed, imported and partly imported again, take about a minute in the test environment (about 4 000 rows applied, 16 ms each, round trips to the database included); an import runs in the background. The history of an enrolment made and validated at once now lists its creation first.
 
+## Increment 38 (lot 2): the pupil's photo
+
+A pupil may have a photo; nothing depends on it (FR-ELV-01 AC0): a pupil is created, enrolled and imported without one, and the sheet then shows their initials, drawn by the platform.
+
+| Route | Contract |
+|---|---|
+| `POST /api/students/{id}/photo` (`student.record.update`) | Multipart `photo`, `version`, and `square` to keep the image's centred square, as the screen proposes. JPEG, PNG or WebP by its content (the name's extension must agree), 2 MB at most, 16 million pixels at most, read from the file's header before anything is decoded. The image is drawn again: turned upright as the camera's EXIF orientation says, reduced to 1 024 pixels at most, with a square thumbnail of 128, written as JPEG with nothing of the sent file but its pixels (no EXIF, no location; transparency becomes white). Answers the pupil, `has_photo: true` |
+| `DELETE /api/students/{id}/photo` (`student.record.update`) | `version`; the photo is removed |
+| `GET /api/students/{id}/photo` (`student.record.read`), `?size=thumb` | The image, inline, `nosniff`, `no-store`, to whoever may read the pupil; 404 without a photo, out of scope, or while the school has photos turned off |
+
+`026_student_photos.sql` holds the rules. A pupil's photo is two live files of the category `student_photo`, made for that pupil, or nothing; any other file is refused. Replaced or removed, the previous images are retired in the same transaction, archived and due, and their bytes deleted once the change is committed; the daily purge (`platform:purge-files`) deletes what that could not (BR-17: the old image is not kept). A photo file is seen, added or changed only with the pupil it shows in the reader's scope; it is never given a signed link, and the generic file routes neither take nor serve it. The journal records that the photo changed and masks both file references. A former pupil's photo stays as it is. The setting `student.photo.enabled` (on by default) turns photos off: they are hidden and no new one is taken, nothing is deleted. Bytes stored for a change that is then refused are removed when it rolls back, for every kind of file.
+
+On the sheet, the photo's thumbnail (or the initials) heads the identity; a *Photo* menu adds, changes or removes it, for whoever may update the pupil. The upload has no preview: FilePond draws it in a worker made from a `blob:` URL, which the Content Security Policy refuses.
+
+The platform image's GD now reads WebP (`--with-webp`, `deploy/smoke-test.sh` checks JPEG, PNG and WebP). The browser acceptance gives its pupil a photo, drawn in the page and sent as a form would, and now fails any screen where an image does not load.
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-01 AC0 | `StudentPhotoTest`: a pupil without a photo; a PDF, a text or a GIF refused whatever their name; 2 MB and 16 million pixels at most; the served image has neither the EXIF block nor the place the camera wrote, is upright and reduced, its thumbnail 128 × 128; WebP and PNG accepted |
+| FR-ELV-01 (photo rules), BR-17 | `StudentPhotoTest`: the previous images deleted from storage and marked purged on replacement and removal; a refused change leaves no bytes; the journal masks the files; photos turned off are hidden, kept, and back when turned on. `tests/sql/database.mjs`: two images of this pupil or nothing, retired at once and due, journal without file references |
+| FR-IAM-04, TST-03 | `StudentPhotoTest`, `tests/sql/database.mjs`: a reader limited to a group or a site sees and changes the photo of its pupils only; a pupil sees their own; no signed link; another school sees none |
+| FR-ELV-01 (screen) | `SchoolingPanelTest`: initials, then the photo added from the sheet, a PDF refused, the photo removed and its files deleted, no photo action while photos are off |
+
+Validation on 12 October 2026: **209 PHP integration tests (6,728 assertions), 190 embedded SQL checks and 201 native PostgreSQL 16 checks including concurrency**; migration 026 rolled back with the others and alone with photos in place, then applied again; the browser acceptance in Chromium, 136 screens without a problem, the pupil's sheet showing their photo. The whole PHPUnit suite, run in one process, now passes 128 MB: `phpunit.xml` gives it 512 MB.
+
 ## Next increments of lot 2
 
-1. Scoped creation, photos, refined cross-alphabet duplicates (transliteration), guardians' duplicates at import, continuing primary-contact validity and the retention decision OD-07.
+1. Scoped creation, refined cross-alphabet duplicates (transliteration), guardians' duplicates at import, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

@@ -883,12 +883,12 @@ await check('a file is stored under its school\'s prefix and keeps its identity'
   await as(null);
   await rejects("UPDATE school.file_object SET sha256 = repeat('b', 64) WHERE id = $1", [invoice], '23514', 'identity_immutable');
 });
-await check('types and size follow the school\'s settings; a photo is an image (FR-FIC-01)', async () => {
+await check('types and size follow the school\'s settings; a photo is an image, of a pupil (FR-FIC-01, FR-ELV-01)', async () => {
   await as('school_runtime', a, 7);
   await rejects(FILE, [a, 'finance_attachment', 'x.csv', 'csv', 10], '23514', 'file_type_refused');
   await rejects(FILE, [a, 'finance_attachment', 'x.pdf', 'pdf', 11 * 1024 * 1024], '23514', 'file_too_large');
   await rejects(FILE, [a, 'student_photo', 'x.pdf', 'pdf', 10], '23514', 'file_type_refused');
-  await file('student_photo', 'jpeg');
+  await rejects(FILE, [a, 'student_photo', 'x.jpeg', 'jpeg', 10], '42501');
   await as('school_runtime', a, 1);
   await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'files.types', '[\"pdf\", \"exe\"]')", [a], '23514', 'setting_invalid');
   await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'files.types', '[\"pdf\", \"csv\"]')", [a]);
@@ -1572,6 +1572,89 @@ await check('a school member without a domain permission reads none of the core 
     assert.equal(await count(`SELECT count(*) n FROM school.${table}`), 0, table);
   await as('school_runtime', b, 2);
   assert.equal(await count('SELECT count(*) n FROM school.student'), 0, 'another school sees none');
+  await as('school_runtime', a, 1);
+});
+
+// The pupil's photo (FR-ELV-01, SQL 026): two images made for the pupil, the previous ones
+// retired as soon as they are replaced, read with the pupil only.
+const PHOTO = `INSERT INTO school.file_object (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256, owner_type, owner_id)
+  VALUES ($1::uuid, 'student_photo', 'tenant/' || $1::text || '/student_photo/' || gen_random_uuid(), 'photo.jpg', 'jpeg', 'image/jpeg', 1000, repeat('a', 64), 'student', $2)
+  RETURNING id`;
+const photoPair = async student => [(await first(PHOTO, [a, student])).id, (await first(PHOTO, [a, student])).id];
+const SET_PHOTO = 'UPDATE school.student SET photo_file_id = $2, photo_thumb_file_id = $3 WHERE id = $1';
+const photoFiles = ids => sql('SELECT id, archived_at IS NOT NULL AS archived, expires_at <= now() AS due, purged_at FROM school.file_object WHERE id = ANY ($1) ORDER BY id', [ids]);
+await check('a pupil\'s photo is two images made for them, both or neither; any other file is refused (FR-ELV-01)', async () => {
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Photo', 'Amel')).id;
+  const other = (await newAdult('Photo', 'Yanis')).id;
+  const [photo, thumb] = await photoPair(pupil);
+  await rejects('UPDATE school.student SET photo_file_id = $2 WHERE id = $1', [pupil, photo], '23514');
+  await rejects(SET_PHOTO, [pupil, photo, photo], '23514', 'student_photo_invalid');
+  await rejects(SET_PHOTO, [pupil, photo, invoice], '23514', 'student_photo_invalid');
+  const [othersPhoto, othersThumb] = await photoPair(other);
+  await rejects(SET_PHOTO, [pupil, othersPhoto, othersThumb], '23514', 'student_photo_invalid');
+  await rejects(PHOTO.replace("'student', $2", "'guardian', $2"), [a, pupil], '42501');
+  await sql(SET_PHOTO, [pupil, photo, thumb]);
+  assert.deepEqual(await first('SELECT photo_file_id, photo_thumb_file_id FROM school.student WHERE id = $1', [pupil]),
+    { photo_file_id: photo, photo_thumb_file_id: thumb });
+});
+await check('a replaced or removed photo is retired at once, due for deletion; the journal never names an image (FR-ELV-01, BR-17)', async () => {
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Photo', 'Ines')).id;
+  const first_ = await photoPair(pupil);
+  await sql(SET_PHOTO, [pupil, ...first_]);
+  const second = await photoPair(pupil);
+  await sql(SET_PHOTO, [pupil, ...second]);
+  await as(null);
+  assert.deepEqual((await photoFiles(first_)).rows.map(r => [r.archived, r.due, r.purged_at]), [[true, true, null], [true, true, null]]);
+  assert.deepEqual((await photoFiles(second)).rows.map(r => r.archived), [false, false]);
+  await as('school_runtime', null, null);
+  const due = (await sql('SELECT id FROM platform.expired_files(1000)')).rows.map(r => r.id);
+  assert.ok(first_.every(id => due.includes(id)) && !second.some(id => due.includes(id)));
+  await as('school_runtime', a, 1);
+  await rejects(SET_PHOTO, [pupil, ...first_], '23514', 'student_photo_invalid');
+  await sql(SET_PHOTO, [pupil, null, null]);
+  await as(null);
+  assert.deepEqual((await photoFiles(second)).rows.map(r => [r.archived, r.due]), [[true, true], [true, true]]);
+  const entries = (await sql("SELECT before, after FROM school.audit_log WHERE object_type = 'student' AND object_id = $1 AND action = 'UPDATE'", [pupil])).rows;
+  assert.equal(entries.length, 3);
+  for (const entry of entries) {
+    assert.deepEqual([entry.before.photo_file_id, entry.after.photo_thumb_file_id], ['[masqué]', '[masqué]']);
+    for (const id of [...first_, ...second]) assert.ok(!JSON.stringify(entry).includes(id));
+  }
+});
+await check('a school that turns photos off keeps them hidden, takes no new one, and lets one be removed (FR-ELV-01)', async () => {
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Photo', 'Rayan')).id;
+  const kept = await photoPair(pupil);
+  await sql(SET_PHOTO, [pupil, ...kept]);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'student.photo.enabled', 'false')", [a]);
+  assert.equal((await first('SELECT photo_file_id FROM school.student WHERE id = $1', [pupil])).photo_file_id, kept[0]);
+  await rejects(SET_PHOTO, [pupil, ...(await photoPair(pupil))], '23514', 'student_photo_disabled');
+  await sql(SET_PHOTO, [pupil, null, null]);
+  await sql("UPDATE school.setting SET value = 'true' WHERE tenant_id = $1 AND key = 'student.photo.enabled'", [a]);
+  await sql(SET_PHOTO, [pupil, ...(await photoPair(pupil))]);
+});
+await check('a photo is read and written with the pupil it shows, within the reader\'s scope, never through a link (FR-ELV-01, TST-03)', async () => {
+  await as('school_runtime', a, 1);
+  const photoA = await photoPair(scopeStudentA);
+  await sql(SET_PHOTO, [scopeStudentA, ...photoA]);
+  const photoB = await photoPair(scopeStudentB);
+  await sql(SET_PHOTO, [scopeStudentB, ...photoB]);
+  const both = [...photoA, ...photoB];
+  for (const reader of [siteIdentity.user, pupilIdentity.user]) {
+    await as('school_runtime', a, reader);
+    assert.deepEqual(await visibleIds('file_object').then(ids => ids.filter(id => both.includes(id))), [...photoA].sort());
+  }
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = ANY ($1)', [both]), 0);
+  await as('school_runtime', null, null);
+  assert.equal((await sql('SELECT * FROM school.file_for_link($1, $2)', [a, photoA[0]])).rows.length, 0);
+  const updater = await scopedAccount('internal', 'group', [scopeGroupB], [...coreReads, 'student.record.update']);
+  await as('school_runtime', a, updater.user);
+  await rejects(PHOTO, [a, scopeStudentA], '42501');
+  assert.equal((await sql("UPDATE school.file_object SET archived_at = now() WHERE id = $1", [photoA[0]])).rowCount ?? 0, 0);
+  await sql(SET_PHOTO, [scopeStudentB, ...(await photoPair(scopeStudentB))]);
   await as('school_runtime', a, 1);
 });
 await as(null);

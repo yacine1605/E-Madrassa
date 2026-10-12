@@ -9,8 +9,8 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
 FROM php:8.3-apache
 COPY --from=vendor /usr/bin/composer /usr/local/bin/composer
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libicu-dev libonig-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype-dev unzip \
-    && docker-php-ext-configure gd --with-jpeg --with-freetype \
+    && apt-get install -y --no-install-recommends libicu-dev libonig-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev libwebp-dev libfreetype-dev unzip \
+    && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install -j"$(nproc)" intl mbstring pdo_pgsql zip gd opcache \
     && pecl install redis-6.2.0 \
     && docker-php-ext-enable redis \

@@ -35,10 +35,11 @@ final class Files
         }
     }
 
-    /** A document the platform made itself (an export, a PDF): its type is known. */
-    public function store(string $contents, string $category, string $name, string $type, ?\DateTimeInterface $expiresAt = null): object
+    /** A document the platform made itself (an export, a PDF, a pupil's photo made again): its type is known. */
+    public function store(string $contents, string $category, string $name, string $type, ?\DateTimeInterface $expiresAt = null,
+        ?string $ownerType = null, ?string $ownerId = null): object
     {
-        return $this->register($category, $name, $type, strlen($contents), hash('sha256', $contents), $contents, null, null, $expiresAt);
+        return $this->register($category, $name, $type, strlen($contents), hash('sha256', $contents), $contents, $ownerType, $ownerId, $expiresAt);
     }
 
     public function find(string $id): ?object
@@ -56,6 +57,17 @@ final class Files
             fclose($stream);
         }, $name, ['Content-Type' => $media, 'Content-Length' => (string) $size, 'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, no-store']);
+    }
+
+    /** An image shown in the page (a pupil's photo), never kept by the browser or a proxy. */
+    public function inline(string $key, string $media, int $size): StreamedResponse
+    {
+        return response()->stream(function () use ($key) {
+            $stream = Storage::disk('files')->readStream($key);
+            fpassthru($stream);
+            fclose($stream);
+        }, 200, ['Content-Type' => $media, 'Content-Length' => (string) $size, 'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }
 
     public function key(string $id): string
@@ -78,8 +90,10 @@ final class Files
             owner_type, owner_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING '.self::COLUMNS,
             [$this->school->id(), $category, $key, FileType::cleanName($name), $type, FileType::MEDIA[$type], $size, $sha256, $ownerType, $ownerId,
              $expiresAt?->format(DATE_ATOM)]);
-        // Written to storage inside the request's transaction: a failure here undoes the register's row.
+        // Written to storage inside the request's transaction: a failure here undoes the register's row,
+        // and a refusal after it removes the bytes the row named.
         Storage::disk('files')->put($key, $contents);
+        DB::afterRollBack(fn () => rescue(fn () => Storage::disk('files')->delete($key)));
         return $row;
     }
 }

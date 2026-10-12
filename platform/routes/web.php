@@ -27,6 +27,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentPhotoController;
 use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
@@ -226,10 +227,15 @@ Route::prefix('api')->group(function () {
                     Route::get('students', [StudentController::class, 'index']);
                     Route::get('students/{student}', [StudentController::class, 'show']);
                     Route::post('students/duplicates', [StudentController::class, 'duplicates']);
+                    Route::get('students/{student}/photo', [StudentPhotoController::class, 'show']);
                 });
                 Route::post('students', [StudentController::class, 'store'])->middleware('permission:student.record.create');
                 Route::put('students/{student}', [StudentController::class, 'update'])->middleware('permission:student.record.update');
                 Route::post('students/{student}/status', [StudentController::class, 'status'])->middleware('permission:student.record.update');
+                Route::middleware('permission:student.record.update')->group(function () {
+                    Route::post('students/{student}/photo', [StudentPhotoController::class, 'store']);
+                    Route::delete('students/{student}/photo', [StudentPhotoController::class, 'destroy']);
+                });
                 Route::post('students/{student}/archive', [StudentController::class, 'archive'])->middleware('permission:student.record.archive');
                 Route::middleware('permission:guardian.record.read')->group(function () {
                     Route::get('guardians', [GuardianController::class, 'index']);

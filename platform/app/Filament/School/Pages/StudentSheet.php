@@ -6,15 +6,20 @@ use App\Filament\School\Pages\Concerns\EnrolsPupils;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentPhotoController;
 use App\Support\Formats;
+use App\Support\InitialsAvatar;
 use App\Support\Locales;
 use App\Support\Permissions;
 use App\Support\SchoolScreen;
+use App\Support\StudentPhotos;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Callout;
@@ -74,9 +79,13 @@ final class StudentSheet extends SchoolingPage
     {
         $rows = $this->identity();
         $enrollments = $this->enrollments();
-        return $schema->components([Section::make(__('schooling.identity'))->columns(['default' => 1, 'sm' => 2])->visible($rows !== [])
-            ->schema(array_map(fn (string $label, string $value, int $index) => TextEntry::make('identity_'.$index)->label($label)->state($value),
-                array_keys($rows), array_values($rows), array_keys(array_values($rows)))),
+        return $schema->components([Section::make(__('schooling.identity'))->columns(['default' => 1, 'sm' => 2])
+            ->schema([
+                // FR-ELV-01: the photo's thumbnail, or the initials of a pupil without one.
+                ImageEntry::make('photo')->hiddenLabel()->state($this->photoUrl())->alt(__('schooling.photo'))->circular()->imageSize(96)->columnSpanFull(),
+                ...array_map(fn (string $label, string $value, int $index) => TextEntry::make('identity_'.$index)->label($label)->state($value),
+                    array_keys($rows), array_values($rows), array_keys(array_values($rows))),
+            ]),
             // FR-ELV-01: the sheet shows the pupil's enrolments and groups, as far as the reader may see them.
             Section::make(__('schooling.enrollments'))->visible($enrollments !== null)->schema([RepeatableEntry::make('enrollments')->hiddenLabel()
                 ->columns(['default' => 2, 'sm' => 4])->placeholder(__('schooling.no_enrollment'))->state(array_map(fn (array $enrollment) => [
@@ -86,6 +95,14 @@ final class StudentSheet extends SchoolingPage
                 ->schema([TextEntry::make('program')->label(__('schooling.program')), TextEntry::make('year')->label(__('reference.year')),
                     TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group'))])]),
         ]);
+    }
+
+    /** The thumbnail through the pupil's own route (never a public link), named by version so that a new photo shows at once. */
+    private function photoUrl(): string
+    {
+        $pupil = $this->pupil();
+        return $pupil['has_photo'] ? url('/api/students/'.$pupil['id'].'/photo?size=thumb&v='.$pupil['version'])
+            : InitialsAvatar::of($this->personName($pupil));
     }
 
     /** @return ?list<array> the pupil's enrolments, or null for a reader without them */
@@ -142,6 +159,25 @@ final class StudentSheet extends SchoolingPage
                 ->action(fn (array $data) => $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student,
                     fn () => SchoolScreen::call('student.record.update', StudentController::class, 'status',
                         [...$data, 'version' => $this->pupil()['version'], 'confirm_enrollments' => true], ['student' => $this->student])))),
+            // FR-ELV-01: an optional photo, added, replaced or removed; the previous image is deleted.
+            ActionGroup::make([
+                Action::make('photo')->label(fn () => __($this->pupil()['has_photo'] ? 'schooling.change_photo' : 'schooling.add_photo'))
+                    ->visible(fn () => app(StudentPhotos::class)->enabled())
+                    ->schema([
+                        // No preview: the browser would draw it in a worker the Content Security Policy refuses.
+                        FileUpload::make('photo')->label(__('schooling.photo'))->storeFiles(false)->required()->previewable(false)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->maxSize(StudentPhotos::MAX_KB)->helperText(__('schooling.photo_help')),
+                        Toggle::make('square')->label(__('schooling.photo_square'))->helperText(__('schooling.photo_square_help'))->default(true),
+                    ])
+                    ->action(fn (array $data) => $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student,
+                        fn () => SchoolScreen::call('student.record.update', StudentPhotoController::class, 'store',
+                            [...$data, 'version' => $this->pupil()['version']], ['student' => $this->student])))),
+                Action::make('removePhoto')->label(__('schooling.remove_photo'))->color('danger')->requiresConfirmation()
+                    ->modalDescription(__('schooling.remove_photo_help'))->visible(fn () => $this->pupil()['has_photo'])
+                    ->action(fn () => $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student,
+                        fn () => SchoolScreen::call('student.record.update', StudentPhotoController::class, 'destroy',
+                            ['version' => $this->pupil()['version']], ['student' => $this->student])))),
+            ])->label(__('schooling.photo'))->icon('heroicon-m-camera')->button()->color('gray')->visible(fn () => $this->editable()),
             Action::make('archive')->label(__('school.archive'))->color('danger')->requiresConfirmation()->modalDescription(__('schooling.archive_help'))
                 ->visible(fn () => $this->pupil()['status'] === 'former' && !$this->pupil()['archived_at']
                     && $this->writableFor('student.record.archive', 'student', $this->student))

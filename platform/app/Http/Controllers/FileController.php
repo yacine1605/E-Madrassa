@@ -23,19 +23,19 @@ final class FileController
     {
         $data = $request->validate([
             'file' => 'required|file|max:51200',
-            'category' => ['required', Rule::in(['finance_attachment', 'student_document', 'student_photo', 'staff_document', 'pedagogy_resource'])],
+            'category' => ['required', Rule::in(['finance_attachment', 'student_document', 'staff_document', 'pedagogy_resource'])],
         ]);
         return response()->json(['data' => $this->files->upload($request->file('file'), $data['category'])], 201);
     }
 
     public function show(string $file)
     {
-        return ['data' => $this->files->find($file) ?? abort(404)];
+        return ['data' => $this->find($file)];
     }
 
     public function content(string $file)
     {
-        $row = $this->files->find($file) ?? abort(404);
+        $row = $this->find($file);
         abort_if($row->archived_at !== null, 404);
         return $this->files->download($this->files->key($row->id), $row->original_name, $row->media_type, (int) $row->size_bytes);
     }
@@ -43,7 +43,7 @@ final class FileController
     /** AC3: a link valid 15 minutes, for a file the user may read. */
     public function link(string $file)
     {
-        $row = $this->files->find($file) ?? abort(404);
+        $row = $this->find($file);
         abort_if($row->archived_at !== null, 404);
         return ['data' => ['url' => $this->files->link($row->id), 'expires_in' => Files::LINK_MINUTES * 60]];
     }
@@ -58,9 +58,17 @@ final class FileController
     public function archive(Request $request, string $file)
     {
         $data = $request->validate(['reason' => 'required|string|min:3|max:1000']);
-        abort_unless($this->files->find($file), 404);
+        $this->find($file);
         DB::select("SELECT set_config('app.reason', ?, true)", [$data['reason']]);
         abort_unless(DB::update('UPDATE school.file_object SET archived_at = now() WHERE id = ? AND archived_at IS NULL', [$file]), 404);
         return ['data' => $this->files->find($file)];
+    }
+
+    /** A pupil's photo is no attachment: it is read, changed and removed with the pupil (StudentPhotoController). */
+    private function find(string $file): object
+    {
+        $row = $this->files->find($file);
+        abort_if(!$row || $row->category === 'student_photo', 404);
+        return $row;
     }
 }

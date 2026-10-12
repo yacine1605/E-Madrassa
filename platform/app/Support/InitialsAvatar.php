@@ -19,7 +19,13 @@ final class InitialsAvatar implements AvatarProvider
 {
     public function get(Model|Authenticatable $record): string
     {
-        $initials = collect(preg_split('/\s+/u', trim(Filament::getNameForDefaultAvatar($record))))
+        return self::of(Filament::getNameForDefaultAvatar($record));
+    }
+
+    /** The same circle for anyone named, a pupil without a photo too (FR-ELV-01). */
+    public static function of(string $name): string
+    {
+        $initials = collect(preg_split('/\s+/u', trim($name)))
             ->map(fn (string $word) => mb_substr((string) preg_replace('/^[^\p{L}\p{N}]+/u', '', $word), 0, 1))
             ->filter()->take(2)->join('');
         $background = Color::convertToHex(FilamentColor::getColor('gray')[950] ?? Color::Gray[950]);

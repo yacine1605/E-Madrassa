@@ -52,6 +52,8 @@ final class PupilRecords
         $custom = json_decode($data['custom'], true, 32, JSON_THROW_ON_ERROR);
         if (!$this->sensitive($entity, $data['id'])) $custom = array_diff_key($custom, array_flip($this->sensitiveKeys($entity)));
         $data['custom'] = (object) $custom;
+        // A pupil's photo, read at /api/students/{id}/photo; none while the school has photos turned off.
+        if (array_key_exists('has_photo', $data)) $data['has_photo'] = $data['has_photo'] && $this->cached('photos', fn () => app(StudentPhotos::class)->enabled());
         return $data;
     }
 

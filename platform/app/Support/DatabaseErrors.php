@@ -26,7 +26,7 @@ final class DatabaseErrors
         'node_archived', 'group_closed', 'program_other_year', 'capacity_below_members', 'enrollment_cancelled',
         'main_group_required', 'program_not_active', 'student_blocked', 'primary_contact_required', 'student_quota_exceeded',
         'membership_ended', 'enrollment_not_assignable', 'group_not_active', 'group_other_year', 'group_other_program',
-        'outside_group_dates', 'group_full', 'idempotency_key_reused',
+        'outside_group_dates', 'group_full', 'idempotency_key_reused', 'student_photo_invalid', 'student_photo_disabled',
     ];
 
     public static function message(string $rule): string

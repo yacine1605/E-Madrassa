@@ -69,6 +69,7 @@ async function check(context, path, locale, name) {
   const state = await page.evaluate(() => ({
     dir: document.documentElement.getAttribute('dir'), lang: document.documentElement.getAttribute('lang'),
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, text: document.body.innerText,
+    broken: Array.from(document.images).filter(image => image.complete && image.naturalWidth === 0).map(image => image.currentSrc || image.src),
   }));
   const problems = [];
   if (response.status() !== 200) problems.push(`HTTP ${response.status()}`);
@@ -76,6 +77,7 @@ async function check(context, path, locale, name) {
   if (state.lang !== locale) problems.push(`lang="${state.lang}"`);
   if (state.dir !== (locale === 'ar' ? 'rtl' : 'ltr')) problems.push(`dir="${state.dir}"`);
   if (state.overflow > 1) problems.push(`${state.overflow}px wider than the screen`);
+  if (state.broken.length) problems.push(`image not shown: ${state.broken[0]}`);
   const key = state.text.match(rawKey);
   if (key) problems.push(`raw key "${key[0]}"`);
   if (errors.length) problems.push('script error: ' + errors[0]);
@@ -174,6 +176,21 @@ async function seed(browser, session) {
     const guardian = await call('guardians', { last_name_lat: 'Benali', first_name_lat: 'Karim', last_name_ar: 'بن علي', first_name_ar: 'كريم',
       phone: '0550 65 43 21', profession: 'Médecin' });
     await call(`students/${pupil.id}/guardians`, { guardian_id: guardian.id, relationship: 'father', is_primary_contact: true, is_payer: true });
+    // Their photo (FR-ELV-01), drawn here and sent as a form would: the sheet shows it through its own route.
+    const canvas = Object.assign(document.createElement('canvas'), { width: 480, height: 360 });
+    const draw = canvas.getContext('2d');
+    draw.fillStyle = '#2f6f4f';
+    draw.fillRect(0, 0, 480, 360);
+    draw.fillStyle = '#f2d16b';
+    draw.beginPath();
+    draw.arc(240, 150, 90, 0, Math.PI * 2);
+    draw.fill();
+    const photo = new FormData();
+    photo.append('photo', await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9)), 'amine.jpg');
+    photo.append('version', String(pupil.version));
+    photo.append('square', '1');
+    const sent = await fetch(`/api/students/${pupil.id}/photo`, { method: 'POST', headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json' }, body: photo });
+    if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
     return { pupil: pupil.id, group: group.id };

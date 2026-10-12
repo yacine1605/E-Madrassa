@@ -70,8 +70,9 @@ final class FileTest extends TestCase
         $this->upload('facture.pdf', "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")->assertUnprocessable();
         $this->upload('contrat.docx', $this->docx())->assertCreated()->assertJsonPath('data.file_type', 'docx');
         $this->upload('liste.csv', "nom;prénom\nBenali;Ahmed\n")->assertStatus(409)->assertJsonPath('code', 'file_type_refused');
-        // A category the accountant may not add to.
-        $this->upload('photo.jpg', "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00", 'student_photo')->assertForbidden();
+        // A category the accountant may not add to; a pupil's photo goes through the pupil's own route.
+        $this->upload('acte.pdf', self::PDF, 'student_document')->assertForbidden();
+        $this->upload('photo.jpg', "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00", 'student_photo')->assertUnprocessable()->assertJsonValidationErrors('category');
     }
 
     public function test_a_financial_attachment_stays_out_of_reach_without_a_finance_permission(): void
