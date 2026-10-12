@@ -432,9 +432,18 @@ Each person is checked by an index as their row is read. On one school of 25 000
 |---|---|
 | NFR-SEC-04, NFR-TEN-01 | SQL suite, Security review: the people of the school and the operators, the person alone outside a school, nobody without a context, one's own language only. `SchoolIsolationTest`: another school's person and a stranger unseen, the accounts' screen unchanged. `ConsoleTest`: the console's sign-in finds the operator by email |
 
+## Increment 29 (lot 2): `'unsafe-eval'` tried away, and kept
+
+The rest of finding F4 of [SECURITY-REVIEW.md](SECURITY-REVIEW.md) was tried: Livewire's CSP build of Alpine, which parses expressions instead of evaluating them, under a policy without `'unsafe-eval'`. `PLATFORM_CSP_STRICT=true` serves both (`config/livewire.php`, `config/platform.php`); it is a trial, never for production. In Chromium, 104 of the 108 screens fail as they load, all on Filament 5.10's own markup: statements, `new`, globals and arrow functions in its Alpine attributes, and the `@script` block it adds to every signed-in page, which the parser cannot read. `'unsafe-eval'` therefore stays; after each upgrade of Filament, `PLATFORM_CSP_STRICT=true sh deploy/acceptance-test.sh` tells whether it still must.
+
+The platform's own markup is ready for that build: the account link's logic moved from an attribute into an `Alpine.data` component. What keeps `'unsafe-eval'` harmless is now tested for the code to come: no view or class writes raw HTML, and the sanitizer behind Filament's notifications drops every attribute Alpine or Livewire reads (`ContentSecurityPolicyTest`).
+
+| Requirement | Evidence |
+|---|---|
+| NFR-SEC-03 | `ContentSecurityPolicyTest`: the trial serves the CSP build without `'unsafe-eval'`; no raw HTML, no Alpine attribute through the sanitizer. The acceptance: 108 screens without a problem; 104 failing under the trial, every one on Filament's markup |
+
 ## Next increments of lot 2
 
-1. **F4, the rest**: Livewire's CSP-safe build of Alpine, tried on every Filament component with its interactions, to remove `'unsafe-eval'`.
-2. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
+1. The schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

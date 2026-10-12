@@ -26,6 +26,12 @@ return [
     // (App\Http\Middleware\ContentSecurityPolicy), should a screen break in production.
     'csp_report_only' => (bool) env('PLATFORM_CSP_REPORT_ONLY', false),
 
+    // A trial, never for production (SECURITY-REVIEW.md, F4): true serves Livewire's CSP build of
+    // Alpine (config/livewire.php) and takes 'unsafe-eval' out of the policy. With Filament 5.10
+    // every screen then breaks; after each upgrade of Filament, the browser acceptance tells
+    // whether it still does (`PLATFORM_CSP_STRICT=true sh deploy/acceptance-test.sh`).
+    'csp_strict' => (bool) env('PLATFORM_CSP_STRICT', false),
+
     // Second step of a sign-in with MFA: how long the first step stays valid.
     'mfa_pending_seconds' => 300,
     'mfa_issuer' => env('PLATFORM_MFA_ISSUER', env('APP_NAME', 'Madrassa')),

@@ -6,6 +6,8 @@
 # Usage: sh deploy/acceptance-test.sh
 #   BROWSERS=chromium,firefox,webkit   the browsers, chromium by default
 #   BROWSER_CHANNEL=msedge             an installed Edge or Chrome instead of Playwright's Chromium
+#   PLATFORM_CSP_STRICT=true           the trial of a policy without 'unsafe-eval' (SECURITY-REVIEW.md,
+#                                      F4), after each upgrade of Filament: with 5.10 every screen fails
 set -eu
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1

@@ -1,8 +1,15 @@
 <x-filament-panels::page.simple>
-    {{-- The token is read from the fragment, then taken out of the address bar and history. --}}
-    <div class="space-y-6" x-data x-init="
-        const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
-        if (token) { history.replaceState(null, '', window.location.pathname); $wire.open(token) } else { $wire.withoutToken() }">
+    {{-- The token is read from the fragment, then taken out of the address bar and history. In a
+         component rather than in the markup: Alpine's CSP build evaluates no statement there (F4). --}}
+    <script nonce="{{ Vite::cspNonce() }}">
+        document.addEventListener('alpine:init', () => Alpine.data('accountLink', () => ({
+            init() {
+                const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
+                if (token) { history.replaceState(null, '', window.location.pathname); this.$wire.open(token) } else { this.$wire.withoutToken() }
+            },
+        })));
+    </script>
+    <div class="space-y-6" x-data="accountLink">
         @switch ($state)
             @case('reading')
                 <p>{{ __('account.reading') }}</p>

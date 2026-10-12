@@ -11,9 +11,10 @@ use Symfony\Component\HttpFoundation\Response;
  * NFR-SEC-03 (SECURITY-REVIEW.md, F4): scripts come from the platform itself, or inline with
  * this response's nonce, which Livewire and Filament put on theirs; anything injected into a
  * page, inline or from elsewhere, does not run. Alpine and Livewire's `@script` blocks still
- * evaluate their expressions (`'unsafe-eval'`), and Filament writes style attributes
- * (`'unsafe-inline'` for styles only). `PLATFORM_CSP_REPORT_ONLY` reports without blocking, for
- * a screen that would break in production.
+ * evaluate their expressions (`'unsafe-eval'`): Filament 5.10 cannot run Alpine's CSP build,
+ * whose trial `PLATFORM_CSP_STRICT` serves. Filament writes style attributes (`'unsafe-inline'`
+ * for styles only). `PLATFORM_CSP_REPORT_ONLY` reports without blocking, for a screen that
+ * would break in production.
  */
 final class ContentSecurityPolicy
 {
@@ -30,7 +31,7 @@ final class ContentSecurityPolicy
     {
         return implode('; ', [
             "default-src 'self'",
-            "script-src 'self' 'nonce-$nonce' 'unsafe-eval'",
+            "script-src 'self' 'nonce-$nonce'".(config('platform.csp_strict') ? '' : " 'unsafe-eval'"),
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
             "font-src 'self' data:",

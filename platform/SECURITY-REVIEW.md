@@ -168,7 +168,7 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 
 ## What the tests keep true
 
-Each property is a test, so a later lot that breaks one fails CI. The first eight look at every table, policy, function, route and page there is, so they also hold for those added later.
+Each property is a test, so a later lot that breaks one fails CI. The first nine look at every table, policy, function, route, page and view there is, so they also hold for those added later.
 
 | Property | Test |
 |---|---|
@@ -180,6 +180,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first eigh
 | Every page of the school's panel declares a permission, except the person's own pages (home, tasks, notifications, choice of school, credentials); Livewire's updates go through the same checks | `PermissionCoverageTest` |
 | No application code names a role: it asks for permissions (P4) | `PermissionCoverageTest` |
 | This review's matrix is the code's | `PermissionCoverageTest` |
+| No view or class writes raw HTML, and the sanitizer behind Filament's notifications drops every attribute Alpine or Livewire reads: no markup from data carries an expression for `'unsafe-eval'` to run | `ContentSecurityPolicyTest` |
 | A school's application cannot create a school, make an account, archive a school or read the publisher's supervision | `tests/sql/database.mjs`, Security review |
 | A school's application reads no password hash, MFA secret or recovery code, and changes none; the sign-in's role reaches those and nothing else | `tests/sql/database.mjs`, Security review; `AuthenticationTest` |
 | The database believes a request's context only signed with the key, on the connection it was made for, since its transaction began; a forged, altered or replayed context is refused, the unsigned settings of lot 1 open nothing, and no role of the application reads or sets the key | `tests/sql/database.mjs`, Security review |
@@ -194,6 +195,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first eigh
 | Support access only under the school's consent, limited in time, revocable, each consultation journaled, read-only | `SupportTest`, `tests/sql/database.mjs` (support access) |
 | No PHP dependency with a known vulnerability is shipped (NFR-SEC-08) | CI, `composer audit` |
 | Every page sends the Content Security Policy with a fresh nonce, which every inline script bears; no screen has anything blocked, in Chromium, Firefox and WebKit; no page loads anything from another site | `ContentSecurityPolicyTest`, `tests/browser/acceptance.mjs` |
+| The strict policy's trial serves Livewire's CSP build of Alpine without `'unsafe-eval'`, so that the browser acceptance can tell when Filament runs on it | `ContentSecurityPolicyTest`; `PLATFORM_CSP_STRICT=true sh deploy/acceptance-test.sh` |
 | Requests run as `school_runtime`; the owner's password never reaches the application | `deploy/smoke-test.sh`, `SessionTest` |
 | The database, Redis and the storage are out of the proxy's reach; Redis asks for its password | `deploy/smoke-test.sh` |
 
@@ -204,7 +206,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first eigh
 | F1 | Every function was executable by everyone | High | Fixed in this review |
 | F2 | `school_runtime` read every person's credentials | Medium | Fixed in increment 25; names and emails confined in increment 28 |
 | F3 | `school_runtime` could change the credential columns of any person | Medium | Fixed in increment 25 |
-| F4 | No Content Security Policy | Medium | Fixed in increment 26, `'unsafe-eval'` left |
+| F4 | No Content Security Policy | Medium | Fixed in increment 26; `'unsafe-eval'` kept, Filament needs it (increment 29) |
 | F5 | Redis had no password | Low | Fixed in increment 24 |
 | F6 | Firefox and Safari were not tested | Low | Fixed in increment 24 |
 | F7 | Row-level security trusted the context the application sets | Medium | Fixed in increment 27 |
@@ -230,13 +232,15 @@ Fix of F2 and F3 (increment 25): a fourth role, `platform_auth`, is the only one
 
 What remained: `school_runtime` still read every person's name and email, not only its school's people, since the person signed in is read before a school is chosen. Fixed in increment 28, once the database knew the person for sure (F7): row-level security confines `public.users` (`020_people.sql`). A school's application reads the person of the request and, in the school the request reaches, its members, whatever their state, and the publisher's operators, whom its journal names (`school.people`, read with its owner's rights so that the membership's own permission checks do not hide the journal's authors). Outside a school it reads the person alone; without a context, nobody. A person changes their own language only. The application reads the person signed in, before any school, in a context of their own that it rolls back at once (`DatabaseContext::reading`, `CredentialsUserProvider`); the console's sign-in finds the person by `platform.find_login`, and the recovery's email takes the person's language from `platform.issue_recovery`. Each person is checked by an index as their row is read: a page of 25 among the 25 000 people of one school, with its count, takes 84 ms instead of 32 (`tests/sql/context-cost.mjs`), a single person 0.3 ms.
 
-### F4. No Content Security Policy (fixed, `'unsafe-eval'` left)
+### F4. No Content Security Policy (fixed, `'unsafe-eval'` kept)
 
 The headers stopped sniffing, framing by another site and the leak of addresses (`docker/apache.conf`), but no `Content-Security-Policy` restricted scripts (NFR-SEC-03).
 
 Fix (increment 26): every response carries a policy (`App\Http\Middleware\ContentSecurityPolicy`). A script runs only from the platform's own files, or inline with the response's nonce, a new one each time, which Livewire and Filament put on theirs: a script injected into a page, inline or from elsewhere, does not run. No plugin; images, fonts, connections, frames and form targets on the platform only; no framing by another site. The browser acceptance fails a screen on anything the policy blocks, in three browsers, the sign-in's typing and clicks included; `deploy/smoke-test.sh` checks the header. `PLATFORM_CSP_REPORT_ONLY=true` reports without blocking, should a screen break in production (DEPLOY.md).
 
-What is left: `'unsafe-eval'` for scripts, and `'unsafe-inline'` for styles. Alpine, under Filament, evaluates the expressions written in its attributes, and Livewire its `@script` blocks; Filament writes style attributes. Markup injected into a page could still carry Alpine attributes that run: Blade and Filament escape what they show and no screen writes raw HTML, so the injection must come first. To take `'unsafe-eval'` away: Livewire's CSP-safe build of Alpine (`csp_safe`), once each of Filament's components has been tried with it in the browser, interactions included.
+What is left: `'unsafe-eval'` for scripts, and `'unsafe-inline'` for styles. Alpine, under Filament, evaluates the expressions written in its attributes, and Livewire its `@script` blocks; Filament writes style attributes. Markup injected into a page could still carry Alpine attributes that run: Blade and Filament escape what they show and no screen writes raw HTML, so the injection must come first. Tried in increment 29, with `PLATFORM_CSP_STRICT=true`, which serves Livewire's CSP build of Alpine and takes `'unsafe-eval'` out of the policy: 104 of the 108 screens fail in Chromium as they load, before any click. That build parses expressions instead of evaluating them, and its parser takes no statement, `new`, arrow function, template literal or global of the browser. Filament 5.10 writes all of these in its own markup (its tables' selection and sorting, its modals, dropdowns, tabs, sidebar and form fields), and Livewire wraps each `@script` block in an arrow function, the one Filament adds to every signed-in page included. Every failure is Filament's: 92 screens on that block (`CSP Parser Error: Unexpected token )`), 12 on the forms of the sign-in and recovery pages. The four that pass are the platform's own account link, whose logic moved from its markup into an `Alpine.data` component. `'unsafe-eval'` stays until Filament runs on that build; the same trial, after each upgrade of Filament, tells when (`PLATFORM_CSP_STRICT=true sh deploy/acceptance-test.sh`; never in production).
+
+What keeps `'unsafe-eval'` from being used against the platform: an expression runs only from an attribute of the page's markup, and no markup comes from data. No view or class of the platform writes raw HTML (`{!!`, `x-html`, `HtmlString`, `->html()`, `->markdown()`, `->allowHtml()`), and the sanitizer behind Filament's notifications keeps none of the attributes Alpine or Livewire read (`x-`, `@`, `:`, `wire:`). `ContentSecurityPolicyTest` keeps both true for the code to come.
 
 ### F5. Redis had no password (fixed)
 
