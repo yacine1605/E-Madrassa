@@ -24,6 +24,7 @@ final class ImportController
     public function template(Request $request, string $kind)
     {
         abort_unless(array_key_exists($kind, config('platform.imports')), 404);
+        $this->allowed($kind);
         $format = $request->query('format') === 'xlsx' ? 'xlsx' : 'csv';
         return response($this->imports->template($kind, $format), 200, [
             'Content-Type' => $format === 'csv' ? 'text/csv; charset=UTF-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -91,10 +92,13 @@ final class ImportController
         }
     }
 
-    /** The permission that creates these records on screen (P5). */
+    /**
+     * The permission that creates these records on screen (P5), for the whole school: what an
+     * import creates belongs to no site or group yet. A module disabled takes its permissions away.
+     */
     private function allowed(string $kind): void
     {
-        if (!$this->permissions->can($this->imports->importer($kind)->permission())) throw Refusal::permissionDenied();
+        if (!$this->permissions->everywhere($this->imports->importer($kind)->permission())) throw Refusal::permissionDenied();
     }
 
     private function uuid(string $id): string

@@ -155,6 +155,19 @@ return [
     'node_changed' => 'تغيّر هذا العنصر منذ الاستيراد.',
     'node_grown' => 'أُضيفت عناصر تحت هذا العنصر منذ الاستيراد.',
     'node_renamed' => 'أُعيدت تسمية هذا العنصر منذ الاستيراد.',
+    // Lot 2 imports: pupils, guardians, enrolments.
+    'import_date_invalid' => 'تاريخ غير صالح في العمود :column: اكتب 2012-03-14 أو 14/03/2012.',
+    'import_value_invalid' => 'قيمة غير صالحة في العمود :column.',
+    'import_column_denied' => 'يحمل العمود :column معطًى حساسًا لا تسمح صلاحياتك بالاطلاع عليه: لا يُستورد.',
+    'import_student_unknown' => 'تلميذ غير معروف: :reference. استورد ملف التلاميذ أولًا.',
+    'import_matricule_differs' => 'رقم التسجيل لهذا الملف هو :matricule؛ ورقم التسجيل لا يتغير.',
+    'import_matricule_taken' => 'رقم التسجيل :matricule مسند مسبقًا إلى تلميذ آخر.',
+    'import_student_duplicate' => 'تكرار محتمل للتلميذ :matricules (الاسم نفسه وتاريخ الميلاد نفسه). افتح ملفه، أو اكتب سببًا في العمود duplicate_reason لإنشاء ملف آخر.',
+    'import_record_changed' => 'تغيّر هذا الملف منذ الاستيراد.',
+    'import_year_unknown' => 'سنة دراسية غير معروفة: :code.',
+    'import_program_unknown' => 'برنامج غير معروف لهذه السنة: :code.',
+    'import_group_unknown' => 'فوج غير معروف لهذه السنة: :code.',
+    'import_enrollment_exists' => 'التلميذ مسجل مسبقًا في هذا البرنامج ضمن فوج آخر: تُجرى تغييراته من الشاشة.',
 
     // The framework's own refusals.
     'not_found' => 'غير موجود.',

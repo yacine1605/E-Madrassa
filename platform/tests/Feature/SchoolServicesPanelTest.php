@@ -79,6 +79,21 @@ final class SchoolServicesPanelTest extends TestCase
         $this->assertSame(0, DB::connection('owner')->table('school.ref_node')->where('tenant_id', $school->id)->where('code', '1AP_BIS')->whereNull('archived_at')->count());
     }
 
+    public function test_pupils_are_imported_on_screen_by_whoever_creates_them_for_the_whole_school(): void
+    {
+        [$school, $admin] = $this->setting();
+        $this->grant($school, $admin, 'academic_hr');
+        $this->within($school, $admin, fn () => Livewire::test(Imports::class)->callTableAction('import', data: ['kind' => 'students',
+            'file' => UploadedFile::fake()->createWithContent('eleves.csv', "external_ref;last_name_lat;first_name_lat;birth_date\r\nEL-1;Benali;Amine;14/03/2012\r\n")])
+            ->assertNotified(__('services.started')));
+        $this->assertSame(['students', 'previewed'], [$this->batch($school)->kind, $this->batch($school)->status]);
+        // A manager of one site creates pupils there, never by a file: nothing to import.
+        $local = $this->account('site-manager');
+        $this->member($school, $local);
+        $this->grant($school, $local, 'academic_hr', 'site', [DB::connection('owner')->table('school.site')->where('tenant_id', $school->id)->value('id')]);
+        $this->within($school, $local, fn () => Livewire::test(Imports::class)->assertTableActionHidden('import')->assertTableActionHidden('template'));
+    }
+
     public function test_an_export_is_made_at_once_and_downloaded_by_its_author_only(): void
     {
         [$school, $admin] = $this->setting();

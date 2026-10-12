@@ -184,7 +184,7 @@ Left for later: time slots and approval thresholds come with planning (lot 4) an
 
 ### Imports (FR-IMP-01, TST-14)
 
-`GET /api/imports/templates/{kind}` gives the template (CSV or Excel, the columns' codes on the first line); `POST /api/imports` keeps the file (category `import`) and previews it in the background: every row is validated, then applied for real in a transaction that is rolled back, so the preview finds every refusal, the database's included, and writes no business data (AC3, the "reprise à blanc"). Each refused row has its line and cause (AC2), also as a downloadable report; references are found by code, never created. `POST /api/imports/{id}/confirm` applies the valid rows by batches of 100, each committed on its own; rows are found by their stable reference, so the same file imported again duplicates nothing (AC1). `POST /api/imports/{id}/rollback` undoes a complete import, last row first, all or nothing, and refuses while something done since depends on it; an imported account is removed only if nobody has used it (`school.discard_account`). Kinds: `accounts` and `referential` (`config/platform.php`, `imports`: an `App\Imports\Importer`); students, staff, groups, payments and the rest join with their modules.
+`GET /api/imports/templates/{kind}` gives the template (CSV or Excel, the columns' codes on the first line); `POST /api/imports` keeps the file (category `import`) and previews it in the background: every row is validated, then applied for real in a transaction that is rolled back, so the preview finds every refusal, the database's included, and writes no business data (AC3, the "reprise à blanc"). Each refused row has its line and cause (AC2), also as a downloadable report; references are found by code, never created. `POST /api/imports/{id}/confirm` applies the valid rows by batches of 100, each committed on its own; rows are found by their stable reference, so the same file imported again duplicates nothing (AC1). `POST /api/imports/{id}/rollback` undoes a complete import, last row first, all or nothing, and refuses while something done since depends on it; an imported account is removed only if nobody has used it (`school.discard_account`). Kinds: `accounts` and `referential` (`config/platform.php`, `imports`: an `App\Imports\Importer`); pupils, guardians and enrolments since increment 37; staff, payments and the rest join with their modules.
 
 A refusal that must undo what the request already wrote is thrown as `App\Exceptions\Refusal`, never as `HttpResponseException`, which the router answers on the spot without rolling the transaction back.
 
@@ -591,9 +591,32 @@ The history of an enrolment's states now keeps every reason, a validation's incl
 | FR-GRP-02, BR-07 | members listed, transfer keeping both memberships, history with dates |
 | FR-ELV-01, FR-ELV-02 AC2 | the sheet shows the enrolment and its class; a minor without a primary contact is refused |
 
+## Increment 37 (lot 2): the 500 reference pupils, imported
+
+Three kinds join the imports (`config/platform.php`), to bring in a school's pupils with their data (lot 2 exit, R02), in this order:
+
+| Kind | A row | Found again by |
+|---|---|---|
+| `students` | A pupil: names in Arabic and/or Latin letters, birth date (`2012-03-14` or `14/03/2012`), place, gender (`m`/`f`), phone, email, address, school of origin, the school's own fields as `custom_<key>` columns; a former `matricule`, or none for one of the year | `external_ref`, the reference of the school's file (SQL 025) |
+| `guardians` | A guardian and their link to one pupil: names, phone, email, profession, own fields, `relationship` (`father`, `mother`, `guardian`, `other`), `is_primary_contact`, `is_payer`, `emergency_contact` (`oui`/`non`, `1`/`0`, `yes`/`no`, `نعم`/`لا`). Brothers and sisters: one row each, the same guardian reference | the guardian's `external_ref` and the pupil's `student_ref` (the pupils' file reference, or the matricule) |
+| `enrollments` | A pupil in a programme of a year, by codes (`year`, `program`), with their class (`group`), `pending` or `validated` | the pupil, the year and the programme |
+
+Each row goes through what the screens apply: names, dates and duplicates checked by the application; permissions, scopes, a minor's primary contact, quota, a class's places, an active programme, the price of the day, by the database. A probable duplicate (same name and birth date, in either alphabet, FR-ELV-04) is refused with the existing matricule, unless the row's `duplicate_reason` says why to create it anyway, which the journal keeps. A column the file leaves out keeps the record's value; an empty cell clears it. An existing enrolment is left as it is: its changes are made on screen. Each kind needs the permission that creates its records for the whole school, and its module.
+
+Undone, an import puts back what it changed and deletes what it created, last row first, all or nothing: an enrolment with its class and history, then a guardian's link and the guardian once no pupil is linked to them, then a pupil without guardian or enrolment. It refuses while something depends on it, including a correction typed on a record since; so a school undoes its enrolments, then its guardians, then its pupils. The deletion goes through functions owned by `platform_provisioner`, for what an import still in place reports having created only (`025_pupil_imports.sql`, SECURITY-REVIEW.md).
+
+| Requirement | Evidence |
+|---|---|
+| FR-IMP-01 AC1–AC3, TST-14, lot 2 exit | `PupilImportTest`: 500 pupils previewed without writing, imported, imported again without a duplicate; 250 guardians for 500 pupils; 500 enrolments validated in two classes, a pupil found by their former matricule; each refused line with its cause; an update undone, imports undone in order, the school's own and sensitive columns |
+| FR-ELV-01, FR-ELV-04 AC1 | former matricules kept, the others generated once each; a duplicate in the other alphabet refused, a reason journaled |
+| FR-ELV-02 AC1, AC2, FR-INS-01, BR-07 | one guardian for brothers and sisters; a minor without a primary contact and a full class refused, row by row |
+| BR-02, BR-05 | `tests/sql/database.mjs`: a reference given once; an undo deletes only what an import still in place created, while nothing depends on it |
+
+The 500 pupils, their guardians and enrolments, previewed, imported and partly imported again, take about a minute in the test environment (about 4 000 rows applied, 16 ms each, round trips to the database included); an import runs in the background. The history of an enrolment made and validated at once now lists its creation first.
+
 ## Next increments of lot 2
 
-1. Scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
+1. Scoped creation, photos, refined cross-alphabet duplicates (transliteration), guardians' duplicates at import, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

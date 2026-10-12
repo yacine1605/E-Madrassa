@@ -78,8 +78,9 @@ final class EnrollmentController
         $this->find($enrollment);
         $request->validate(Paging::RULES);
         $request->merge(['paginate' => true]);
+        // An enrolment made and validated at once (an import) has two states of the same instant: its creation first.
         return Paging::select($request, 'SELECT id, from_status, to_status, reason, changed_at, changed_by FROM school.enrollment_status_history WHERE tenant_id = ? AND enrollment_id = ?',
-            [$this->school->id(), $enrollment], 'changed_at, id');
+            [$this->school->id(), $enrollment], 'changed_at, from_status IS NOT NULL, id');
     }
 
     /** FR-GRP-02 AC3: the enrolment's groups, the ended ones with their dates. */

@@ -88,7 +88,7 @@ final class Imports extends SchoolPage implements HasTable
     {
         if (!app(Permissions::class)->can('import.job.create')) return [];
         return collect(array_keys(config('platform.imports')))
-            ->filter(fn (string $kind) => app(Permissions::class)->can(app(ImportService::class)->importer($kind)->permission()))
+            ->filter(fn (string $kind) => app(Permissions::class)->everywhere(app(ImportService::class)->importer($kind)->permission()))
             ->mapWithKeys(fn (string $kind) => [$kind => __('services.import_kinds.'.$kind)])->all();
     }
 

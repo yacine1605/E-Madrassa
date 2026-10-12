@@ -155,6 +155,19 @@ return [
     'node_changed' => 'Cet élément a changé depuis l’import.',
     'node_grown' => 'Des éléments ont été ajoutés sous cet élément depuis l’import.',
     'node_renamed' => 'Cet élément a été renommé depuis l’import.',
+    // Lot 2 imports: pupils, guardians, enrolments.
+    'import_date_invalid' => 'Date invalide dans la colonne :column : écrivez 2012-03-14 ou 14/03/2012.',
+    'import_value_invalid' => 'Valeur invalide dans la colonne :column.',
+    'import_column_denied' => 'La colonne :column porte une donnée sensible que vos droits ne permettent pas de lire : elle ne s’importe pas.',
+    'import_student_unknown' => 'Élève inconnu : :reference. Importez d’abord le fichier des élèves.',
+    'import_matricule_differs' => 'Ce dossier a le matricule :matricule ; un matricule ne change pas.',
+    'import_matricule_taken' => 'Le matricule :matricule est déjà celui d’un autre élève.',
+    'import_student_duplicate' => 'Doublon probable de l’élève :matricules (même nom, même date de naissance). Ouvrez sa fiche, ou indiquez un motif dans la colonne duplicate_reason pour créer un autre dossier.',
+    'import_record_changed' => 'Ce dossier a changé depuis l’import.',
+    'import_year_unknown' => 'Année scolaire inconnue : :code.',
+    'import_program_unknown' => 'Programme inconnu pour cette année : :code.',
+    'import_group_unknown' => 'Groupe inconnu pour cette année : :code.',
+    'import_enrollment_exists' => 'Élève déjà inscrit à ce programme, dans un autre groupe : ses changements se font à l’écran.',
 
     // The framework's own refusals.
     'not_found' => 'Introuvable.',

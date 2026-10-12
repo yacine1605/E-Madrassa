@@ -1318,6 +1318,122 @@ await check('a failed group transfer preserves the source assignment and its pla
   assert.equal((await first('SELECT valid_to FROM school.group_membership WHERE id = $1', [membership])).valid_to, null);
 });
 
+// The reference import (FR-IMP-01, lot 2 exit; SQL 025): pupils and guardians keep the reference of
+// the school's file; an import is undone while nothing depends on what it created.
+const STUDENT_REF = STUDENT.replace('custom)', 'custom, external_ref)').replace('$7)', '$7, $8)');
+const importBatch = async () => {
+  const batch = (await first("INSERT INTO school.import_batch (tenant_id, user_id, kind, file_id) VALUES ($1, 1, 'students', $2) RETURNING id",
+    [a, await file('import', 'csv', 10)])).id;
+  for (const status of ['previewed', 'importing', 'imported']) await sql('UPDATE school.import_batch SET status = $2 WHERE id = $1', [batch, status]);
+  return batch;
+};
+let importLine = 0;
+// A member of the school without any role.
+await as(null);
+const roleless = Number((await first("INSERT INTO public.users (name, email, password) VALUES ('Sans rôle', 'sans.role@example.test', 'hash') RETURNING id")).id);
+await sql("INSERT INTO school.membership (tenant_id, user_id, status) VALUES ($1, $2, 'active')", [a, roleless]);
+await as('school_runtime', a, 1);
+// As the import's run reports a row: valid at the preview, then created, with what it created.
+const reported = async (batch, type, id) => {
+  const row = (await first("INSERT INTO school.import_row (tenant_id, batch_id, line, data, outcome, action) VALUES ($1, $2, $3, '{}', 'valid', 'create') RETURNING id",
+    [a, batch, ++importLine])).id;
+  await sql("UPDATE school.import_row SET outcome = 'created', target_type = $2, target_id = $3, previous = $4 WHERE id = $1",
+    [row, type, id, JSON.stringify({ created: { [type]: id } })]);
+};
+
+await check("a pupil's or a guardian's reference from a file is theirs alone and never changes (FR-IMP-01, BR-05)", async () => {
+  const pupil = (await first(STUDENT_REF, [a, 'Reference', 'Unique', null, null, '1990-01-01', pupilFields, 'REF-1'])).id;
+  await rejects(STUDENT_REF, [a, 'Reference', 'Double', null, null, '1990-01-01', pupilFields, 'REF-1'], '23505');
+  const guardian = (await first("INSERT INTO school.guardian (tenant_id, last_name_lat, first_name_lat, external_ref) VALUES ($1, 'Reference', 'Parent', 'REF-1') RETURNING id", [a])).id;
+  await rejects("INSERT INTO school.guardian (tenant_id, last_name_lat, first_name_lat, external_ref) VALUES ($1, 'Reference', 'Autre', 'REF-1')", [a], '23505');
+  // The application cannot write it once given; the database refuses it to anyone.
+  await rejects("UPDATE school.student SET external_ref = 'REF-2' WHERE id = $1", [pupil], '42501');
+  await rejects('UPDATE school.guardian SET external_ref = NULL WHERE id = $1', [guardian], '42501');
+  await as(null);
+  await rejects("UPDATE school.student SET external_ref = 'REF-2' WHERE id = $1", [pupil], '23514', 'code_immutable');
+  await rejects('UPDATE school.guardian SET external_ref = NULL WHERE id = $1', [guardian], '23514', 'code_immutable');
+  await as('school_runtime', a, 1);
+});
+
+await check('undoing an import removes the pupils and guardians it created, while nothing depends on them (FR-IMP-01, BR-02)', async () => {
+  const batch = await importBatch();
+  const pupil = (await first(STUDENT_REF, [a, 'Importe', 'Defait', null, null, '1990-01-01', pupilFields, 'IMP-DEFAIT'])).id;
+  await rejects('SELECT school.discard_student($1)', [pupil], '23514', 'dependent_operation');
+  await reported(batch, 'student', pupil);
+  await sql('SELECT school.discard_student($1)', [pupil]);
+  assert.equal(await count('SELECT count(*) n FROM school.student WHERE id = $1', [pupil]), 0);
+  // The journal keeps the removal and its reason, the person's data masked (BR-17).
+  await as(null);
+  assert.deepEqual(await first("SELECT reason, before ->> 'last_name_lat' AS name, before ->> 'external_ref' AS ref FROM school.audit_log WHERE object_id = $1 AND action = 'DELETE'",
+    [pupil]), { reason: 'import_rollback', name: '[masqué]', ref: '[masqué]' });
+  await as('school_runtime', a, 1);
+  // Enrolled since: the pupil stays.
+  const p = await programme('DEFAIRE');
+  const enrolled = await newAdult('Importe', 'Inscrit');
+  await reported(batch, 'student', enrolled.id);
+  await enroll(enrolled.id, p);
+  await rejects('SELECT school.discard_student($1)', [enrolled.id], '23514', 'dependent_operation');
+  // A guardian goes once no pupil is linked to them; a primary contact's link, not while an
+  // enrolment relies on it (FR-ELV-02 AC2).
+  const minor = await newPupil('Importe', 'Mineur');
+  await reported(batch, 'student', minor.id);
+  const guardian = await contact(minor.id);
+  const link = (await first('SELECT id FROM school.student_guardian WHERE guardian_id = $1', [guardian])).id;
+  await reported(batch, 'guardian', guardian);
+  await reported(batch, 'student_guardian', link);
+  await rejects('SELECT school.discard_student($1)', [minor.id], '23514', 'dependent_operation');
+  await rejects('SELECT school.discard_guardian($1)', [guardian], '23514', 'dependent_operation');
+  const e = await enroll(minor.id, p);
+  await rejects('SELECT school.discard_guardian_link($1)', [link], '23514', 'dependent_operation');
+  await sql("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Erreur de saisie' WHERE id = $1", [e]);
+  await sql('SELECT school.discard_guardian_link($1)', [link]);
+  await sql('SELECT school.discard_guardian($1)', [guardian]);
+  assert.equal(await count('SELECT count(*) n FROM school.guardian WHERE id = $1', [guardian]), 0);
+  // The cancelled enrolment is the pupil's history (BR-03): the pupil stays.
+  await rejects('SELECT school.discard_student($1)', [minor.id], '23514', 'dependent_operation');
+  // Nobody deletes these rows otherwise; without the permission to create pupils, not even so.
+  await rejects('DELETE FROM school.student WHERE id = $1', [minor.id], '42501');
+  await as('school_runtime', a, roleless);
+  await rejects('SELECT school.discard_student($1)', [minor.id], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+
+await check('an imported enrolment is undone with its class and history, unless its state moved on since (FR-IMP-01)', async () => {
+  const batch = await importBatch();
+  const p = await programme('DEFAIRE-INS');
+  const g = await group('DEFAIRE-A', p, 1);
+  const pending = await enroll((await newAdult('Defaire', 'Attente')).id, p);
+  await joinGroup(pending, g);
+  await rejects('SELECT school.discard_enrollment($1)', [pending], '23514', 'dependent_operation');
+  await reported(batch, 'enrollment', pending);
+  await sql('SELECT school.discard_enrollment($1)', [pending]);
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE id = $1', [pending]), 0);
+  assert.equal(await members(g), 0, 'its place is free again');
+  // Validated by the import: its two states. Suspended since, even validated again: it stays.
+  const validated = await enroll((await newAdult('Defaire', 'Valide')).id, p);
+  await joinGroup(validated, g);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [validated]);
+  await reported(batch, 'enrollment', validated);
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Absence prolongée' WHERE id = $1", [validated]);
+  await rejects('SELECT school.discard_enrollment($1)', [validated], '23514', 'dependent_operation');
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [validated]);
+  await rejects('SELECT school.discard_enrollment($1)', [validated], '23514', 'dependent_operation');
+  // An enrolment's history is never changed, and deleted by that function alone.
+  await as(null);
+  await rejects('DELETE FROM school.enrollment_status_history WHERE enrollment_id = $1', [validated], '23514', 'immutable_record');
+  await rejects("UPDATE school.enrollment_status_history SET reason = 'Autre' WHERE enrollment_id = $1", [validated], '23514', 'immutable_record');
+  await as('school_runtime', a, 1);
+  await rejects('DELETE FROM school.enrollment WHERE id = $1', [validated], '42501');
+  // Once its import is undone, nothing it reported goes any more.
+  const later = await enroll((await newAdult('Defaire', 'Tard')).id, p);
+  await reported(batch, 'enrollment', later);
+  await sql("UPDATE school.import_batch SET status = 'rolled_back' WHERE id = $1", [batch]);
+  await rejects('SELECT school.discard_enrollment($1)', [later], '23514', 'dependent_operation');
+  await as('school_runtime', a, roleless);
+  await rejects('SELECT school.discard_enrollment($1)', [later], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+
 // Scoped identities are separate from the suite's administrators and other broad grants.
 const scopedAccount = async (kind, scope, ids, permissions) => {
   await as(null);
