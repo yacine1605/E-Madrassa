@@ -675,6 +675,8 @@ On screen, the Enrollments list offers **Transfer to another programme** (active
 | FR-ELV-02 | `tests/sql/database.mjs`: unset, archived, phone cleared, guardian archived, birth date corrected, all refused while enrolled; another contact first; two contacts unset at once (native). `AcademicWorkflowTest`, `LotTwoWalkthroughTest`: through the API and the sheet |
 | FR-INS-03 AC2, TST-08 | `tests/sql/database.mjs`: source cancelled with its reason and history, place given back, target at its price and linked; same programme, stale version, second transfer refused; the link not writable nor claimable; two requests at once make one (native). `AcademicWorkflowTest`: an inactive target changes nothing; retry. `LotTwoWalkthroughTest`: from the Enrollments screen with the new class, both histories |
 
+Validation on 12 October 2026: **220 PHP integration tests (7,040 assertions), 192 embedded SQL checks and 205 native PostgreSQL 16 checks including concurrency**; migration 027 rolled back alone with transfers in place, then with all the others, and applied again. The Enrollments screen gains an action and a history section only: the browser acceptance was left to CI.
+
 ## Next increments of lot 2
 
 1. Scoped creation (a decision first: what places a new pupil within a site's reach) and the retention decision OD-07.
