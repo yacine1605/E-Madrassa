@@ -11,7 +11,12 @@ use Illuminate\Support\Facades\DB;
 
 final class GroupMembershipController
 {
-    private const COLUMNS = 'id, enrollment_id, group_id, is_main, valid_from, valid_to, version, created_at, updated_at';
+    // With the enrolment's state and its pupil, as the reader may see them.
+    private const COLUMNS = "id, enrollment_id, group_id, is_main, valid_from, valid_to, version, created_at, updated_at,
+        (SELECT jsonb_build_object('status', e.status, 'student_id', e.student_id, 'matricule', s.matricule, 'last_name_ar', s.last_name_ar,
+           'first_name_ar', s.first_name_ar, 'last_name_lat', s.last_name_lat, 'first_name_lat', s.first_name_lat)
+         FROM school.enrollment e LEFT JOIN school.student s ON s.tenant_id = e.tenant_id AND s.id = e.student_id
+         WHERE e.tenant_id = group_membership.tenant_id AND e.id = group_membership.enrollment_id) AS enrollment";
 
     public function __construct(private CurrentSchool $school, private AcademicRecords $records) {}
 
@@ -24,7 +29,7 @@ final class GroupMembershipController
         if (!$request->boolean('include_history')) $sql .= ' AND valid_to IS NULL';
         if ($request->filled('enrollment_id')) { $sql .= ' AND enrollment_id = ?'; $bindings[] = $request->input('enrollment_id'); }
         $request->merge(['paginate' => true]);
-        return Paging::select($request, $sql, $bindings, 'valid_from, id');
+        return Paging::select($request, $sql, $bindings, 'valid_from, id', fn ($row) => $this->present($row));
     }
 
     public function store(Request $request, string $group)
@@ -36,7 +41,7 @@ final class GroupMembershipController
         $this->records->find('enrollment', $data['enrollment_id']);
         unset($data['tenant_id'], $data['group_id'], $data['is_main'], $data['valid_to']);
         $id = DB::table('school.group_membership')->insertGetId(['tenant_id' => $this->school->id(), 'group_id' => $group, ...$data], 'id');
-        return response()->json(['data' => (array) $this->find($id)], 201);
+        return response()->json(['data' => $this->present($this->find($id))], 201);
     }
 
     public function end(Request $request, string $membership)
@@ -50,7 +55,7 @@ final class GroupMembershipController
         $changed = DB::selectOne('UPDATE school.group_membership SET valid_to = greatest(current_date, valid_from), version = ? WHERE tenant_id = ? AND id = ? RETURNING '.self::COLUMNS,
             [$data['version'], $this->school->id(), $row->id]);
         abort_unless($changed, 404);
-        return ['data' => (array) $changed];
+        return ['data' => $this->present($changed)];
     }
 
     public function transfer(Request $request, string $membership)
@@ -64,8 +69,15 @@ final class GroupMembershipController
         if ($row->group_id === $data['group_id']) throw Refusal::of('group_unchanged');
         $this->records->reason($data['reason']);
         $id = DB::selectOne('SELECT school.move_to_group(?, ?) AS id', [$row->id, $data['group_id']])->id;
-        return ['data' => (array) $this->find($id), 'previous' => (array) $this->find($row->id)];
+        return ['data' => $this->present($this->find($id)), 'previous' => $this->present($this->find($row->id))];
     }
 
     private function find(string $id, bool $lock = false): object { return $this->records->find('group_membership', $id, $lock, self::COLUMNS); }
+
+    private function present(object $row): array
+    {
+        $data = (array) $row;
+        $data['enrollment'] = $data['enrollment'] === null ? null : json_decode($data['enrollment'], true, 4, JSON_THROW_ON_ERROR);
+        return $data;
+    }
 }

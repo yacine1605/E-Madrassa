@@ -2,16 +2,20 @@
 
 namespace App\Filament\School\Pages;
 
+use App\Filament\School\Pages\Concerns\EnrolsPupils;
+use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\StudentController;
 use App\Support\Formats;
 use App\Support\Locales;
+use App\Support\Permissions;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Section;
@@ -31,6 +35,8 @@ use Livewire\Attributes\Locked;
  */
 final class StudentSheet extends SchoolingPage
 {
+    use EnrolsPupils;
+
     protected static bool $isDiscovered = true;
     protected static bool $shouldRegisterNavigation = false;
     protected static array $permissions = ['student.record.read'];
@@ -67,9 +73,32 @@ final class StudentSheet extends SchoolingPage
     public function identityInfolist(Schema $schema): Schema
     {
         $rows = $this->identity();
+        $enrollments = $this->enrollments();
         return $schema->components([Section::make(__('schooling.identity'))->columns(['default' => 1, 'sm' => 2])->visible($rows !== [])
             ->schema(array_map(fn (string $label, string $value, int $index) => TextEntry::make('identity_'.$index)->label($label)->state($value),
-                array_keys($rows), array_values($rows), array_keys(array_values($rows))))]);
+                array_keys($rows), array_values($rows), array_keys(array_values($rows)))),
+            // FR-ELV-01: the sheet shows the pupil's enrolments and groups, as far as the reader may see them.
+            Section::make(__('schooling.enrollments'))->visible($enrollments !== null)->schema([RepeatableEntry::make('enrollments')->hiddenLabel()
+                ->columns(['default' => 2, 'sm' => 4])->placeholder(__('schooling.no_enrollment'))->state(array_map(fn (array $enrollment) => [
+                    'program' => $enrollment['terms_snapshot']['code'].' · '.Locales::label($enrollment['terms_snapshot']['labels']),
+                    'year' => $this->years()[$enrollment['year_id']]['code'] ?? null, 'status' => __('schooling.enrollment_states.'.$enrollment['status']),
+                    'group' => $enrollment['main_group']['code'] ?? null], $enrollments ?? []))
+                ->schema([TextEntry::make('program')->label(__('schooling.program')), TextEntry::make('year')->label(__('reference.year')),
+                    TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group'))])]),
+        ]);
+    }
+
+    /** @return ?list<array> the pupil's enrolments, or null for a reader without them */
+    private function enrollments(): ?array
+    {
+        if (!app(Permissions::class)->can('enrollment.enrollment.read')) return null;
+        return SchoolScreen::call('enrollment.enrollment.read', EnrollmentController::class, 'index', ['student_id' => $this->student, 'per_page' => 100])['data'];
+    }
+
+    /** A pupil is enrolled while active (FR-INS-01 AC2, FR-ELV-03). */
+    protected function enrollable(): bool
+    {
+        return $this->pupil()['status'] === 'active' && !$this->pupil()['archived_at'];
     }
 
     /** @return array<string, string> label and value */
@@ -90,6 +119,9 @@ final class StudentSheet extends SchoolingPage
     protected function getHeaderActions(): array
     {
         return [
+            $this->enrolAction($this->student)->after(fn () => $this->changed([])),
+            Action::make('enrollments')->label(__('schooling.enrollments'))->color('gray')->visible(fn () => app(Permissions::class)->can('enrollment.enrollment.read'))
+                ->url(fn () => Enrollments::getUrl(['tableFilters' => ['student' => ['student_id' => $this->student]]])),
             Action::make('edit')->label(__('school.edit'))->visible(fn () => $this->editable())
                 ->fillForm(fn () => $this->pupil())
                 ->schema(fn () => [...$this->studentFields(), ...$this->customFields('student'), Hidden::make('version')->required()])

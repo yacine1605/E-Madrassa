@@ -13,9 +13,23 @@ final class EnrollmentController
 {
     use HandlesLabels;
 
+    // With the pupil as the reader may see them (null otherwise) and the current main group.
     private const COLUMNS = "id, student_id, program_id, year_id, status, status_reason, agreed_price, discount_total,
         price_version, terms_snapshot || jsonb_build_object('base_price', agreed_price::text) AS terms_snapshot,
-        validated_by, validated_at, transferred_from, version, archived_at, created_at, updated_at";
+        validated_by, validated_at, transferred_from, version, archived_at, created_at, updated_at,
+        (SELECT jsonb_build_object('matricule', s.matricule, 'last_name_ar', s.last_name_ar, 'first_name_ar', s.first_name_ar,
+           'last_name_lat', s.last_name_lat, 'first_name_lat', s.first_name_lat)
+         FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id) AS student,
+        (SELECT jsonb_build_object('id', g.id, 'code', g.code, 'labels', g.labels) FROM school.group_membership m
+           JOIN school.study_group g ON g.tenant_id = m.tenant_id AND g.id = m.group_id
+         WHERE m.tenant_id = enrollment.tenant_id AND m.enrollment_id = enrollment.id AND m.is_main AND m.valid_to IS NULL) AS main_group";
+    // FR-ELV-04: an enrolment is found by its pupil's names or matricule, among the pupils the reader may see.
+    private const PUPIL = "(SELECT concat_ws(' ', s.matricule, s.last_name_ar, s.first_name_ar, s.last_name_lat, s.first_name_lat)
+        FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id)";
+    private const GROUPS = "SELECT id, group_id, is_main, valid_from, valid_to,
+        (SELECT jsonb_build_object('code', g.code, 'labels', g.labels, 'group_type', g.group_type) FROM school.study_group g
+         WHERE g.tenant_id = group_membership.tenant_id AND g.id = group_membership.group_id) AS group_info
+        FROM school.group_membership WHERE tenant_id = ? AND enrollment_id = ?";
 
     public function __construct(private CurrentSchool $school, private AcademicRecords $records) {}
 
@@ -23,7 +37,7 @@ final class EnrollmentController
     {
         return $this->records->listing($request, 'SELECT '.self::COLUMNS.' FROM school.enrollment',
             ['student_id' => 'nullable|uuid', 'program_id' => 'nullable|uuid', 'year_id' => 'nullable|uuid',
-                'status' => 'nullable|in:pending,validated,suspended,cancelled'], [], 'created_at DESC, id', fn ($row) => $this->present($row));
+                'status' => 'nullable|in:pending,validated,suspended,cancelled'], [self::PUPIL], 'created_at DESC, id', fn ($row) => $this->present($row));
     }
 
     public function show(string $enrollment) { return ['data' => $this->present($this->find($enrollment))]; }
@@ -68,6 +82,15 @@ final class EnrollmentController
             [$this->school->id(), $enrollment], 'changed_at, id');
     }
 
+    /** FR-GRP-02 AC3: the enrolment's groups, the ended ones with their dates. */
+    public function groups(Request $request, string $enrollment)
+    {
+        $this->find($enrollment);
+        $request->validate(Paging::RULES);
+        $request->merge(['paginate' => true]);
+        return Paging::select($request, self::GROUPS, [$this->school->id(), $enrollment], 'valid_from, created_at, id', fn ($row) => $this->decoded($row, ['group_info']));
+    }
+
     private function find(string $id, bool $lock = false): object { return $this->records->find('enrollment', $id, $lock, self::COLUMNS); }
-    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot']); }
+    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot', 'student', 'main_group']); }
 }

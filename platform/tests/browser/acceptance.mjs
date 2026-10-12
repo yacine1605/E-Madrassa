@@ -22,7 +22,7 @@ const screens = name => ({
 });
 let viewports;
 let shotsOf;
-const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
+const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
@@ -148,12 +148,12 @@ async function signInSteps(page, kind, account) {
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
 // year, a programme, a class, a pupil with a guardian in it. The lists then have rows, and the
-// pupil's sheet is a screen too.
+// pupil's sheet and the class's members are screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
   await page.goto(base + '/school/home', { waitUntil: 'networkidle' });
-  const pupil = await page.evaluate(async () => {
+  const records = await page.evaluate(async () => {
     const token = document.querySelector('meta[name="csrf-token"]').content;
     const call = async (path, body) => {
       const response = await fetch('/api/' + path, body === undefined ? { headers: { Accept: 'application/json' } } : { method: 'POST',
@@ -176,18 +176,18 @@ async function seed(browser, session) {
     await call(`students/${pupil.id}/guardians`, { guardian_id: guardian.id, relationship: 'father', is_primary_contact: true, is_payer: true });
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    return pupil.id;
+    return { pupil: pupil.id, group: group.id };
   });
   await context.close();
-  return pupil;
+  return records;
 }
 
-let pupil;
+let records;
 async function run(browser) {
   const sessions = { admin: await signIn(browser, 'admin'), operator: await signIn(browser, 'operator') };
-  pupil ??= await seed(browser, sessions.admin);
+  records ??= await seed(browser, sessions.admin);
   for (const locale of ['fr', 'ar']) {
-    for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${pupil}`]], ['operator', 'console', consolePages]]) {
+    for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

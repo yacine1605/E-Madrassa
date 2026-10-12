@@ -574,9 +574,26 @@ The browser acceptance now creates, through the API, a year, a programme, a clas
 | FR-ELV-02 | `SchoolingPanelTest`: one guardian for two children, the same link twice refused, the link and the guardian changed, the link removed with its reason |
 | FR-IAM-04, BR-01 | `SchoolingPanelTest`: a site-scoped secretary sees and edits their site's pupils only; a pupil of another school, or out of scope, is not found; an administrator without pupil rights is refused |
 
+## Increment 36 (lot 2): enrolments and groups' members, the walkthrough through the screens
+
+- **Enrolments** (`enrollment.enrollment.read`): the pupil, the programme and the price of the enrolment's day (BR-11), the year, the main class, the state; searched by the pupil's name or matricule, filtered by state, year and pupil. **Enrol** offers active programmes only (FR-PRG-01 AC2) and, if the reader may place pupils, the programme's open classes with their places: the enrolment and its class are made together or not at all. The form's key is made when it opens, so the same form sent twice makes one enrolment, and the second answer is the first one, not a refusal (TST-08, FR-INS-01 AC1). Each row: place in a group, validate, suspend, cancel (a reason each time, by whoever may on that enrolment), and its history: the states with their reasons, the groups with their dates.
+- **A group's members** (from Groups and classes): current members, or every one since the start; add an enrolment of the year (of the programme, for a class or a session), transfer to another group (today's membership ends and the next begins, both kept, FR-GRP-02 AC3), remove with a reason. The group's places are shown above.
+- **The pupil's sheet** shows the enrolments with their main class, and enrols the pupil while they are active.
+
+The history of an enrolment's states now keeps every reason, a validation's included: a validated enrolment holds no reason of its own, so `024_enrollment_history_reason.sql` takes the one the request gave. The enrolments' and memberships' APIs give each row its pupil as the reader may see them, and the main class; `GET /api/enrollments/{id}/groups` lists an enrolment's groups with their dates. With them, the enrolments' list of a school of 2 000 pupils takes 6.2 ms for the whole school, 12.4 ms for one site and 9.0 ms for a pupil's own record (`tests/sql/scope-cost.mjs`, which now lists them as the API does), 2 to 5 ms more than without.
+
+`LotTwoWalkthroughTest` goes through lot 2 with the screens only: a year, a programme and two classes; a minor refused without a primary contact, then enrolled in class A once their father is linked; validated, transferred to class B, its history showing both classes and the validation's reason; cancelled, frozen, its place given back. The browser acceptance adds the enrolments and a class's members (136 screens in each browser).
+
+| Requirement | Evidence |
+|---|---|
+| FR-INS-01, TST-08 | `LotTwoWalkthroughTest`: enrolment and class together, price of the day; the same form sent twice gives one enrolment and two successes; inactive and draft programmes not offered |
+| FR-INS-02, FR-INS-03, BR-12 | validation, cancellation from the list; history with each reason (tests/sql: the validation's reason kept); a cancelled enrolment offers no action and frees its place |
+| FR-GRP-02, BR-07 | members listed, transfer keeping both memberships, history with dates |
+| FR-ELV-01, FR-ELV-02 AC2 | the sheet shows the enrolment and its class; a minor without a primary contact is refused |
+
 ## Next increments of lot 2
 
-1. The enrolments' and the groups' composition screens, and the pupil → enrolment → group walkthrough through the screens; scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
+1. Scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

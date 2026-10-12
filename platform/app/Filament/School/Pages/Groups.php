@@ -82,7 +82,8 @@ final class Groups extends SchoolingPage
                         if (!in_array($data['group_type'], ['class', 'session'], true) && empty($data['program_id'])) unset($data['program_id']);
                         SchoolScreen::change('group.group.manage', fn () => SchoolScreen::call('group.group.manage', StudyGroupController::class, 'store', $this->sent($data)));
                     }),
-            ])->recordActions([
+            ])->recordUrl(fn (array $record) => GroupMembers::getUrl(['group' => $record['id']]))->recordActions([
+                Action::make('members')->label(__('schooling.members'))->url(fn (array $record) => GroupMembers::getUrl(['group' => $record['id']])),
                 Action::make('edit')->label(__('school.edit'))
                     ->visible(fn (array $record) => $record['status'] !== 'closed' && !$this->yearClosed($record['year_id'])
                         && $this->writableFor('group.group.manage', 'study_group', $record['id']))

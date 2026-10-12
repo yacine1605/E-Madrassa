@@ -213,6 +213,7 @@ Route::prefix('api')->group(function () {
                     Route::get('enrollments', [EnrollmentController::class, 'index']);
                     Route::get('enrollments/{enrollment}', [EnrollmentController::class, 'show']);
                     Route::get('enrollments/{enrollment}/history', [EnrollmentController::class, 'history']);
+                    Route::get('enrollments/{enrollment}/groups', [EnrollmentController::class, 'groups']);
                 });
                 Route::post('enrollments', [EnrollmentController::class, 'store'])->middleware('permission:enrollment.enrollment.create');
                 Route::post('enrollments/{enrollment}/validate', [EnrollmentController::class, 'validateEnrollment'])->middleware('permission:enrollment.enrollment.validate');

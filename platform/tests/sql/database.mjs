@@ -1216,7 +1216,10 @@ await check('validation needs the main group; a stop needs a reason; a cancelled
   const e = await enroll((await newAdult('Validation', 'Omar')).id, p);
   await rejects("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e], '23514', 'main_group_required');
   await joinGroup(e, g);
+  // The reason the request gives goes to the history, a validation's too (SQL 024).
+  await sql("SELECT set_config('app.reason', 'Dossier complet', false)");
   await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+  await sql("SELECT set_config('app.reason', '', false)");
   assert.equal((await first('SELECT validated_by::int AS u FROM school.enrollment WHERE id = $1', [e])).u, 1);
   await rejects("UPDATE school.enrollment SET status = 'suspended' WHERE id = $1", [e], '23514', 'reason_required');
   await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Absence prolongée' WHERE id = $1", [e]);
@@ -1229,6 +1232,8 @@ await check('validation needs the main group; a stop needs a reason; a cancelled
   assert.deepEqual((await sql('SELECT from_status, to_status FROM school.enrollment_status_history WHERE enrollment_id = $1 ORDER BY changed_at, to_status', [e])).rows
     .map(r => `${r.from_status ?? '-'}>${r.to_status}`).sort(),
     ['-' + '>pending', 'pending>validated', 'suspended>validated', 'validated>cancelled', 'validated>suspended'].sort());
+  assert.deepEqual((await sql("SELECT to_status || ':' || coalesce(reason, '-') AS r FROM school.enrollment_status_history WHERE enrollment_id = $1 AND from_status IS NOT NULL",
+    [e])).rows.map(r => r.r).sort(), ['cancelled:Départ de la famille', 'suspended:Absence prolongée', 'validated:-', 'validated:Dossier complet']);
   const other = await enroll((await newAdult('Validation', 'Lyna')).id, p);
   await rejects("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Essai' WHERE id = $1", [other], '23514', 'status_transition_refused');
 });
