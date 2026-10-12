@@ -516,6 +516,25 @@ Validation on 12 October 2026: **185 PHP integration tests (5,303 assertions), 1
 
 The next step is the screen workflow. Programme subjects/volumes, teacher/room links, planning conflicts, composition notifications, programme-to-programme transfers, financial instalments, payment-based access and annual progression are still open. No new screen or browser acceptance is claimed by this increment.
 
+## Increment 33 (lot 2): what a restricted scope costs
+
+Before the screens, the cost of the resource policies of increments 30 to 32 was measured for readers limited to a site, a level, some groups or their own record (`tests/sql/scope-cost.mjs`: one school, each pupil with a guardian, an enrolment and a class, on two sites; medians, round trips included). It grew with the school rather than with the scope: each policy computed the reader's permissions twice, then joined every pupil, enrolment, membership and group of the school before keeping those in scope, and compared each row with every visible ID in turn.
+
+`023_scope_cost.sql` keeps the rules and changes how they are computed. `school.core_ids` starts from the scope: the groups and sites, the levels with their descendants, the reader's own pupils, and only what they reach, by index. The policies compare each row with those IDs through a hash built once per query. `school.effective_permissions` is written in PL/pgSQL, whose plans last from one call to the next: 0.8 ms instead of 1.8, for every permission check of every request.
+
+| Pupils' list, count and first page | Whole school | One site | Two classes | One level | Own record |
+|---|---|---|---|---|---|
+| 2 000 pupils, before | 6.1 ms | 22.8 ms | 20.5 ms | 21.9 ms | 20.6 ms |
+| 2 000 pupils, now | 3.2 ms | 6.5 ms | 5.2 ms | 5.6 ms | 5.1 ms |
+| 10 000 pupils, before | 6.5 ms | 101 ms | 36.6 ms | 68.6 ms | 37.4 ms |
+| 10 000 pupils, now | 4.0 ms | 21.1 ms | 9.3 ms | 19.2 ms | 6.8 ms |
+
+A single pupil now takes 1.4 to 3.2 ms for every reader of a school of 2 000 (2.8 to 11.4 before), and the enrolments' list of a site reader among 10 000 pupils 22 ms instead of 158. Each reader sees exactly the same rows as before. The SQL suite (183 embedded, 194 native checks), the 185 PHP tests and the migration's rollback pass unchanged.
+
+| Requirement | Evidence |
+|---|---|
+| NFR-PERF-01, NFR-PERF-03 | `tests/sql/scope-cost.mjs [platform folder] [pupils]`: the reference school of 2 000 pupils under 9 ms for every list of every reader; 10 000 pupils measured too |
+
 ## Next increments of lot 2
 
 1. Dossier/programme/group screens and the pupil → enrolment → group walkthrough: scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
