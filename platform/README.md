@@ -639,9 +639,31 @@ The platform image's GD now reads WebP (`--with-webp`, `deploy/smoke-test.sh` ch
 
 Validation on 12 October 2026: **209 PHP integration tests (6,728 assertions), 190 embedded SQL checks and 201 native PostgreSQL 16 checks including concurrency**; migration 026 rolled back with the others and alone with photos in place, then applied again; the browser acceptance in Chromium, 136 screens without a problem, the pupil's sheet showing their photo. The whole PHPUnit suite, run in one process, now passes 128 MB: `phpunit.xml` gives it 512 MB.
 
+## Increment 39 (lot 2): duplicates across alphabets, and guardians typed again
+
+`NameMatch` decides whether two names are probably one (FR-ELV-04, NFR-I18N-03), on rows the database has already filtered by the reader's scope:
+
+- **In the same alphabet**, the name as the search reads it (`school.search_key`, ported letter for letter and checked against the database): case, accents, Arabic diacritics and letter forms, spaces and the order of the two fields aside. « HÉLÈNE Benali » is « Benali Helene »; « Amine » is not « Amina », so twins are not taken for one child.
+- **Across alphabets**, when the two records share none: both names come down to their consonants by sound, in the same symbols (ح and ه and h are H, ج and dj are J, ش and ch are C, ق, ك, k, q and g are K; vowels, ʿayn, hamza and tāʾ marbūṭa unwritten; the article ال and « el » dropped; a doubled letter once). « Mohamed Amine » and « محمد أمين » are M H M D, M N. Each part must share 75 % of its consonants (« Abdelkader », « عبد القادر »), or a compound name must hold the other (« Amine », « محمد أمين »).
+
+| Who | Probable duplicate | Where |
+|---|---|---|
+| A pupil | The same phone; or the same birth date and the same name, in either alphabet. Each suggestion says why (`match`: `phone`, `name`, `other_alphabet`). Another child born the same day in the other alphabet is no longer one | `POST /api/students/duplicates`, creation (409 `student_duplicate`), the Pupils screen, the import |
+| A guardian | The same name, and the same phone or e-mail. The mother on the household's phone is another person | `POST /api/guardians/duplicates` (`guardian.record.read`), creation (409 `guardian_duplicate` with the suggestions, unless `duplicate_reason`, journaled), the Guardians screen, the pupil's sheet, the import |
+
+On the pupil's sheet, a new guardian who is already recorded (a brother's father, in either alphabet) is proposed: link them, or create another record with a reason (FR-ELV-02 AC1). The guardians' import refuses a guardian recorded under another reference, naming them, unless its `duplicate_reason` column says why; brothers and sisters share the first row's reference as before. No schema change.
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-04 AC1, NFR-I18N-03 | `NameMatchTest`: 15 Algerian names and their Arabic writing, compound names, articles, doubled letters; twins and other names apart; the key equal to the database's. `DuplicatesTest`: « Mohamed Amine » and « محمد أمين » born the same day, and not another child born that day |
+| FR-ELV-02 AC1 | `DuplicatesTest`: the same father by phone, in Arabic letters by e-mail, refused without a reason; the mother on the same phone and a namesake on another created. `SchoolingPanelTest`: found from the sheet and linked, one record for two children; a reason from the Guardians screen |
+| FR-IMP-01 | `PupilImportTest`: a guardian recorded on screen refused under two references, in either alphabet; created with a reason, journaled; brothers and sisters linked |
+
+Validation on 12 October 2026: **217 PHP integration tests (6,917 assertions)**, among them the key checked against the database's for French, Arabic and digits; no migration, so the SQL suites, the rollback and the browser screens are unchanged (the new warnings appear in forms only).
+
 ## Next increments of lot 2
 
-1. Scoped creation, refined cross-alphabet duplicates (transliteration), guardians' duplicates at import, continuing primary-contact validity and the retention decision OD-07.
+1. Scoped creation, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

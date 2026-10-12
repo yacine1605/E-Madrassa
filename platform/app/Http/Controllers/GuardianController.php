@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Http\Controllers\Concerns\HandlesLabels;
 use App\Support\CurrentSchool;
 use App\Support\PupilRecords;
@@ -28,12 +29,26 @@ final class GuardianController
 
     public function show(string $guardian) { return ['data' => $this->records->present($this->find($guardian), 'guardian')]; }
 
+    /** FR-ELV-02: the guardians already recorded who are probably this one, as the reader may see them. */
+    public function duplicates(Request $request)
+    {
+        $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120']);
+        $this->records->name($data);
+        return ['data' => $this->suggestions($data)];
+    }
+
     public function store(Request $request)
     {
         $this->records->createPermission('guardian.record.create');
-        $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120']);
+        $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120', 'duplicate_reason' => 'nullable|string|min:3|max:500']);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id']);
         $this->records->name($data);
+        // As for pupils: the warning and the write together, against two secretaries entering the same father.
+        DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 32))', [$this->school->id()]);
+        $matches = $this->suggestions($data);
+        if ($matches && empty($data['duplicate_reason'])) throw Refusal::of('guardian_duplicate', extra: ['duplicates' => $matches]);
+        if ($matches) DB::select("SELECT set_config('app.reason', ?, true)", [$data['duplicate_reason']]);
+        unset($data['duplicate_reason']);
         $data['custom'] = $this->records->custom('guardian', $data['custom'] ?? []);
         $id = DB::table('school.guardian')->insertGetId(['tenant_id' => $this->school->id(), ...$data], 'id');
         return response()->json($this->show($id), 201);
@@ -91,6 +106,12 @@ final class GuardianController
         DB::table('school.student_guardian')->where('tenant_id', $this->school->id())->where('id', $current->id)
             ->update(['archived_at' => now(), 'version' => $data['version']]);
         return ['data' => $this->decoded($this->findLink($student, $link), ['guardian'])];
+    }
+
+    /** The probable duplicates as the API shows them: the file's reference is the import's alone. */
+    private function suggestions(array $data): array
+    {
+        return array_map(fn (array $row) => array_diff_key($row, ['external_ref' => 1]), $this->records->guardianDuplicates($data));
     }
 
     private function linkRules(): array

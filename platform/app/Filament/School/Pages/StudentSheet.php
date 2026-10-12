@@ -17,15 +17,19 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -49,6 +53,8 @@ final class StudentSheet extends SchoolingPage
     protected static string|array $routeMiddleware = ['module:students_crm', 'permission:student.record.read'];
     protected string $view = 'filament.school.student-sheet';
     #[Locked] public string $student = '';
+    /** The guardians already recorded who are probably the one being created, once found (FR-ELV-02). */
+    public array $sameGuardians = [];
     private ?array $pupilRow = null;
 
     public function mount(): void
@@ -209,14 +215,41 @@ final class StudentSheet extends SchoolingPage
                         ->getOptionLabelUsing(fn ($value) => $this->guardianLabel($value)), ...$this->linkFields()])
                     ->action(fn (array $data) => SchoolScreen::change('guardian.record.create',
                         fn () => SchoolScreen::call('guardian.record.create', GuardianController::class, 'link', $data, ['student' => $this->student]))),
-                // A new guardian and their link, together or not at all.
+                // A new guardian and their link, together or not at all. The same guardian typed again (a
+                // brother's father) is found first, and linked rather than recorded twice (FR-ELV-02 AC1).
                 Action::make('createGuardian')->label(__('schooling.create_guardian'))->visible(fn () => $this->linkable('guardian.record.create'))
-                    ->schema(fn () => [...$this->guardianFields(), ...$this->customFields('guardian'), ...$this->linkFields()])
-                    ->action(fn (array $data) => SchoolScreen::change('guardian.record.create', function () use ($data) {
+                    ->mountUsing(function (?Schema $schema = null) {
+                        $this->sameGuardians = [];
+                        $schema?->fill();
+                    })
+                    ->schema(fn () => [...$this->guardianFields(), ...$this->customFields('guardian'), ...$this->linkFields(),
+                        Callout::make(__('schooling.guardian_duplicates_found'))->warning()->visible(fn () => $this->sameGuardians !== [])
+                            ->description(fn () => Formats::list(array_map(fn (array $row) => $this->guardianLine($row), $this->sameGuardians))),
+                        Radio::make('existing')->label(__('schooling.guardian_choice'))->live()
+                            ->visible(fn () => $this->sameGuardians !== [])->required(fn () => $this->sameGuardians !== [])
+                            ->options(fn () => [...collect($this->sameGuardians)->mapWithKeys(fn (array $row) => [$row['id'] =>
+                                __('schooling.link_this_guardian', ['name' => $this->personName($row)])])->all(), 'new' => __('schooling.create_anyway')]),
+                        Textarea::make('duplicate_reason')->label(__('schooling.guardian_duplicate_reason'))->helperText(__('schooling.duplicate_reason_help'))
+                            ->visible(fn (Get $get) => $get('existing') === 'new')->required(fn (Get $get) => $get('existing') === 'new')->minLength(3)->maxLength(500),
+                    ])
+                    ->action(function (array $data) {
                         $link = array_intersect_key($data, array_flip(['relationship', 'is_primary_contact', 'is_payer', 'emergency_contact']));
-                        $guardian = SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson(array_diff_key($data, $link), 'guardian'));
-                        return SchoolScreen::call('guardian.record.create', GuardianController::class, 'link', [...$link, 'guardian_id' => $guardian['data']['id']], ['student' => $this->student]);
-                    })),
+                        $person = array_diff_key($data, $link, ['existing' => 1]);
+                        $existing = $data['existing'] ?? null;
+                        if ($existing === null) {
+                            $this->sameGuardians = $this->guardianDuplicates($person);
+                            if ($this->sameGuardians !== []) {
+                                Notification::make()->title(__('schooling.guardian_duplicates_found'))->warning()->send();
+                                throw new Halt();
+                            }
+                        }
+                        SchoolScreen::change('guardian.record.create', function () use ($person, $link, $existing) {
+                            $guardian = $existing !== null && $existing !== 'new' ? $existing
+                                : SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson($person, 'guardian'))['data']['id'];
+                            return SchoolScreen::call('guardian.record.create', GuardianController::class, 'link', [...$link, 'guardian_id' => $guardian], ['student' => $this->student]);
+                        });
+                        $this->sameGuardians = [];
+                    }),
             ])->recordActions([ActionGroup::make([
                 Action::make('editLink')->label(__('schooling.edit_link'))->visible(fn () => $this->linkable('guardian.record.update'))
                     ->fillForm(fn (array $record) => $record)->schema([...$this->linkFields(), Hidden::make('version')->required()])

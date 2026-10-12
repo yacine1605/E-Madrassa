@@ -66,7 +66,7 @@ final class Students extends SchoolingPage
                         ...$this->customFields('student'),
                         Callout::make(__('schooling.duplicates_found'))->warning()->visible(fn () => $this->duplicates !== [])
                             ->description(fn () => Formats::list(array_map(fn ($row) => $row['matricule'].' · '.$this->personName($row)
-                                .' · '.Formats::date($row['birth_date']), $this->duplicates))),
+                                .' · '.Formats::date($row['birth_date']).' ('.__('schooling.duplicate_matches.'.$row['match']).')', $this->duplicates))),
                         Textarea::make('duplicate_reason')->label(__('schooling.duplicate_reason'))->helperText(__('schooling.duplicate_reason_help'))
                             ->visible(fn () => $this->duplicates !== [])->required(fn () => $this->duplicates !== [])->minLength(3)->maxLength(500)])
                     ->extraModalFooterActions(fn () => $this->duplicates === [] ? [] : [Action::make('openExisting')->label(__('schooling.open_existing'))

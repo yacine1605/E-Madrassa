@@ -21,7 +21,7 @@ final class GuardiansImporter implements Importer
     private const SELECT = 'SELECT id, last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom FROM school.guardian';
     private const LINK = 'SELECT id, relationship, is_primary_contact, is_payer, emergency_contact FROM school.student_guardian';
 
-    public function __construct(private CurrentSchool $school) {}
+    public function __construct(private CurrentSchool $school, private PupilRecords $records) {}
 
     public function permission(): string { return 'guardian.record.create'; }
 
@@ -30,7 +30,8 @@ final class GuardiansImporter implements Importer
         return ['external_ref' => 'required|string|max:100', 'student_ref' => 'required|string|max:100',
             'relationship' => 'required|in:father,mother,guardian,other', ...array_fill_keys(PupilRecords::NAMES, 'nullable|string|max:80'),
             'phone' => 'nullable|string|max:40', 'email' => 'nullable|email|max:200', 'profession' => 'nullable|string|max:120',
-            ...array_fill_keys(self::FLAGS, ['nullable', self::BOOLEAN]), ...$this->customRules('guardian')];
+            ...array_fill_keys(self::FLAGS, ['nullable', self::BOOLEAN]), ...$this->customRules('guardian'),
+            'duplicate_reason' => 'nullable|string|min:3|max:500'];
     }
 
     public function key(array $row): string { return trim((string) $row['external_ref']).' / '.trim((string) $row['student_ref']); }
@@ -52,7 +53,19 @@ final class GuardiansImporter implements Importer
             $id = $guardian->id;
         } else {
             $values = $this->wanted($row, $this->state(null));
+            // The same person under another reference (same phone or e-mail, same name): refused, as
+            // on screen, unless the row says why; brothers and sisters share the first one's reference.
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 32))', [$tenant]);
+            $matches = $this->records->guardianDuplicates($values);
+            $reason = $this->text($row['duplicate_reason'] ?? null);
+            if ($matches && $reason === null) {
+                throw new RowRefused('guardian_duplicate', __('errors.import_guardian_duplicate', ['guardians' => implode(', ', array_map(
+                    fn (array $match) => trim(implode(' ', array_filter([$match['last_name_lat'] ?? $match['last_name_ar'], $match['first_name_lat'] ?? $match['first_name_ar']])))
+                        .($match['external_ref'] ? ' ('.$match['external_ref'].')' : ''), $matches))]));
+            }
+            DB::select("SELECT set_config('app.reason', ?, true)", [$matches ? $reason : '']);
             $id = DB::table('school.guardian')->insertGetId(['tenant_id' => $tenant, 'external_ref' => trim($row['external_ref']), ...$this->columns($values)], 'id');
+            DB::select("SELECT set_config('app.reason', '', true)");
             $previous['created']['guardian'] = $id;
             $previous['guardian'] = ['before' => null, 'after' => $values];
         }

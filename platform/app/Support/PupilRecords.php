@@ -117,21 +117,51 @@ final class PupilRecords
         return Paging::select($request, $sql, $bindings, 'name_key, id', fn ($row) => $this->present($row, $entity));
     }
 
-    /** Bounded, scoped suggestions. Cross-alphabet matches on birth date are warnings, never merges. */
+    /**
+     * FR-ELV-04: at most ten pupils the reader may see who are probably this one: the same phone, or
+     * the same birth date and the same name, in the same alphabet or the other (NameMatch). Each
+     * says why (`match`: phone, name, other_alphabet). A warning, never a merge.
+     */
     public function duplicates(array $data): array
     {
-        $lat = trim(($data['last_name_lat'] ?? '').' '.($data['first_name_lat'] ?? ''));
-        $ar = trim(($data['last_name_ar'] ?? '').' '.($data['first_name_ar'] ?? ''));
-        return DB::select("SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date
-            FROM school.student WHERE tenant_id = ? AND archived_at IS NULL AND (
-              (nullif(regexp_replace(school.search_key(?), '[^0-9+]', '', 'g'), '') IS NOT NULL AND
-               regexp_replace(school.search_key(phone), '[^0-9+]', '', 'g') = regexp_replace(school.search_key(?), '[^0-9+]', '', 'g'))
-              OR (birth_date = ?::date AND (
-                (nullif(?, '') IS NOT NULL AND school.search_key(concat_ws(' ', last_name_lat, first_name_lat)) = school.search_key(?)) OR
-                (nullif(?, '') IS NOT NULL AND school.search_key(concat_ws(' ', last_name_ar, first_name_ar)) = school.search_key(?)) OR
-                (nullif(?, '') IS NOT NULL AND last_name_lat IS NULL AND last_name_ar IS NOT NULL) OR
-                (nullif(?, '') IS NOT NULL AND last_name_ar IS NULL AND last_name_lat IS NOT NULL))))
-            ORDER BY matricule, id LIMIT 10", [$this->school->id(), $data['phone'] ?? '', $data['phone'] ?? '',
-                $data['birth_date'], $lat, $lat, $ar, $ar, $lat, $ar]);
+        $candidates = DB::select("SELECT * FROM (SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date,
+              coalesce(nullif(regexp_replace(school.search_key(?), '[^0-9+]', '', 'g'), '') =
+                regexp_replace(school.search_key(phone), '[^0-9+]', '', 'g'), false) AS same_phone
+            FROM school.student WHERE tenant_id = ? AND archived_at IS NULL) s
+            WHERE same_phone OR birth_date = ?::date ORDER BY matricule, id LIMIT 500", [$data['phone'] ?? '', $this->school->id(), $data['birth_date']]);
+        return $this->matching($candidates, $data);
+    }
+
+    /**
+     * FR-ELV-02: the guardians the reader may see who are probably this one: the same phone or
+     * e-mail, and the same name in either alphabet. A household's phone shared by the father and the
+     * mother is no duplicate. With their reference from the school's file, for the import's message.
+     */
+    public function guardianDuplicates(array $data): array
+    {
+        $candidates = DB::select("SELECT * FROM (SELECT id, last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, external_ref,
+              coalesce(nullif(regexp_replace(school.search_key(?), '[^0-9+]', '', 'g'), '') =
+                regexp_replace(school.search_key(phone), '[^0-9+]', '', 'g'), false) AS same_phone,
+              coalesce(nullif(lower(btrim(?)), '') = email, false) AS same_email
+            FROM school.guardian WHERE tenant_id = ? AND archived_at IS NULL) g
+            WHERE same_phone OR same_email ORDER BY id LIMIT 500", [$data['phone'] ?? '', $data['email'] ?? '', $this->school->id()]);
+        return $this->matching($candidates, $data, true);
+    }
+
+    /** @return list<array> at most ten, each with why it matches */
+    private function matching(array $candidates, array $data, bool $guardian = false): array
+    {
+        $found = [];
+        foreach ($candidates as $row) {
+            $row = (array) $row;
+            $name = NameMatch::compare($data, $row);
+            $match = $guardian ? ($name === null ? null : ($row['same_phone'] ? 'phone' : 'email'))
+                : ($row['same_phone'] ? 'phone' : ($row['birth_date'] === ($data['birth_date'] ?? null) ? $name : null));
+            if ($match === null) continue;
+            unset($row['same_phone'], $row['same_email']);
+            $found[] = [...$row, 'match' => $match];
+            if (count($found) === 10) break;
+        }
+        return $found;
     }
 }

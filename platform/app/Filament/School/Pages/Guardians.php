@@ -7,11 +7,19 @@ use App\Support\Formats;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Callout;
+use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 
-/** FR-ELV-02: the guardians, one record for brothers and sisters; linked to a pupil from the pupil's sheet. */
+/**
+ * FR-ELV-02: the guardians, one record for brothers and sisters; linked to a pupil from the pupil's
+ * sheet. A new one is first looked for among those recorded (same name, same phone or e-mail).
+ */
 final class Guardians extends SchoolingPage
 {
     protected static bool $isDiscovered = true;
@@ -19,6 +27,8 @@ final class Guardians extends SchoolingPage
     protected static array $permissions = ['guardian.record.read'];
     protected static ?string $module = 'students_crm';
     protected static string|array $routeMiddleware = ['module:students_crm', 'permission:guardian.record.read'];
+    /** The probable duplicates of the guardian being created, once found. */
+    public array $duplicates = [];
 
     public static function getNavigationLabel(): string { return __('schooling.guardians'); }
     public function getTitle(): string { return __('schooling.guardians'); }
@@ -35,9 +45,29 @@ final class Guardians extends SchoolingPage
             ])->filters([Filter::make('archived')->label(__('schooling.include_archived'))->toggle()])
             ->headerActions([
                 Action::make('create')->label(__('schooling.create_guardian'))->visible(fn () => $this->writable('guardian.record.create'))
-                    ->schema(fn () => [...$this->guardianFields(), ...$this->customFields('guardian')])
-                    ->action(fn (array $data) => SchoolScreen::change('guardian.record.create',
-                        fn () => SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson($data, 'guardian')))),
+                    ->mountUsing(function (?Schema $schema = null) {
+                        $this->duplicates = [];
+                        $schema?->fill();
+                    })
+                    ->schema(fn () => [...$this->guardianFields(), ...$this->customFields('guardian'),
+                        Callout::make(__('schooling.guardian_duplicates_found'))->warning()->visible(fn () => $this->duplicates !== [])
+                            ->description(fn () => Formats::list(array_map(fn (array $row) => $this->guardianLine($row), $this->duplicates))),
+                        Textarea::make('duplicate_reason')->label(__('schooling.guardian_duplicate_reason'))->helperText(__('schooling.duplicate_reason_help'))
+                            ->visible(fn () => $this->duplicates !== [])->required(fn () => $this->duplicates !== [])->minLength(3)->maxLength(500)])
+                    ->action(function (array $data) {
+                        // FR-ELV-02: the same guardian typed again is found first; the API refuses them without a reason anyway.
+                        if (($data['duplicate_reason'] ?? '') === '') {
+                            unset($data['duplicate_reason']);
+                            $this->duplicates = $this->guardianDuplicates($data);
+                            if ($this->duplicates !== []) {
+                                Notification::make()->title(__('schooling.guardian_duplicates_found'))->warning()->send();
+                                throw new Halt();
+                            }
+                        }
+                        SchoolScreen::change('guardian.record.create',
+                            fn () => SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson($data, 'guardian')));
+                        $this->duplicates = [];
+                    }),
             ])->recordActions([
                 Action::make('edit')->label(__('school.edit'))
                     ->visible(fn (array $record) => !$record['archived_at'] && $this->writableFor('guardian.record.update', 'guardian', $record['id']))

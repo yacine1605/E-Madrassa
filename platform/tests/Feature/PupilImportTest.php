@@ -164,6 +164,38 @@ final class PupilImportTest extends TestCase
         $this->assertSame(1, $this->confirmed($batch)['counts']['created']);
     }
 
+    public function test_a_guardian_already_recorded_under_another_reference_is_refused_unless_the_row_says_why(): void
+    {
+        [$school] = $this->manager();
+        $this->confirmed($this->import('students', $this->pupils(3)));
+        // The father, recorded on screen before the file came.
+        $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550 00 00 01'])->assertCreated();
+        $row = fn (string $ref, string $pupil, string $relationship, array $values) => ['external_ref' => $ref, 'student_ref' => $pupil,
+            'relationship' => $relationship, 'last_name_lat' => null, 'first_name_lat' => null, 'last_name_ar' => null, 'first_name_ar' => null,
+            'phone' => null, 'duplicate_reason' => null, ...$values];
+        $batch = $this->import('guardians', [
+            $row('P-1', 'EL-0001', 'father', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550000001']),
+            // The same father in Arabic letters (FR-ELV-04 AC1's rule, for guardians).
+            $row('P-2', 'EL-0002', 'father', ['last_name_ar' => 'بن علي', 'first_name_ar' => 'كريم', 'phone' => '0550000001']),
+            // The mother, on the household's phone: another person.
+            $row('P-3', 'EL-0003', 'mother', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Mina', 'phone' => '0550000001']),
+            $row('P-4', 'EL-0001', 'guardian', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550000001',
+                'duplicate_reason' => 'Homonyme : le grand-père, tuteur']),
+            // Brothers and sisters: the reference of the first row, not a duplicate.
+            $row('P-3', 'EL-0002', 'mother', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Mina', 'phone' => '0550000001']),
+        ]);
+        $this->assertSame([[2, 'guardian_duplicate'], [3, 'guardian_duplicate']], $this->refused($batch));
+        $this->assertSame(__('errors.import_guardian_duplicate', ['guardians' => 'Benali Karim']),
+            $this->getJson('/api/imports/'.$batch['id'].'/rows?outcome=rejected')->json('data.0.error_message'));
+        $this->assertSame(3, $this->confirmed($batch)['counts']['created']);
+        $this->assertSame([3, 3], [$this->rows($school, 'guardian'), $this->rows($school, 'student_guardian')]);
+        $this->assertSame('Homonyme : le grand-père, tuteur', DB::connection('owner')->selectOne("SELECT a.reason FROM school.audit_log a
+            JOIN school.guardian g ON g.id = a.object_id WHERE g.tenant_id = ? AND g.external_ref = 'P-4' AND a.action = 'INSERT'", [$school->id])->reason);
+        $this->assertNull(DB::connection('owner')->selectOne("SELECT a.reason FROM school.audit_log a JOIN school.guardian g ON g.id = a.object_id
+            WHERE g.tenant_id = ? AND g.external_ref = 'P-3' AND a.action = 'INSERT'", [$school->id])->reason);
+        $this->assertStringContainsString(';duplicate_reason', $this->get('/api/imports/templates/guardians')->assertOk()->getContent());
+    }
+
     public function test_an_import_updates_what_its_file_changes_and_is_undone_last_first_while_nothing_depends_on_it(): void
     {
         [$school] = $this->manager();

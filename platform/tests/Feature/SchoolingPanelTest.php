@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\School\Pages\Groups;
+use App\Filament\School\Pages\Guardians;
 use App\Filament\School\Pages\Programs;
 use App\Filament\School\Pages\Students;
 use App\Filament\School\Pages\StudentSheet;
@@ -260,6 +261,41 @@ final class SchoolingPanelTest extends TestCase
                 ->assertActionHidden('edit')->assertActionHidden('status')->assertTableActionHidden('link')
                 ->callAction('archive', data: ['reason' => 'Dossier clos'])->assertNotified(__('school.saved'));
             Livewire::test(Students::class)->assertCanNotSeeTableRecords([$pupils[1]])->filterTable('archived', true)->assertCanSeeTableRecords([$pupils[1]]);
+        });
+    }
+
+    public function test_a_guardian_typed_again_is_found_and_linked_rather_than_recorded_twice(): void
+    {
+        [$school, $manager] = $this->setting();
+        $pupils = [];
+        foreach (['Amine', 'Yasmine'] as $name) {
+            $pupils[] = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'birth_date' => '2012-05-01'])->assertCreated()->json('data.id');
+        }
+        $this->postJson('/api/students/'.$pupils[0].'/guardians', ['relationship' => 'father', 'is_primary_contact' => true, 'guardian_id' =>
+            $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550 12 34 56'])->assertCreated()->json('data.id')])
+            ->assertCreated();
+        $karim = DB::connection('owner')->table('school.guardian')->where('tenant_id', $school->id)->value('id');
+        $this->within($school, $manager, function () use ($pupils, $karim) {
+            // FR-ELV-02 AC1: the second child's father, typed in Arabic letters, is the first one's.
+            $father = ['last_name_ar' => 'بن علي', 'first_name_ar' => 'كريم', 'phone' => '0550123456', 'relationship' => 'father', 'is_primary_contact' => true];
+            $sheet = Livewire::withQueryParams(['student' => $pupils[1]])->test(StudentSheet::class)->mountTableAction('createGuardian')
+                ->setTableActionData($father)->callMountedTableAction()->assertNotified(__('schooling.guardian_duplicates_found'))
+                ->assertSet('sameGuardians.0.id', $karim)->assertMountedActionModalSee(__('schooling.duplicate_matches.phone'));
+            $this->assertSame(1, DB::table('school.guardian')->count());
+            $sheet->setTableActionData([...$father, 'existing' => $karim])->callMountedTableAction()->assertNotified(__('school.saved'));
+            $this->assertSame(1, DB::table('school.guardian')->count());
+            $this->assertSame($karim, DB::table('school.student_guardian')->where('student_id', $pupils[1])->value('guardian_id'));
+            // The mother on the household's phone is another person, recorded at once.
+            Livewire::withQueryParams(['student' => $pupils[1]])->test(StudentSheet::class)->callTableAction('createGuardian', data: ['last_name_lat' => 'Benali',
+                'first_name_lat' => 'Mina', 'phone' => '0550123456', 'relationship' => 'mother'])->assertNotified(__('school.saved'));
+            $this->assertSame(2, DB::table('school.guardian')->count());
+            // From the guardians' list, a second record of the same person needs a reason, kept in the journal.
+            $page = Livewire::test(Guardians::class)->mountTableAction('create')->setTableActionData(['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim',
+                'phone' => '0550123456'])->callMountedTableAction()->assertNotified(__('schooling.guardian_duplicates_found'))->assertSet('duplicates.0.id', $karim);
+            $this->assertSame(2, DB::table('school.guardian')->count());
+            $page->setTableActionData(['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550123456', 'duplicate_reason' => 'Homonyme : le grand-père'])
+                ->callMountedTableAction()->assertNotified(__('school.saved'));
+            $this->assertSame(3, DB::table('school.guardian')->count());
         });
     }
 

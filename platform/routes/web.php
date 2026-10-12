@@ -240,6 +240,7 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:guardian.record.read')->group(function () {
                     Route::get('guardians', [GuardianController::class, 'index']);
                     Route::get('guardians/{guardian}', [GuardianController::class, 'show']);
+                    Route::post('guardians/duplicates', [GuardianController::class, 'duplicates']);
                     Route::get('students/{student}/guardians', [GuardianController::class, 'links']);
                 });
                 Route::middleware('permission:guardian.record.create')->group(function () {

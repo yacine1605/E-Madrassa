@@ -5,6 +5,7 @@ namespace App\Filament\School\Pages;
 use App\Exceptions\Refusal;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\SiteController;
 use App\Support\Formats;
@@ -180,6 +181,23 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
     }
 
     /** As the API reads a person: empty texts are none; the school's numbers are numbers, its dates days. */
+    /**
+     * FR-ELV-02: the guardians already recorded who are probably the one being typed (same name,
+     * same phone or e-mail), as the reader may see them; none for a reader who may not.
+     */
+    protected function guardianDuplicates(array $data): array
+    {
+        if (!app(Permissions::class)->can('guardian.record.read')) return [];
+        return SchoolScreen::call('guardian.record.read', GuardianController::class, 'duplicates', $this->sentPerson($data, 'guardian'))['data'];
+    }
+
+    /** A probable duplicate as a person recognizes them: name, phone or e-mail, and why. */
+    protected function guardianLine(array $guardian): string
+    {
+        return $this->personName($guardian).' · '.Formats::isolated($guardian['match'] === 'email' ? $guardian['email'] : $guardian['phone'])
+            .' ('.__('schooling.duplicate_matches.'.$guardian['match']).')';
+    }
+
     protected function sentPerson(array $data, string $entity): array
     {
         foreach ($data as $field => $value) if (is_string($value) && trim($value) === '') $data[$field] = null;
