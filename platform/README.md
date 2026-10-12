@@ -388,10 +388,20 @@ Deployments need `DB_AUTH_PASSWORD` in their `deploy.env` (DEPLOY.md, Updates); 
 
 The review also gained F7: row-level security learns the school and the person from settings that any SQL of `school_runtime` can set, so it stops a query that forgets its school, not an SQL injection. Its fix, a context the database checks, comes later in lot 2.
 
+## Increment 26 (lot 2): Content Security Policy
+
+Every response carries a Content Security Policy (finding F4 of [SECURITY-REVIEW.md](SECURITY-REVIEW.md); `App\Http\Middleware\ContentSecurityPolicy`). A script runs only from the platform's files, or inline with the response's nonce, which Livewire and Filament put on theirs; images, fonts, connections, frames and forms stay on the platform; no other site may frame it. `'unsafe-eval'` remains, for Alpine's expressions and Livewire's `@script` blocks, and `'unsafe-inline'` for styles. `PLATFORM_CSP_REPORT_ONLY=true` reports without blocking (DEPLOY.md).
+
+The browser acceptance now fails a screen on anything the policy blocks, in Chromium, Firefox and WebKit. Its first run found that Filament's avatars came from ui-avatars.com, which learned the initials of whoever was signed in on every page (finding F8): the initials are now drawn by the platform (`App\Support\InitialsAvatar`).
+
+| Requirement | Evidence |
+|---|---|
+| NFR-SEC-03 | `ContentSecurityPolicyTest`: a fresh nonce on every page, borne by every inline script; nothing loaded from another site. The acceptance: nothing blocked on 324 screens. The smoke test: the header on the deployment |
+
 ## Next increments of lot 2
 
-1. **F4**: a Content Security Policy, report-only across the browser acceptance first, then enforced.
-2. **F7**: a request context signed by the application and checked by the database, after measuring its cost.
+1. **F7**: a request context signed by the application and checked by the database, after measuring its cost.
+2. **F4, the rest**: Livewire's CSP-safe build of Alpine, tried on every Filament component with its interactions, to remove `'unsafe-eval'`.
 3. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 25. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 26. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 25 : 157 tests PHP/PostgreSQL 16 et 153 contrôles SQL embarqués, sans fichier `.env` local ; 108 écrans vérifiés dans chacun des navigateurs Chromium, Firefox et WebKit, en français et en arabe, sur ordinateur et téléphone (`platform/deploy/acceptance-test.sh`, en CI) ; déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; contrôles SQL natifs avec concurrence en CI sur PostgreSQL 16. La revue de sécurité du lot 1 est dans `platform/SECURITY-REVIEW.md`. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation de l'incrément 26 : 160 tests PHP/PostgreSQL 16 et 153 contrôles SQL embarqués, sans fichier `.env` local ; 108 écrans vérifiés dans chacun des navigateurs Chromium, Firefox et WebKit, en français et en arabe, sur ordinateur et téléphone (`platform/deploy/acceptance-test.sh`, en CI) ; déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; contrôles SQL natifs avec concurrence en CI sur PostgreSQL 16. La revue de sécurité du lot 1 est dans `platform/SECURITY-REVIEW.md`. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -126,7 +126,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-PERF-05 | ABSENT | Poids compressé des pages à mesurer | mineur | M |
 | NFR-SEC-01 | PARTIEL | Proxy Caddy : HTTPS seul, HSTS, cookies sécurisés, proxys de confiance (platform/compose.yaml, smoke-test) ; TLS entre conteneurs non requis sur le réseau privé, à revoir en multi-hôte | majeur | S |
 | NFR-SEC-02 | PARTIEL | Argon2id et variables d'environnement ; rotation en exploitation à documenter | majeur | M |
-| NFR-SEC-03 | PARTIEL | CSRF, Blade, SQL paramétré, fichiers et exports testés ; aucun HTML brut à l'écran ; CSP à compléter au lot 2 (constat F4 de `platform/SECURITY-REVIEW.md`) | majeur | M |
+| NFR-SEC-03 | PARTIEL | CSRF, Blade, SQL paramétré, fichiers et exports testés ; aucun HTML brut à l'écran ; CSP avec nonce sur chaque réponse (ContentSecurityPolicyTest, recette navigateur sans blocage dans trois navigateurs) ; reste `'unsafe-eval'` pour Alpine (constat F4) | majeur | S |
 | NFR-SEC-04 | PARTIEL | Revue de sécurité du lot 1 (`platform/SECURITY-REVIEW.md`) : matrice d'accès de chaque route et écran, générée par `platform:access-matrix` et vérifiée par PermissionCoverageTest ; SchoolPanelTest, SchoolReferencePanelTest : permissions retirées, IDs étrangers et onglets périmés refusés ; identifiants réservés au rôle `platform_auth` (F2, F3 corrigés) ; contexte RLS non signé (F7) au lot 2 | bloquant | M |
 | NFR-SEC-05 | PARTIEL | LoginThrottle, SchoolLogin, pages d'activation et de récupération limitées comme l'API, tests ; revue d'exploitation | majeur | S |
 | NFR-SEC-06 | PARTIEL | Refusal, DatabaseErrors, liens chiffrés ; revue exploitation/logs à terminer | majeur | M |
@@ -178,7 +178,8 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 11. **Lot 1, incrément 24 livré** : Redis protégé par mot de passe, base, Redis et stockage sur un réseau interne (constat F5) ; chaque écran vérifié dans Chromium, Firefox et WebKit (constat F6).
 12. **Lot 1, suite** : relecture des libellés arabes par un locuteur natif, sur les captures de la recette, avec le choix d'une police arabe (la police des écrans n'a pas de lettres arabes). Le lot 1 ne peut pas être déclaré terminé avant ce point.
 13. **Lot 2, incrément 25 livré** : identifiants (empreintes de mot de passe, secrets MFA, codes de secours) réservés au rôle `platform_auth` ; `school_runtime` n'en lit ni n'en modifie aucun (constats F2 et F3).
-14. **Lot 2, suite** : CSP (constat F4) ; contexte de requête signé et vérifié par la base (constat F7) ; ensuite schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-15. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-16. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-17. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+14. **Lot 2, incrément 26 livré** : politique de sécurité du contenu (CSP) avec nonce sur chaque réponse, vérifiée dans trois navigateurs (constat F4, `'unsafe-eval'` restant) ; avatars dessinés par la plateforme au lieu de ui-avatars.com, qui recevait les initiales de la personne connectée (constat F8).
+15. **Lot 2, suite** : contexte de requête signé et vérifié par la base (constat F7) ; version d'Alpine sans évaluation (reste de F4) ; ensuite schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
+16. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+17. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+18. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

@@ -1,6 +1,7 @@
 // Browser acceptance of every screen (FR-I18-01 AC1, NFR-UX-02): in French and Arabic, on a desktop
 // and a phone, each page loads, runs right to left in Arabic, overflows nothing sideways, shows
-// no raw catalog key and raises no script error; a screenshot of each goes to SHOTS for a
+// no raw catalog key, raises no script error and nothing the Content Security Policy blocks
+// (NFR-SEC-03), the sign-in's typing and clicks included; a screenshot of each goes to SHOTS for a
 // person to look at. In each browser of BROWSERS (chromium, firefox, webkit; chromium by default,
 // BROWSER_CHANNEL for an installed Chrome or Edge). Run by deploy/acceptance-test.sh against a
 // disposable installation.
@@ -49,10 +50,20 @@ async function totp(secret) {
   return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
 }
 
+// What the Content Security Policy blocks on this page, through every navigation it makes.
+async function watchPolicy(page) {
+  const refused = [];
+  await page.exposeFunction('reportBlocked', text => refused.push(text));
+  await page.addInitScript(() => document.addEventListener('securitypolicyviolation', event =>
+    window.reportBlocked(`${event.effectiveDirective} ${event.blockedURI || 'inline'}`)));
+  return refused;
+}
+
 async function check(context, path, locale, name) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  const refused = await watchPolicy(page);
   const response = await page.goto(base + '/' + path, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
   const state = await page.evaluate(() => ({
@@ -68,6 +79,7 @@ async function check(context, path, locale, name) {
   const key = state.text.match(rawKey);
   if (key) problems.push(`raw key "${key[0]}"`);
   if (errors.length) problems.push('script error: ' + errors[0]);
+  if (refused.length) problems.push('blocked by the Content Security Policy: ' + refused[0]);
   await page.screenshot({ path: `${shotsOf}/${name}.png`, fullPage: true });
   report.push({ browser: shotsOf.split('/').pop(), page: path, screen: name, problems });
   if (problems.length) failures.push(`${shotsOf.split('/').pop()} ${name} (/${path}): ${problems.join('; ')}`);
@@ -92,12 +104,15 @@ async function signIn(browser, kind) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, locale: 'fr-FR' });
   const page = await context.newPage();
   const account = accounts[kind];
+  const refused = await watchPolicy(page);
   try {
     await signInSteps(page, kind, account);
+    if (refused.length) failures.push(`${shotsOf.split('/').pop()} sign-in of ${kind}: blocked by the Content Security Policy: ${refused[0]}`);
   } catch (error) {
     // What the person would have seen, for the failure's report.
     await page.screenshot({ path: `${shotsOf}/sign-in-${kind}.png`, fullPage: true });
-    writeFileSync(`${shotsOf}/sign-in-${kind}.txt`, `${page.url()}\n\n${await page.evaluate(() => document.body.innerText)}`);
+    writeFileSync(`${shotsOf}/sign-in-${kind}.txt`, `${page.url()}\n\n${await page.evaluate(() => document.body.innerText)}`
+      + (refused.length ? `\n\nBlocked by the Content Security Policy:\n${refused.join('\n')}` : ''));
     throw error;
   }
   await page.close();
@@ -110,6 +125,9 @@ async function signInSteps(page, kind, account) {
     await page.getByLabel('E-mail ou identifiant').fill(account.email);
     await page.locator('input[type="password"]').fill(account.password);
     await page.getByRole('button', { name: 'Se connecter' }).click();
+    // The page comes again with the code's field: typed only once its scripts are running, or the code is lost.
+    await page.locator('input[autocomplete="one-time-code"]').waitFor();
+    await page.waitForLoadState('networkidle');
     await page.locator('input[autocomplete="one-time-code"]').fill(await totp(account.secret));
     await page.getByRole('button', { name: 'Se connecter' }).click();
     await page.waitForURL('**/school/home');

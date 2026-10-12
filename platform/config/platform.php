@@ -22,6 +22,10 @@ return [
     'lockout_first_minutes' => 1,
     'lockout_max_minutes' => 60,
 
+    // NFR-SEC-03: true reports what the Content Security Policy would block without blocking it
+    // (App\Http\Middleware\ContentSecurityPolicy), should a screen break in production.
+    'csp_report_only' => (bool) env('PLATFORM_CSP_REPORT_ONLY', false),
+
     // Second step of a sign-in with MFA: how long the first step stays valid.
     'mfa_pending_seconds' => 300,
     'mfa_issuer' => env('PLATFORM_MFA_ISSUER', env('APP_NAME', 'Madrassa')),

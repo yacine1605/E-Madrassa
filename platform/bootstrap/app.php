@@ -2,6 +2,7 @@
 
 use App\Exceptions\Refusal;
 use App\Http\Middleware\AccountState;
+use App\Http\Middleware\ContentSecurityPolicy;
 use App\Http\Middleware\Localize;
 use App\Http\Middleware\LivewireTransaction;
 use App\Http\Middleware\RequireModule;
@@ -27,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['account' => AccountState::class, 'school' => SchoolContext::class, 'module' => RequireModule::class, 'permission' => RequirePermission::class]);
         $middleware->web(append: [Localize::class, LivewireTransaction::class]);
+        // Every response, the panels' included: they have their own middleware, not the web group's.
+        $middleware->append(ContentSecurityPolicy::class);
         // Behind the deployment's TLS proxy (DEPLOY.md): the client's address and scheme come from its headers.
         if ($proxies = env('TRUSTED_PROXIES')) $middleware->trustProxies(at: explode(',', $proxies));
     })

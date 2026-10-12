@@ -12,6 +12,7 @@ A school's request crosses these layers in order; each one refuses on its own, w
 |---|---|---|---|
 | Proxy | HTTPS only, HSTS, certificates | `docker/Caddyfile` | `deploy/smoke-test.sh` (HSTS) |
 | Web server | `nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: SAMEORIGIN` | `docker/apache.conf` | `deploy/smoke-test.sh` (`nosniff`) |
+| Page | Content Security Policy: scripts from the platform, or inline with the response's nonce; no plugin; images, fonts, connections, frames and forms to the platform only | `ContentSecurityPolicy` | `ContentSecurityPolicyTest`, `tests/browser/acceptance.mjs` (nothing blocked, three browsers), `deploy/smoke-test.sh` |
 | Session | Cookie `Secure`, `HttpOnly`, `SameSite=Lax`; a CSRF token on every change; an idle limit of 30 minutes (each school sets it between 15 and 120), an absolute limit of 12 hours | `config/session.php`, `compose.yaml`, `AccountState` | `AuthenticationTest`; the CSRF token in `tests/browser/acceptance.mjs` |
 | Sign-in | Lockout after 5 failures per login and per address, from 1 minute doubling to 60; MFA by TOTP, a code accepted once; recovery codes hashed and single-use; the secret encrypted with the application key, which the database never holds | `LoginThrottle`, `MultiFactor` | `AuthenticationTest`, `SessionTest` (Argon2id) |
 | School | An active membership in an active school, chosen by the server; MFA when the school requires it; a support session only under a valid consent. The school, the person and the request are then set for the database, inside one transaction | `SchoolContext`, `SchoolPanelContext` | `SchoolIsolationTest`, `SchoolPanelTest`, `SupportTest` |
@@ -188,6 +189,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | A file is served to a person who may read it in its school, or through a signed link valid 15 minutes | `FileTest` |
 | Support access only under the school's consent, limited in time, revocable, each consultation journaled, read-only | `SupportTest`, `tests/sql/database.mjs` (support access) |
 | No PHP dependency with a known vulnerability is shipped (NFR-SEC-08) | CI, `composer audit` |
+| Every page sends the Content Security Policy with a fresh nonce, which every inline script bears; no screen has anything blocked, in Chromium, Firefox and WebKit; no page loads anything from another site | `ContentSecurityPolicyTest`, `tests/browser/acceptance.mjs` |
 | Requests run as `school_runtime`; the owner's password never reaches the application | `deploy/smoke-test.sh`, `SessionTest` |
 | The database, Redis and the storage are out of the proxy's reach; Redis asks for its password | `deploy/smoke-test.sh` |
 
@@ -198,10 +200,11 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | F1 | Every function was executable by everyone | High | Fixed in this review |
 | F2 | `school_runtime` read every person's credentials | Medium | Fixed in increment 25 |
 | F3 | `school_runtime` could change the credential columns of any person | Medium | Fixed in increment 25 |
-| F4 | No Content Security Policy | Medium | Open, lot 2 |
+| F4 | No Content Security Policy | Medium | Fixed in increment 26, `'unsafe-eval'` left |
 | F5 | Redis had no password | Low | Fixed in increment 24 |
 | F6 | Firefox and Safari were not tested | Low | Fixed in increment 24 |
 | F7 | Row-level security trusts the context the application sets | Medium | Open, lot 2 |
+| F8 | Every signed-in page sent the person's initials to ui-avatars.com | Low | Fixed in increment 26 |
 
 ### F1. Every function was executable by everyone (fixed)
 
@@ -223,11 +226,13 @@ Fix of F2 and F3 (increment 25): a fourth role, `platform_auth`, is the only one
 
 What remains: `school_runtime` still reads every person's name and email, not only its school's people, since the person signed in is read before a school is chosen. Confining that by row-level security waits for F7.
 
-### F4. No Content Security Policy
+### F4. No Content Security Policy (fixed, `'unsafe-eval'` left)
 
-The headers stop sniffing, framing by another site and the leak of addresses (`docker/apache.conf`), but no `Content-Security-Policy` restricts scripts (NFR-SEC-03). Blade and Filament escape what they show, and no screen writes raw HTML (no `{!! !!}`, `HtmlString` or `->html()` in the code). Filament and Livewire evaluate Alpine expressions at run time, so a strict policy needs their CSP-safe build.
+The headers stopped sniffing, framing by another site and the leak of addresses (`docker/apache.conf`), but no `Content-Security-Policy` restricted scripts (NFR-SEC-03).
 
-To do (lot 2): a policy with nonces, first in report-only mode across the browser acceptance test, then enforced.
+Fix (increment 26): every response carries a policy (`App\Http\Middleware\ContentSecurityPolicy`). A script runs only from the platform's own files, or inline with the response's nonce, a new one each time, which Livewire and Filament put on theirs: a script injected into a page, inline or from elsewhere, does not run. No plugin; images, fonts, connections, frames and form targets on the platform only; no framing by another site. The browser acceptance fails a screen on anything the policy blocks, in three browsers, the sign-in's typing and clicks included; `deploy/smoke-test.sh` checks the header. `PLATFORM_CSP_REPORT_ONLY=true` reports without blocking, should a screen break in production (DEPLOY.md).
+
+What is left: `'unsafe-eval'` for scripts, and `'unsafe-inline'` for styles. Alpine, under Filament, evaluates the expressions written in its attributes, and Livewire its `@script` blocks; Filament writes style attributes. Markup injected into a page could still carry Alpine attributes that run: Blade and Filament escape what they show and no screen writes raw HTML, so the injection must come first. To take `'unsafe-eval'` away: Livewire's CSP-safe build of Alpine (`csp_safe`), once each of Filament's components has been tried with it in the browser, interactions included.
 
 ### F5. Redis had no password (fixed)
 
@@ -248,6 +253,12 @@ The database learns the school and the person of a request from two settings, `a
 What stands against an injection today: every query is parameterised, and the roles' privileges, which no SQL can widen: the credentials (F2, F3), the publisher's functions (F1), no deletion of business records, no write to the journal.
 
 To do (lot 2): a context the database can check. The application signs the school, the person and the request with a key `school_runtime` cannot read; `school.tenant()` and `school.actor()` answer only for a signed context, checked once per transaction. Its cost on every request is to be measured first.
+
+### F8. Every signed-in page sent the person's initials to ui-avatars.com (fixed)
+
+Filament draws a person's avatar by asking an outside service, ui-avatars.com, for an image of their initials. Every page of the panels thus told that service the initials, the address and the browser of whoever was signed in. The Content Security Policy found it, by blocking the image (F4).
+
+Fix (increment 26): the initials are drawn by the platform (`App\Support\InitialsAvatar`), as an image inside the page. `ContentSecurityPolicyTest` checks that a signed-in page loads nothing from another site.
 
 ## Outside this review
 

@@ -33,6 +33,8 @@ echo "$headers" | grep -q "^HTTP/[0-9.]* 200" || fail "the sign-in page is not s
 echo "$headers" | grep -qi "^strict-transport-security: max-age=31536000" || fail "no HSTS header"
 echo "$headers" | grep -qi "^x-content-type-options: nosniff" || fail "no nosniff header"
 pass "the sign-in page is served over HTTPS with HSTS (NFR-SEC-01)"
+echo "$headers" | grep -qi "^content-security-policy: default-src 'self'; script-src 'self' 'nonce-" || fail "no Content Security Policy"
+pass "the sign-in page carries the Content Security Policy (NFR-SEC-03)"
 grep -q "Se connecter" "$work/login.html" || fail "the sign-in page is not the platform's"
 
 [ "$(compose exec -T app php artisan tinker --execute="echo DB::selectOne('select current_user u')->u;")" = school_runtime ] \

@@ -44,6 +44,7 @@ x-application: &application
   PLATFORM_FRONT_URL: ${APP_URL}/school
   PLATFORM_DEDICATED_SCHOOL: ${PLATFORM_DEDICATED_SCHOOL:-}
   PLATFORM_MFA_ISSUER: ${PLATFORM_MFA_ISSUER:-Madrassa}
+  PLATFORM_CSP_REPORT_ONLY: ${PLATFORM_CSP_REPORT_ONLY:-false}
   # FR-FIC-01: the schools' files in S3-compatible storage, the bundled Garage by default.
   FILES_DRIVER: s3
   AWS_ACCESS_KEY_ID: ${FILES_ACCESS_KEY_ID:?set FILES_ACCESS_KEY_ID}

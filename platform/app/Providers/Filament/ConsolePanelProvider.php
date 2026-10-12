@@ -7,6 +7,7 @@ use App\Filament\Console\Pages\ConsoleLogin;
 use App\Filament\Console\Pages\Supervision;
 use App\Http\Middleware\AccountState;
 use App\Http\Middleware\Localize;
+use App\Support\InitialsAvatar;
 use App\Support\Locales;
 use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
@@ -40,6 +41,7 @@ final class ConsolePanelProvider extends PanelProvider
             ->login(ConsoleLogin::class)
             ->brandName(fn () => __('console.brand'))
             ->colors(['primary' => Color::Indigo])
+            ->defaultAvatarProvider(InitialsAvatar::class)
             ->multiFactorAuthentication([PlatformAppAuthentication::make()->recoverable()], isRequired: true)
             ->discoverResources(in: app_path('Filament/Console/Resources'), for: 'App\\Filament\\Console\\Resources')
             ->pages([Supervision::class])

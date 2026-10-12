@@ -10,6 +10,7 @@ use App\Http\Middleware\Localize;
 use App\Http\Middleware\SchoolPanelContext;
 use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequirePermission;
+use App\Support\InitialsAvatar;
 use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -30,7 +31,7 @@ final class SchoolPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         return $panel->id('school')->path('school')->login(SchoolLogin::class)
-            ->brandName(fn () => __('school.brand'))->colors(['primary' => Color::Indigo])
+            ->brandName(fn () => __('school.brand'))->colors(['primary' => Color::Indigo])->defaultAvatarProvider(InitialsAvatar::class)
             ->homeUrl('/school/home')
             ->discoverPages(in: app_path('Filament/School/Pages'), for: 'App\\Filament\\School\\Pages')
             ->middleware([EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class, Localize::class,

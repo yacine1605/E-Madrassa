@@ -63,6 +63,10 @@ docker compose --env-file deploy.env up -d --build --wait
 
 `migrate` applies the new migrations and privileges before the application restarts. When Compose answers `set REDIS_PASSWORD` or `set DB_AUTH_PASSWORD`, the `deploy.env` predates that secret: add it with `echo "REDIS_PASSWORD=$(openssl rand -hex 24)" >> deploy.env` (or `DB_AUTH_PASSWORD=`), then update again. Every migration has its reverse (`php artisan migrate:rollback --database=owner`, in `migrate`).
 
+## If a screen stops working
+
+The application sends a Content Security Policy (SECURITY-REVIEW.md, F4): a script the platform did not put on the page does not run. If a screen stops working after an update and the browser's console speaks of the Content Security Policy, set `PLATFORM_CSP_REPORT_ONLY=true` in `deploy.env` and run `docker compose --env-file deploy.env up -d`: the policy then reports without blocking, until the screen is fixed.
+
 ## Checking an installation
 
 `sh deploy/smoke-test.sh` builds the image and deploys it in a disposable project on ports 18080 and 18443, then checks HTTPS and HSTS, the restricted roles, the owner's password kept out of the running services, the data services out of the proxy's reach and Redis behind its password, the files' storage, a school created, its administrator invited and signed in, the scheduler and the worker; it removes its project afterwards. CI runs it on every change.
