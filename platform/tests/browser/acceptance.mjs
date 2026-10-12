@@ -22,8 +22,8 @@ const screens = name => ({
 });
 let viewports;
 let shotsOf;
-const schoolPages = ['home', 'programs', 'groups', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years',
-  'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
+const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -146,17 +146,55 @@ async function signInSteps(page, kind, account) {
   }
 }
 
+// Lot 2's records of the acceptance school, made once through the API by its administrator: a
+// year, a programme, a class, a pupil with a guardian in it. The lists then have rows, and the
+// pupil's sheet is a screen too.
+async function seed(browser, session) {
+  const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
+  const page = await context.newPage();
+  await page.goto(base + '/school/home', { waitUntil: 'networkidle' });
+  const pupil = await page.evaluate(async () => {
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const call = async (path, body) => {
+      const response = await fetch('/api/' + path, body === undefined ? { headers: { Accept: 'application/json' } } : { method: 'POST',
+        headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(`${path}: HTTP ${response.status} ${await response.text()}`);
+      return (await response.json()).data;
+    };
+    const day = offset => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+    const year = await call('years', { code: 'ACCEPTANCE', start_date: day(-30), end_date: day(300), status: 'current' });
+    const grade = (await call('referential/nodes?type=grade'))[0];
+    const site = (await call('sites')).find(s => s.is_default);
+    const program = await call('programs', { year_id: year.id, node_id: grade.id, code: 'ACC-1', status: 'active', base_price: '120000',
+      labels: { fr: 'Programme de recette', ar: 'برنامج الاختبار' }, duration_value: 9, duration_unit: 'months' });
+    const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
+      labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active' });
+    const pupil = await call('students', { last_name_lat: 'Benali', first_name_lat: 'Amine', last_name_ar: 'بن علي', first_name_ar: 'أمين',
+      birth_date: '2012-05-01', birth_place: 'Alger', gender: 'm', phone: '0550 12 34 56', address: '12 rue des Oliviers, Alger' });
+    const guardian = await call('guardians', { last_name_lat: 'Benali', first_name_lat: 'Karim', last_name_ar: 'بن علي', first_name_ar: 'كريم',
+      phone: '0550 65 43 21', profession: 'Médecin' });
+    await call(`students/${pupil.id}/guardians`, { guardian_id: guardian.id, relationship: 'father', is_primary_contact: true, is_payer: true });
+    const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
+    await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
+    return pupil.id;
+  });
+  await context.close();
+  return pupil;
+}
+
+let pupil;
 async function run(browser) {
   const sessions = { admin: await signIn(browser, 'admin'), operator: await signIn(browser, 'operator') };
+  pupil ??= await seed(browser, sessions.admin);
   for (const locale of ['fr', 'ar']) {
-    for (const [kind, prefix, pages] of [['admin', 'school', schoolPages], ['operator', 'console', consolePages]]) {
+    for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${pupil}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();
       await setup.close();
       for (const [screen, options] of Object.entries(viewports)) {
         const context = await browser.newContext({ ...options, ignoreHTTPSErrors: true, storageState: sessions[kind] });
-        for (const page of pages) await check(context, prefix + '/' + page, locale, `${locale}-${screen}-${prefix}-${page.replace('/', '-')}`);
+        for (const page of pages) await check(context, prefix + '/' + page, locale, `${locale}-${screen}-${prefix}-${page.replace(/[/?=].*$/, '').replace('/', '-')}`);
         await context.close();
       }
     }

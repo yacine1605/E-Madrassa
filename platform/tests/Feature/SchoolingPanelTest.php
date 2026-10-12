@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Filament\School\Pages\Groups;
 use App\Filament\School\Pages\Programs;
+use App\Filament\School\Pages\Students;
+use App\Filament\School\Pages\StudentSheet;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -156,6 +158,133 @@ final class SchoolingPanelTest extends TestCase
             Livewire::test(Groups::class)->callTableAction('edit', $groups['ANNEX'], data: ['labels' => ['fr' => 'Annexe, soutien'], 'capacity' => 12,
                 'status' => 'active', 'version' => 1])->assertNotified(__('school.saved'));
             $this->assertSame(12, DB::table('school.study_group')->where('id', $groups['ANNEX'])->value('capacity'));
+        });
+    }
+
+    public function test_the_pupils_pages_follow_their_permissions_and_a_sheet_shows_only_a_reachable_pupil(): void
+    {
+        [$school] = $this->setting();
+        $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Amine', 'birth_date' => '2012-05-01'])->assertCreated()->json('data');
+        $this->get('/school/students')->assertOk()->assertSee($pupil['matricule'])->assertSee(__('schooling.create_student'));
+        $this->get('/school/guardians')->assertOk()->assertSee(__('schooling.create_guardian'));
+        $this->get('/school/student-sheet?student='.$pupil['id'])->assertOk()->assertSee('Benali Amine')->assertSee(__('schooling.link_guardian'));
+        $this->get('/school/student-sheet?student='.Str::uuid())->assertNotFound();
+        $this->get('/school/student-sheet?student=nothing')->assertNotFound();
+        // The school's administrator reads no pupil (section 3.2); a pupil of another school is not found.
+        $admin = $this->account('administrator');
+        $this->member($school, $admin, 'active', ['tenant_admin']);
+        $this->signIn($admin);
+        foreach (['students', 'guardians', 'student-sheet?student='.$pupil['id']] as $page) $this->get('/school/'.$page)->assertForbidden();
+        $this->setting();
+        $this->get('/school/student-sheet?student='.$pupil['id'])->assertNotFound();
+    }
+
+    public function test_a_new_pupil_gets_a_matricule_and_a_probable_duplicate_needs_a_reason(): void
+    {
+        [$school, $manager] = $this->setting();
+        $second = null;
+        $this->within($school, $manager, function () use (&$second) {
+            Livewire::test(Students::class)->callTableAction('create', data: ['last_name_lat' => 'Benali', 'first_name_lat' => 'Amine',
+                'birth_date' => '2012-05-01', 'phone' => '0550 12 34 56'])->assertHasNoTableActionErrors()->assertRedirect();
+            $first = DB::table('school.student')->where('first_name_lat', 'Amine')->first();
+            $this->assertMatchesRegularExpression('/^'.now()->year.'\d{5}$/', $first->matricule);
+            // The same child written in Arabic, born the same day: a probable duplicate (FR-ELV-04 AC1). Nothing is
+            // created until a reason is given; the reason goes to the journal.
+            $arabic = ['last_name_ar' => 'بن علي', 'first_name_ar' => 'محمد أمين', 'birth_date' => '2012-05-01'];
+            $page = Livewire::test(Students::class)->mountTableAction('create')->setTableActionData($arabic)->callMountedTableAction()
+                ->assertNotified(__('schooling.duplicates_found'))->assertSet('duplicates.0.id', $first->id)->assertSee($first->matricule);
+            $this->assertSame(1, DB::table('school.student')->count());
+            $page->setTableActionData([...$arabic, 'duplicate_reason' => 'Homonyme d’une autre famille'])->callMountedTableAction()->assertRedirect();
+            $second = DB::table('school.student')->where('first_name_ar', 'محمد أمين')->value('id');
+            // A matricule taken from another register stays as it is; the same one twice is refused.
+            Livewire::test(Students::class)->callTableAction('create', data: ['last_name_lat' => 'Kaci', 'first_name_lat' => 'Lina',
+                'birth_date' => '2011-02-03', 'matricule' => 'ANC-0042'])->assertRedirect();
+            Livewire::test(Students::class)->callTableAction('create', data: ['last_name_lat' => 'Kaci', 'first_name_lat' => 'Sara',
+                'birth_date' => '2010-02-03', 'matricule' => 'ANC-0042'])->assertNotified(__('errors.duplicate'));
+            Livewire::test(Students::class)->searchTable('ANC-0042')->assertCountTableRecords(1)->searchTable('امين')->assertCanSeeTableRecords([$second]);
+            // Without any full name, or born tomorrow: refused before anything is written.
+            Livewire::test(Students::class)->callTableAction('create', data: ['last_name_lat' => 'Seul', 'birth_date' => now()->addDay()->toDateString()])
+                ->assertHasTableActionErrors(['first_name_lat', 'birth_date']);
+        });
+        $this->assertSame('Homonyme d’une autre famille', DB::connection('owner')->table('school.audit_log')->where('tenant_id', $school->id)
+            ->where('object_id', $second)->where('action', 'INSERT')->value('reason'));
+    }
+
+    public function test_the_sheet_links_one_guardian_to_brothers_and_sisters_and_a_block_leaves_enrolments_as_they_are(): void
+    {
+        [$school, $manager, $year] = $this->setting();
+        $pupils = [];
+        foreach (['Amine', 'Yasmine'] as $name) {
+            $pupils[] = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'birth_date' => '2012-05-01'])->assertCreated()->json('data.id');
+        }
+        $program = $this->postJson('/api/programs', ['year_id' => $year, 'node_id' => $this->node($school), 'code' => '1AS-SCI',
+            'labels' => ['fr' => '1AS Sciences'], 'base_price' => '1000', 'status' => 'active'])->assertCreated()->json('data.id');
+        $this->within($school, $manager, function () use ($pupils) {
+            Livewire::withQueryParams(['student' => $pupils[0]])->test(StudentSheet::class)->assertSeeText(__('schooling.no_guardian'))
+                ->callTableAction('createGuardian', data: ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550123456',
+                    'profession' => 'Médecin', 'relationship' => 'father', 'is_primary_contact' => true])->assertNotified(__('school.saved'));
+            $guardian = DB::table('school.guardian')->where('first_name_lat', 'Karim')->value('id');
+            // FR-ELV-02 AC1: the second child is linked to the same record.
+            $sheet = Livewire::withQueryParams(['student' => $pupils[1]])->test(StudentSheet::class)
+                ->callTableAction('link', data: ['guardian_id' => $guardian, 'relationship' => 'father', 'is_primary_contact' => true])->assertNotified(__('school.saved'));
+            $link = DB::table('school.student_guardian')->where('student_id', $pupils[1])->value('id');
+            $sheet->assertCanSeeTableRecords([$link])->assertSeeText('Benali Karim')->assertSeeText('0550123456');
+            // A refused action keeps its form open: the next one starts from the page again.
+            Livewire::withQueryParams(['student' => $pupils[1]])->test(StudentSheet::class)
+                ->callTableAction('link', data: ['guardian_id' => $guardian, 'relationship' => 'father'])->assertNotified(__('errors.duplicate'));
+            $sheet->callTableAction('editLink', $link, data: ['relationship' => 'guardian', 'is_primary_contact' => true, 'is_payer' => true,
+                    'emergency_contact' => false, 'version' => 1])->assertNotified(__('school.saved'))
+                ->callTableAction('editGuardian', $link, data: ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0661000000', 'version' => 1])
+                ->assertNotified(__('school.saved'));
+            $this->assertSame(1, DB::table('school.guardian')->count());
+            $this->assertSame(['guardian', true, '0661000000'], [DB::table('school.student_guardian')->where('id', $link)->value('relationship'),
+                (bool) DB::table('school.student_guardian')->where('id', $link)->value('is_payer'), DB::table('school.guardian')->where('id', $guardian)->value('phone')]);
+            $sheet->callTableAction('unlink', $link, data: ['reason' => 'Erreur de saisie'])->assertNotified(__('school.saved'))->assertCanNotSeeTableRecords([$link]);
+        });
+        $enrollment = $this->postJson('/api/enrollments', ['student_id' => $pupils[0], 'program_id' => $program, 'idempotency_key' => (string) Str::uuid()])
+            ->assertCreated()->json('data.id');
+        $this->within($school, $manager, function () use ($pupils, $enrollment) {
+            // FR-ELV-03 AC1: blocking warns of the enrolments and leaves them as they are.
+            Livewire::withQueryParams(['student' => $pupils[0]])->test(StudentSheet::class)->mountAction('status')->setActionData(['status' => 'blocked'])
+                ->assertMountedActionModalSee(__('schooling.block_enrollments_help', ['count' => '1']))
+                ->setActionData(['status' => 'blocked', 'reason' => 'Dossier incomplet'])->callMountedAction()->assertNotified(__('school.saved'))
+                ->assertSeeText('Dossier incomplet')->assertActionHidden('archive');
+            $this->assertSame(['blocked', 'pending'], [DB::table('school.student')->where('id', $pupils[0])->value('status'),
+                DB::table('school.enrollment')->where('id', $enrollment)->value('status')]);
+            // A former pupil's record stays as it is, then leaves the lists once archived.
+            Livewire::withQueryParams(['student' => $pupils[1]])->test(StudentSheet::class)
+                ->callAction('status', data: ['status' => 'former', 'reason' => 'Parti en fin d’année'])->assertNotified(__('school.saved'))
+                ->assertActionHidden('edit')->assertActionHidden('status')->assertTableActionHidden('link')
+                ->callAction('archive', data: ['reason' => 'Dossier clos'])->assertNotified(__('school.saved'));
+            Livewire::test(Students::class)->assertCanNotSeeTableRecords([$pupils[1]])->filterTable('archived', true)->assertCanSeeTableRecords([$pupils[1]]);
+        });
+    }
+
+    public function test_a_site_scoped_secretary_updates_the_pupils_of_their_site_only(): void
+    {
+        [$school, , $year] = $this->setting();
+        $annex = $this->postJson('/api/sites', ['code' => 'ANNEXE', 'labels' => ['fr' => 'Annexe']])->assertCreated()->json('data.id');
+        $program = $this->postJson('/api/programs', ['year_id' => $year, 'node_id' => $this->node($school), 'code' => 'P',
+            'labels' => ['fr' => 'P'], 'base_price' => '0', 'status' => 'active'])->assertCreated()->json('data.id');
+        $pupils = [];
+        foreach (['MAIN' => $this->site($school), 'ANNEX' => $annex] as $code => $site) {
+            $group = $this->postJson('/api/groups', ['year_id' => $year, 'group_type' => 'class', 'program_id' => $program, 'site_id' => $site, 'code' => $code,
+                'labels' => ['fr' => $code], 'capacity' => 10, 'valid_from' => '2026-09-01', 'status' => 'active'])->assertCreated()->json('data.id');
+            $pupils[$code] = $this->postJson('/api/students', ['last_name_lat' => 'Eleve', 'first_name_lat' => $code, 'birth_date' => '2000-01-01'])->json('data.id');
+            $enrollment = $this->postJson('/api/enrollments', ['student_id' => $pupils[$code], 'program_id' => $program, 'idempotency_key' => (string) Str::uuid()])->json('data.id');
+            $this->postJson('/api/groups/'.$group.'/memberships', ['enrollment_id' => $enrollment])->assertCreated();
+        }
+        $secretary = $this->account('annex-secretary');
+        $this->member($school, $secretary);
+        $this->grant($school, $secretary, 'front_office', 'site', [$annex]);
+        $this->signIn($secretary)->assertOk();
+        $this->get('/school/student-sheet?student='.$pupils['MAIN'])->assertNotFound();
+        $this->within($school, $secretary, function () use ($pupils) {
+            Livewire::test(Students::class)->assertCanSeeTableRecords([$pupils['ANNEX']])->assertCanNotSeeTableRecords([$pupils['MAIN']])
+                ->assertTableActionHidden('create');
+            Livewire::withQueryParams(['student' => $pupils['ANNEX']])->test(StudentSheet::class)->assertActionVisible('edit')
+                ->callAction('edit', data: ['last_name_lat' => 'Eleve', 'first_name_lat' => 'Annexe', 'birth_date' => '2000-01-01', 'version' => 1])
+                ->assertNotified(__('school.saved'))->assertSee('Eleve Annexe')->assertTableActionHidden('link');
         });
     }
 }

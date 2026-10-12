@@ -46,6 +46,15 @@ abstract class SchoolPage extends Page
         abort_unless($this->schoolId === app(CurrentSchool::class)->id() && static::canAccess(), 403);
     }
 
+    /**
+     * A table of the API's rows keeps those it read to find an action's record; without this, the
+     * render that follows the action would show them as they were before it.
+     */
+    public function rendering(): void
+    {
+        if (method_exists($this, 'flushCachedTableRecords')) $this->flushCachedTableRecords();
+    }
+
     protected function writable(string $permission): bool { return SchoolScreen::writable($permission); }
     protected function writableFor(string $permission, string $entity, string $id): bool { return SchoolScreen::writableFor($permission, $entity, $id); }
 

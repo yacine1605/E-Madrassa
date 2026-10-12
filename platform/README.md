@@ -553,9 +553,30 @@ A record's action now shows to whoever may perform it on that record, not only t
 | FR-IAM-04, BR-01 | `SchoolingPanelTest`: pages by permission and module; a site-scoped manager sees and edits their site's groups only |
 | NFR-I18N-01 | `PseudoLocalizationTest` with both pages; acceptance in three browsers |
 
+## Increment 35 (lot 2): pupils and their guardians on screen
+
+- **Pupils** (`student.record.read`, module `students_crm`): searched by name in either alphabet, matricule or phone, filtered by state and birth date, archived records on request; each row opens the pupil's sheet. A new pupil gets a matricule, or keeps one taken from another register. Before writing, the screen asks the API for probable duplicates (the same name and birth date, the same birth date written in the other alphabet, the same phone): the existing record opens, or the new one is made with a reason, which the journal keeps.
+- **The pupil's sheet**: identity and the school's own fields (a sensitive one only for whoever may read it), the state and the reason of a block; editing, a change of state with its reason, the archive of a former pupil. Blocking first says how many enrolments are not cancelled, and leaves them as they are. Its guardians: link an existing one (brothers and sisters share one record) or create one with the link, together or not at all; change the link (relationship, primary contact, payer, emergency contact), the guardian, or remove the link with a reason. A former pupil's sheet is read only.
+- **Guardians** (`guardian.record.read`): list, creation, edits.
+
+A record's actions follow the reader's scope: a secretary of one site edits the pupils of that site, and reads no other. Creating records and linking guardians stay with whole-school grants, as in the API (increment 31). The guardians' API gives each link the guardian's name and phone, as the reader may see them.
+
+What people typed (a phone, an address, an e-mail) keeps its own direction within an Arabic line (`Formats::isolated`, Unicode isolates): « 0550 12 34 56 » no longer comes out as « 56 34 12 0550 ».
+
+A fix for every school screen: a list made of the API's rows kept, for the render following an action, the rows it had read to find the action's record, so an archived node or a removed link stayed on screen until the next request. `SchoolPage::rendering` reads them again.
+
+The browser acceptance now creates, through the API, a year, a programme, a class and a pupil with their guardian: the lists have rows, and the pupil's sheet is checked as well (128 screens in each browser).
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-01, FR-ELV-03 | `SchoolingPanelTest`: matricule given, imported one kept and unique, incomplete name and future birth date refused; the sheet's edits; a block that warns of the enrolment and leaves it pending; a former pupil read only, then archived |
+| FR-ELV-04 | `SchoolingPanelTest`: the same birth date in the other alphabet warns, nothing is written without a reason, the reason is in the journal; search in Arabic and by matricule |
+| FR-ELV-02 | `SchoolingPanelTest`: one guardian for two children, the same link twice refused, the link and the guardian changed, the link removed with its reason |
+| FR-IAM-04, BR-01 | `SchoolingPanelTest`: a site-scoped secretary sees and edits their site's pupils only; a pupil of another school, or out of scope, is not found; an administrator without pupil rights is refused |
+
 ## Next increments of lot 2
 
-1. Pupils' and guardians' screens, the enrolments' and the groups' composition, and the pupil → enrolment → group walkthrough through them; scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
+1. The enrolments' and the groups' composition screens, and the pupil → enrolment → group walkthrough through the screens; scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

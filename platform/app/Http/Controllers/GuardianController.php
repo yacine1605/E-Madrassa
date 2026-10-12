@@ -14,8 +14,13 @@ final class GuardianController
 
     private const SELECT = 'SELECT id, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
         phone, email, profession, custom, version, archived_at, created_at, updated_at FROM school.guardian';
-    private const LINKS = 'SELECT id, student_id, guardian_id, relationship, is_primary_contact, is_payer,
-        emergency_contact, version, archived_at FROM school.student_guardian';
+    // With the guardian's name and phone, as the reader may see them (FR-ELV-02).
+    private const LINKS = "SELECT id, student_id, guardian_id, relationship, is_primary_contact, is_payer,
+        emergency_contact, version, archived_at,
+        (SELECT jsonb_build_object('last_name_ar', g.last_name_ar, 'first_name_ar', g.first_name_ar, 'last_name_lat', g.last_name_lat,
+           'first_name_lat', g.first_name_lat, 'phone', g.phone, 'email', g.email, 'archived_at', g.archived_at)
+         FROM school.guardian g WHERE g.tenant_id = student_guardian.tenant_id AND g.id = student_guardian.guardian_id) AS guardian
+        FROM school.student_guardian";
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records) {}
 
@@ -50,8 +55,8 @@ final class GuardianController
     {
         $this->student($student);
         $request->validate(['include_archived' => 'boolean']);
-        return ['data' => DB::select(self::LINKS.' WHERE tenant_id = ? AND student_id = ?'.
-            ($request->boolean('include_archived') ? '' : ' AND archived_at IS NULL').' ORDER BY created_at, id', [$this->school->id(), $student])];
+        return ['data' => array_map(fn ($row) => $this->decoded($row, ['guardian']), DB::select(self::LINKS.' WHERE tenant_id = ? AND student_id = ?'.
+            ($request->boolean('include_archived') ? '' : ' AND archived_at IS NULL').' ORDER BY created_at, id', [$this->school->id(), $student]))];
     }
 
     public function link(Request $request, string $student)
@@ -62,7 +67,7 @@ final class GuardianController
         $guardian = $this->find($data['guardian_id']);
         abort_if($guardian->archived_at, 404);
         $id = DB::table('school.student_guardian')->insertGetId(['tenant_id' => $this->school->id(), 'student_id' => $student, ...$data], 'id');
-        return response()->json(['data' => $this->findLink($student, $id)], 201);
+        return response()->json(['data' => $this->decoded($this->findLink($student, $id), ['guardian'])], 201);
     }
 
     public function updateLink(Request $request, string $student, string $link)
@@ -73,7 +78,7 @@ final class GuardianController
         $data = $request->validate($this->linkRules() + ['version' => 'required|integer|min:1', 'guardian_id' => 'prohibited']);
         unset($data['guardian_id']);
         DB::table('school.student_guardian')->where('tenant_id', $this->school->id())->where('id', $current->id)->update($data);
-        return ['data' => $this->findLink($student, $link)];
+        return ['data' => $this->decoded($this->findLink($student, $link), ['guardian'])];
     }
 
     public function unlink(Request $request, string $student, string $link)
@@ -85,7 +90,7 @@ final class GuardianController
         DB::select("SELECT set_config('app.reason', ?, true)", [$data['reason']]);
         DB::table('school.student_guardian')->where('tenant_id', $this->school->id())->where('id', $current->id)
             ->update(['archived_at' => now(), 'version' => $data['version']]);
-        return ['data' => $this->findLink($student, $link)];
+        return ['data' => $this->decoded($this->findLink($student, $link), ['guardian'])];
     }
 
     private function linkRules(): array

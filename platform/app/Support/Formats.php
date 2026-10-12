@@ -36,6 +36,15 @@ final class Formats
         return implode(__('formats.list_separator'), $items);
     }
 
+    /**
+     * A text typed by a person, kept in its own direction within a line of the other language:
+     * in Arabic, « 0550 12 34 56 » or « 12 rue des Oliviers » no longer come out reversed.
+     */
+    public static function isolated(?string $text): string
+    {
+        return $text === null || $text === '' ? '' : "\u{2068}".$text."\u{2069}";
+    }
+
     public static function digits(string $text, ?string $locale = null, bool $arabicDigits = false): string
     {
         return $arabicDigits && ($locale ?? app()->getLocale()) === 'ar' ? strtr($text, array_combine(range(0, 9), self::ARABIC_INDIC)) : $text;
