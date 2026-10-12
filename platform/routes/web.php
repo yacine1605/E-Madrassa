@@ -7,13 +7,17 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\GuardianController;
+use App\Http\Controllers\GroupMembershipController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
+use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
@@ -22,9 +26,14 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
 use Illuminate\Support\Facades\Route;
+
+// The deployment URL opens the school sign-in by default; publisher operators use /console.
+Route::redirect('/', '/school/login');
 
 // Same-origin API for the application's own front end; CSRF protects every mutation.
 Route::prefix('api')->group(function () {
@@ -178,6 +187,63 @@ Route::prefix('api')->group(function () {
                 Route::post('custom-fields', [CustomFieldController::class, 'store']);
                 Route::put('custom-fields/{field}', [CustomFieldController::class, 'update']);
                 Route::post('custom-fields/{field}/archive', [CustomFieldController::class, 'archive']);
+            });
+
+            Route::middleware('module:enrollment_groups')->group(function () {
+                Route::middleware('permission:program.program.read')->group(function () {
+                    Route::get('programs', [ProgramController::class, 'index']);
+                    Route::get('programs/{program}', [ProgramController::class, 'show']);
+                    Route::get('programs/{program}/prices', [ProgramController::class, 'prices']);
+                });
+                Route::post('programs', [ProgramController::class, 'store'])->middleware('permission:program.program.manage');
+                Route::put('programs/{program}', [ProgramController::class, 'update'])->middleware('permission:program.program.manage');
+                Route::middleware('permission:group.group.read')->group(function () {
+                    Route::get('groups', [StudyGroupController::class, 'index']);
+                    Route::get('groups/{group}', [StudyGroupController::class, 'show']);
+                    Route::get('groups/{group}/memberships', [GroupMembershipController::class, 'index']);
+                });
+                Route::post('groups', [StudyGroupController::class, 'store'])->middleware('permission:group.group.manage');
+                Route::put('groups/{group}', [StudyGroupController::class, 'update'])->middleware('permission:group.group.manage');
+                Route::middleware('permission:group.membership.manage')->group(function () {
+                    Route::post('groups/{group}/memberships', [GroupMembershipController::class, 'store']);
+                    Route::post('group-memberships/{membership}/end', [GroupMembershipController::class, 'end']);
+                    Route::post('group-memberships/{membership}/transfer', [GroupMembershipController::class, 'transfer']);
+                });
+                Route::middleware('permission:enrollment.enrollment.read')->group(function () {
+                    Route::get('enrollments', [EnrollmentController::class, 'index']);
+                    Route::get('enrollments/{enrollment}', [EnrollmentController::class, 'show']);
+                    Route::get('enrollments/{enrollment}/history', [EnrollmentController::class, 'history']);
+                });
+                Route::post('enrollments', [EnrollmentController::class, 'store'])->middleware('permission:enrollment.enrollment.create');
+                Route::post('enrollments/{enrollment}/validate', [EnrollmentController::class, 'validateEnrollment'])->middleware('permission:enrollment.enrollment.validate');
+                Route::post('enrollments/{enrollment}/suspend', [EnrollmentController::class, 'suspend'])->middleware('permission:enrollment.enrollment.suspend');
+                Route::post('enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->middleware('permission:enrollment.enrollment.cancel');
+            });
+
+            Route::middleware('module:students_crm')->group(function () {
+                Route::middleware('permission:student.record.read')->group(function () {
+                    Route::get('students', [StudentController::class, 'index']);
+                    Route::get('students/{student}', [StudentController::class, 'show']);
+                    Route::post('students/duplicates', [StudentController::class, 'duplicates']);
+                });
+                Route::post('students', [StudentController::class, 'store'])->middleware('permission:student.record.create');
+                Route::put('students/{student}', [StudentController::class, 'update'])->middleware('permission:student.record.update');
+                Route::post('students/{student}/status', [StudentController::class, 'status'])->middleware('permission:student.record.update');
+                Route::post('students/{student}/archive', [StudentController::class, 'archive'])->middleware('permission:student.record.archive');
+                Route::middleware('permission:guardian.record.read')->group(function () {
+                    Route::get('guardians', [GuardianController::class, 'index']);
+                    Route::get('guardians/{guardian}', [GuardianController::class, 'show']);
+                    Route::get('students/{student}/guardians', [GuardianController::class, 'links']);
+                });
+                Route::middleware('permission:guardian.record.create')->group(function () {
+                    Route::post('guardians', [GuardianController::class, 'store']);
+                    Route::post('students/{student}/guardians', [GuardianController::class, 'link']);
+                });
+                Route::middleware('permission:guardian.record.update')->group(function () {
+                    Route::put('guardians/{guardian}', [GuardianController::class, 'update']);
+                    Route::put('students/{student}/guardians/{link}', [GuardianController::class, 'updateLink']);
+                    Route::post('students/{student}/guardians/{link}/archive', [GuardianController::class, 'unlink']);
+                });
             });
 
             Route::middleware('module:sites_rooms')->group(function () {

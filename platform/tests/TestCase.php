@@ -32,7 +32,7 @@ abstract class TestCase extends BaseTestCase
         if (!str_ends_with((string) $owner->getDatabaseName(), '_test')) {
             throw new RuntimeException('Tests run only on a disposable database whose name ends in _test.');
         }
-        $owner->unprepared('DROP SCHEMA IF EXISTS school CASCADE; DROP SCHEMA IF EXISTS platform CASCADE;');
+        $owner->unprepared('DROP SCHEMA IF EXISTS school CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS secret CASCADE;');
         Artisan::call('db:wipe', ['--database' => 'owner', '--force' => true]);
         Artisan::call('migrate', ['--database' => 'owner', '--force' => true]);
         Artisan::call('platform:roles');

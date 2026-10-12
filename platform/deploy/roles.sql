@@ -105,6 +105,33 @@ GRANT EXECUTE ON FUNCTION platform.locale_for(bigint, uuid), school.search_key(t
 GRANT SELECT ON platform.setting_definition TO school_runtime;
 GRANT SELECT, INSERT (tenant_id, key, value) ON school.setting TO school_runtime;
 GRANT UPDATE (value, version, archived_at) ON school.setting TO school_runtime;
+-- Pupils, guardians, programmes, groups, enrolments (021). Archived, never deleted (BR-02); the
+-- matricule, a price version, an enrolment's price and state history are written by the database.
+GRANT SELECT ON school.student, school.guardian, school.student_guardian, school.program, school.program_price, school.study_group,
+  school.enrollment, school.enrollment_status_history, school.group_membership TO school_runtime;
+GRANT INSERT (tenant_id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date, birth_place, gender, phone,
+  email, address, status, status_reason, origin_school, custom) ON school.student TO school_runtime;
+GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date, birth_place, gender, phone, email, address, status,
+  status_reason, origin_school, custom, version, archived_at) ON school.student TO school_runtime;
+GRANT INSERT (tenant_id, last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom)
+  ON school.guardian TO school_runtime;
+GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom, version, archived_at)
+  ON school.guardian TO school_runtime;
+GRANT INSERT (tenant_id, student_id, guardian_id, relationship, is_primary_contact, is_payer, emergency_contact) ON school.student_guardian TO school_runtime;
+GRANT UPDATE (relationship, is_primary_contact, is_payer, emergency_contact, version, archived_at) ON school.student_guardian TO school_runtime;
+GRANT INSERT (tenant_id, year_id, node_id, code, labels, description, duration_value, duration_unit, base_price, payment_terms, status)
+  ON school.program TO school_runtime;
+GRANT UPDATE (labels, description, duration_value, duration_unit, base_price, payment_terms, status, version, archived_at) ON school.program TO school_runtime;
+GRANT INSERT (tenant_id, year_id, code, labels, group_type, program_id, site_id, capacity, valid_from, valid_to, status) ON school.study_group TO school_runtime;
+GRANT UPDATE (labels, capacity, valid_to, status, version, archived_at) ON school.study_group TO school_runtime;
+GRANT INSERT (tenant_id, student_id, program_id, idempotency_key) ON school.enrollment TO school_runtime;
+GRANT UPDATE (status, status_reason, version) ON school.enrollment TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, group_id, valid_from) ON school.group_membership TO school_runtime;
+GRANT UPDATE (valid_to, version) ON school.group_membership TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.require(text), school.person_name_valid(text, text, text, text), school.enroll(uuid, uuid, uuid),
+  school.move_to_group(uuid, uuid), school.next_matricule(uuid), school.core_ids(text, text), school.require_core(text, text, uuid),
+  school.group_scope_valid(uuid, uuid[]) TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.student_enrollment_count(uuid) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -154,6 +181,27 @@ ALTER FUNCTION school.context() OWNER TO platform_provisioner;
 ALTER FUNCTION school.allowed_tenant() OWNER TO platform_provisioner;
 -- Read with its owner's rights: the membership's policies do not apply to it (020).
 ALTER VIEW school.people OWNER TO platform_provisioner;
+-- The rules of pupils, groups and enrolments that read other rows (021): capacity, quota, history.
+GRANT SELECT ON school.student, school.guardian, school.student_guardian, school.program, school.enrollment, school.group_membership
+  TO platform_provisioner;
+-- PostgreSQL row locks also require an UPDATE privilege. These columns are never written by
+-- the rule functions; the grant permits locking eligibility, price and enrolment state.
+GRANT UPDATE (archived_at) ON school.student, school.program, school.enrollment TO platform_provisioner;
+GRANT SELECT, INSERT, UPDATE (last) ON school.matricule_counter TO platform_provisioner;
+GRANT SELECT, UPDATE (archived_at) ON school.study_group TO platform_provisioner;
+GRANT SELECT, INSERT ON school.program_price, school.enrollment_status_history TO platform_provisioner;
+GRANT UPDATE (valid_to, updated_at, updated_by, version) ON school.group_membership TO platform_provisioner;
+GRANT SELECT ON school.academic_year TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.require(text), school.require_core(text, text, uuid) TO platform_provisioner;
+ALTER FUNCTION school.version_program_price() OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_group_places() OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_enrollment() OWNER TO platform_provisioner;
+ALTER FUNCTION school.follow_enrollment() OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_group_membership() OWNER TO platform_provisioner;
+ALTER FUNCTION school.core_ids(text, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.next_matricule(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.group_scope_valid(uuid, uuid[]) OWNER TO platform_provisioner;
+ALTER FUNCTION school.student_enrollment_count(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

@@ -1,4 +1,4 @@
-# Madrassa platform — new base (SRS 1.2, lot 1)
+# Madrassa platform — new base (SRS 1.2, lots 1–2)
 
 New schema base decided in ND-09 (SRS 1.2, §10.1): written from the SRS data model (§7), on the same stack (PHP 8.3 / Laravel 12, PostgreSQL 16), reusing the proven invariants of the current application in `madrassa-backend/` and `ecole-filament/`. That application stays usable until this one covers its scope.
 
@@ -442,8 +442,83 @@ The platform's own markup is ready for that build: the account link's logic move
 |---|---|
 | NFR-SEC-03 | `ContentSecurityPolicyTest`: the trial serves the CSP build without `'unsafe-eval'`; no raw HTML, no Alpine attribute through the sanitizer. The acceptance: 108 screens without a problem; 104 failing under the trial, every one on Filament's markup |
 
+## Increment 30 (lot 2): pupils, guardians, programmes, groups and enrolments
+
+`021_pupils_and_enrolments.sql` supplies the first school-domain schema; the migration and the SQL suite load the same file. It adds no API or screen yet.
+
+| Requirement | Database behaviour and evidence in `tests/sql/database.mjs` |
+|---|---|
+| FR-ELV-01/02/03 | A pupil's Arabic or Latin name, immutable matricule, dates, custom values and statuses; shared guardians and links. Generated matricules skip imported ones, serialize concurrent creation and refuse an exhausted five-digit sequence. A minor needs a primary contact with a phone to enrol (`student.majority_age`, initially 19) |
+| FR-PRG-01, BR-11, TST-18 | A programme references a school year and the school's referential. Each price change creates an immutable version. Enrolments copy the agreed price and terms, which cannot be edited after a catalogue change |
+| FR-GRP-01/02, BR-07, TST-07 | A group's capacity is locked before a place is counted and taken; 30 simultaneous requests fill exactly 25 places. Capacity cannot fall below current membership. One main group per enrolment; `school.move_to_group` keeps dated history and rolls back the source change if the target refuses |
+| FR-INS-01/02/03, TST-08 | `school.enroll(student, program, idempotency_key)` returns the same enrolment after simultaneous duplicate submissions, and refuses a key reused for different input. Teaching-state transitions need their own permission and scope. Cancellation freezes the record and frees its places; a concurrent assignment cannot leave a cancelled enrolment occupying a place |
+| FR-PLT-02 | The quota counts distinct pupils with a non-cancelled enrolment in a year that is not closed. Concurrent requests cannot both take its last place; another programme for an already-counted pupil takes no new place |
+| FR-IAM-04, TST-03 | Restrictive resource policies intersect tenant isolation with each action's site, level (including descendants), group or personal scope, including history and core-domain audit entries. Personal scopes use provisioned pupil/guardian account links; students cannot read classmates, and unlinking a guardian removes access immediately. Role managers can assign valid group scopes without reading the roster |
+
+The application cannot edit matricule counters, price versions, agreed terms or state history directly. School-domain audit entries mask names, contact details and custom values. Definer functions read the complete membership when applying capacity and quota rules, independently of the caller's narrower visibility; the resource policies compute scoped IDs once per query.
+
+Validation on 12 October 2026: **183 embedded SQL checks, 194 native PostgreSQL 16 checks with concurrency, 168 PHP integration tests (4,747 assertions)**, plus migration, restricted grants, rollback and reapplication on a disposable database. Browser/deployment acceptance remains the evidence of increment 29; no new screens were introduced here.
+
+Remaining limits: unlinked record creation currently requires a tenant-scoped permission. Subject scopes remain closed for these records until programme-subject links exist; staff will provide implicit teacher/replacement scopes. Personal account links are reserved to provisioning, with no portal exposed. Photos, field-level sensitive-data filtering, duplicate detection, API/UI workflows, CRM, rooms, staff, programme subjects, programme transfers, annual progression and payment-based access are not delivered by this schema. Financial state, discounts and invoices come with lot 3.
+
+## Increment 31 (lot 2): pupil and guardian APIs
+
+`StudentController`, `GuardianController` and `PupilRecords` expose 15 routes under the school session, CSRF protection, `students_crm` module and each action's permission. The database still enforces tenant and resource scopes. New unlinked dossiers and changes to family links require a tenant-wide grant; a scoped user can read and update permitted dossiers.
+
+| Routes | Contract |
+|---|---|
+| `GET /api/students`, `GET /api/guardians` | Always paginated: 25 by default, at most 100; `page`, `per_page`, normalized `q`, `include_archived`. Pupils also accept `birth_date` and `status` filters |
+| `GET /api/students/{id}`, `GET /api/guardians/{id}` | An explicit set of dossier fields; inaccessible or foreign IDs return 404; provisioning account links and photo references are not exposed |
+| `POST /api/students`, `POST /api/guardians` | At least one complete Arabic or Latin name; pupils require a non-future birth date, with generated or imported immutable matricule |
+| `PUT /api/students/{id}`, `PUT /api/guardians/{id}` | Partial changes with required `version`; stale edits return 409. `custom` patches supplied keys, preserving omitted values |
+| `POST /api/students/duplicates` | Up to ten scoped suggestions by normalized name plus birth date, or normalized phone. Same-date records in different alphabets are broad warnings, without transliteration or a name similarity score |
+| `POST /api/students/{id}/status` | `status`, `reason`, `version`; blocking with non-cancelled enrolments first returns 409 `student_active_enrollments` and their count, then requires `confirm_enrollments: true`. Enrolments and group places are unchanged |
+| `POST /api/students/{id}/archive` | Only a former pupil, with `reason` and `version`; retention timing remains dependent on OD-07 |
+| `GET/POST /api/students/{id}/guardians` | Read links or attach an existing guardian with relationship and contact/payer/emergency flags; one guardian can serve siblings |
+| `PUT /api/students/{id}/guardians/{link}`, `POST .../{link}/archive` | Versioned link metadata; archiving needs a reason and retains history, available with `include_archived=1` |
+
+A creation that finds probable duplicates returns 409 `student_duplicate` with those suggestions. Retrying with `duplicate_reason` records the reason in the journal. The check and creation share a school-specific transaction lock. This is a warning mechanism, never an automatic merge; cross-alphabet suggestions need refinement before FR-ELV-04 is complete.
+
+Sensitive custom values, including those with archived definitions, are omitted without `student.sensitive.read` on that particular resource, and attempts to write them are refused. An ordinary partial edit preserves hidden values. Permission and definition caches belong to the request, including when a controller survives multiple requests. Database triggers validate custom value types; impossible calendar dates are rejected before SQL. Errors have French and Arabic messages.
+
+`022_pupil_admission.sql` supplies the narrowly scoped count needed to confirm a block: the updater can learn the number of non-cancelled enrolments even without enrolment read access, but no programme or price details. It checks the pupil update permission and its scope itself. The pupil row lock serializes the status change with enrolment creation.
+
+`PupilRecordsTest` exercises the real routes with restricted database roles: duplicate override audit, shared guardians and link history, versions, localized status refusals, pagination, school/module boundaries, action-specific group scopes, sensitive fields and permission changes between requests, and blocking without changing enrolments. The test database reset also drops its private `secret` schema, allowing consecutive suite runs against the same disposable database.
+
+Validation on 12 October 2026: **177 PHP integration tests (4,959 assertions), 183 embedded SQL checks and 194 native PostgreSQL 16 checks including concurrency**. Migration 022, restricted grants, rollback and reapplication were checked on a disposable database. Browser/deployment checks were not rerun for this API-only increment.
+
+Screens, photos, aggregated dossier history, pupil imports and programme/enrolment/group APIs remain to be delivered. The primary contact is checked when enrolling a minor; maintaining it after later contact/link edits remains open. The access matrix in `SECURITY-REVIEW.md` includes the new routes.
+
+## Increment 32 (lot 2): programme, enrolment and group APIs
+
+Twenty additional routes expose the school-domain rules of schema 021 under the school session, CSRF protection, the `enrollment_groups` module and each action's permission. `AcademicRecords` shares tenant filtering, pagination, resource lookup and action-scope checks. Database triggers and functions enforce capacity, eligibility, immutable terms and history; no new migration is needed.
+
+| Routes | Contract |
+|---|---|
+| `GET/POST /api/programs`, `GET/PUT /api/programs/{id}` | Year, referential node, immutable code, FR/AR labels, description, paired duration/unit, base price, payment terms and status. Updates are partial and require `version`; year, node, code and price-version changes by the caller are refused |
+| `GET /api/programs/{id}/prices` | Paginated, immutable price/terms history, latest version first |
+| `GET/POST /api/groups`, `GET/PUT /api/groups/{id}` | Year, site, programme (required for class/session), labels, capacity, dates and status. Updates require `version`; identity fields stay fixed. Closing keeps the composition and makes the group immutable |
+| `GET/POST /api/enrollments`, `GET /api/enrollments/{id}` | Creation takes only `student_id`, `program_id`, `idempotency_key`; SQL fixes pending status, year, price, version and terms. A successful retry returns 201 with the same resource; key reuse with different input returns 409 |
+| `POST /api/enrollments/{id}/validate`, `/suspend`, `/cancel` | Each route requires its own permission plus `version` and `reason`. Validation also resumes a suspended enrolment. Cancellation is final, releases places and performs no financial operation |
+| `GET /api/enrollments/{id}/history` | Paginated state history with author, dates and suspension/cancellation reasons |
+| `GET/POST /api/groups/{id}/memberships` | Paginated current composition, `include_history=1` for ended memberships, optional `enrollment_id` filter. Creation takes an enrolment and optional `valid_from`; SQL derives whether this is the main group |
+| `POST /api/group-memberships/{id}/end`, `/transfer` | Required `version` and audited `reason`; transfer also takes the destination `group_id`. A refused destination rolls back the source change; success returns the new `data` and ended `previous` membership |
+
+Every list paginates (25 by default, 100 at most), including price/state histories and composition. Programmes and groups accept normalized `q` on code and translated labels. Programmes filter by year, node and status; groups by year, programme, site, type and status; enrolments by pupil, programme, year and teaching status. Inactive programmes are excluded from an admission selector by requesting `status=active`.
+
+Send a programme's `base_price` as a decimal **string**, for example `"120000.50"`. The API refuses numeric JSON values, scientific notation, negative amounts, more than two decimal places and values beyond NUMERIC(14,2), rather than rounding them. Prices in resources and the enrolment snapshot's `base_price` are also strings, including `"999999999999.99"`; the database keeps the original numeric snapshot unchanged. `payment_terms` is an opaque list of at most 100 entries for now, with a JSON encoding depth limit of 12 to keep the enclosing snapshot readable; excessive nesting returns 422. Generating and validating financial instalments belongs to lot 3.
+
+Create the minor's dossier and primary guardian contact first, create an active programme and group, then `POST /api/enrollments` with a stable UUID key. Assign its result through `POST /api/groups/{group}/memberships`, then validate it with `version: 1` and a reason. `AcademicWorkflowTest` runs this complete API walkthrough. It also tests price precision and snapshot stability, repeated submissions, stale versions, capacity, transfer rollback/history, suspension/resumption/cancellation, scoped actions/rosters/history, foreign references, module guards and localized domain refusals.
+
+Creation and group transfers still require tenant-wide grants under schema 021. Existing records can be changed within each action's resource scope. A group-scoped cancellation returns its authorised result directly because ending the memberships may immediately remove the caller's subsequent read access. Inaccessible reads and rows excluded by a mutation's policies answer 404; a missing action permission answers 403. The access matrix includes all new routes.
+
+Validation on 12 October 2026: **185 PHP integration tests (5,303 assertions), 183 embedded SQL checks and 194 native PostgreSQL 16 checks including concurrency**, with 26 focused API/permission/localization tests (3,073 assertions) also passing after the final payment-terms nesting validation. No new migration or browser/deployment acceptance was needed for this API increment.
+
+The next step is the screen workflow. Programme subjects/volumes, teacher/room links, planning conflicts, composition notifications, programme-to-programme transfers, financial instalments, payment-based access and annual progression are still open. No new screen or browser acceptance is claimed by this increment.
+
 ## Next increments of lot 2
 
-1. The schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
+1. Dossier/programme/group screens and the pupil → enrolment → group walkthrough: scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
+2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

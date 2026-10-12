@@ -1057,6 +1057,407 @@ await check('the school sees every consent, the console their dates and use, nev
   assert.deepEqual(listed.find(r => r.reason === 'Ticket 1042 : import bloqué'), { reason: 'Ticket 1042 : import bloqué', c: 1 });
 });
 
+// Lot 2: pupils and guardians, programmes, groups, enrolments (FR-ELV, FR-PRG, FR-GRP, FR-INS)
+await as(null);
+const lotYear = (await first("SELECT id FROM school.academic_year WHERE tenant_id = $1 AND code = '2027-2028'", [a])).id;
+const grade = (await first("SELECT id FROM school.ref_node WHERE tenant_id = $1 AND type_code = 'grade' AND archived_at IS NULL ORDER BY code LIMIT 1", [a])).id;
+// The school's own required fields on pupils, filled.
+const pupilFields = JSON.stringify(Object.fromEntries((await sql(
+  "SELECT key FROM school.custom_field WHERE tenant_id = $1 AND entity = 'student' AND required AND archived_at IS NULL", [a])).rows.map(r => [r.key, '0550'])));
+const STUDENT = `INSERT INTO school.student (tenant_id, last_name_lat, first_name_lat, last_name_ar, first_name_ar, birth_date, custom)
+  VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, matricule`;
+const newPupil = async (last, given, birth = '2012-05-01') => first(STUDENT, [a, last, given, null, null, birth, pupilFields]);
+const newAdult = async (last, given) => newPupil(last, given, '1995-03-14');
+const PROGRAM = 'INSERT INTO school.program (tenant_id, year_id, node_id, code, labels, base_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id';
+const programme = async (code, price = 120000, status = 'active', yearId = lotYear) =>
+  (await first(PROGRAM, [a, yearId, grade, code, JSON.stringify({ fr: 'Programme ' + code, ar: 'برنامج ' + code }), price, status])).id;
+const GROUP = `INSERT INTO school.study_group (tenant_id, year_id, code, labels, group_type, program_id, site_id, capacity, valid_from, status)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '2026-01-01', 'active') RETURNING id`;
+const group = async (code, program, capacity, type = 'class', site = siteA) =>
+  (await first(GROUP, [a, lotYear, code, JSON.stringify({ fr: 'Groupe ' + code }), type, program, site, capacity])).id;
+const ENROLL = 'SELECT school.enroll($1, $2, $3) AS id';
+const enroll = async (student, program, key = uuid()) => (await first(ENROLL, [student, program, key])).id;
+const JOIN_GROUP = 'INSERT INTO school.group_membership (tenant_id, enrollment_id, group_id) VALUES ($1, $2, $3) RETURNING id';
+const joinGroup = async (enrollment, groupId) => (await first(JOIN_GROUP, [a, enrollment, groupId])).id;
+const contact = async (student, phone = '0550 12 34 56', primary = true) => {
+  const g = (await first("INSERT INTO school.guardian (tenant_id, last_name_lat, first_name_lat, phone) VALUES ($1, 'Benali', 'Karim', $2) RETURNING id",
+    [a, phone])).id;
+  await sql("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship, is_primary_contact) VALUES ($1, $2, $3, 'father', $4)",
+    [a, student, g, primary]);
+  return g;
+};
+const members = groupId => count('SELECT count(*) n FROM school.group_membership WHERE group_id = $1 AND valid_to IS NULL', [groupId]);
+// User 1 also runs the pupils and enrolments (academic_hr, section 3.2): nobody grants themselves a role.
+await sql("INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type) VALUES ($1, 1, $2, 'tenant')", [a, roles.academic_hr]);
+await as('school_runtime', a, 1);
+const thisYear = String(new Date().getFullYear());
+
+await check('a pupil receives a matricule of the year, never changed; a name in Arabic or Latin letters is needed (FR-ELV-01 AC1)', async () => {
+  const first1 = await newPupil('Benali', 'Amine');
+  const second = await newPupil('Saidi', 'Lina');
+  assert.match(first1.matricule, new RegExp(`^${thisYear}\\d{5}$`));
+  assert.equal(Number(second.matricule), Number(first1.matricule) + 1);
+  assert.equal((await first(STUDENT.replace('custom)', 'custom, matricule)').replace('$7)', '$7, $8)'),
+    [a, 'Haddad', 'Yasmine', null, null, '2011-02-02', pupilFields, 'EXT-001'])).matricule, 'EXT-001');
+  await rejects(STUDENT, [a, 'Benali', null, 'بن علي', null, '2012-05-01', pupilFields], '23514');
+  assert.ok((await first(STUDENT, [a, null, null, 'بن علي', 'أمين', '2012-05-01', pupilFields])).matricule);
+  await rejects(STUDENT, [a, 'Futur', 'Bébé', null, null, '2999-01-01', pupilFields], '23514', 'birth_date_future');
+  await rejects("UPDATE school.student SET matricule = 'X' WHERE id = $1", [first1.id], '42501');
+  await as(null);
+  await rejects("UPDATE school.student SET matricule = 'X' WHERE id = $1", [first1.id], '23514', 'code_immutable');
+  await as('school_runtime', a, 1);
+});
+await check('a blocked pupil says why; a former pupil\'s record stays as it is (FR-ELV-03)', async () => {
+  const p = (await newPupil('Mansouri', 'Rania')).id;
+  await rejects("UPDATE school.student SET status = 'blocked' WHERE id = $1", [p], '23514');
+  await sql("UPDATE school.student SET status = 'blocked', status_reason = 'Dossier incomplet' WHERE id = $1", [p]);
+  await sql("UPDATE school.student SET status = 'active' WHERE id = $1", [p]);
+  assert.equal((await first('SELECT status_reason FROM school.student WHERE id = $1', [p])).status_reason, null);
+  await sql("UPDATE school.student SET status = 'former' WHERE id = $1", [p]);
+  await rejects("UPDATE school.student SET phone = '0551' WHERE id = $1", [p], '23514', 'student_former');
+  await rejects("UPDATE school.student SET status = 'active' WHERE id = $1", [p], '23514', 'student_former');
+  await sql('UPDATE school.student SET archived_at = now() WHERE id = $1', [p]);
+  await rejects('DELETE FROM school.student WHERE id = $1', [p], '42501');
+});
+await check('one guardian for brothers and sisters, linked to each (FR-ELV-02 AC1)', async () => {
+  const [brother, sister] = [(await newPupil('Kaci', 'Walid')).id, (await newPupil('Kaci', 'Meriem')).id];
+  const parent = await contact(brother);
+  await sql("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship, is_primary_contact) VALUES ($1, $2, $3, 'father', true)",
+    [a, sister, parent]);
+  assert.equal(await count('SELECT count(*) n FROM school.student_guardian WHERE guardian_id = $1', [parent]), 2);
+  await rejects("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship) VALUES ($1, $2, $3, 'mother')",
+    [a, sister, parent], '23505');
+});
+await check('programmes take their level from the school\'s referential, never one of another school or archived (TST-18, BR-13)', async () => {
+  await as(null);
+  await sql(`INSERT INTO school.node_type (tenant_id, code, labels, level_order, is_required) VALUES ($1, 'grade', '{"fr": "Niveau"}', 1, false)
+    ON CONFLICT DO NOTHING`, [b]);
+  const otherNode = (await first(`INSERT INTO school.ref_node (tenant_id, type_code, code, labels) VALUES ($1, 'grade', 'B_LEVEL', '{"fr": "Niveau de B"}')
+    RETURNING id`, [b])).id;
+  const archived = (await first("SELECT id FROM school.ref_node WHERE tenant_id = $1 AND archived_at IS NOT NULL LIMIT 1", [a])).id;
+  await as('school_runtime', a, 1);
+  await rejects(PROGRAM, [a, lotYear, otherNode, 'AILLEURS', JSON.stringify({ fr: 'Ailleurs' }), 0, 'draft'], '23503');
+  await rejects(PROGRAM, [a, lotYear, archived, 'ARCHIVE', JSON.stringify({ fr: 'Archivé' }), 0, 'draft'], '23514', 'node_archived');
+  const p = await programme('TST18');
+  await rejects("UPDATE school.program SET node_id = $2 WHERE id = $1", [p, archived], '42501');
+});
+await check('a new price is a new version; an enrolment keeps the price it was made with (FR-PRG-01 AC1, BR-11)', async () => {
+  const p = await programme('PRIX', 120000);
+  const e = await enroll((await newAdult('Amrani', 'Sofiane')).id, p);
+  await sql('UPDATE school.program SET base_price = 130000 WHERE id = $1', [p]);
+  assert.deepEqual((await sql('SELECT version, base_price::text AS price FROM school.program_price WHERE program_id = $1 ORDER BY version', [p])).rows,
+    [{ version: 1, price: '120000.00' }, { version: 2, price: '130000.00' }]);
+  assert.deepEqual(await first("SELECT agreed_price::text AS price, price_version, terms_snapshot ->> 'base_price' AS terms FROM school.enrollment WHERE id = $1", [e]),
+    { price: '120000.00', price_version: 1, terms: '120000.00' });
+  await rejects("UPDATE school.enrollment SET agreed_price = 1 WHERE id = $1", [e], '42501');
+  await sql("UPDATE school.program SET labels = '{\"fr\": \"Prix\"}' WHERE id = $1", [p]);
+  assert.equal((await first('SELECT price_version FROM school.program WHERE id = $1', [p])).price_version, 2);
+});
+await check('no enrolment in an inactive programme, nor for a blocked pupil, nor for a minor without a primary contact\'s phone (FR-PRG-01 AC2, FR-INS-01 AC2, FR-ELV-02 AC2)', async () => {
+  const closed = await programme('FERME', 1000, 'inactive');
+  const open = await programme('OUVERT', 1000);
+  const grown = (await newAdult('Bouzid', 'Nadia')).id;
+  await rejects(ENROLL, [grown, closed, uuid()], '23514', 'program_not_active');
+  const blocked = (await newAdult('Rahmani', 'Ilyes')).id;
+  await sql("UPDATE school.student SET status = 'blocked', status_reason = 'Impayés' WHERE id = $1", [blocked]);
+  await rejects(ENROLL, [blocked, open, uuid()], '23514', 'student_blocked');
+  const minor = (await newPupil('Ziani', 'Adam')).id;
+  await rejects(ENROLL, [minor, open, uuid()], '23514', 'primary_contact_required');
+  await contact(minor, null);
+  await rejects(ENROLL, [minor, open, uuid()], '23514', 'primary_contact_required');
+  await contact(minor, '   ');
+  await rejects(ENROLL, [minor, open, uuid()], '23514', 'primary_contact_required');
+  await contact(minor, '0661 00 11 22', false);
+  await rejects(ENROLL, [minor, open, uuid()], '23514', 'primary_contact_required');
+  await contact(minor);
+  assert.ok(await enroll(minor, open));
+});
+await check('an enrolment asked for twice with the same key is made once (TST-08, BR-05)', async () => {
+  const p = await programme('DOUBLE');
+  const s = (await newAdult('Cherif', 'Imane')).id;
+  const key = uuid();
+  const firstTime = await enroll(s, p, key);
+  assert.equal(await enroll(s, p, key), firstTime);
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE student_id = $1 AND program_id = $2', [s, p]), 1);
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment_status_history WHERE enrollment_id = $1', [firstTime]), 1);
+  await rejects(ENROLL, [s, await programme('AUTRE'), key], '23514', 'idempotency_key_reused');
+  await rejects(ENROLL, [s, p, uuid()], '23505');
+});
+await check('a group never goes over its capacity, nor below its members (BR-07, FR-GRP-01 AC2)', async () => {
+  const p = await programme('CAPA');
+  const g = await group('CAPA-1', p, 2);
+  for (const name of ['Un', 'Deux']) await joinGroup(await enroll((await newAdult('Capacite', name)).id, p), g);
+  await rejects(JOIN_GROUP, [a, await enroll((await newAdult('Capacite', 'Trois')).id, p), g], '23514', 'group_full');
+  await rejects('UPDATE school.study_group SET capacity = 1 WHERE id = $1', [g], '23514', 'capacity_below_members');
+  await sql('UPDATE school.study_group SET capacity = 3 WHERE id = $1', [g]);
+  assert.equal(await members(g), 2);
+});
+await check('one main group per enrolment; a transfer keeps both groups with their dates (FR-GRP-02 AC2, AC3)', async () => {
+  const p = await programme('TRANSF');
+  const [g1, g2] = [await group('TRANSF-1', p, 10), await group('TRANSF-2', p, 10)];
+  const support = await group('SOUTIEN-1', null, 10, 'support');
+  const e = await enroll((await newAdult('Transfert', 'Aya')).id, p);
+  const m = await joinGroup(e, g1);
+  await rejects(JOIN_GROUP, [a, e, g2], '23505');
+  await joinGroup(e, support);
+  const moved = (await first('SELECT school.move_to_group($1, $2) AS id', [m, g2])).id;
+  assert.deepEqual((await sql(`SELECT g.code, m.is_main, m.valid_to IS NULL AS current FROM school.group_membership m
+    JOIN school.study_group g ON g.id = m.group_id WHERE m.enrollment_id = $1 ORDER BY g.code`, [e])).rows,
+    [{ code: 'SOUTIEN-1', is_main: false, current: true }, { code: 'TRANSF-1', is_main: true, current: false },
+     { code: 'TRANSF-2', is_main: true, current: true }]);
+  assert.equal((await first('SELECT valid_from::text AS d FROM school.group_membership WHERE id = $1', [moved])).d,
+    (await first('SELECT valid_to::text AS d FROM school.group_membership WHERE id = $1', [m])).d);
+  await rejects("UPDATE school.group_membership SET valid_to = NULL WHERE id = $1", [m], '23514', 'membership_ended');
+  await rejects(JOIN_GROUP, [a, e, await group('AUTRE-PRG', await programme('AUTREPRG'), 5)], '23514', 'group_other_program');
+});
+await check('validation needs the main group; a stop needs a reason; a cancelled enrolment is frozen and frees its place (FR-INS-01, FR-INS-02, FR-INS-03 AC1, BR-12)', async () => {
+  const p = await programme('VALID');
+  const g = await group('VALID-1', p, 5);
+  const e = await enroll((await newAdult('Validation', 'Omar')).id, p);
+  await rejects("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e], '23514', 'main_group_required');
+  await joinGroup(e, g);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+  assert.equal((await first('SELECT validated_by::int AS u FROM school.enrollment WHERE id = $1', [e])).u, 1);
+  await rejects("UPDATE school.enrollment SET status = 'suspended' WHERE id = $1", [e], '23514', 'reason_required');
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Absence prolongée' WHERE id = $1", [e]);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+  assert.equal(await members(g), 1);
+  await sql("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Départ de la famille' WHERE id = $1", [e]);
+  assert.equal(await members(g), 0);
+  await rejects("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e], '23514', 'enrollment_cancelled');
+  await rejects(JOIN_GROUP, [a, e, g], '23514', 'enrollment_not_assignable');
+  assert.deepEqual((await sql('SELECT from_status, to_status FROM school.enrollment_status_history WHERE enrollment_id = $1 ORDER BY changed_at, to_status', [e])).rows
+    .map(r => `${r.from_status ?? '-'}>${r.to_status}`).sort(),
+    ['-' + '>pending', 'pending>validated', 'suspended>validated', 'validated>cancelled', 'validated>suspended'].sort());
+  const other = await enroll((await newAdult('Validation', 'Lyna')).id, p);
+  await rejects("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Essai' WHERE id = $1", [other], '23514', 'status_transition_refused');
+});
+await check('the plan\'s quota of active pupils holds (FR-PLT-02)', async () => {
+  const p = await programme('QUOTA');
+  const q = await programme('QUOTA2');
+  const already = (await newAdult('Quota', 'Deja')).id;
+  await enroll(already, p);
+  await as(null);
+  const active = await count(`SELECT count(DISTINCT e.student_id) n FROM school.enrollment e JOIN school.academic_year y ON y.id = e.year_id
+    WHERE e.tenant_id = $1 AND e.status <> 'cancelled' AND y.status <> 'closed'`, [a]);
+  const quota = (await first('SELECT quota_active_students AS q FROM platform.tenant_entitlement WHERE tenant_id = $1', [a])).q;
+  await sql('UPDATE platform.tenant_entitlement SET quota_active_students = $2 WHERE tenant_id = $1', [a, active]);
+  await as('school_runtime', a, 1);
+  await rejects(ENROLL, [(await newAdult('Quota', 'Nouveau')).id, p, uuid()], '23514', 'student_quota_exceeded');
+  assert.ok(await enroll(already, q), 'a pupil already counted enrols again');
+  await as(null);
+  await sql('UPDATE platform.tenant_entitlement SET quota_active_students = $2 WHERE tenant_id = $1', [a, quota]);
+  await as('school_runtime', a, 1);
+});
+await check('a closed year freezes its programmes, groups and enrolments (FR-PRG-01, FR-REF-05)', async () => {
+  await as(null);
+  const old = (await first(YEAR, [a, 'LOT2-OLD', '2020-09-01', '2021-06-30', 'planned'])).id;
+  await as('school_runtime', a, 1);
+  const p = await programme('ANCIEN', 1000, 'active', old);
+  const g = (await first(GROUP, [a, old, 'ANCIEN-1', JSON.stringify({ fr: 'Ancien' }), 'class', p, siteA, 5])).id;
+  const e = await enroll((await newAdult('Ancien', 'Eleve')).id, p);
+  await as(null);
+  await sql("UPDATE school.academic_year SET status = 'closed' WHERE id = $1", [old]);
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.program SET base_price = 2000 WHERE id = $1', [p], '23514', 'year_closed');
+  await rejects('UPDATE school.study_group SET capacity = 6 WHERE id = $1', [g], '23514', 'year_closed');
+  await rejects(ENROLL, [(await newAdult('Ancien', 'Autre')).id, p, uuid()], '23514', 'year_closed');
+  await rejects("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Trop tard' WHERE id = $1", [e], '23514', 'year_closed');
+});
+await check('writing pupils, groups and enrolments needs the permission (TST-02)', async () => {
+  const p = await programme('DROITS');
+  const s = (await newAdult('Droits', 'Sami')).id;
+  // A teacher: neither pupils, nor groups, nor enrolments to write.
+  await as('school_runtime', a, 9);
+  assert.equal((await first("SELECT school.can('student.record.create') AS c")).c, false);
+  await rejects(STUDENT, [a, 'Sans', 'Droit', null, null, '2010-01-01', pupilFields], '42501', 'permission_denied');
+  await rejects(ENROLL, [s, p, uuid()], '42501', 'permission_denied');
+  await rejects(GROUP, [a, lotYear, 'SANS-DROIT', JSON.stringify({ fr: 'x' }), 'support', null, siteA, 5], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+await check('the journal masks pupils\' and guardians\' personal data (BR-17)', async () => {
+  const p = (await newPupil('Masque', 'Ines')).id;
+  await sql("UPDATE school.student SET last_name_lat = 'Masquee', phone = '0770' WHERE id = $1", [p]);
+  const entry = await first("SELECT before, after FROM school.audit_log WHERE object_type = 'student' AND object_id = $1 AND action = 'UPDATE'", [p]);
+  assert.deepEqual(entry, { before: { last_name_lat: '[masqué]', phone: '[masqué]' }, after: { last_name_lat: '[masqué]', phone: '[masqué]' } });
+  const created = await first("SELECT changed_fields FROM school.audit_log WHERE object_type = 'student' AND object_id = $1 AND action = 'INSERT'", [p]);
+  assert.ok(!created.changed_fields.includes('name_key'));
+});
+
+await check('generated matricules skip imported numbers; a full five-digit sequence fails explicitly', async () => {
+  await as(null);
+  const last = (await first('SELECT last FROM school.matricule_counter WHERE tenant_id = $1 AND year = $2', [a, Number(thisYear)])).last;
+  await as('school_runtime', a, 1);
+  const imported = thisYear + String(last + 1).padStart(5, '0');
+  await first(STUDENT.replace('custom)', 'custom, matricule)').replace('$7)', '$7, $8)'),
+    [a, 'Importe', 'Numero', null, null, '1990-01-01', pupilFields, imported]);
+  assert.equal((await newAdult('Genere', 'Suivant')).matricule, thisYear + String(last + 2).padStart(5, '0'));
+  await rejects('UPDATE school.matricule_counter SET last = 99999 WHERE tenant_id = $1', [a], '42501');
+  await as(null);
+  await sql('UPDATE school.matricule_counter SET last = 99999 WHERE tenant_id = $1 AND year = $2', [a, Number(thisYear)]);
+  await as('school_runtime', a, 1);
+  await rejects(STUDENT, [a, 'Sans', 'Numero', null, null, '1990-01-01', pupilFields], '23514', 'matricule_exhausted');
+  await as(null);
+  await sql('UPDATE school.matricule_counter SET last = $3 WHERE tenant_id = $1 AND year = $2', [a, Number(thisYear), last + 2]);
+  await as('school_runtime', a, 1);
+});
+
+await check('a failed group transfer preserves the source assignment and its place (BR-06)', async () => {
+  const p = await programme('ATOMIQUE');
+  const source = await group('ATOMIQUE-A', p, 1);
+  const target = await group('ATOMIQUE-B', p, 1);
+  const membership = await joinGroup(await enroll((await newAdult('Transfert', 'Source')).id, p), source);
+  await joinGroup(await enroll((await newAdult('Transfert', 'Occupe')).id, p), target);
+  await rejects('SELECT school.move_to_group($1, $2)', [membership, target], '23514', 'group_full');
+  assert.equal(await members(source), 1);
+  assert.equal((await first('SELECT valid_to FROM school.group_membership WHERE id = $1', [membership])).valid_to, null);
+});
+
+// Scoped identities are separate from the suite's administrators and other broad grants.
+const scopedAccount = async (kind, scope, ids, permissions) => {
+  await as(null);
+  const user = (await first("INSERT INTO public.users (name, email, password) VALUES ('Scoped', $1, 'hash') RETURNING id", [uuid() + '@example.test'])).id;
+  await sql("INSERT INTO school.membership (tenant_id, user_id, status) VALUES ($1, $2, 'active')", [a, user]);
+  const role = (await first("INSERT INTO school.role (tenant_id, code, kind, labels) VALUES ($1, $2, $3, '{\"fr\": \"Portée de test\"}') RETURNING id",
+    [a, 'scope_' + uuid().replaceAll('-', ''), kind])).id;
+  for (const permission of permissions) await sql('INSERT INTO school.role_permission (tenant_id, role_id, permission_code) VALUES ($1, $2, $3)', [a, role, permission]);
+  const assignment = (await first('INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type, scope_ids, valid_from) VALUES ($1, $2, $3, $4, $5, current_date - 2) RETURNING id',
+    [a, user, role, scope, ids])).id;
+  return { user, role, assignment };
+};
+await as('school_runtime', a, 1);
+const scopeProgram = await programme('SCOPES');
+const scopeSiteB = (await first("INSERT INTO school.site (tenant_id, code, labels) VALUES ($1, 'SCOPE-B', '{\"fr\": \"Site B\"}') RETURNING id", [a])).id;
+const scopeGroupA = await group('SCOPES-A', scopeProgram, 10);
+const scopeGroupB = await group('SCOPES-B', scopeProgram, 10, 'class', scopeSiteB);
+const scopeStudentA = (await newAdult('Visible', 'Amine')).id;
+const scopeStudentB = (await newAdult('Prive', 'Lina')).id;
+const scopeEnrollmentA = await enroll(scopeStudentA, scopeProgram);
+const scopeEnrollmentB = await enroll(scopeStudentB, scopeProgram);
+await joinGroup(scopeEnrollmentA, scopeGroupA);
+await joinGroup(scopeEnrollmentB, scopeGroupB);
+const scopeGuardianA = await contact(scopeStudentA);
+const scopeGuardianB = await contact(scopeStudentB);
+await as(null);
+const coreReads = ['student.record.read', 'guardian.record.read', 'program.program.read', 'group.group.read', 'enrollment.enrollment.read', 'audit.log.read'];
+const pupilIdentity = await scopedAccount('student', 'personal', null, coreReads);
+const parentIdentity = await scopedAccount('parent', 'personal', null, coreReads);
+const groupIdentity = await scopedAccount('internal', 'group', [scopeGroupA], [...coreReads, 'student.record.update']);
+const siteIdentity = await scopedAccount('internal', 'site', [siteA], coreReads);
+await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [scopeStudentA, pupilIdentity.user]);
+await sql('UPDATE school.guardian SET user_id = $2 WHERE id = $1', [scopeGuardianA, parentIdentity.user]);
+const visibleIds = async table => (await sql(`SELECT id FROM school.${table}`)).rows.map(r => r.id).sort();
+await check('a pupil reads their own records, never a classmate\'s, including group history and the journal (TST-03)', async () => {
+  await as('school_runtime', a, pupilIdentity.user);
+  assert.deepEqual(await visibleIds('student'), [scopeStudentA]);
+  assert.deepEqual(await visibleIds('enrollment'), [scopeEnrollmentA]);
+  assert.deepEqual(await visibleIds('guardian'), [scopeGuardianA]);
+  assert.deepEqual(await visibleIds('study_group'), [scopeGroupA]);
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment_status_history WHERE enrollment_id = $1', [scopeEnrollmentB]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.group_membership WHERE enrollment_id = $1', [scopeEnrollmentB]), 0);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'student' AND object_id = $1", [scopeStudentB]), 0);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'student' AND object_id = $1", [scopeStudentA]) > 0);
+  assert.equal((await sql("UPDATE school.student SET phone = 'intrusion' WHERE id = $1", [scopeStudentA])).rowCount ?? 0, 0);
+});
+await check('a parent reads only linked children; unlinking removes access immediately (TST-03)', async () => {
+  await as('school_runtime', a, parentIdentity.user);
+  assert.deepEqual(await visibleIds('student'), [scopeStudentA]);
+  assert.deepEqual(await visibleIds('enrollment'), [scopeEnrollmentA]);
+  await as(null);
+  await sql('UPDATE school.student_guardian SET archived_at = now() WHERE student_id = $1 AND guardian_id = $2', [scopeStudentA, scopeGuardianA]);
+  await as('school_runtime', a, parentIdentity.user);
+  assert.deepEqual(await visibleIds('student'), []);
+  await as(null);
+  await sql('UPDATE school.student_guardian SET archived_at = NULL WHERE student_id = $1 AND guardian_id = $2', [scopeStudentA, scopeGuardianA]);
+});
+await check('a group scope filters direct reads, searches, exports and writes to that group (TST-03)', async () => {
+  await as('school_runtime', a, groupIdentity.user);
+  assert.deepEqual(await visibleIds('study_group'), [scopeGroupA]);
+  assert.deepEqual(await visibleIds('student'), [scopeStudentA]);
+  assert.deepEqual(await visibleIds('enrollment'), [scopeEnrollmentA]);
+  assert.equal((await first('SELECT school.student_enrollment_count($1) AS n', [scopeStudentA])).n, 1);
+  await rejects('SELECT school.student_enrollment_count($1)', [scopeStudentB], '42501', 'permission_denied');
+  assert.equal(await count("SELECT count(*) n FROM school.student WHERE name_key LIKE '%prive%'"), 0);
+  assert.deepEqual((await sql('SELECT matricule FROM school.student ORDER BY matricule')).rows.length, 1, 'same query used by an export');
+  await sql("UPDATE school.student SET phone = '0550' WHERE id = $1", [scopeStudentA]);
+  assert.equal((await sql("UPDATE school.student SET phone = 'intrusion' WHERE id = $1", [scopeStudentB])).rowCount ?? 0, 0);
+  await rejects(STUDENT, [a, 'New', 'Unlinked', null, null, '1990-01-01', pupilFields], '42501');
+});
+await check('a site scope returns only its pupils and enrolments (FR-IAM-04 AC3)', async () => {
+  await as('school_runtime', a, siteIdentity.user);
+  assert.ok((await visibleIds('student')).includes(scopeStudentA));
+  assert.ok(!(await visibleIds('student')).includes(scopeStudentB));
+  assert.ok(!(await visibleIds('enrollment')).includes(scopeEnrollmentB));
+  assert.ok(!(await visibleIds('study_group')).includes(scopeGroupB));
+});
+await check('a role manager assigns group scopes without permission to read the group roster', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['role.assignment.manage']);
+  await as('school_runtime', a, manager.user);
+  assert.deepEqual(await visibleIds('study_group'), []);
+  const assignment = 'INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type, scope_ids) VALUES ($1, $2, $3, \'group\', $4)';
+  await sql(assignment, [a, groupIdentity.user, groupIdentity.role, [scopeGroupA]]);
+  await rejects(assignment, [a, groupIdentity.user, groupIdentity.role, [uuid()]], '23514', 'scope_unknown');
+  await rejects(assignment, [a, groupIdentity.user, groupIdentity.role, [null]], '23514', 'scope_unknown');
+  // Remove this additional grant so the expiration check still tests all of this user's grants.
+  await as(null);
+  await sql('UPDATE school.role_assignment SET archived_at = now() WHERE tenant_id = $1 AND user_id = $2 AND id <> $3',
+    [a, groupIdentity.user, groupIdentity.assignment]);
+  await sql('UPDATE school.role_assignment SET archived_at = now() WHERE id = $1', [manager.assignment]);
+});
+await check('a level scope includes descendants of the referential, and excludes other levels (TST-18)', async () => {
+  await as(null);
+  const parentNode = (await first('SELECT parent_id FROM school.ref_node WHERE id = $1', [grade])).parent_id;
+  assert.ok(parentNode);
+  const identity = await scopedAccount('internal', 'level', [parentNode], coreReads);
+  await as('school_runtime', a, identity.user);
+  assert.ok((await visibleIds('student')).includes(scopeStudentA));
+  assert.ok((await visibleIds('program')).includes(scopeProgram));
+  await as(null);
+  await rejects('UPDATE school.role_assignment SET scope_ids = $2 WHERE id = $1', [identity.assignment, [uuid()]], '23514', 'scope_unknown');
+});
+await check('each action uses its own scope, even with several roles (FR-IAM-04)', async () => {
+  const identity = await scopedAccount('internal', 'group', [scopeGroupA], [...coreReads, 'enrollment.enrollment.cancel']);
+  await as(null);
+  const otherRole = (await first("INSERT INTO school.role (tenant_id, code, kind, labels) VALUES ($1, 'scope_other_action', 'internal', '{\"fr\": \"Autre action\"}') RETURNING id", [a])).id;
+  await sql("INSERT INTO school.role_permission (tenant_id, role_id, permission_code) VALUES ($1, $2, 'enrollment.enrollment.update'), ($1, $2, 'enrollment.enrollment.read')", [a, otherRole]);
+  await sql("INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type, scope_ids) VALUES ($1, $2, $3, 'group', $4)", [a, identity.user, otherRole, [scopeGroupB]]);
+  await as('school_runtime', a, identity.user);
+  await rejects("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Mauvaise portée' WHERE id = $1", [scopeEnrollmentB], '42501', 'permission_denied');
+});
+await check('unknown group scopes are refused; expired grants, suspended members and disabled modules expose no records', async () => {
+  await as(null);
+  await rejects('UPDATE school.role_assignment SET scope_ids = $2 WHERE id = $1', [groupIdentity.assignment, [uuid()]], '23514', 'scope_unknown');
+  await sql("UPDATE school.role_assignment SET valid_until = current_date - 1 WHERE id = $1", [groupIdentity.assignment]);
+  await as('school_runtime', a, groupIdentity.user);
+  assert.deepEqual(await visibleIds('student'), []);
+  await as(null);
+  await sql("UPDATE school.membership SET status = 'suspended' WHERE tenant_id = $1 AND user_id = $2", [a, pupilIdentity.user]);
+  await as('school_runtime', a, pupilIdentity.user);
+  assert.deepEqual(await visibleIds('student'), []);
+  await as(null);
+  await sql("UPDATE school.membership SET status = 'active' WHERE tenant_id = $1 AND user_id = $2", [a, pupilIdentity.user]);
+  await sql("SELECT platform.disable_module($1, 'student_finance')", [a]);
+  await sql("SELECT platform.disable_module($1, 'enrollment_groups')", [a]);
+  await sql("SELECT platform.disable_module($1, 'students_crm')", [a]);
+  await as('school_runtime', a, pupilIdentity.user);
+  assert.deepEqual(await visibleIds('student'), []);
+  await as(null);
+  await sql("SELECT platform.enable_module($1, 'student_finance')", [a]);
+});
+await check('a school member without a domain permission reads none of the core tables', async () => {
+  const identity = await scopedAccount('internal', 'tenant', null, []);
+  await as('school_runtime', a, identity.user);
+  for (const table of ['student', 'guardian', 'student_guardian', 'program', 'program_price', 'study_group', 'enrollment', 'enrollment_status_history', 'group_membership'])
+    assert.equal(await count(`SELECT count(*) n FROM school.${table}`), 0, table);
+  await as('school_runtime', b, 2);
+  assert.equal(await count('SELECT count(*) n FROM school.student'), 0, 'another school sees none');
+  await as('school_runtime', a, 1);
+});
+await as(null);
+// Restore the active-site fixture used by the earlier last-site concurrency test.
+await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [scopeSiteB]);
+await as('school_runtime', a, 1);
+
 // Security review (SECURITY-REVIEW.md): what holds for every table and function, present and future
 await check('every table of a school forces row-level security, even on its owner (BR-01, NFR-TEN-01)', async () => {
   await as(null);
@@ -1365,6 +1766,73 @@ if (PgClient) {
     const ids = batches.flat();
     assert.equal(new Set(ids).size, ids.length);
     assert.equal(ids.length, due);
+  });
+  await check('thirty requests for the twenty-five places of a group make twenty-five assignments (TST-07, BR-07, FR-GRP-02 AC1)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('TST07');
+    const g = await group('TST07-1', p, 25);
+    const enrolments = [];
+    for (let i = 0; i < 30; i++) enrolments.push(await enroll((await newAdult('Course', 'Eleve' + i)).id, p));
+    const clients = await Promise.all(enrolments.map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map((c, i) => c.query(JOIN_GROUP, [a, enrolments[i], g])));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 25);
+    assert.deepEqual([...new Set(results.filter(r => r.status === 'rejected').map(r => r.reason.message))], ['group_full']);
+    assert.equal(await members(g), 25);
+  });
+  await check('an enrolment submitted twice at the same moment is made once (TST-08, BR-05)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('TST08');
+    const s = (await newAdult('Double', 'Clic')).id;
+    const key = uuid();
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const ids = await Promise.all(clients.map(c => c.query(ENROLL, [s, p, key]).then(r => r.rows[0].id)));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(ids[0], ids[1]);
+    assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE student_id = $1', [s]), 1);
+  });
+  await check('pupils created at the same moment receive different matricules (FR-ELV-01 AC1)', async () => {
+    const clients = await Promise.all(Array.from({ length: 10 }, () => connect('school_runtime', a, 1)));
+    const made = await Promise.all(clients.map((c, i) => c.query(STUDENT, [a, 'Simultane', 'Eleve' + i, null, null, '1990-01-01', pupilFields])
+      .then(r => r.rows[0].matricule)));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(new Set(made).size, 10);
+  });
+  await check('two enrolments cannot both take the last active-pupil quota place (FR-PLT-02)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('QUOTA-RACE');
+    const pupils = [(await newAdult('QuotaRace', 'Un')).id, (await newAdult('QuotaRace', 'Deux')).id];
+    await as(null);
+    const quota = (await first('SELECT quota_active_students AS q FROM platform.tenant_entitlement WHERE tenant_id = $1', [a])).q;
+    const active = await count(`SELECT count(DISTINCT e.student_id) n FROM school.enrollment e JOIN school.academic_year y ON y.id = e.year_id
+      WHERE e.tenant_id = $1 AND e.status <> 'cancelled' AND y.status <> 'closed'`, [a]);
+    await sql('UPDATE platform.tenant_entitlement SET quota_active_students = $2 WHERE tenant_id = $1', [a, active + 1]);
+    const clients = await Promise.all(pupils.map(() => connect('school_runtime', a, 1)));
+    try {
+      const results = await Promise.allSettled(clients.map((c, i) => c.query(ENROLL, [pupils[i], p, uuid()])));
+      assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+      assert.equal(results.find(r => r.status === 'rejected').reason.message, 'student_quota_exceeded');
+    } finally {
+      await Promise.all(clients.map(c => c.end()));
+      await sql('UPDATE platform.tenant_entitlement SET quota_active_students = $2 WHERE tenant_id = $1', [a, quota]);
+    }
+  });
+  await check('a concurrent cancellation prevents an assignment from leaving a place occupied (FR-INS-03)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('CANCEL-RACE');
+    const g = await group('CANCEL-RACE', p, 1);
+    const e = await enroll((await newAdult('Annule', 'Course')).id, p);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    try {
+      await clients[0].query('BEGIN');
+      await clients[0].query("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Annulation simultanée' WHERE id = $1", [e]);
+      const joining = clients[1].query(JOIN_GROUP, [a, e, g]).then(() => null, error => error.message);
+      await clients[0].query('COMMIT');
+      assert.equal(await joining, 'enrollment_not_assignable');
+      assert.equal(await members(g), 0);
+    } finally {
+      await Promise.all(clients.map(c => c.end()));
+    }
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

@@ -1,12 +1,12 @@
 # Madrassa — état d'application du SRS 1.2
 
-Analyse du 11 octobre 2026, mise à jour avec les incréments 14 à 29. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
+Analyse du 11 octobre 2026, mise à jour le 12 octobre avec les incréments 14 à 32. Référence : `SRS_Madrassa_1_2.md`, décisions §10.1 et rapport 1.1 déjà intégré. La suite reprend le plan existant ; aucune nouvelle décision d'architecture n'est introduite. Le document SRS source n'est pas modifié.
 
 ## Base retenue et preuves
 
 `platform/` est la nouvelle application normative (ND-09) : Laravel 12, Filament 5, PostgreSQL, schéma incrémental, rôles SQL restreints, API et services. `ecole-filament/` et `madrassa-backend/` restent l'application antérieure ; leur couverture ne vaut pas conformité de la nouvelle base. Les bulletins et la démonstration sont hors périmètre (ND-02, ND-04).
 
-Validation de l'incrément 29 : 168 tests PHP/PostgreSQL 16 et 158 contrôles SQL embarqués (164 sur PostgreSQL 16 natif, concurrence comprise), sans fichier `.env` local ; 108 écrans vérifiés dans chacun des navigateurs Chromium, Firefox et WebKit, en français et en arabe, sur ordinateur et téléphone (`platform/deploy/acceptance-test.sh`, en CI) ; déploiement Docker Compose vérifié de bout en bout par `platform/deploy/smoke-test.sh`, sauvegarde chiffrée puis restauration dans une installation neuve par `platform/deploy/restore-test.sh` (les deux en CI) ; contrôles SQL natifs avec concurrence en CI sur PostgreSQL 16. La revue de sécurité du lot 1 est dans `platform/SECURITY-REVIEW.md`. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner une API testée dont le parcours utilisateur manque ; aucune ligne n'affirme la conformité complète du produit avant recette.
+Validation locale de l'incrément 32, refaite le 12 octobre à l'analyse du projet : suite complète de 185 tests PHP/PostgreSQL 16 (5 310 assertions), 183 contrôles SQL embarqués et 194 sur PostgreSQL 16 natif, concurrence comprise, sans fichier `.env` local. Aucune nouvelle migration à l'incrément 32 ; migrations 021 et 022, droits restreints, retour arrière et réapplication validés aux incréments 30 et 31. Les incréments 30 à 32 sont versés ensemble sur `main` ; la CI y rejoue les contrôles SQL natifs, les tests PHP, le retour arrière des migrations, le déploiement, la sauvegarde restaurée et la recette des 324 écrans. Les preuves de l'incrément 29 restent acquises : 108 écrans dans chacun des navigateurs Chromium, Firefox et WebKit, en français et en arabe, ordinateur et téléphone (`platform/deploy/acceptance-test.sh`) ; déploiement Docker Compose (`platform/deploy/smoke-test.sh`) et sauvegarde chiffrée restaurée dans une installation neuve (`platform/deploy/restore-test.sh`), en CI. Ces parcours navigateur/déploiement ne sont pas rejoués pour cet incrément d'API, sans nouvel écran. La revue de sécurité du lot 1 est dans `platform/SECURITY-REVIEW.md`. Les tests utilisent des bases jetables, jamais les données de l'application antérieure. « PARTIEL » peut désigner un schéma ou une API testés sans parcours utilisateur ; aucune ligne n'affirme la conformité complète du produit avant recette.
 
 Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `platform/app/Http/Controllers/`, **services** = `platform/app/Support/`, **tests** = `platform/tests/Feature/` et `platform/tests/sql/`, **UI** = `platform/app/Filament/`, **CI** = `.github/workflows/ci.yml`. S/M/L : effort relatif d'un complément, pas un engagement calendaire.
 
@@ -15,33 +15,33 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | ID | Statut | Preuves et complément nécessaire | Risque | Effort |
 |---|---|---|---|---|
 | FR-PLT-01 | PARTIEL | SQL, UI/Console, ConsoleTest, LotOneWalkthroughTest : deux établissements créés depuis la console, activés et utilisés de bout en bout ; recette utilisateur à terminer | majeur | S |
-| FR-PLT-02 | PARTIEL | SQL, ConsoleTest : dépendances, quotas de stockage, lecture seule ; quota élèves avec lot 2 | majeur | M |
+| FR-PLT-02 | PARTIEL | SQL, ConsoleTest : dépendances, stockage, lecture seule ; 021 et tests/sql : quota d'élèves ayant une inscription non annulée dans une année non close, testé en concurrence sur la dernière place ; recette utilisateur | majeur | M |
 | FR-PLT-03 | PARTIEL | SQL, ReferentialTest : profils versionnés ; validation des libellés métier OD-13 | mineur | S |
 | FR-PLT-04 | PARTIEL | SupportTest, SchoolPanelTest, SchoolAdministrationPanelTest, UI/School/SupportAccess : consentement, retrait, consultations, lecture seule et bannière ; recette utilisateur à terminer | majeur | S |
 | FR-PLT-05 | PARTIEL | UI/Console/Supervision, ConsoleTest : comptages ; supervision et alertes d'exploitation à compléter | majeur | M |
 | FR-IAM-01 | PARTIEL | AccountController, UI/School/Accounts et Activation, AccountTest, SchoolPanelTest, SchoolPublicPagesTest : cycle de vie et activation dans le navigateur ; recette utilisateur à terminer | majeur | S |
 | FR-IAM-02 | PARTIEL | SessionController, CredentialController, SchoolLogin, Credentials, Recovery, acceptance-test : connexion avec MFA vérifiée dans un navigateur, verrouillage, mot de passe provisoire et oublié ; recette utilisateur | majeur | S |
 | FR-IAM-03 | PARTIEL | RoleController, SQL, UI/School/Roles et Assignments, SchoolPanelTest ; recette utilisateur et présentation groupée des permissions à compléter | majeur | M |
-| FR-IAM-04 | PARTIEL | Permissions, RoleAssignmentController ; portées groupe/personnelles à compléter avec lot 2 | bloquant | L |
+| FR-IAM-04 | PARTIEL | Permissions, SQL 021, tests/sql : dossiers filtrés par site, descendants d'un niveau, groupe et lien personnel, actions et journal compris ; PupilRecordsTest et AcademicWorkflowTest : API des dossiers/programmes/groupes/inscriptions, tarifs/historique/composition sous portée et contrôle propre à chaque action, champs sensibles selon leur permission ; créations et transferts de groupe limités à la portée tenant, portées implicites enseignant/remplaçant, matières, écrans et exports métier à compléter | bloquant | L |
 | FR-IAM-05 | PARTIEL | SQL, AuthorizationTest : auto-attribution et auto-élévation refusées ; validations métier avec lots 3/4 | bloquant | M |
 | FR-REF-01 | PARTIEL | ReferentialController, UI/School/ReferenceTypes, ReferentialTest, SchoolReferencePanelTest ; recette utilisateur à terminer | majeur | S |
-| FR-REF-02 | PARTIEL | ReferentialController, UI/School/ReferenceNodes, SchoolReferencePanelTest ; références des lots suivants et recette utilisateur | majeur | M |
+| FR-REF-02 | PARTIEL | ReferentialController, UI/School/ReferenceNodes, SchoolReferencePanelTest ; SQL 021 : programmes et portées « niveau » référencent les nœuds, descendants compris ; personnel, planning et recette utilisateur | majeur | M |
 | FR-REF-03 | PARTIEL | SubjectController, UI/School/Subjects, SchoolReferencePanelTest ; utilisation par programmes au lot 2 et recette utilisateur | majeur | M |
-| FR-REF-04 | PARTIEL | CustomFieldController, SQL, UI/School/CustomFields, SchoolAdministrationPanelTest ; saisie des valeurs avec les dossiers du lot 2 | majeur | M |
-| FR-REF-05 | PARTIEL | CalendarController, UI/School/Years et Periods, SchoolReferencePanelTest ; clôture des dossiers futurs au lot 2 | majeur | M |
+| FR-REF-04 | PARTIEL | CustomFieldController, SQL, UI/School/CustomFields, SchoolAdministrationPanelTest ; PupilRecords et PupilRecordsTest : valeurs élève/responsable saisies par API, dates validées, champs sensibles masqués et protégés, valeurs omises conservées lors d'une modification partielle ; écrans métier à créer | majeur | M |
+| FR-REF-05 | PARTIEL | CalendarController, UI/School/Years et Periods, SchoolReferencePanelTest ; 021 : année close refusant programmes, groupes et inscriptions ; autres objets futurs | majeur | M |
 | FR-REF-06 | PARTIEL | SettingController, SQL, UI/School/Settings, SchoolAdministrationPanelTest ; logo, seuils finance et créneaux planning avec leurs lots | majeur | M |
-| FR-AUD-01 | PARTIEL | AuditController, SQL, ServicesTest, UI/School/Journal, SchoolAdministrationPanelTest : filtres et détail avant/après ; objets métier futurs | majeur | M |
+| FR-AUD-01 | PARTIEL | AuditController, SQL, ServicesTest, UI/School/Journal, SchoolAdministrationPanelTest : filtres et détail avant/après ; SQL 021 : objets du lot 2 journalisés, données personnelles masquées, entrées filtrées selon la portée de lecture de chaque objet ; objets des lots 3–4 | majeur | M |
 | FR-I18-01 | PARTIEL | Locales, lang/fr, lang/ar, LocalizationTest, PseudoLocalizationTest, acceptance-test : chaque écran du lot 1 en arabe, de droite à gauche, sans débordement sur ordinateur ni téléphone (AC1), captures en CI ; relecture des libellés arabes par un locuteur natif | majeur | S |
-| FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest, UI/School/Imports, SchoolServicesPanelTest : modèle, aperçu, rejets, confirmation, annulation ; import des entités du lot 2 | majeur | M |
+| FR-IMP-01 | PARTIEL | Imports, ImportController, ImportTest, UI/School/Imports, SchoolServicesPanelTest : modèle, aperçu, rejets, confirmation, annulation ; import des élèves, responsables et inscriptions du lot 2, dont les 500 élèves de référence (sortie du lot 2) | majeur | M |
 | FR-IMP-02 | PARTIEL | Exporter, ExportController, ExportTest, UI/School/Exports, SchoolServicesPanelTest ; jeux de données métier futurs | majeur | M |
 | FR-FIC-01 | PARTIEL | Files, FileController, FileTest, stockage S3 Garage du déploiement (smoke-test) ; interfaces métier des lots suivants | majeur | M |
 | FR-NOT-01 | PARTIEL | Outbox, NotificationController, ServicesTest, UI/School/Notifications et Deliveries, SchoolServicesPanelTest : compteur des non-lues, préférences, renvoi ; événements futurs | majeur | M |
 | FR-JOB-01 | PARTIEL | Tasks, WithinSchool, JobController, ServicesTest, UI/School/Tasks, SchoolServicesPanelTest : suivi, annulation, relance, téléchargement ; supervision d'exploitation | majeur | M |
 | FR-PDF-01 | PARTIEL | Pdf, vues/pdf, PdfTest ; modèles métier et recette visuelle arabe | majeur | M |
-| FR-ELV-01 | ABSENT | platform : fiche élève à créer au lot 2 | majeur | L |
-| FR-ELV-02 | ABSENT | platform : responsables et liens à créer au lot 2 | majeur | M |
-| FR-ELV-03 | ABSENT | platform : statuts et archivage des élèves | majeur | M |
-| FR-ELV-04 | ABSENT | platform : recherche et doublons des élèves | majeur | M |
+| FR-ELV-01 | PARTIEL | SQL 021, StudentController, PupilRecordsTest : création/lecture/modification sans photo, nom AR/latin, matricule immuable généré/importé, conflit de version, champs sensibles filtrés, audit ; écrans, historique agrégé et traitement des photos à créer | majeur | L |
+| FR-ELV-02 | PARTIEL | SQL 021, GuardianController, PupilRecordsTest : API responsables partagés par fratrie, liens versionnés et archivés avec motif ; contact principal avec téléphone requis à l'inscription d'un mineur ; écrans à créer, maintien du contact après inscription à compléter, lien au compte réservé au provisionnement | majeur | M |
+| FR-ELV-03 | PARTIEL | SQL 021/022, StudentController, PupilRecordsTest : transitions avec motif, avertissement et confirmation du blocage avec nombre d'inscriptions non annulées sans les modifier, ancien élève en lecture, archivage motivé ; écrans, détail des inscriptions selon droits et rétention OD-07 à compléter | majeur | M |
+| FR-ELV-04 | PARTIEL | PupilRecords, PupilRecordsTest : recherche normalisée par nom/matricule/téléphone et filtre naissance, pagination 25/100, suggestions sous portée, doublon contournable avec motif audité ; suggestion interalphabets fondée sur la même naissance sans translittération ni score de nom, rapprochement à affiner ; écrans et import à créer | majeur | M |
 | FR-CRM-01 | ABSENT | platform : prospects, pipeline et historique | majeur | M |
 | FR-CRM-02 | ABSENT | platform : conversion transactionnelle | majeur | M |
 | FR-SLL-01 | PARTIEL | SiteController, SQL, AuthorizationTest, UI/School/Sites, SchoolPublicPagesTest ; compléments lot 2 | majeur | M |
@@ -50,13 +50,13 @@ Abréviations de fichiers : **SQL** = `platform/database/schema/`, **API** = `pl
 | FR-STF-02 | ABSENT | platform : habilitations référencées | bloquant | M |
 | FR-STF-03 | ABSENT | platform : disponibilités et bornes | majeur | M |
 | FR-STF-04 | ABSENT | platform : contrats et congés | majeur | M |
-| FR-PRG-01 | ABSENT | platform : programmes et tarifs | majeur | L |
+| FR-PRG-01 | PARTIEL | SQL 021, ProgramController, AcademicWorkflowTest : API référentiel/année, durée, statut, prix décimaux transmis en chaînes sans arrondi, tarifs versionnés et historique paginé, refus d'inscription sur programme inactif ; écrans, matières et modèles d'échéancier avec lot 3 | majeur | L |
 | FR-PRG-02 | ABSENT | platform : matières, volumes et séances des programmes | majeur | L |
-| FR-GRP-01 | ABSENT | platform : groupes/classes | majeur | L |
-| FR-GRP-02 | ABSENT | platform : affectations, capacité concurrente, transferts | bloquant | L |
-| FR-INS-01 | ABSENT | platform : inscription idempotente et engagement figé | bloquant | L |
-| FR-INS-02 | ABSENT | platform : deux dimensions d'état | bloquant | M |
-| FR-INS-03 | ABSENT | platform : annulation, suspension et transfert | majeur | L |
+| FR-GRP-01 | PARTIEL | SQL 021, StudyGroupController, AcademicWorkflowTest : API groupes/classes par site/année, dates, statuts, versions, capacité non inférieure aux membres, fermeture conservant la composition ; écrans, salles et personnel à compléter | majeur | L |
+| FR-GRP-02 | PARTIEL | SQL 021, GroupMembershipController, AcademicWorkflowTest, tests/sql natifs : composition paginée, affectation/retrait/transfert motivé, un principal, capacité verrouillée (30 requêtes/25 places), transfert atomique avec historique et source conservée en cas de refus ; écrans, notifications, conflits planning et liste d'attente OD-14 à compléter | bloquant | L |
+| FR-INS-01 | PARTIEL | SQL 021, school.enroll, EnrollmentController, AcademicWorkflowTest : parcours API mineur → responsable → inscription → groupe → validation ; clé idempotente, prix/version/conditions figés, contrôles élève/programme/contact/quota, validation avec principal si requis ; écrans et facture/échéancier au lot 3 | bloquant | L |
+| FR-INS-02 | PARTIEL | SQL 021, EnrollmentController, AcademicWorkflowTest : API état pédagogique, historique paginé append-only, routes de validation/suspension/annulation avec permission propre, motif et version ; écrans et état financier calculé au lot 3 | bloquant | M |
+| FR-INS-03 | PARTIEL | SQL 021, EnrollmentController, AcademicWorkflowTest, tests/sql : motifs d'arrêt, inscription annulée immuable, places libérées, affectation concurrente refusée après annulation ; réponse de l'annulation conservée même si elle retire immédiatement la portée de lecture par groupe ; transfert de programme et traitement financier à créer | majeur | L |
 | FR-INS-04 | ABSENT | platform : politique d'accès liée au paiement | majeur | M |
 | FR-INS-05 | ABSENT | platform : passage annuel | majeur | L |
 | FR-FIN-01 | ABSENT | platform : échéanciers, remises et validations | bloquant | L |
@@ -95,22 +95,22 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | ID | Statut | Preuves et complément nécessaire | Risque | Effort |
 |---|---|---|---|---|
 | BR-01 | PARTIEL | SQL RLS, SchoolContext, SchoolIsolationTest ; étendre aux écrans et lots futurs | bloquant | M |
-| BR-02 | PARTIEL | SQL et tests : archivage ; tables métier futures | majeur | M |
-| BR-03 | ABSENT | Écritures financières et inscriptions annulées non créées | bloquant | L |
+| BR-02 | PARTIEL | SQL et tests : archivage ; SQL 021 : élèves, responsables, liens, programmes, groupes, inscriptions et affectations archivés ou clos, jamais supprimés (aucun droit DELETE), ancien élève en lecture ; tables des lots 3–4 | majeur | M |
+| BR-03 | PARTIEL | SQL 021, tests/sql : inscription annulée figée et historique conservé ; écritures financières au lot 3 | bloquant | L |
 | BR-04 | PARTIEL | Money : format en centimes ; arrondi métier avec finance | bloquant | M |
-| BR-05 | PARTIEL | Création tenant, jobs et imports idempotents ; opérations métier futures | bloquant | L |
-| BR-06 | PARTIEL | SchoolContext transactionnel ; transactions des lots suivants | bloquant | L |
-| BR-07 | ABSENT | Groupes et capacité concurrente au lot 2 | bloquant | L |
+| BR-05 | PARTIEL | Création tenant, jobs et imports idempotents ; `school.enroll` et EnrollmentController : clé d'idempotence d'inscription, doubles soumissions simultanées réduites à une (TST-08, tests/sql natifs), clé réutilisée pour une autre demande refusée ; écritures financières au lot 3 | bloquant | L |
+| BR-06 | PARTIEL | SchoolContext transactionnel ; SQL 021 : affectation et occupation du groupe dans la même transaction, transfert clôturant la source et ouvrant la cible ensemble, annulation libérant les places ; paiement et solde au lot 3 | bloquant | L |
+| BR-07 | PARTIEL | SQL 021, tests/sql natifs et AcademicWorkflowTest : verrou du groupe, 30 requêtes simultanées pour 25 places, baisse de capacité sous l'effectif refusée, refus API explicites et transfert annulé sans perte de la source ; écrans à créer | bloquant | L |
 | BR-08 | PARTIEL | SQL check_segregation, tests ; tables d'approbation futures | bloquant | M |
-| BR-09 | PARTIEL | SQL audit append-only et API ; événements métier futurs | majeur | M |
-| BR-10 | PARTIEL | SQL rôles/assignations ; tarifs, groupes et rémunérations futurs | majeur | M |
-| BR-11 | ABSENT | Engagement d'inscription au lot 2 | bloquant | M |
-| BR-12 | ABSENT | Inscription au lot 2, financier au lot 3 | bloquant | M |
-| BR-13 | PARTIEL | SQL référentiel et portées ; dossiers métier futurs | majeur | M |
+| BR-09 | PARTIEL | SQL audit append-only et API ; SQL 021 : dossiers élèves, responsables, inscriptions, groupes et affectations journalisés avec auteur et motif, historique d'état d'inscription en ajout seul ; notes, paiements, salaires et planning futurs | majeur | M |
+| BR-10 | PARTIEL | SQL rôles/assignations ; SQL 021 : groupes et affectations datés, tarifs versionnés sans réécriture ; volumes de programme (FR-PRG-02) et rémunérations futurs | majeur | M |
+| BR-11 | PARTIEL | SQL 021, tests/sql, AcademicWorkflowTest : prix/version/conditions copiés et immuables malgré un nouveau tarif, maximum NUMERIC(14,2) préservé dans la réponse API et son instantané ; remises/échéanciers au lot 3 | bloquant | M |
+| BR-12 | PARTIEL | SQL 021, EnrollmentController, AcademicWorkflowTest : état pédagogique et historique, aucune saisie d'état financier ; calcul financier au lot 3 | bloquant | M |
+| BR-13 | PARTIEL | SQL référentiel et portées ; SQL 021 : programme lié à un nœud du référentiel de l'école, jamais d'une autre ni archivé (TST-18), niveau des groupes et inscriptions hérité du programme ; matières des programmes et personnel futurs | majeur | M |
 | BR-14 | ABSENT | Notes, appel et pointage futurs | majeur | M |
 | BR-15 | ABSENT | Clôture financière au lot 3 | bloquant | L |
-| BR-16 | PARTIEL | Refus SQL explicites, DatabaseErrors ; invariants métier futurs | bloquant | L |
-| BR-17 | PARTIEL | Tokens hachés, messages sans SQL ; rétention et anonymisation absentes | majeur | L |
+| BR-16 | PARTIEL | Refus SQL explicites, DatabaseErrors ; SQL 021 et AcademicWorkflowTest : capacité, quota, contact principal, élève bloqué, programme inactif, année close et portée refusés avec message FR/AR, jamais assouplis ; conflits de planning et séparation des validations aux lots 3–4 | bloquant | L |
+| BR-17 | PARTIEL | Tokens hachés, messages sans SQL ; SQL 021 : noms, coordonnées, matricule et champs propres des élèves et responsables masqués dans le journal, champs sensibles filtrés par permission (PupilRecordsTest) ; rétention et anonymisation absentes (OD-07) | majeur | L |
 | BR-18 | PARTIEL | Codes SQL immuables, labels FR/AR de tous les catalogues de la plateforme (017) et rôles copiés ; futurs catalogues | majeur | M |
 | BR-19 | PARTIEL | Notifications sans détails sensibles ; publication planning future | majeur | M |
 | BR-20 | PARTIEL | RequireModule, Permissions, jobs, menu des sites absent sans son module (SchoolPublicPagesTest) ; menus et calculs des modules futurs | bloquant | M |
@@ -121,7 +121,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 |---|---|---|---|---|
 | NFR-PERF-01 | ABSENT | Test de charge et mesures p95 à produire | majeur | L |
 | NFR-PERF-02 | ABSENT | Scénario mixte et environnement de mesure à documenter | majeur | M |
-| NFR-PERF-03 | PARTIEL | Coût du contexte signé mesuré sur deux écoles de 25 000 lignes (`platform/tests/sql/context-cost.mjs`) : une page de 25 avec son total en 5 ms au lieu de 80 s ; politiques lisant le contexte une fois par requête (tests/sql) ; 50 tenants/25 000 élèves à mesurer après lot 2 | majeur | L |
+| NFR-PERF-03 | PARTIEL | Coût du contexte signé mesuré sur deux écoles de 25 000 lignes (`platform/tests/sql/context-cost.mjs`) : une page de 25 avec son total en 5 ms au lieu de 80 s ; politiques lisant le contexte une fois par requête (tests/sql) ; non mesuré : les portées restreintes du lot 2 (site, niveau, groupe, personnelle) recalculent à chaque requête la liste des objets visibles sur toute l'école (`school.core_ids`), puis la comparent ligne à ligne ; à mesurer pour un lecteur restreint dans une école de 2 000 élèves, avant les écrans ; 50 tenants/25 000 élèves après lot 2 | majeur | L |
 | NFR-PERF-04 | PARTIEL | Jobs et exports > 2 000 en arrière-plan ; listes qui grandissent paginées (25 par défaut, 100 au plus) dans l'API et à l'écran (Paging, PagingTest) ; mesures de charge avec le lot 2 | majeur | S |
 | NFR-PERF-05 | ABSENT | Poids compressé des pages à mesurer | mineur | M |
 | NFR-SEC-01 | PARTIEL | Proxy Caddy : HTTPS seul, HSTS, cookies sécurisés, proxys de confiance (platform/compose.yaml, smoke-test) ; TLS entre conteneurs non requis sur le réseau privé, à revoir en multi-hôte | majeur | S |
@@ -134,7 +134,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-SEC-08 | PARTIEL | `composer audit --locked` dans la CI à chaque envoi (job PHP de platform) ; images Docker pas encore analysées | mineur | S |
 | NFR-SEC-09 | PARTIEL | Sauvegardes de platform chiffrées (GnuPG AES-256), phrase secrète hors des archives, contrôles d'intégrité (platform/docker/backup) ; copie hors site à organiser par l'exploitant | majeur | S |
 | NFR-TEN-01 | PARTIEL | SQL, deploy/roles.sql, tests ; RLS forcée vérifiée sur toute table `school`, présente et future, et sur les personnes (`public.users`, lues par leur école seulement) ; fonctions fermées à PUBLIC (tests/sql, revue de sécurité) ; base, Redis (avec mot de passe) et stockage sur un réseau interne hors de portée du proxy (smoke-test) ; revalider pour les tables des lots suivants | bloquant | S |
-| NFR-TEN-02 | PARTIEL | SchoolIsolationTest, LotOneWalkthroughTest (deux établissements, API et écrans), fichiers/exports/jobs, SchoolPanelTest, SchoolReferencePanelTest ; étendre aux écrans des lots suivants | bloquant | M |
+| NFR-TEN-02 | PARTIEL | SchoolIsolationTest, LotOneWalkthroughTest (deux établissements, API et écrans), fichiers/exports/jobs, SchoolPanelTest, SchoolReferencePanelTest ; PupilRecordsTest et AcademicWorkflowTest : identifiants et références d'une autre école refusés par les API du lot 2 ; étendre aux écrans des lots suivants | bloquant | M |
 | NFR-TEN-03 | PARTIEL | CurrentSchool, WithinSchool, Files ; déploiement et prochains modules | bloquant | M |
 | NFR-AVL-01 | ABSENT | SLO et mesure d'exploitation à contractualiser | majeur | M |
 | NFR-REC-01 | PARTIEL | Sauvegarde quotidienne de la base, du bucket et de la clé, 14 conservées, santé du service (DEPLOY.md) ; copie hors site et RPO à valider en exploitation | bloquant | S |
@@ -159,7 +159,7 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 | NFR-PORT-01 | PARTIEL | Image Docker et Compose de platform (app, worker, scheduler, migrations, PostgreSQL, Redis, Garage, Caddy) ; hébergement réel à valider | majeur | S |
 | NFR-PORT-02 | PARTIEL | Socle PHP/SQL sans GPU ; vérifier futurs processus | mineur | S |
 | NFR-MNT-01 | PARTIEL | CI SQL/PHP/migrations ; analyse statique et audit dépendances à ajouter | majeur | M |
-| NFR-MNT-02 | PARTIEL | Tests des invariants fondations ; lots 2–4 non réalisés | bloquant | L |
+| NFR-MNT-02 | PARTIEL | Invariants des fondations, schéma et premier parcours API du lot 2 testés, dont portées par action, précision des prix, capacité, idempotence, quota et annulation concurrents ; écrans, reste du lot 2 et lots 3–4 à réaliser | bloquant | L |
 | NFR-MNT-03 | PARTIEL | platform/README ; guides API/administration/exploitation à compléter | majeur | M |
 | NFR-MNT-04 | PARTIEL | Migrations et profils versionnés ; paramètres de calcul au lot 3 | majeur | M |
 
@@ -182,7 +182,11 @@ Les lots 5–10 n'ont pas encore d'identifiants FR détaillés : LMS, optimisati
 15. **Lot 2, incrément 27 livré** : contexte de requête (école, personne, consentement, requête, adresse) signé par HMAC avec une clé dérivée de celle de l'application, que seule la fonction de vérification lit ; la base refuse un contexte forgé, modifié, signé pour une autre connexion ou avant sa transaction (constat F7). Coût mesuré : politiques et fonctions lisent le contexte une fois par requête ; une page de 25 matières parmi 25 000 passe de 80 s à 5 ms.
 16. **Lot 2, incrément 28 livré** : RLS sur `public.users` (reste de F2) : l'application d'une école lit la personne de la requête et, dans l'école atteinte, ses membres et les opérateurs de l'éditeur ; personne hors contexte ; chacun ne change que sa propre langue. Connexion et console lisent la personne dans un contexte à elle, annulé aussitôt. Une page de 25 parmi 25 000 personnes : 84 ms au lieu de 32.
 17. **Lot 2, incrément 29 livré** : version d'Alpine sans évaluation essayée sous une politique sans `'unsafe-eval'` (reste de F4) : 104 écrans sur 108 en échec, tous sur le balisage de Filament 5.10 ; `'unsafe-eval'` maintenu, essai rejouable (`PLATFORM_CSP_STRICT`) à chaque mise à jour de Filament ; balisage de la plateforme prêt ; garde-fous testés (aucun HTML brut, assainisseur sans attributs Alpine).
-18. **Lot 2, suite** : schéma, RLS et invariants TST-03/07/08/18, puis dossiers et parcours élève → inscription → groupe ; import des 500 élèves.
-19. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
-20. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
-21. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.
+18. **Lot 2, incrément 30 livré** : schéma 021, RLS et invariants des élèves/responsables/programmes/groupes/inscriptions ; TST-07/08 en concurrence, référentiel TST-18, portées explicites et liens personnels de TST-03. Matricules générés/importés immuables, tarifs versionnés et engagement figé, groupe principal unique, transfert atomique, annulation libérant les places, quota élèves concurrent, journal masqué et filtré par ressource. Les créations de dossiers non liés exigent encore une portée tenant ; les portées implicites des enseignants et les matières restent à compléter. Migration et retour arrière testés ; 183 contrôles SQL embarqués, 194 natifs et 168 tests PHP.
+19. **Lot 2, incrément 31 livré** : 15 routes élèves/responsables et liens familiaux, derrière permissions et module `students_crm` ; recherche paginée, avertissement de doublon avec motif audité, versions optimistes, statuts motivés et archivage des anciens. Les champs personnalisés sensibles suivent leur propre portée et restent conservés lors d'une modification partielle ; les permissions mises en cache ne survivent pas à la requête. La fonction SQL 022 ne divulgue que le nombre d'inscriptions pour confirmer un blocage, y compris sans droit de lecture des inscriptions, et ne les modifie pas. Neuf tests API supplémentaires et matrice des accès actualisée. Créations et mutations des liens familiaux limitées à la portée tenant ; rapprochement interalphabets conservateur par date, sans translittération.
+20. **Lot 2, incrément 32 livré** : 20 routes programmes/groupes/inscriptions/composition derrière le module `enrollment_groups` et chaque permission. Parcours API élève mineur → responsable → inscription → groupe → validation ; recherche et listes/historiques paginés, prix exacts en chaînes décimales, tarifs versionnés, instantané contractuel conservé, clé idempotente, transitions motivées avec version. Affectation, retrait et transfert atomique avec historique ; capacité/éligibilité/clôture vérifiées en SQL et refus FR/AR explicites. Huit tests supplémentaires couvrent aussi les portées par action, les références interécoles, les modules et une annulation qui retire la portée de lecture. Créations et transferts de groupe limités à la portée tenant ; aucune nouvelle migration.
+21. **Lot 2, prochaine étape** : mesurer le coût des portées restreintes (NFR-PERF-03) pour un lecteur limité à un site, un niveau, des groupes ou à lui-même, dans une école de 2 000 élèves, et le corriger s'il le faut, avant les écrans.
+22. **Lot 2, suite** : écrans des dossiers/programmes/groupes et parcours élève → inscription → groupe ; photos, import des 500 élèves, rapprochement interalphabets et créations sous portée restreinte ; maintien du contact principal d'un mineur après inscription et rétention OD-07. Compléter matières/volumes, personnel/habilitations et portées implicites enseignant/remplaçant (reste de TST-03), salles, CRM/conversion, notifications de composition, transfert de programme, accès pédagogique et passage annuel.
+23. **Lot 3** : TST-09–13/19 avant écrans ; centimes exacts, idempotence, séparation, immutabilité, clôture et rapprochement des versements.
+24. **Lot 4** : TST-05/15/16 avant écrans ; exclusions concurrentes, publication, remplacements, pointage validé et indicateurs rapprochables.
+25. **Lots 5–10** : détailler les exigences et décisions ouvertes avant leur réalisation. Les décisions métier/juridiques du SRS restent à obtenir auprès de leurs responsables.

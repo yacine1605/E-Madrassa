@@ -22,6 +22,11 @@ final class DatabaseErrors
         'custom_field_limit', 'custom_value_invalid', 'custom_value_required', 'custom_field_unknown', 'profile_unknown',
         'profile_mismatch', 'profile_published', 'job_finished', 'not_failed', 'tenant_required', 'file_type_refused', 'file_too_large',
         'dependent_operation', 'storage_quota_exceeded',
+        'student_former', 'birth_date_future', 'status_transition_refused', 'matricule_exhausted',
+        'node_archived', 'group_closed', 'program_other_year', 'capacity_below_members', 'enrollment_cancelled',
+        'main_group_required', 'program_not_active', 'student_blocked', 'primary_contact_required', 'student_quota_exceeded',
+        'membership_ended', 'enrollment_not_assignable', 'group_not_active', 'group_other_year', 'group_other_program',
+        'outside_group_dates', 'group_full', 'idempotency_key_reused',
     ];
 
     public static function message(string $rule): string
