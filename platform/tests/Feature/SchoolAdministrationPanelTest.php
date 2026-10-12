@@ -6,7 +6,6 @@ use App\Filament\School\Pages\CustomFields;
 use App\Filament\School\Pages\Journal;
 use App\Filament\School\Pages\Settings;
 use App\Filament\School\Pages\SupportAccess;
-use App\Models\User;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +26,7 @@ final class SchoolAdministrationPanelTest extends TestCase
 
     private function within(object $school, array $account, callable $test): void
     {
-        $this->actingAs(User::findOrFail($account['id']));
+        $this->actingAs($this->person($account));
         $this->withSession(['school.tenant' => $school->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
         Filament::setCurrentPanel(Filament::getPanel('school'));
         DB::transaction(function () use ($school, $account, $test) {
@@ -136,7 +135,7 @@ final class SchoolAdministrationPanelTest extends TestCase
         DB::connection('owner')->insert('INSERT INTO platform.operator (user_id) VALUES (?)', [$operator['id']]);
         $grant = $this->postJson('/api/support-grants', ['hours' => 2, 'reason' => 'Assistance paramètres'])->assertCreated()->json('data.id');
         $this->deleteJson('/api/session');
-        $this->actingAs(User::findOrFail($operator['id']));
+        $this->actingAs($this->person($operator));
         $this->withSession(['auth.started_at' => time(), 'auth.seen_at' => time()]);
         $this->postJson('/api/support/session', ['tenant_id' => $school->id, 'grant_id' => $grant])->assertNoContent();
         $this->get('/school/support-access')->assertOk()->assertSee('Assistance paramètres')->assertDontSee(__('admin.grant'))->assertDontSee(__('admin.revoke'));

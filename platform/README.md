@@ -420,10 +420,21 @@ A check of the signature costs about 13 µs, where reading a setting cost nothin
 
 Deployments need nothing new: the key comes from the application's (DEPLOY.md). A connection pooler in transaction mode cannot sit between the application and the database, since a context is signed for one connection.
 
+## Increment 28 (lot 2): people apart
+
+The rest of finding F2 is closed. A school's application read every person's name and email, in every school; row-level security now confines `public.users` (`020_people.sql`). It reads the person of the request and, in the school the request reaches, its members, whatever their state, and the publisher's operators, whom the school's journal names (`school.people`). Outside a school it reads the person alone; without a context, nobody. A person changes their own language only; an administrator changes the others' accounts through the school's functions, as before.
+
+The person signed in is read before any school, in a context of their own that the application rolls back at once, so that it never replaces the context around it (`DatabaseContext::reading`). The user provider reads that way every person it loads (`CredentialsUserProvider`), the console's sign-in finds the person by email through `platform.find_login`, and the recovery's email takes the person's language from `platform.issue_recovery`. The sign-in's role, `platform_auth`, still reads the credentials of whoever signs in.
+
+Each person is checked by an index as their row is read. On one school of 25 000 people, a page of 25 with its count takes 84 ms instead of 32 (`tests/sql/context-cost.mjs`); NFR-PERF-01 allows 800 ms.
+
+| Requirement | Evidence |
+|---|---|
+| NFR-SEC-04, NFR-TEN-01 | SQL suite, Security review: the people of the school and the operators, the person alone outside a school, nobody without a context, one's own language only. `SchoolIsolationTest`: another school's person and a stranger unseen, the accounts' screen unchanged. `ConsoleTest`: the console's sign-in finds the operator by email |
+
 ## Next increments of lot 2
 
-1. **F2, the rest**: now that the person is signed, row-level security on people, so that a school's application reads only its own school's people.
-2. **F4, the rest**: Livewire's CSP-safe build of Alpine, tried on every Filament component with its interactions, to remove `'unsafe-eval'`.
-3. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
+1. **F4, the rest**: Livewire's CSP-safe build of Alpine, tried on every Filament component with its interactions, to remove `'unsafe-eval'`.
+2. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

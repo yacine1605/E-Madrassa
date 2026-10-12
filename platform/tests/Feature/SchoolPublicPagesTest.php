@@ -6,7 +6,6 @@ use App\Filament\School\Pages\Activation;
 use App\Filament\School\Pages\Recovery;
 use App\Filament\School\Pages\Sites;
 use App\Mail\AccountLink;
-use App\Models\User;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +96,7 @@ final class SchoolPublicPagesTest extends TestCase
         $this->get('/school/sites')->assertOk()->assertSee('Site principal');
         $main = DB::connection('owner')->table('school.site')->where('tenant_id', $school->id)->value('id');
         $within = function (callable $test) use ($school, $admin) {
-            $this->actingAs(User::findOrFail($admin['id']));
+            $this->actingAs($this->person($admin));
             $this->withSession(['school.tenant' => $school->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
             Filament::setCurrentPanel(Filament::getPanel('school'));
             DB::transaction(function () use ($school, $admin, $test) {

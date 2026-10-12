@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Filament\Console\Resources\TenantResource\Pages\ListTenants;
 use App\Models\Console\Tenant;
-use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +35,7 @@ final class SupportTest extends TestCase
     private function asOperator(array $operator): void
     {
         $this->deleteJson('/api/session');
-        $this->actingAs(User::query()->findOrFail($operator['id']));
+        $this->actingAs($this->person($operator));
         $this->withSession(['auth.started_at' => now()->getTimestamp(), 'auth.seen_at' => now()->getTimestamp()]);
     }
 

@@ -41,8 +41,7 @@ final class AccountLinkController
     {
         $data = $request->validate(['email' => 'required|email|max:200']);
         [$token, $hash] = AccountLinks::token();
-        $person = DB::selectOne('SELECT r.email, r.name, u.locale FROM platform.issue_recovery(?, ?) r LEFT JOIN public.users u ON u.id = r.user_id',
-            [$data['email'], $hash]);
+        $person = DB::selectOne('SELECT email, name, locale FROM platform.issue_recovery(?, ?)', [$data['email'], $hash]);
         // In the person's own language, else in the language of the page that asked.
         if ($person) AccountLinks::queue('recovery', $person->email, $person->name, $token, Locales::usable($person->locale ?? app()->getLocale()));
         return response()->json(['message' => __('messages.recovery_sent')], 202);

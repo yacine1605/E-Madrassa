@@ -22,10 +22,8 @@ final class CredentialController
     {
         $user = $request->user();
         // The person's usernames in their schools; their own memberships are visible to them.
-        $username = DB::transaction(function () use ($user) {
-            app(DatabaseContext::class)->enter(null, $user->id);
-            return DB::selectOne("SELECT string_agg(username, ' ') AS u FROM school.membership WHERE user_id = ?", [$user->id])->u;
-        });
+        $username = app(DatabaseContext::class)->reading(null, $user->id,
+            fn () => DB::selectOne("SELECT string_agg(username, ' ') AS u FROM school.membership WHERE user_id = ?", [$user->id])->u);
         $data = $request->validate([
             'current_password' => 'required|string|max:200',
             'password' => ['required', 'string', 'confirmed', 'different:current_password', new StrongPassword([$user->name, $user->email, $username])],

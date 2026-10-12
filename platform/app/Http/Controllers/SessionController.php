@@ -8,6 +8,7 @@ use App\Support\Credentials;
 use App\Support\LoginThrottle;
 use App\Support\MultiFactor;
 use App\Support\SchoolMemberships;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -36,7 +37,7 @@ final class SessionController
         if ($wait = $throttle->wait($key, $request->ip())) return $this->locked($wait);
 
         $id = DB::selectOne('SELECT platform.find_login(?, ?) AS id', [$data['login'], $school])->id;
-        $user = $id ? User::find($id) : null;
+        $user = $id ? $this->person($id) : null;
         $hash = $user ? $this->credentials->passwordHash($user->id) : null;
         // The same work and the same answer whether the account exists, has no password yet, or the password is wrong.
         $valid = Hash::check($data['password'], $hash ?: (self::$decoy ??= Hash::make(Str::random(40))));
@@ -63,7 +64,7 @@ final class SessionController
             $request->session()->forget('auth.pending');
             return Refusal::response('mfa_expired', 401);
         }
-        $user = User::findOrFail($pending['user']);
+        $user = $this->person($pending['user']) ?? throw (new ModelNotFoundException())->setModel(User::class);
         $key = 'mfa|'.$user->id;
         if ($wait = $throttle->wait($key, $request->ip())) return $this->locked($wait);
         $ok = isset($data['code']) ? $mfa->verify($user, $data['code']) : $mfa->useRecoveryCode($user, $data['recovery_code']);
@@ -120,6 +121,12 @@ final class SessionController
     private function locked(int $seconds): JsonResponse
     {
         return Refusal::response('too_many_attempts', 429)->header('Retry-After', (string) $seconds);
+    }
+
+    /** The person before any school: read in their own context (SECURITY-REVIEW.md, F2). */
+    private function person(int $id): ?User
+    {
+        return Auth::guard('web')->getProvider()->retrieveById($id);
     }
 
     /** The schools this user may open; a dedicated installation offers only its own. */

@@ -159,6 +159,28 @@ final class SchoolIsolationTest extends TestCase
         (new CurrentSchool(app(DatabaseContext::class)))->cacheKey('menu');
     }
 
+    /** SECURITY-REVIEW.md, F2: a school's application reads its own people, not another school's, nor strangers. */
+    public function test_a_school_reads_its_own_people_only(): void
+    {
+        [$a, $b] = [$this->school(), $this->school()];
+        [$admin, $colleague, $other, $stranger] = [$this->account('admin'), $this->account('colleague'), $this->account('other'), $this->account('stranger')];
+        $this->member($a, $admin, 'active', ['tenant_admin']);
+        $this->member($a, $colleague, 'suspended');
+        $this->member($b, $other);
+        $ids = [$admin['id'], $colleague['id'], $other['id'], $stranger['id']];
+        $seen = fn (?string $tenant, int $user) => DB::transaction(function () use ($tenant, $user, $ids) {
+            app(DatabaseContext::class)->enter($tenant, $user);
+            return array_map('intval', array_column(DB::select('SELECT id FROM public.users WHERE id = ANY (?::bigint[]) ORDER BY id',
+                ['{'.implode(',', $ids).'}']), 'id'));
+        });
+        $this->assertSame([$admin['id'], $colleague['id']], $seen($a->id, $admin['id']));
+        // Before a school, the person alone.
+        $this->assertSame([$stranger['id']], $seen(null, $stranger['id']));
+        // The screens still name the school's people.
+        $this->signIn($admin);
+        $this->getJson('/api/accounts')->assertOk()->assertJsonFragment(['name' => 'colleague'])->assertJsonMissing(['name' => 'other']);
+    }
+
     public function test_the_console_cannot_read_school_data(): void
     {
         $this->school();

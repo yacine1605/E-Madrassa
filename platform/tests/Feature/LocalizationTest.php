@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Mail\AccountLink;
-use App\Models\User;
 use App\Support\Formats;
 use App\Support\Money;
 use Filament\Facades\Filament;
@@ -98,7 +97,7 @@ final class LocalizationTest extends TestCase
             && str_contains($mail->render(), 'مرحبًا Karim') && str_contains($mail->render(), 'خلال 72 ساعة'));
         // A recovery link: the person's own language.
         $reader = $this->account('reader', false);
-        User::query()->findOrFail($reader['id'])->forceFill(['locale' => 'ar'])->save();
+        $this->speaks($reader, 'ar');
         $this->deleteJson('/api/session');
         $this->postJson('/api/recovery/request', ['email' => $reader['email']])->assertStatus(202);
         Mail::assertQueued(AccountLink::class, fn (AccountLink $mail) => $mail->purpose === 'recovery' && $mail->locale === 'ar');
@@ -120,15 +119,14 @@ final class LocalizationTest extends TestCase
     {
         $operator = $this->account('operator');
         DB::connection('owner')->insert('INSERT INTO platform.operator (user_id) VALUES (?)', [$operator['id']]);
-        $user = User::query()->findOrFail($operator['id']);
-        $user->forceFill(['locale' => 'ar'])->save();
+        $user = $this->speaks($operator, 'ar');
         $this->actingAs($user);
         $this->withSession(['auth.started_at' => now()->getTimestamp(), 'auth.seen_at' => now()->getTimestamp()]);
         Filament::setCurrentPanel(Filament::getPanel('console'));
         $this->get('/console/tenants')->assertOk()->assertSee('dir="rtl"', false)->assertSee(__('console.tenant.models', [], 'ar'))
             ->assertDontSee(__('console.tenant.models', [], 'fr'));
         $this->post('/console/locale/fr')->assertRedirect();
-        $this->assertSame('fr', $user->fresh()->locale);
+        $this->assertSame('fr', $this->person($operator)->locale);
         $this->get('/console/tenants')->assertOk()->assertSee('dir="ltr"', false)->assertSee(__('console.tenant.models', [], 'fr'));
         $this->post('/console/locale/en')->assertNotFound();
     }

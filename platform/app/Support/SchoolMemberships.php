@@ -10,10 +10,8 @@ final class SchoolMemberships
 {
     public function forUser(int $user): Collection
     {
-        $schools = collect(DB::transaction(function () use ($user) {
-            app(DatabaseContext::class)->enter(null, $user);
-            return DB::select('SELECT tenant_id, slug, name, default_locale, mode FROM school.my_schools()');
-        }));
+        $schools = collect(app(DatabaseContext::class)->reading(null, $user,
+            fn () => DB::select('SELECT tenant_id, slug, name, default_locale, mode FROM school.my_schools()')));
         $pinned = config('platform.dedicated_school');
         return $pinned ? $schools->where('slug', $pinned)->values() : $schools;
     }

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Mail\AccountLink;
 use App\Mail\NotificationMail;
-use App\Models\User;
 use App\Support\DatabaseErrors;
 use App\Support\Locales;
 use DOMDocument;
@@ -94,7 +93,7 @@ final class PseudoLocalizationTest extends TestCase
         $operator = $this->account('operator');
         DB::connection('owner')->insert('INSERT INTO platform.operator (user_id) VALUES (?)', [$operator['id']]);
         $school = $this->school('essential', null, 'private_school_dz');
-        $this->actingAs(User::query()->findOrFail($operator['id']));
+        $this->actingAs($this->person($operator));
         $this->withSession(['auth.started_at' => now()->getTimestamp(), 'auth.seen_at' => now()->getTimestamp()]);
         Filament::setCurrentPanel(Filament::getPanel('console'));
         // What the pages may show as it is: the data, and each language's own name.

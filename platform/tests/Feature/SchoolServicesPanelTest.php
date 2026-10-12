@@ -7,7 +7,6 @@ use App\Filament\School\Pages\Exports;
 use App\Filament\School\Pages\Imports;
 use App\Filament\School\Pages\Notifications;
 use App\Filament\School\Pages\Tasks;
-use App\Models\User;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
@@ -40,7 +39,7 @@ final class SchoolServicesPanelTest extends TestCase
 
     private function within(object $school, array $account, callable $test): void
     {
-        $this->actingAs(User::findOrFail($account['id']));
+        $this->actingAs($this->person($account));
         $this->withSession(['school.tenant' => $school->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
         Filament::setCurrentPanel(Filament::getPanel('school'));
         DB::transaction(function () use ($school, $account, $test) {
@@ -152,7 +151,7 @@ final class SchoolServicesPanelTest extends TestCase
         DB::connection('owner')->insert('INSERT INTO platform.operator (user_id) VALUES (?)', [$operator['id']]);
         $grant = $this->postJson('/api/support-grants', ['hours' => 2, 'reason' => 'Assistance import'])->assertCreated()->json('data.id');
         $this->deleteJson('/api/session');
-        $this->actingAs(User::findOrFail($operator['id']));
+        $this->actingAs($this->person($operator));
         $this->withSession(['auth.started_at' => time(), 'auth.seen_at' => time()]);
         $this->postJson('/api/support/session', ['tenant_id' => $school->id, 'grant_id' => $grant])->assertNoContent();
         $this->get('/school/imports')->assertOk()->assertDontSee(__('services.new_import'));

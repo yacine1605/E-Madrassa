@@ -41,7 +41,8 @@ final class PlatformServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Auth::provider('credentials', fn ($app, array $config) => new CredentialsUserProvider($app['hash'], $config['model'], $app->make(Credentials::class)));
+        Auth::provider('credentials', fn ($app, array $config) => new CredentialsUserProvider($app['hash'], $config['model'],
+            $app->make(Credentials::class), $app->make(DatabaseContext::class)));
         // Flood limits before sign-in (NFR-SEC-05); the lockout of FR-IAM-02 is LoginThrottle's.
         RateLimiter::for('public', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
         RateLimiter::for('recovery', fn (Request $request) => [

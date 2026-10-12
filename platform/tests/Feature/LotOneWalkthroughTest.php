@@ -6,7 +6,6 @@ use App\Filament\Console\Resources\TenantResource\Pages\CreateTenant;
 use App\Filament\Console\Resources\TenantResource\Pages\ListTenants;
 use App\Mail\AccountLink;
 use App\Models\Console\Tenant;
-use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -38,7 +37,7 @@ final class LotOneWalkthroughTest extends TestCase
     private function inConsole(): void
     {
         $this->deleteJson('/api/session');
-        $this->actingAs(User::findOrFail($this->operator['id']));
+        $this->actingAs($this->person($this->operator));
         $this->withSession(['auth.started_at' => time(), 'auth.seen_at' => time()]);
         Filament::setCurrentPanel(Filament::getPanel('console'));
     }

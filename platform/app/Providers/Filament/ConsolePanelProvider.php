@@ -7,6 +7,7 @@ use App\Filament\Console\Pages\ConsoleLogin;
 use App\Filament\Console\Pages\Supervision;
 use App\Http\Middleware\AccountState;
 use App\Http\Middleware\Localize;
+use App\Support\DatabaseContext;
 use App\Support\InitialsAvatar;
 use App\Support\Locales;
 use Filament\Actions\Action;
@@ -56,7 +57,8 @@ final class ConsolePanelProvider extends PanelProvider
             ->authenticatedRoutes(function () {
                 Route::post('locale/{locale}', function (Request $request, string $locale) {
                     abort_unless(in_array($locale, Locales::AVAILABLE, true), 404);
-                    $request->user()->forceFill(['locale' => $locale])->save();
+                    $user = $request->user();
+                    app(DatabaseContext::class)->acting($user->id, fn () => $user->forceFill(['locale' => $locale])->save());
                     $request->session()->forget('locale');
                     return redirect()->back();
                 })->name('locale');

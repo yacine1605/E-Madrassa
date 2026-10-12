@@ -7,7 +7,6 @@ use App\Filament\School\Pages\ReferenceNodes;
 use App\Filament\School\Pages\ReferenceTypes;
 use App\Filament\School\Pages\Subjects;
 use App\Filament\School\Pages\Years;
-use App\Models\User;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +28,7 @@ final class SchoolReferencePanelTest extends TestCase
 
     private function within(object $school, array $account, callable $test): void
     {
-        $this->actingAs(User::findOrFail($account['id']));
+        $this->actingAs($this->person($account));
         $this->withSession(['school.tenant' => $school->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
         Filament::setCurrentPanel(Filament::getPanel('school'));
         DB::transaction(function () use ($school, $account, $test) {

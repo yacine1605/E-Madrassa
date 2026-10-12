@@ -36,6 +36,46 @@ final class DatabaseContext
     }
 
     /**
+     * Reads in this context alone, in a transaction, or a savepoint of the current one, rolled
+     * back afterwards: the context around it comes back unchanged. For what precedes a school's
+     * request: the person signed in, their schools and memberships, a support consent.
+     *
+     * @template T
+     * @param callable(): T $read
+     * @return T
+     */
+    public function reading(?string $tenant, int $user, callable $read, ?string $support = null): mixed
+    {
+        DB::beginTransaction();
+        try {
+            $this->enter($tenant, $user, $support);
+            return $read();
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    /**
+     * Works as the person alone, in a transaction, or a savepoint of the current one, that is
+     * kept: for what a person changes of their own before any school, their language. The
+     * context around it, if any, is set again afterwards; a failure rolls it back by itself.
+     *
+     * @template T
+     * @param callable(): T $work
+     * @return T
+     */
+    public function acting(int $user, callable $work): mixed
+    {
+        $around = DB::transactionLevel() > 0 ? DB::selectOne("SELECT current_setting('app.context', true) AS c")->c : null;
+        $result = DB::transaction(function () use ($user, $work) {
+            $this->enter(null, $user);
+            return $work();
+        });
+        if ($around !== null) DB::select("SELECT set_config('app.context', ?, true)", [$around]);
+        return $result;
+    }
+
+    /**
      * Derived from the application key, which never reaches the database; `platform:roles` gives
      * the database this one. A new application key gives a new one at the next deployment.
      */

@@ -1090,7 +1090,29 @@ await check("a school's application reads no password, MFA secret or recovery co
   await rejects('UPDATE public.users SET mfa_secret = NULL, mfa_enabled_at = NULL WHERE id = 1', [], '42501');
   await rejects('DELETE FROM public.mfa_recovery_code WHERE user_id = 1', [], '42501');
   // What it needs: who the person is, whether they have chosen a password, their language.
-  assert.deepEqual(await first('SELECT name, has_password FROM public.users WHERE id = 3'), { name: 'Person 3', has_password: true });
+  assert.deepEqual(await first('SELECT name, has_password FROM public.users WHERE id = 4'), { name: 'Person 4', has_password: true });
+});
+await check("a school's application reads the person, and in its school its people and the publisher's operators; nobody else (F2)", async () => {
+  const seen = async () => (await sql('SELECT id::int AS id FROM public.users ORDER BY id')).rows.map(r => r.id);
+  await as(null);
+  const school = (await sql(`SELECT id::int AS id FROM public.users WHERE id IN (SELECT user_id FROM school.membership WHERE tenant_id = $1)
+    OR id IN (SELECT user_id FROM platform.operator) ORDER BY id`, [a])).rows.map(r => r.id);
+  const elsewhere = (await sql(`SELECT id::int AS id FROM public.users WHERE id IN (SELECT user_id FROM school.membership WHERE tenant_id = $1)
+    AND NOT id = ANY ($2::bigint[])`, [b, school])).rows.map(r => r.id);
+  assert.ok(school.includes(5) && school.includes(6) && elsewhere.length > 0, 'a suspended member and an operator in, people of B only out');
+  await as('school_runtime', a, 1);
+  assert.deepEqual(await seen(), school);
+  assert.deepEqual((await sql('SELECT user_id::int AS id FROM school.people ORDER BY 1')).rows.map(r => r.id), school);
+  // Before a school, the person alone; without a context, nobody.
+  await as('school_runtime', null, 3);
+  assert.deepEqual(await seen(), [3]);
+  assert.equal(await count('SELECT count(*) n FROM school.people'), 0);
+  await as('school_runtime', null, null);
+  assert.deepEqual(await seen(), []);
+  // A person changes their own language, nobody else's.
+  await as('school_runtime', a, 1);
+  assert.equal((await sql("UPDATE public.users SET locale = 'ar' WHERE id = 4 RETURNING id")).rows.length, 0);
+  assert.equal((await sql("UPDATE public.users SET locale = locale WHERE id = 1 RETURNING id")).rows.length, 1);
 });
 await check("the sign-in's role reads and changes the credentials, and nothing else", async () => {
   await as('platform_auth', null, null);
@@ -1217,14 +1239,18 @@ await check('labels differing by an Arabic-Indic digit are two labels', async ()
   await rejects(SUBJECT, [a, 'GROUPE_1B', 'subject', JSON.stringify({ ar: 'فوج 1' })], '23505');
 });
 await check('an email goes out in its recipient\'s language (FR-I18-01)', async () => {
+  // Each person chooses their own language.
+  await as('school_runtime', a, 9);
   await sql("UPDATE public.users SET locale = 'ar' WHERE id = 9");
+  await as('school_runtime', a, 1);
   await sql("SELECT school.notify('access.sensitive_permission', ARRAY[9]::bigint[])");
-  await as('school_runtime', null, '');
+  await as('school_runtime', null, null);
   const claimed = (await sql('SELECT id, email, locale FROM platform.claim_outbox(50, 60)')).rows.find(r => r.email === 'user9@example.test');
   assert.equal(claimed.locale, 'ar');
   await sql('SELECT platform.finish_outbox($1, NULL)', [claimed.id]);
-  await as('school_runtime', a, 1);
+  await as('school_runtime', a, 9);
   await sql('UPDATE public.users SET locale = NULL WHERE id = 9');
+  await as('school_runtime', a, 1);
 });
 await check('a new school\'s site is named in French and Arabic, or in its language when named (BR-18)', async () => {
   await as('platform_admin', null, 6);

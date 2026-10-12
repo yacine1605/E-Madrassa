@@ -7,7 +7,6 @@ use App\Filament\School\Pages\Assignments;
 use App\Filament\School\Pages\Credentials;
 use App\Filament\School\Pages\Roles;
 use App\Filament\School\Pages\SchoolLogin;
-use App\Models\User;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +29,7 @@ final class SchoolPanelTest extends TestCase
     /** For component assertions only. HTTP tests below exercise the actual middleware. */
     private function within(object $school, array $account, callable $test): void
     {
-        $this->actingAs(User::findOrFail($account['id']));
+        $this->actingAs($this->person($account));
         $this->withSession(['school.tenant' => $school->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
         Filament::setCurrentPanel(Filament::getPanel('school'));
         DB::transaction(function () use ($school, $account, $test) {
@@ -97,7 +96,7 @@ final class SchoolPanelTest extends TestCase
         // The page that comes back asks for the code, and only for it.
         $this->get('/school/login')->assertOk()->assertSee(__('school.mfa_code'))->assertDontSee(__('school.login'));
         Livewire::test(SchoolLogin::class)->fillForm(['code' => $this->totp($admin)])->call('authenticate')->assertRedirect('/school/home');
-        $this->assertAuthenticatedAs(User::findOrFail($admin['id']));
+        $this->assertAuthenticatedAs($this->person($admin));
         $this->assertSame($school->id, session('school.tenant'));
         $this->deleteJson('/api/session');
         for ($i = 0; $i < 5; $i++) Livewire::test(SchoolLogin::class)->fillForm(['login' => $admin['email'], 'password' => 'bad-password'])->call('authenticate');
@@ -242,7 +241,7 @@ final class SchoolPanelTest extends TestCase
             ->assertCount('recoveryCodes', 8);
         $this->get('/school/accounts')->assertOk();
         DB::connection('owner')->table('users')->where('id', $admin['id'])->update(['must_change_password' => true]);
-        auth()->user()->refresh();
+        auth()->setUser($this->person($admin));
         $this->get('/school/accounts')->assertRedirect('/school/credentials');
         $this->get('/school/credentials')->assertOk();
         Livewire::test(Credentials::class)->callAction('password', data: ['current_password' => $admin['password'],
@@ -267,7 +266,7 @@ final class SchoolPanelTest extends TestCase
         $this->signIn($admin);
         $grant = $this->postJson('/api/support-grants', ['hours' => 2, 'reason' => 'Assistance panneau école'])->assertCreated()->json('data.id');
         $this->deleteJson('/api/session');
-        $this->actingAs(User::findOrFail($operator['id']));
+        $this->actingAs($this->person($operator));
         $this->withSession(['auth.started_at' => time(), 'auth.seen_at' => time()]);
         $this->postJson('/api/support/session', ['tenant_id' => $school->id, 'grant_id' => $grant])->assertNoContent();
         $this->get('/school/home')->assertOk()->assertSee('Accès support en lecture seule');

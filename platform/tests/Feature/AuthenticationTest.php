@@ -54,7 +54,7 @@ final class AuthenticationTest extends TestCase
                 $this->assertSame('42501', $e->getCode());
             }
         }
-        $person = User::findOrFail($account['id'])->fresh();
+        $person = $this->person($account);
         $this->assertSame(User::COLUMNS, array_keys($person->getAttributes()));
         $this->assertTrue($person->has_password);
 

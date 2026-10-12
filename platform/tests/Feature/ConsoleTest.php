@@ -7,7 +7,6 @@ use App\Filament\Console\Resources\TenantResource\Pages\CreateTenant;
 use App\Filament\Console\Resources\TenantResource\Pages\ListTenants;
 use App\Mail\AccountLink;
 use App\Models\Console\Tenant;
-use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -26,7 +25,7 @@ final class ConsoleTest extends TestCase
 
     private function enter(array $account): void
     {
-        $this->actingAs(User::query()->findOrFail($account['id']));
+        $this->actingAs($this->person($account));
         $this->withSession(['auth.started_at' => now()->getTimestamp(), 'auth.seen_at' => now()->getTimestamp()]);
         Filament::setCurrentPanel(Filament::getPanel('console'));
     }
@@ -133,6 +132,16 @@ final class ConsoleTest extends TestCase
         // FR-PLT-05: the school and its numbers, never its people.
         $this->get('/console/supervision')->assertOk()->assertSee($school->slug)->assertSee('Comptes actifs')
             ->assertDontSee($secret['email'])->assertDontSee('eleve-confidentiel');
+    }
+
+    /** Before any school the database shows nobody: the sign-in finds the operator through platform.find_login (F2). */
+    public function test_the_console_sign_in_finds_the_operator_by_email(): void
+    {
+        $operator = $this->operator();
+        Livewire::test(ConsoleLogin::class)->fillForm(['email' => strtoupper($operator['email']), 'password' => $operator['password']])
+            ->call('authenticate')->assertHasNoFormErrors();
+        Livewire::test(ConsoleLogin::class)->fillForm(['email' => 'nobody@example.test', 'password' => $operator['password']])
+            ->call('authenticate')->assertHasFormErrors(['email']);
     }
 
     public function test_the_console_sign_in_locks_after_five_failures(): void

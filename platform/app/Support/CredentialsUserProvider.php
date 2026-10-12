@@ -5,18 +5,34 @@ namespace App\Support;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Support\Facades\DB;
 use SensitiveParameter;
 
 /**
  * Laravel's and Filament's sign-in, with the password checked through `platform_auth`
  * (Credentials): the user model the schools' application reads holds no hash. No "remember me":
- * a session ends at its time limits (config/platform.php), and no token outlives it.
+ * a session ends at its time limits (config/platform.php), and no token outlives it. A person
+ * is read in their own context: before a school, the database shows nobody else (F2).
  */
 final class CredentialsUserProvider extends EloquentUserProvider
 {
-    public function __construct(Hasher $hasher, string $model, private Credentials $credentials)
+    public function __construct(Hasher $hasher, string $model, private Credentials $credentials, private DatabaseContext $context)
     {
         parent::__construct($hasher, $model);
+    }
+
+    public function retrieveById($identifier): ?Authenticatable
+    {
+        return $this->context->reading(null, (int) $identifier, fn () => parent::retrieveById($identifier));
+    }
+
+    /** Filament's console sign-in names the person by email; the database finds them (platform.find_login). */
+    public function retrieveByCredentials(#[SensitiveParameter] array $credentials): ?Authenticatable
+    {
+        $email = $credentials['email'] ?? null;
+        if (!is_string($email) || $email === '') return null;
+        $id = DB::selectOne('SELECT platform.find_login(?, NULL) AS id', [$email])->id;
+        return $id ? $this->retrieveById($id) : null;
     }
 
     public function validateCredentials(Authenticatable $user, #[SensitiveParameter] array $credentials): bool

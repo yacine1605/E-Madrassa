@@ -2,8 +2,11 @@
 
 namespace Tests;
 
+use App\Models\User;
+use App\Support\DatabaseContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +54,20 @@ abstract class TestCase extends BaseTestCase
             'password' => Hash::make($password), 'created_at' => now(), 'updated_at' => now(),
             'mfa_secret' => $secret ? Crypt::encryptString($secret) : null, 'mfa_enabled_at' => $mfa ? now() : null]);
         return ['id' => $id, 'email' => $email, 'password' => $password, 'mfa_secret' => $secret];
+    }
+
+    /** The person, read as the application reads them before any school: in their own context (SECURITY-REVIEW.md, F2). */
+    protected function person(array $account): User
+    {
+        return Auth::guard('web')->getProvider()->retrieveById($account['id']) ?? throw new RuntimeException('No such person.');
+    }
+
+    /** The person's own language, which only they may change. */
+    protected function speaks(array $account, ?string $locale): User
+    {
+        $person = $this->person($account);
+        app(DatabaseContext::class)->acting($person->id, fn () => $person->forceFill(['locale' => $locale])->save());
+        return $person;
     }
 
     /** The current code of the account's authenticator; the last step is forgotten so that tests may sign in again at once. */

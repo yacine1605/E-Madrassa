@@ -1,7 +1,9 @@
-// What the request's context costs (SECURITY-REVIEW.md, F7), on native PostgreSQL:
+// What the request's context and the policies reading it cost (SECURITY-REVIEW.md, F7 and F2),
+// on native PostgreSQL:
 //   DATABASE_URL=postgres://user:password@host/cost_test node tests/sql/context-cost.mjs [platform folder]
 // The platform folder, this one by default, gives the schema and the roles, so that an earlier
-// version can be measured on the same data: two schools of 25 000 subjects each, journaled.
+// version can be measured on the same data: two schools of 25 000 subjects each, journaled, and
+// 25 000 people in the first.
 // Each line is the median of its runs, round trips to the database included.
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -46,6 +48,10 @@ for (const tenant of [a, b]) {
   await sql(`INSERT INTO school.subject (tenant_id, code, kind, labels)
     SELECT $1, 'S' || g, 'subject', jsonb_build_object('fr', 'Matière ' || g) FROM generate_series(1, 25000) g`, [tenant]);
 }
+await sql(`INSERT INTO public.users (id, name, email, password)
+  SELECT g, 'Élève ' || g, 'eleve' || g || '@example.test', 'hash' FROM generate_series(3, 25002) g`);
+await sql("SELECT setval('public.users_id_seq', 25002)");
+await sql("INSERT INTO school.membership (tenant_id, user_id, status) SELECT $1, g, 'active' FROM generate_series(3, 25002) g", [a]);
 await sql('VACUUM ANALYZE');
 await sql('SET ROLE school_runtime');
 
@@ -78,6 +84,12 @@ await time('school.actor() called for each of 10 000 rows', 20, request(() => sq
 await time('A page of 25 subjects among 25 000, and their count', 50, request(async () => {
   await sql('SELECT id, code, labels FROM school.subject WHERE archived_at IS NULL ORDER BY code LIMIT 25 OFFSET 12000');
   await sql('SELECT count(*) FROM school.subject WHERE archived_at IS NULL');
+}));
+// As the accounts' list asks for a page (AccountController, Paging).
+const ACCOUNTS = 'SELECT m.user_id AS id, u.name, u.email, m.username, m.status FROM school.membership m JOIN public.users u ON u.id = m.user_id WHERE m.tenant_id = $1';
+await time('A page of 25 people among 25 000, and their count', 50, request(async () => {
+  await sql(`SELECT count(*) AS n FROM (${ACCOUNTS}) listed`, [a]);
+  await sql(`${ACCOUNTS} ORDER BY u.name, m.user_id LIMIT 25 OFFSET 12000`, [a]);
 }));
 await time('The journal\'s first page, and its count', 50, request(async () => {
   await sql('SELECT id, action, object_type, occurred_at FROM school.audit_log ORDER BY occurred_at DESC, id LIMIT 25');

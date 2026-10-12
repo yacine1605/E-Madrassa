@@ -23,6 +23,8 @@ REVOKE ALL ON public.users, public.mfa_recovery_code FROM school_runtime;
 GRANT SELECT (id, name, email, email_verified_at, locale, must_change_password, password_changed_at, mfa_enabled_at, has_password,
   created_at, updated_at) ON public.users TO school_runtime;
 GRANT UPDATE (locale, updated_at) ON public.users TO school_runtime;
+-- Whose rows: the person, and the people of the school the request reaches (020, rest of F2).
+GRANT SELECT ON school.people TO school_runtime;
 GRANT SELECT ON school.membership, school.audit_log TO school_runtime;
 GRANT SELECT, INSERT ON school.site TO school_runtime;
 GRANT UPDATE (labels, version, archived_at) ON school.site TO school_runtime;
@@ -150,6 +152,8 @@ GRANT USAGE ON SCHEMA secret TO platform_provisioner;
 GRANT SELECT ON secret.context_key TO platform_provisioner;
 ALTER FUNCTION school.context() OWNER TO platform_provisioner;
 ALTER FUNCTION school.allowed_tenant() OWNER TO platform_provisioner;
+-- Read with its owner's rights: the membership's policies do not apply to it (020).
+ALTER VIEW school.people OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

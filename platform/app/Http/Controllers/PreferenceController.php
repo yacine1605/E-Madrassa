@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DatabaseContext;
 use App\Support\Locales;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,8 @@ final class PreferenceController
         $data = $request->validate(['locale' => ['present', 'nullable', Rule::in(Locales::AVAILABLE)]],
             ['locale.in' => __('errors.language_unavailable')]);
         $user = $request->user();
-        $user->forceFill(['locale' => $data['locale']])->save();
+        // The person's own row, which only their own context may change.
+        app(DatabaseContext::class)->acting($user->id, fn () => $user->forceFill(['locale' => $data['locale']])->save());
         // The school's offer still decides; outside a school, the person's choice or the browser's.
         $tenant = $request->session()->get('school.tenant');
         $request->session()->forget('locale');

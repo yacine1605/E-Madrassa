@@ -15,10 +15,8 @@ final class SupportSessions
     {
         $user = auth()->user();
         if (!$user?->isOperator()) return false;
-        $valid = DB::transaction(function () use ($tenant, $grant, $user) {
-            app(DatabaseContext::class)->enter($tenant, $user->id, $grant);
-            return DB::selectOne('SELECT school.support_grant_in_use() AS g')->g === $grant;
-        });
+        $valid = app(DatabaseContext::class)->reading($tenant, $user->id,
+            fn () => DB::selectOne('SELECT school.support_grant_in_use() AS g')->g === $grant, $grant);
         if (!$valid) return false;
         session()->regenerate();
         session()->put(['school.tenant' => $tenant, 'support.grant' => $grant]);
