@@ -22,12 +22,12 @@ const screens = name => ({
 });
 let viewports;
 let shotsOf;
-const schoolPages = ['home', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years',
+const schoolPages = ['home', 'programs', 'groups', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years',
   'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
-const rawKey = /\b(?:school|admin|services|reference|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
+const rawKey = /\b(?:school|admin|schooling|services|reference|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
 
 const failures = [];
 const report = [];

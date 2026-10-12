@@ -11,7 +11,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
 
 /**
  * FR-SLL-01: the school's sites, named in French or Arabic, archived with a reason, never
@@ -21,15 +20,11 @@ final class Sites extends ReferencePage
 {
     protected static bool $isDiscovered = true;
     protected static ?int $navigationSort = 35;
+    protected static ?string $module = 'sites_rooms';
     protected static string|array $routeMiddleware = ['module:sites_rooms', 'permission:referential.node.read'];
 
     public static function getNavigationLabel(): string { return __('reference.sites'); }
     public function getTitle(): string { return __('reference.sites'); }
-
-    public static function canAccess(): bool
-    {
-        return parent::canAccess() && DB::selectOne("SELECT school.module_enabled('sites_rooms') AS enabled")->enabled;
-    }
 
     public function table(Table $table): Table
     {

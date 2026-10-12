@@ -132,7 +132,7 @@ final class PseudoLocalizationTest extends TestCase
         $this->pseudo();
         $admin = $this->account('admin');
         $school = $this->school('essential', $admin, 'private_school_dz');
-        $this->member($school, $admin);
+        $this->member($school, $admin, 'active', ['academic_hr']);
         $this->signIn($admin)->assertOk();
         $data = ['Madrassa', $admin['email'], 'admin', 'A', 'MAIN', 'tenant_admin', 'accountant', 'stock_manager', 'teacher', 'student', 'parent',
             'direction', 'academic_hr', 'supervisor', 'front_office', ...array_values(Locales::NAMES), Locales::NAMES['fr'].', '.Locales::NAMES['ar'],
@@ -148,7 +148,8 @@ final class PseudoLocalizationTest extends TestCase
             }
         }
         foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods',
-            'custom-fields', 'settings', 'support-access', 'journal', 'tasks', 'notifications', 'deliveries', 'imports', 'exports', 'sites', 'activation', 'recovery'] as $page) {
+            'custom-fields', 'settings', 'support-access', 'journal', 'tasks', 'notifications', 'deliveries', 'imports', 'exports', 'sites', 'activation', 'recovery',
+            'programs', 'groups'] as $page) {
             $data = array_map(fn ($text) => trim((string) $text, self::PUNCTUATION), $data);
             $unmarked = array_values(array_diff($this->visibleTexts($this->get('/school/'.$page)->assertOk()->getContent()), $data));
             $this->assertSame([], $unmarked, "Text outside the catalogs on /school/$page.");

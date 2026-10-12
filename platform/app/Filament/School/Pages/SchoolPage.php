@@ -9,18 +9,22 @@ use App\Http\Controllers\SchoolController;
 use Filament\Forms\Components\Textarea;
 use Filament\Pages\Page;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 
 abstract class SchoolPage extends Page
 {
     protected static bool $isDiscovered = false;
     protected static array $permissions = [];
+    /** The module the page belongs to, when the school's plan may lack it (ARC-04). */
+    protected static ?string $module = null;
     /** Its group in the menu: people and rights, referential, administration. */
     protected static ?string $section = null;
     #[Locked] public string $schoolId;
 
     public static function canAccess(): bool
     {
+        if (static::$module !== null && !DB::selectOne('SELECT school.module_enabled(?) AS enabled', [static::$module])->enabled) return false;
         foreach (static::$permissions as $permission) if (app(Permissions::class)->can($permission)) return true;
         return static::$permissions === [];
     }
@@ -43,6 +47,7 @@ abstract class SchoolPage extends Page
     }
 
     protected function writable(string $permission): bool { return SchoolScreen::writable($permission); }
+    protected function writableFor(string $permission, string $entity, string $id): bool { return SchoolScreen::writableFor($permission, $entity, $id); }
 
     /** A page of the list the API gives, with its total (NFR-PERF-04): the screen never loads the whole list. */
     protected function apiPage(string|array $permission, string $controller, string $method, array $data, int $page, int $perPage): LengthAwarePaginator

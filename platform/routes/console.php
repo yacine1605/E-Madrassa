@@ -161,15 +161,26 @@ Artisan::command('platform:invite-admin {slug}', function (string $slug, Console
     return 0;
 })->purpose('Send the activation link to the administrator named when the school was created (as platform_admin)');
 
-Artisan::command('platform:membership {slug} {email} {--status=active}', function (string $slug, string $email) {
+Artisan::command('platform:membership {slug} {email} {--status=active} {--role=*}', function (string $slug, string $email) {
     $owner = DB::connection('owner');
     $tenant = $owner->table('platform.tenant')->where('slug', $slug)->value('id');
     $user = $owner->table('users')->where('email', mb_strtolower($email))->value('id');
     if (!$tenant || !$user) { $this->error('Unknown school or account.'); return 1; }
-    $owner->statement('INSERT INTO school.membership (tenant_id, user_id, status) VALUES (?, ?, ?)
-        ON CONFLICT (tenant_id, user_id) DO UPDATE SET status = EXCLUDED.status', [$tenant, $user, $this->option('status')]);
-    $this->info('Membership '.$this->option('status').'.');
-})->purpose('Set an account\'s membership in a school (as the database owner)');
+    $roles = $this->option('role');
+    $known = $owner->table('school.role')->where('tenant_id', $tenant)->whereIn('code', $roles)->pluck('id', 'code');
+    if ($unknown = array_diff($roles, $known->keys()->all())) { $this->error('Unknown role: '.implode(', ', $unknown)); return 1; }
+    $owner->transaction(function () use ($owner, $tenant, $user, $known) {
+        $owner->statement('INSERT INTO school.membership (tenant_id, user_id, status) VALUES (?, ?, ?)
+            ON CONFLICT (tenant_id, user_id) DO UPDATE SET status = EXCLUDED.status', [$tenant, $user, $this->option('status')]);
+        // A role for the whole school, once: running the command again adds nothing.
+        foreach ($known as $role) {
+            $owner->statement("INSERT INTO school.role_assignment (tenant_id, user_id, role_id) SELECT ?, ?, ? WHERE NOT EXISTS (
+                SELECT 1 FROM school.role_assignment WHERE tenant_id = ? AND user_id = ? AND role_id = ? AND scope_type = 'tenant'
+                AND archived_at IS NULL AND (valid_until IS NULL OR valid_until >= current_date))", [$tenant, $user, $role, $tenant, $user, $role]);
+        }
+    });
+    $this->info('Membership '.$this->option('status').($roles ? ', roles '.implode(', ', $roles) : '').'.');
+})->purpose('Set an account\'s membership in a school, with whole-school roles if asked (as the database owner)');
 
 // FR-NOT-01, ARC-05: the email outbox, worked every minute by the scheduler (`php artisan schedule:work`).
 Artisan::command('platform:outbox {--limit=50}', function (Outbox $outbox) {

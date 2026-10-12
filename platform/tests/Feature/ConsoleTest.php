@@ -91,6 +91,22 @@ final class ConsoleTest extends TestCase
         $this->artisan('platform:invite-admin', ['slug' => 'unknown-school'])->assertFailed();
     }
 
+    /** A membership with whole-school roles, given once however often the command runs; an unknown role changes nothing. */
+    public function test_the_membership_command_grants_whole_school_roles_once(): void
+    {
+        $school = $this->school();
+        $member = $this->account('secretary', false);
+        $this->artisan('platform:membership', ['slug' => $school->slug, 'email' => $member['email'], '--role' => ['nobody']])->assertFailed();
+        $this->assertSame(0, DB::connection('owner')->table('school.membership')->where('tenant_id', $school->id)->where('user_id', $member['id'])->count());
+        foreach ([1, 2] as $run) {
+            $this->artisan('platform:membership', ['slug' => $school->slug, 'email' => $member['email'], '--role' => ['academic_hr', 'front_office']])
+                ->assertSuccessful();
+        }
+        $roles = DB::connection('owner')->select("SELECT r.code, a.scope_type FROM school.role_assignment a JOIN school.role r ON r.tenant_id = a.tenant_id AND r.id = a.role_id
+            WHERE a.tenant_id = ? AND a.user_id = ? ORDER BY r.code", [$school->id, $member['id']]);
+        $this->assertSame([['academic_hr', 'tenant'], ['front_office', 'tenant']], array_map(fn ($row) => [$row->code, $row->scope_type], $roles));
+    }
+
     public function test_a_school_suspended_from_the_console_is_closed_and_the_journal_says_by_whom(): void
     {
         $school = $this->school();

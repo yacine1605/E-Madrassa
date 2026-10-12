@@ -13,8 +13,13 @@ final class StudyGroupController
 {
     use HandlesLabels;
 
+    // With the programme's code and the current members the reader may see (all of them, from a
+    // grant on the group, its site or the whole school).
     private const COLUMNS = 'id, year_id, code, labels, group_type, program_id, site_id, capacity, valid_from, valid_to,
-        status, version, archived_at, created_at, updated_at';
+        status, version, archived_at, created_at, updated_at,
+        (SELECT p.code FROM school.program p WHERE p.tenant_id = study_group.tenant_id AND p.id = study_group.program_id) AS program_code,
+        (SELECT count(*) FROM school.group_membership m WHERE m.tenant_id = study_group.tenant_id AND m.group_id = study_group.id
+           AND m.valid_to IS NULL) AS members';
 
     public function __construct(private CurrentSchool $school, private AcademicRecords $records) {}
 

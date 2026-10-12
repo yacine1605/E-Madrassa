@@ -15,6 +15,9 @@ use Illuminate\Validation\ValidationException;
 /** Calls the existing controller validations/services inside the panel's school transaction. */
 final class SchoolScreen
 {
+    /** @var ?\WeakMap<Request, array<string, ?list<string>>> the scopes read during a request */
+    private static ?\WeakMap $scopes = null;
+
     public static function request(array $data = []): Request
     {
         // Livewire's JSON content type belongs to its envelope, not this form payload. An
@@ -55,15 +58,48 @@ final class SchoolScreen
     }
 
     /**
+     * For an action on one record (lot 2): granted for the whole school, or for a scope that
+     * reaches this record (site, level, group, own). The database decides again on writing.
+     */
+    public static function writableFor(string $permission, string $entity, string $id): bool
+    {
+        if (!self::writable(null)) return false;
+        $request = request();
+        self::$scopes ??= new \WeakMap();
+        $scopes = self::$scopes[$request] ?? [];
+        // One reading per permission and table for the whole list, not one per row.
+        $key = $permission.':'.$entity;
+        if (!array_key_exists($key, $scopes)) {
+            $row = DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]);
+            $scopes[$key] = $row->everywhere ? null : json_decode($row->ids, true, 4, JSON_THROW_ON_ERROR);
+            self::$scopes[$request] = $scopes;
+        }
+        return $scopes[$key] === null || in_array($id, $scopes[$key], true);
+    }
+
+    /**
      * Savepoint: a refused multi-step action rolls back, and the surrounding render still works.
      *
      * @param ?callable(array): Notification $done what to tell once done, from the result; « saved » by default
      */
     public static function change(?string $permission, callable $change, ?callable $done = null): array
     {
+        return self::run(fn () => self::writable($permission), $change, $done);
+    }
+
+    /** The same, for an action on one record that a scoped grant may reach (writableFor). */
+    public static function changeFor(string $permission, string $entity, string $id, callable $change, ?callable $done = null): array
+    {
+        return self::run(fn () => self::writableFor($permission, $entity, $id), $change, $done);
+    }
+
+    private static function run(callable $allowed, callable $change, ?callable $done): array
+    {
         try {
-            if (!self::writable($permission)) throw Refusal::permissionDenied();
+            if (!$allowed()) throw Refusal::permissionDenied();
             $result = DB::transaction(fn () => self::payload($change()));
+            // What a change moved (a pupil into a group) may widen or narrow what the list shows next.
+            self::$scopes = null;
             ($done ? $done($result) : Notification::make()->title(__('school.saved'))->success())->send();
             return $result;
         } catch (QueryException $e) {

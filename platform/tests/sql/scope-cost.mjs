@@ -108,6 +108,10 @@ const time = async (runs, work) => {
 // As the API lists (PupilRecords, AcademicRecords, Paging): the count, then the first page.
 const PUPILS = "SELECT id, matricule, last_name_lat, first_name_lat FROM school.student WHERE tenant_id = $1 AND archived_at IS NULL";
 const ENROLMENTS = "SELECT id, student_id, program_id, status FROM school.enrollment WHERE tenant_id = $1 AND archived_at IS NULL";
+const GROUPS = `SELECT id, code, capacity,
+  (SELECT p.code FROM school.program p WHERE p.tenant_id = study_group.tenant_id AND p.id = study_group.program_id) AS program_code,
+  (SELECT count(*) FROM school.group_membership m WHERE m.tenant_id = study_group.tenant_id AND m.group_id = study_group.id AND m.valid_to IS NULL) AS members
+  FROM school.study_group WHERE tenant_id = $1 AND archived_at IS NULL`;
 const measures = {
   'Pupils: count and first page': async () => {
     const n = Number((await one(`SELECT count(*) AS n FROM (${PUPILS}) listed`, [a])).n);
@@ -118,6 +122,12 @@ const measures = {
   'Enrolments: count and first page': async () => {
     const n = Number((await one(`SELECT count(*) AS n FROM (${ENROLMENTS}) listed`, [a])).n);
     await sql(`${ENROLMENTS} ORDER BY created_at DESC, id LIMIT 25`, [a]);
+    return n;
+  },
+  // With the programme's code and the members of each group, as StudyGroupController lists them.
+  'Groups: count and first page': async () => {
+    const n = Number((await one(`SELECT count(*) AS n FROM (${GROUPS}) listed`, [a])).n);
+    await sql(`${GROUPS} ORDER BY code, id LIMIT 25`, [a]);
     return n;
   },
   'A class roster': async () => (await sql(`SELECT m.id, s.last_name_lat FROM school.group_membership m

@@ -535,9 +535,27 @@ A single pupil now takes 1.4 to 3.2 ms for every reader of a school of 2 000 (2.
 |---|---|
 | NFR-PERF-01, NFR-PERF-03 | `tests/sql/scope-cost.mjs [platform folder] [pupils]`: the reference school of 2 000 pupils under 9 ms for every list of every reader; 10 000 pupils measured too |
 
+## Increment 34 (lot 2): the programmes' and groups' screens
+
+The school panel has a new section, *Scolarité*, with the first two of lot 2's screens; each calls the API of increment 32 inside the panel's school transaction, so the same permissions, triggers and refusals apply.
+
+- **Programmes** (`program.program.read`, module `enrollment_groups`): the year's offer by level of the referential, searched in either alphabet, filtered by year, level and state; price and duration as they are read (« 120 000,00 DA », « 9 mois »). A manager creates a programme for an open year and changes its labels, description, duration, price and state; a new price is a new version, whose history the row shows, and a closed year hides the changes. The payment terms' model waits for lot 3's finance.
+- **Groups and classes** (`group.group.read`): type, programme, site, year, dates, state, and the places taken against the capacity (« 22 / 25 »). A class or a session names its programme; a group goes from draft to open to closed, never back; fewer places than members is refused with its message, and a closed group keeps its members and is no longer changed.
+
+A record's action now shows to whoever may perform it on that record, not only to whole-school grants: `SchoolScreen::writableFor` reads the reader's scope once per list (`school.core_ids`), so a manager of one site edits that site's groups and no other, and the database decides again on writing. The groups' API gives each group its programme's code and its current members, counted among the memberships the reader may see. Measured with `tests/sql/scope-cost.mjs` (new line), the groups' list stays at 6 to 10 ms for every reader of a school of 2 000 pupils.
+
+`platform:membership --role=…` gives an account whole-school roles, once; the browser acceptance gives its school's administrator `academic_hr`, so the two new screens are checked in French and Arabic, desktop and phone, in each browser.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PRG-01, BR-11 | `SchoolingPanelTest`: creation with Arabic labels and search, refused duration without unit and price with three decimals, a new price as version 2 with its history, stale version refused, nothing changed once the year is closed |
+| FR-GRP-01 | `SchoolingPanelTest`: a class without programme refused, a support group without one, places shown, capacity under the members refused, closing keeps the members |
+| FR-IAM-04, BR-01 | `SchoolingPanelTest`: pages by permission and module; a site-scoped manager sees and edits their site's groups only |
+| NFR-I18N-01 | `PseudoLocalizationTest` with both pages; acceptance in three browsers |
+
 ## Next increments of lot 2
 
-1. Dossier/programme/group screens and the pupil → enrolment → group walkthrough: scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
+1. Pupils' and guardians' screens, the enrolments' and the groups' composition, and the pupil → enrolment → group walkthrough through them; scoped creation, photos, the 500-pupil import, refined cross-alphabet duplicates, continuing primary-contact validity and the retention decision OD-07.
 2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

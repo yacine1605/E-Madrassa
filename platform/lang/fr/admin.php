@@ -4,6 +4,7 @@
 return [
     'sections' => [
         'personal' => 'Mon espace',
+        'schooling' => 'Scolarité',
         'data' => 'Imports et exports',
         'people' => 'Personnes et droits',
         'referential' => 'Référentiel',
