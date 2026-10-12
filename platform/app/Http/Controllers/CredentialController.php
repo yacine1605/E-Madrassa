@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\Refusal;
 use App\Rules\StrongPassword;
 use App\Support\Credentials;
+use App\Support\DatabaseContext;
 use App\Support\MultiFactor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -22,7 +23,7 @@ final class CredentialController
         $user = $request->user();
         // The person's usernames in their schools; their own memberships are visible to them.
         $username = DB::transaction(function () use ($user) {
-            DB::select("SELECT set_config('app.user_id', ?, true)", [(string) $user->id]);
+            app(DatabaseContext::class)->enter(null, $user->id);
             return DB::selectOne("SELECT string_agg(username, ' ') AS u FROM school.membership WHERE user_id = ?", [$user->id])->u;
         });
         $data = $request->validate([

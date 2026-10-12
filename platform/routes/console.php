@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Support\Console;
+use App\Support\DatabaseContext;
 use App\Support\MultiFactor;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
@@ -27,8 +28,10 @@ Artisan::command('platform:roles', function () {
     foreach (['school_runtime' => env('DB_PASSWORD'), 'platform_admin' => env('DB_CONSOLE_PASSWORD'), 'platform_auth' => env('DB_AUTH_PASSWORD')] as $role => $password) {
         if ($password) $owner->statement('ALTER ROLE '.$role.' PASSWORD '.$owner->getPdo()->quote($password));
     }
+    // The key that signs the request's context (SECURITY-REVIEW.md, F7), from the application's.
+    $owner->statement("CALL secret.set_context_key(decode(?, 'hex'))", [bin2hex(DatabaseContext::key())]);
     $this->info('Roles and privileges applied.');
-})->purpose('Apply deploy/roles.sql and the role passwords (as the database owner)');
+})->purpose('Apply deploy/roles.sql, the role passwords and the context key (as the database owner)');
 
 // Deployment (DEPLOY.md): the bundled Garage storage gets its layout, the school files' bucket
 // and the application's key, allowed on that bucket only. Safe to run again; nothing to do when

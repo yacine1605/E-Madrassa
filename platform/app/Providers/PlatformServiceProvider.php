@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Support\Credentials;
 use App\Support\CredentialsUserProvider;
 use App\Support\CurrentSchool;
+use App\Support\DatabaseContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +34,9 @@ final class PlatformServiceProvider extends ServiceProvider
             $connection['password'] = (string) env($prefix.'PASSWORD');
             config(["database.connections.$name" => $connection]);
         }
-        $this->app->scoped(CurrentSchool::class, fn () => new CurrentSchool());
+        // One per process: it remembers the server process behind each database connection.
+        $this->app->singleton(DatabaseContext::class);
+        $this->app->scoped(CurrentSchool::class, fn ($app) => new CurrentSchool($app->make(DatabaseContext::class)));
     }
 
     public function boot(): void

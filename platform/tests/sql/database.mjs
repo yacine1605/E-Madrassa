@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
 import { readFileSync, readdirSync } from 'node:fs';
-import { randomBytes, randomUUID as uuid } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID as uuid } from 'node:crypto';
 import assert from 'node:assert/strict';
 
 let db;
@@ -38,13 +38,25 @@ for (const file of readdirSync(schemaDir).filter(f => /^\d{3}_.+\.sql$/.test(f))
   await db.exec(readFileSync(new URL(file, schemaDir), 'utf8'));
 await db.exec(readFileSync(new URL('../../deploy/roles.sql', import.meta.url), 'utf8'));
 
+// The request's context, signed as the application signs it (App\Support\DatabaseContext), with
+// this suite's own key. The suite keeps one context over many transactions, which the
+// application never does: it dates its contexts an hour ahead.
+const contextKey = randomBytes(32);
+await sql("CALL secret.set_context_key(decode($1, 'hex'))", [contextKey.toString('hex')]);
+const backend = (await first('SELECT pg_backend_pid() AS pid')).pid;
+const sign = (claims, key = contextKey) => {
+  const payload = JSON.stringify(claims);
+  return payload + '.' + createHmac('sha256', key).update(payload).digest('hex');
+};
+const context = (tenant, user, claims = {}) => sign({ tenant: tenant ?? null, user: user ?? null, support: null, request: null, ip: null,
+  pid: backend, at: (Date.now() + 3600e3) * 1000, ...claims });
+
 // Users 1 and 4 belong to school A, 2 to school B, 5 is suspended in A, 3 belongs nowhere;
 // 6 is a publisher operator on the console.
-const as = async (role, tenant, user) => {
+const as = async (role, tenant, user, claims = {}) => {
   await db.exec(role ? `SET ROLE ${role}` : 'RESET ROLE');
   // A new identity starts outside any support session (FR-PLT-04).
-  await sql("SELECT set_config('app.tenant_id', $1, false), set_config('app.user_id', $2, false), set_config('app.support_grant', '', false)",
-    [tenant ?? '', user == null ? '' : String(user)]);
+  await sql("SELECT set_config('app.context', $1, false)", [tenant == null && user == null ? '' : context(tenant, user, claims)]);
 };
 const today = new Date().toISOString().slice(0, 10);
 const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
@@ -134,7 +146,7 @@ await check('a suspended member sees nothing', async () => assert.equal(await si
 await as('school_runtime', a, 1);
 await check('the request context resets on rollback', async () => {
   await sql('BEGIN');
-  await sql("SELECT set_config('app.tenant_id', $1, true)", [b]);
+  await sql("SELECT set_config('app.context', $1, true)", [context(b, 1)]);
   await sql('ROLLBACK');
   assert.equal((await first('SELECT school.tenant() AS t')).t, a);
 });
@@ -171,13 +183,15 @@ await check('a school keeps at least one site in use (ARC-03)', async () => {
 
 // Audit (BR-09, FR-AUD-01)
 await as('school_runtime', a, 1);
-await check('an update is audited with old and new values, author, reason and request', async () => {
-  await sql("SELECT set_config('app.reason', 'Renommage du site', false), set_config('app.request_id', 'req-test-0001', false)");
+await check('an update is audited with old and new values, author, reason, request and address', async () => {
+  await as('school_runtime', a, 1, { request: 'req-test-0001', ip: '192.0.2.10' });
+  await sql("SELECT set_config('app.reason', 'Renommage du site', false)");
   await sql('UPDATE school.site SET labels = $2 WHERE id = $1', [siteA, JSON.stringify({ fr: 'Site central', ar: 'المقر' })]);
-  await sql("SELECT set_config('app.reason', '', false), set_config('app.request_id', '', false)");
-  const entry = await first("SELECT actor_id::int AS actor, before, after, reason, request_id FROM school.audit_log WHERE object_type = 'site' AND object_id = $1 AND action = 'UPDATE'", [siteA]);
+  await sql("SELECT set_config('app.reason', '', false)");
+  await as('school_runtime', a, 1);
+  const entry = await first("SELECT actor_id::int AS actor, before, after, reason, request_id, ip FROM school.audit_log WHERE object_type = 'site' AND object_id = $1 AND action = 'UPDATE'", [siteA]);
   assert.deepEqual(entry, { actor: 1, before: { labels: { fr: 'Site principal' } }, after: { labels: { fr: 'Site central', ar: 'المقر' } },
-    reason: 'Renommage du site', request_id: 'req-test-0001' });
+    reason: 'Renommage du site', request_id: 'req-test-0001', ip: '192.0.2.10' });
 });
 await check('the school journal records its own creation (FR-PLT-01)', async () =>
   assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'tenant' AND action = 'INSERT'"), 1));
@@ -983,10 +997,7 @@ await check('supervision counts each school\'s activity without showing any of i
 
 // Support access (FR-PLT-04)
 const GRANT = "INSERT INTO school.support_grant (tenant_id, reason, expires_at, include_sensitive) VALUES ($1, $2, now() + ($3 || ' hours')::interval, $4) RETURNING id";
-const support = async (grant) => {
-  await as('school_runtime', a, 6);
-  await sql("SELECT set_config('app.support_grant', $1, false)", [grant ?? '']);
-};
+const support = grant => as('school_runtime', a, 6, { support: grant ?? null });
 await as(null);
 await sql('INSERT INTO platform.operator (user_id) VALUES (6) ON CONFLICT DO NOTHING');
 await as('school_runtime', a, 1);
@@ -1061,7 +1072,7 @@ await check('every function running with its owner\'s rights belongs to the prov
 await check('no function of the schemas is executable by everyone; the restricted roles own nothing and bypass nothing', async () => {
   await as(null);
   assert.deepEqual((await sql(`SELECT n.nspname || '.' || p.proname AS f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname IN ('school', 'platform') AND has_function_privilege('public', p.oid, 'EXECUTE') ORDER BY 1`)).rows, []);
+    WHERE n.nspname IN ('school', 'platform', 'secret') AND has_function_privilege('public', p.oid, 'EXECUTE') ORDER BY 1`)).rows, []);
   assert.deepEqual((await sql(`SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles
     WHERE rolname IN ('school_runtime', 'platform_admin', 'platform_auth') ORDER BY 1`)).rows.map(r => [r.rolname, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb]),
     [['platform_admin', false, false, false, false], ['platform_auth', false, false, false, false], ['school_runtime', false, false, false, false]]);
@@ -1093,6 +1104,64 @@ await check("the sign-in's role reads and changes the credentials, and nothing e
   await rejects("SELECT platform.ensure_user('intrus@example.test', 'Intrus')", [], '42501');
   await as(null);
   await sql('UPDATE public.users SET mfa_last_step = NULL WHERE id = 3');
+});
+await check('the request context is believed only signed with the key, on its connection, since its transaction began (F7)', async () => {
+  await as('school_runtime', a, 1);
+  const seen = await sites();
+  assert.ok(seen > 0);
+  const refused = async token => {
+    await sql("SELECT set_config('app.context', $1, false)", [token]);
+    await rejects('SELECT count(*) FROM school.site', [], '42501', 'context_invalid');
+    await rejects('SELECT school.actor()', [], '42501', 'context_invalid');
+  };
+  const claims = { tenant: a, user: 1, support: null, request: null, ip: null, pid: backend, at: Date.now() * 1000 };
+  await refused(sign(claims, randomBytes(32)));
+  const valid = sign(claims);
+  await refused(valid.replace(a, b));
+  await refused(valid.replace('"user":1', '"user":4'));
+  await refused(valid.slice(0, -1) + (valid.endsWith('0') ? '1' : '0'));
+  await refused(JSON.stringify(claims));
+  await refused(sign({ ...claims, pid: backend + 1 }));
+  await refused(sign({ ...claims, at: (Date.now() - 60e3) * 1000 }));
+  // Signed during the transaction, it holds until the transaction ends.
+  await sql('BEGIN');
+  await sql("SELECT set_config('app.context', $1, true)", [sign({ ...claims, at: Date.now() * 1000 })]);
+  assert.equal(await sites(), seen);
+  await sql('COMMIT');
+  // The settings of old, unsigned, open nothing.
+  await as('school_runtime', null, null);
+  await sql("SELECT set_config('app.tenant_id', $1, false), set_config('app.user_id', '1', false)", [a]);
+  assert.equal(await sites(), 0);
+  assert.equal((await first('SELECT school.actor() AS u')).u, null);
+});
+await check('no role of the application reads or sets the context\'s key (F7)', async () => {
+  for (const [role, tenant, user] of [['school_runtime', a, 1], ['platform_admin', null, 6], ['platform_auth', null, null]]) {
+    await as(role, tenant, user);
+    await rejects('SELECT * FROM secret.context_key', [], '42501');
+    await rejects("CALL secret.set_context_key(decode(repeat('ab', 32), 'hex'))", [], '42501');
+  }
+});
+await check('every policy reads the context once per query, never once per row (F7, NFR-PERF-03)', async () => {
+  await as(null);
+  const policies = (await sql(`SELECT schemaname || '.' || tablename || ' ' || policyname AS p, concat_ws(' ', qual, with_check) AS e
+    FROM pg_policies WHERE schemaname IN ('school', 'platform')`)).rows;
+  assert.ok(policies.length > 20);
+  assert.deepEqual(policies.filter(r => /(?<!SELECT )school\.(context|tenant|actor|allowed|allowed_tenant)\(/.test(r.e)).map(r => r.p), []);
+});
+await check('the start of a request and a page check the signature a few times, not once per row or permission (F7)', async () => {
+  await as(null);
+  await sql("SET track_functions = 'all'");
+  await as('school_runtime', a, 1);
+  await sql('BEGIN');
+  // As SchoolContext opens a request, then a page of the subjects.
+  await sql('SELECT platform.tenant_mode($1::uuid) AS mode, school.allowed($1::uuid) AS allowed, platform.locale_for($2, $1::uuid) AS locale', [a, 1]);
+  await sql("SELECT school.mfa_required() AS mfa, (school.setting_value('session.idle_minutes'))::int AS idle");
+  await sql('SELECT id FROM school.subject ORDER BY code LIMIT 25');
+  const checks = Number((await first("SELECT coalesce(sum(calls), 0) AS n FROM pg_stat_xact_user_functions WHERE schemaname = 'school' AND funcname = 'context'")).n);
+  await sql('COMMIT');
+  await as(null);
+  await sql('RESET track_functions');
+  assert.ok(checks > 0 && checks <= 20, `${checks} checks`);
 });
 await check('a school\'s application cannot call the publisher\'s functions: no school created, no account made, no school archived', async () => {
   await as('school_runtime', a, 1);
@@ -1211,7 +1280,8 @@ if (PgClient) {
     const c = new PgClient({ connectionString: process.env.DATABASE_URL });
     await c.connect();
     await c.query(`SET ROLE ${role}`);
-    await c.query("SELECT set_config('app.tenant_id', $1, false), set_config('app.user_id', $2, false)", [tenant ?? '', String(user)]);
+    const pid = (await c.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    await c.query("SELECT set_config('app.context', $1, false)", [tenant == null && user == null ? '' : context(tenant, user, { pid })]);
     return c;
   };
   await check('concurrent creations with the same key create one school', async () => {
@@ -1245,7 +1315,7 @@ if (PgClient) {
     const twice = await first(CREATE_ACCOUNT, ['Course', 'course@example.test', null, null, null]);
     const link = tokenHash();
     await sql('SELECT school.issue_activation($1, $2)', [twice.id, link]);
-    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, '')));
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, null)));
     const results = await Promise.allSettled(clients.map(async (c, i) => {
       await c.query('BEGIN');
       try {
@@ -1263,7 +1333,7 @@ if (PgClient) {
     await sql("UPDATE school.outbox SET status = 'pending', next_attempt_at = now(), locked_until = NULL WHERE status <> 'failed'");
     const due = await count("SELECT count(*) n FROM school.outbox WHERE status = 'pending'");
     assert.ok(due >= 2);
-    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, '')));
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', null, null)));
     const batches = await Promise.all(clients.map(c => c.query('SELECT id FROM platform.claim_outbox(50, 60)').then(r => r.rows.map(row => row.id))));
     await Promise.all(clients.map(c => c.end()));
     const ids = batches.flat();

@@ -6,7 +6,7 @@ Method: the code and the grants were read layer by layer, and every property tha
 
 ## The layers of a request
 
-A school's request crosses these layers in order; each one refuses on its own, without counting on the next. Row-level security, though, relies on the context the application gives the database (F7).
+A school's request crosses these layers in order; each one refuses on its own, without counting on the next. The database believes the school and the person of a request only as the application signed them (F7).
 
 | Layer | What it enforces | Where | Tests |
 |---|---|---|---|
@@ -15,11 +15,11 @@ A school's request crosses these layers in order; each one refuses on its own, w
 | Page | Content Security Policy: scripts from the platform, or inline with the response's nonce; no plugin; images, fonts, connections, frames and forms to the platform only | `ContentSecurityPolicy` | `ContentSecurityPolicyTest`, `tests/browser/acceptance.mjs` (nothing blocked, three browsers), `deploy/smoke-test.sh` |
 | Session | Cookie `Secure`, `HttpOnly`, `SameSite=Lax`; a CSRF token on every change; an idle limit of 30 minutes (each school sets it between 15 and 120), an absolute limit of 12 hours | `config/session.php`, `compose.yaml`, `AccountState` | `AuthenticationTest`; the CSRF token in `tests/browser/acceptance.mjs` |
 | Sign-in | Lockout after 5 failures per login and per address, from 1 minute doubling to 60; MFA by TOTP, a code accepted once; recovery codes hashed and single-use; the secret encrypted with the application key, which the database never holds | `LoginThrottle`, `MultiFactor` | `AuthenticationTest`, `SessionTest` (Argon2id) |
-| School | An active membership in an active school, chosen by the server; MFA when the school requires it; a support session only under a valid consent. The school, the person and the request are then set for the database, inside one transaction | `SchoolContext`, `SchoolPanelContext` | `SchoolIsolationTest`, `SchoolPanelTest`, `SupportTest` |
+| School | An active membership in an active school, chosen by the server; MFA when the school requires it; a support session only under a valid consent. The school, the person, the consent and the request are then signed for the database, inside one transaction | `SchoolContext`, `SchoolPanelContext`, `DatabaseContext` | `SchoolIsolationTest`, `SchoolPanelTest`, `SupportTest` |
 | Permission | One of the route's permissions, held through an active assignment, checked again at every request (a withdrawn permission is refused at once) | `permission:` middleware, `RequirePermission` | `PermissionCoverageTest`, `AuthorizationTest` |
 | Module | A school's module turned off answers `module_disabled`, its menu disappears | `module:` middleware, `RequireModule` | `SchoolPanelTest`, `LotOneWalkthroughTest` (R09) |
 | Scope | The controller narrows to the assignment's scope (site, level); a record of another school answers 404 | Controllers, `CurrentSchool`; `WithinSchool` for the jobs | `AuthorizationTest`, `SchoolReferencePanelTest` |
-| Database | The application connects as `school_runtime`: no ownership, no `BYPASSRLS`, row-level security forced on every school table, column-level grants, no deletion of a business record, no password hash, MFA secret or recovery code (those are `platform_auth`'s, the sign-in's role). Triggers refuse what a bug could still attempt: a permission granted by someone who does not hold it, an assignment to oneself, the last administrator removed, writes in a read-only school, a change to the journal | `database/schema/`, `deploy/roles.sql` | `tests/sql/database.mjs` |
+| Database | The application connects as `school_runtime`: no ownership, no `BYPASSRLS`, row-level security forced on every school table, column-level grants, no deletion of a business record, no password hash, MFA secret or recovery code (those are `platform_auth`'s, the sign-in's role). Triggers refuse what a bug could still attempt: a permission granted by someone who does not hold it, an assignment to oneself, the last administrator removed, writes in a read-only school, a change to the journal. The request's context is believed only signed with a key no role of the application reads, on its own connection, in its own transaction | `database/schema/`, `deploy/roles.sql`, `school.context()` | `tests/sql/database.mjs` |
 
 Accounts, memberships, account links and schools are written only by functions owned by `platform_provisioner`, which cannot sign in. A school's functions check the caller's permission in the school; the publisher's functions are granted to the console's role only, and that grant is their only guard. The publisher's console connects as `platform_admin`, which has no privilege on the `school` schema: a school's data is reached only through a support consent (FR-PLT-04).
 
@@ -168,12 +168,13 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 
 ## What the tests keep true
 
-Each property is a test, so a later lot that breaks one fails CI. The first seven look at every table, function, route and page there is, so they also hold for those added later.
+Each property is a test, so a later lot that breaks one fails CI. The first eight look at every table, policy, function, route and page there is, so they also hold for those added later.
 
 | Property | Test |
 |---|---|
 | Every table of the `school` schema forces row-level security, even on its owner | `tests/sql/database.mjs`, Security review |
-| No function of the `school` and `platform` schemas is executable by everyone; each function running with its owner's rights belongs to `platform_provisioner` | `tests/sql/database.mjs`, Security review |
+| Every policy reads the request's context once per query, never once per row | `tests/sql/database.mjs`, Security review |
+| No function of the `school`, `platform` and `secret` schemas is executable by everyone; each function running with its owner's rights belongs to `platform_provisioner` | `tests/sql/database.mjs`, Security review |
 | `school_runtime`, `platform_admin` and `platform_auth` are not superusers, do not bypass row-level security, create neither roles nor databases, and own no table or function | `tests/sql/database.mjs`, Security review |
 | Every school route declares a permission, except those that describe the session or the person's own records | `PermissionCoverageTest` |
 | Every page of the school's panel declares a permission, except the person's own pages (home, tasks, notifications, choice of school, credentials); Livewire's updates go through the same checks | `PermissionCoverageTest` |
@@ -181,6 +182,8 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | This review's matrix is the code's | `PermissionCoverageTest` |
 | A school's application cannot create a school, make an account, archive a school or read the publisher's supervision | `tests/sql/database.mjs`, Security review |
 | A school's application reads no password hash, MFA secret or recovery code, and changes none; the sign-in's role reaches those and nothing else | `tests/sql/database.mjs`, Security review; `AuthenticationTest` |
+| The database believes a request's context only signed with the key, on the connection it was made for, since its transaction began; a forged, altered or replayed context is refused, the unsigned settings of lot 1 open nothing, and no role of the application reads or sets the key | `tests/sql/database.mjs`, Security review |
+| The start of a request and a page check the signature a few times, never once per row or per permission | `tests/sql/database.mjs`, Security review; `tests/sql/context-cost.mjs` measures the cost |
 | Two schools created from the console never see each other's people, through the API or the screens | `LotOneWalkthroughTest`, `SchoolIsolationTest`, `tests/sql/database.mjs` (isolation) |
 | What a person may not see on screen, they may not export | `LotOneWalkthroughTest` (R01), `ExportTest` |
 | No permission granted by someone who does not hold it; no assignment to oneself; the last administrator kept; segregation of duties | `tests/sql/database.mjs` (roles), `AuthorizationTest` |
@@ -203,7 +206,7 @@ Each property is a test, so a later lot that breaks one fails CI. The first seve
 | F4 | No Content Security Policy | Medium | Fixed in increment 26, `'unsafe-eval'` left |
 | F5 | Redis had no password | Low | Fixed in increment 24 |
 | F6 | Firefox and Safari were not tested | Low | Fixed in increment 24 |
-| F7 | Row-level security trusts the context the application sets | Medium | Open, lot 2 |
+| F7 | Row-level security trusted the context the application sets | Medium | Fixed in increment 27 |
 | F8 | Every signed-in page sent the person's initials to ui-avatars.com | Low | Fixed in increment 26 |
 
 ### F1. Every function was executable by everyone (fixed)
@@ -224,7 +227,7 @@ Fix: `deploy/roles.sql` takes `EXECUTE` back from `PUBLIC` on every function of 
 
 Fix of F2 and F3 (increment 25): a fourth role, `platform_auth`, is the only one that reads or writes the credentials: password hashes, MFA secrets, the last TOTP step and the recovery codes (`018_credentials.sql`, `deploy/roles.sql`). It has no other column of a person, no table of the platform or of a school, and no function. The application uses it through one class, `App\Support\Credentials`, called by the sign-in, the MFA challenge and the person's own password and MFA, and by `CredentialsUserProvider` for the console's sign-in. `school_runtime` keeps a person's name, email, language, and whether they have a password and MFA; an administrator's reset still goes through `school.reset_password`. No "remember me" is offered any more: a session ends at its time limits, and no token outlives it.
 
-What remains: `school_runtime` still reads every person's name and email, not only its school's people, since the person signed in is read before a school is chosen. Confining that by row-level security waits for F7.
+What remains: `school_runtime` still reads every person's name and email, not only its school's people, since the person signed in is read before a school is chosen. Now that the database knows the person for sure (F7), row-level security can confine that: next in lot 2.
 
 ### F4. No Content Security Policy (fixed, `'unsafe-eval'` left)
 
@@ -246,13 +249,26 @@ The browser acceptance ran on Chromium only. The server's checks do not depend o
 
 Fix (increment 24): `deploy/acceptance-test.sh` runs every screen in Chromium, Firefox and WebKit, Safari's engine (`BROWSERS`); CI runs the three side by side. All 324 screens pass: 108 in each browser.
 
-### F7. Row-level security trusts the context the application sets
+### F7. Row-level security trusted the context the application sets (fixed)
 
-The database learns the school and the person of a request from two settings, `app.tenant_id` and `app.user_id`, which the application sets at the start of each transaction (`CurrentSchool::enter`). Any SQL running as `school_runtime` may set them too. An SQL injection could therefore name another school and read its rows, or name an administrator and pass the permission checks of the functions running with their owner's rights, which read the same settings. Row-level security stops a query that forgets its school; it does not stop an injection.
+The database learnt the school and the person of a request from two settings, `app.tenant_id` and `app.user_id`, which the application set at the start of each transaction. Any SQL running as `school_runtime` could set them too. An SQL injection could therefore name another school and read its rows, or name an administrator and pass the permission checks of the functions running with their owner's rights, which read the same settings. Row-level security stopped a query that forgot its school; it did not stop an injection.
 
-What stands against an injection today: every query is parameterised, and the roles' privileges, which no SQL can widen: the credentials (F2, F3), the publisher's functions (F1), no deletion of business records, no write to the journal.
+Fix (increment 27): the application signs the context, and the database believes it only signed (`019_signed_context.sql`, `App\Support\DatabaseContext`). The context names the school, the person, the support consent, the request and its address, followed by its HMAC-SHA256 under a key derived from the application's key; `platform:roles` gives the database that key at every deployment. The key is in the `secret` schema, which only `platform_provisioner` reaches, and `school.context()` alone reads it: `school_runtime`, `platform_admin` and `platform_auth` neither read nor change it. `school.context()` refuses, with `context_invalid`, a context whose signature is wrong, signed for another server process than the connection's (`pg_backend_pid()`, which the signature covers), or signed before its transaction began (five seconds allowed between the clocks of the application's host and the database's). `school.tenant()`, `school.actor()`, the consent in use and the journal's author, request and address all come from it. An injection can thus name neither another school nor another person. It cannot replay a context taken from another request either: that one was signed for another connection, or before the current transaction. It can only clear the context, which closes every school row.
 
-To do (lot 2): a context the database can check. The application signs the school, the person and the request with a key `school_runtime` cannot read; `school.tenant()` and `school.actor()` answer only for a signed context, checked once per transaction. Its cost on every request is to be measured first.
+The cost was measured before the fix was kept (`tests/sql/context-cost.mjs`: PostgreSQL 16, two schools of 25 000 subjects each, journaled; medians, round trips included):
+
+| Measure | Settings of lot 1 | Signed context |
+|---|---|---|
+| A request that only enters its school | 1.6 ms | 1.6 ms |
+| Its start, as `SchoolContext` checks the school and the person | 6.5 ms | 5.3 ms |
+| `school.actor()` called for each of 10 000 rows | 3.2 ms | 125 ms |
+| A page of 25 subjects among 25 000, and their count | 80 s | 5.0 ms |
+| The journal's first page, and its count | 7.4 ms | 8.0 ms |
+| 500 subjects written, stamped and journaled | 849 ms | 58 ms |
+
+A check of the signature costs about 13 µs, where reading a setting cost almost nothing: a query must not make it once per row (the third line). Every policy, and every function that read it for each row of a query, now reads the context once per query, as `(SELECT school.actor())`; a test keeps that true for every policy, those to come included, and another bounds the checks made by the start of a request and a page. The triggers still read it once per row written, which the last line includes. A school's own membership is read with the provisioner's rights (`school.allowed_tenant()`), since the person is now certain, without the permission checks the membership's policies make. The measure also showed what the policies of lot 1 cost: each row called `school.allowed()`, whose reading of the membership ran those permission checks again, so a page of 25 subjects among 25 000, with its count, took 80 seconds; it takes 5 ms now, and writing 500 rows 58 ms instead of 849.
+
+What remains: an injection still acts as the request's own person in the request's school, within that person's permissions and the roles' privileges. The reason given for a change (`app.reason`) stays the application's statement, unsigned, like the text of a form. A connection pooler in transaction mode cannot sit between the application and the database, since a context is signed for one server process (DEPLOY.md).
 
 ### F8. Every signed-in page sent the person's initials to ui-avatars.com (fixed)
 

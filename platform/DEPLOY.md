@@ -20,6 +20,8 @@ The database, Redis and the storage are on the internal `data` network: no way o
 
 The database owner's password reaches `migrate` only. Requests and jobs connect as `school_runtime` (row-level security), the console as `platform_admin` (no school data), the sign-in as `platform_auth` (passwords and MFA secrets, which the other two cannot read); none owns a table or bypasses row-level security. The application's encryption key is created on the first start and kept on the storage volume, with the data it protects.
 
+The database believes a request's school and person only as the application signed them, with a key derived from the encryption key, which `migrate` gives the database at every start (SECURITY-REVIEW.md, F7): no other secret to keep. A context is signed for one database connection, so no connection pooler in transaction mode (PgBouncer) may sit between the application and the database.
+
 ## First start
 
 ```sh

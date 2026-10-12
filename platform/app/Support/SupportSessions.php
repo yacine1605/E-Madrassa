@@ -16,8 +16,7 @@ final class SupportSessions
         $user = auth()->user();
         if (!$user?->isOperator()) return false;
         $valid = DB::transaction(function () use ($tenant, $grant, $user) {
-            DB::select("SELECT set_config('app.user_id', ?, true), set_config('app.tenant_id', ?, true), set_config('app.support_grant', ?, true)",
-                [(string) $user->id, $tenant, $grant]);
+            app(DatabaseContext::class)->enter($tenant, $user->id, $grant);
             return DB::selectOne('SELECT school.support_grant_in_use() AS g')->g === $grant;
         });
         if (!$valid) return false;

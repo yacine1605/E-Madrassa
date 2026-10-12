@@ -9,8 +9,8 @@ ALTER ROLE platform_auth LOGIN;
 -- (001's did nothing): without this, the restricted roles could call every function of the
 -- schemas they use, the publisher's definer functions included. Applied again on every
 -- deployment, so that a function added later is closed too (SECURITY-REVIEW.md).
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA platform, school FROM PUBLIC;
-REVOKE ALL ON ALL PROCEDURES IN SCHEMA school FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA platform, school, secret FROM PUBLIC;
+REVOKE ALL ON ALL PROCEDURES IN SCHEMA school, secret FROM PUBLIC;
 
 -- Schools' application: its own school's data only, through RLS. No table ownership,
 -- no BYPASSRLS, no memberships or audit entries written directly, no deletion.
@@ -27,8 +27,9 @@ GRANT SELECT ON school.membership, school.audit_log TO school_runtime;
 GRANT SELECT, INSERT ON school.site TO school_runtime;
 GRANT UPDATE (labels, version, archived_at) ON school.site TO school_runtime;
 GRANT SELECT ON platform.tenant, platform.module, platform.module_dependency, platform.plan TO school_runtime;
-GRANT EXECUTE ON FUNCTION school.tenant(), school.actor(), school.allowed(uuid), school.module_enabled(text),
-  school.my_schools(), school.my_modules(), platform.tenant_mode(uuid) TO school_runtime;
+-- The request's context, signed by the application and checked by school.context() (019, F7).
+GRANT EXECUTE ON FUNCTION school.context(), school.tenant(), school.actor(), school.allowed_tenant(), school.allowed(uuid),
+  school.module_enabled(text), school.my_schools(), school.my_modules(), platform.tenant_mode(uuid) TO school_runtime;
 -- Roles and assignments: written by the application, checked by triggers (permission held,
 -- never on oneself, scope, last administrator). A role is archived, never deleted (FR-IAM-03);
 -- a permission is taken off a role by deleting the link, which the audit keeps.
@@ -142,7 +143,13 @@ GRANT UPDATE (name, email, password, must_change_password, password_changed_at, 
 GRANT USAGE ON SEQUENCE public.users_id_seq TO platform_provisioner;
 GRANT SELECT, INSERT, UPDATE ON public.account_token TO platform_provisioner;
 GRANT UPDATE (status, username, external_ref, activated_at, updated_at) ON school.membership TO platform_provisioner;
-GRANT EXECUTE ON FUNCTION school.tenant(), school.actor(), school.allowed(uuid), school.is_system() TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.tenant(), school.actor(), school.allowed_tenant(), school.allowed(uuid), school.is_system() TO platform_provisioner;
+-- The key that signs the request's context (019, F7): read by school.context() alone, which the
+-- provisioner owns; no other role reaches the `secret` schema.
+GRANT USAGE ON SCHEMA secret TO platform_provisioner;
+GRANT SELECT ON secret.context_key TO platform_provisioner;
+ALTER FUNCTION school.context() OWNER TO platform_provisioner;
+ALTER FUNCTION school.allowed_tenant() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

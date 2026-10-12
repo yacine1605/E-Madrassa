@@ -28,7 +28,8 @@ final class Console
     private function as(?string $reason, callable $work): mixed
     {
         return $this->db()->transaction(function (Connection $db) use ($reason, $work) {
-            $db->select("SELECT set_config('app.user_id', ?, true), set_config('app.reason', ?, true)", [(string) auth()->id(), (string) $reason]);
+            app(DatabaseContext::class)->enter(null, auth()->id(), db: $db);
+            $db->select("SELECT set_config('app.reason', ?, true)", [(string) $reason]);
             return $work($db);
         });
     }

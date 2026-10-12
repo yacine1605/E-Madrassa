@@ -398,9 +398,31 @@ The browser acceptance now fails a screen on anything the policy blocks, in Chro
 |---|---|
 | NFR-SEC-03 | `ContentSecurityPolicyTest`: a fresh nonce on every page, borne by every inline script; nothing loaded from another site. The acceptance: nothing blocked on 324 screens. The smoke test: the header on the deployment |
 
+## Increment 27 (lot 2): a signed request context
+
+Finding F7 of [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is closed. The database learnt a request's school and person from two settings that any SQL of `school_runtime` could set; it now believes only a context the application signs (`019_signed_context.sql`, `App\Support\DatabaseContext`). The context names the school, the person, the support consent, the request and its address, with an HMAC-SHA256 under a key derived from the application's key; `php artisan platform:roles` gives the database that key at every deployment, in a `secret` schema that only the definer functions' owner reaches. `school.context()` refuses a context forged, altered, signed for another connection or before its transaction began; `school.tenant()`, `school.actor()`, the consent in use and the journal's author, request and address read it. An SQL injection can no longer name another school or person, nor replay another request's context.
+
+A check of the signature costs about 13 µs, where reading a setting cost nothing, so the cost was measured before keeping it (`tests/sql/context-cost.mjs`). Every policy, and the functions that read the context for each row, now read it once per query; a school's own membership is read with the provisioner's rights, without the permission checks of the membership's policies. The measure also found what the old policies cost on large tables: each row called `school.allowed()`, whose reading of the membership ran its permission checks again, so a page of 25 subjects among 25 000, with its count, took 80 seconds.
+
+| Measure, PostgreSQL 16, two schools of 25 000 subjects | Before | Now |
+|---|---|---|
+| A request that only enters its school | 1.6 ms | 1.6 ms |
+| Its start, as `SchoolContext` checks the school and the person | 6.5 ms | 5.3 ms |
+| `school.actor()` called for each of 10 000 rows | 3.2 ms | 125 ms |
+| A page of 25 subjects among 25 000, and their count | 80 s | 5.0 ms |
+| The journal's first page, and its count | 7.4 ms | 8.0 ms |
+| 500 subjects written, stamped and journaled | 849 ms | 58 ms |
+
+| Requirement | Evidence |
+|---|---|
+| NFR-SEC-04 | SQL suite, Security review: forged, altered and replayed contexts refused; the settings of lot 1 open nothing; no role of the application reads the key; every policy reads the context once per query. `DatabaseContextTest`: the application's signature believed, another connection's refused |
+| NFR-PERF-03 | `tests/sql/context-cost.mjs`: a page among 25 000 rows in milliseconds; the SQL suite bounds the checks a request makes |
+
+Deployments need nothing new: the key comes from the application's (DEPLOY.md). A connection pooler in transaction mode cannot sit between the application and the database, since a context is signed for one connection.
+
 ## Next increments of lot 2
 
-1. **F7**: a request context signed by the application and checked by the database, after measuring its cost.
+1. **F2, the rest**: now that the person is signed, row-level security on people, so that a school's application reads only its own school's people.
 2. **F4, the rest**: Livewire's CSP-safe build of Alpine, tried on every Filament component with its interactions, to remove `'unsafe-eval'`.
 3. Then the schema, row-level security and invariants of lot 2 (TST-03/07/08/18), before the student records and the enrolment walkthrough.
 

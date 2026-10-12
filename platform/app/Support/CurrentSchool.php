@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 
@@ -16,13 +15,13 @@ final class CurrentSchool
     private string $mode = 'active';
     private ?string $support = null;
 
+    public function __construct(private DatabaseContext $context) {}
+
     /** @param string|null $support the consent a support session works under (FR-PLT-04) */
     public function enter(string $tenant, int $user, string $requestId, ?string $ip = null, ?string $support = null): void
     {
-        // Local to the transaction: reset on commit or rollback, also behind a connection pool.
-        DB::select("SELECT set_config('app.user_id', ?, true), set_config('app.tenant_id', ?, true),
-            set_config('app.request_id', ?, true), set_config('app.ip', ?, true), set_config('app.support_grant', ?, true)",
-            [(string) $user, $tenant, $requestId, (string) $ip, (string) $support]);
+        // Signed, and local to the transaction: reset on commit or rollback.
+        $this->context->enter($tenant, $user, $support, $requestId, $ip);
         $this->id = $tenant;
         $this->support = $support;
     }

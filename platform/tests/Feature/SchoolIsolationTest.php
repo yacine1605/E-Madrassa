@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\SchoolAccessRevoked;
 use App\Support\CurrentSchool;
+use App\Support\DatabaseContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -147,7 +148,7 @@ final class SchoolIsolationTest extends TestCase
         $keys = [];
         foreach ([$a, $b] as $school) {
             DB::transaction(function () use ($school, &$keys) {
-                $current = new CurrentSchool();
+                $current = new CurrentSchool(app(DatabaseContext::class));
                 $current->enter($school->id, 1, 'req-keys-0001');
                 $keys[] = [$current->cacheKey('menu'), $current->storagePath('photos/eleve.jpg')];
             });
@@ -155,7 +156,7 @@ final class SchoolIsolationTest extends TestCase
         $this->assertSame(['school:'.$a->id.':menu', 'schools/'.$a->id.'/photos/eleve.jpg'], $keys[0]);
         $this->assertNotSame($keys[0], $keys[1]);
         $this->expectException(LogicException::class);
-        (new CurrentSchool())->cacheKey('menu');
+        (new CurrentSchool(app(DatabaseContext::class)))->cacheKey('menu');
     }
 
     public function test_the_console_cannot_read_school_data(): void
