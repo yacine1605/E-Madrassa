@@ -75,6 +75,68 @@ final class AcademicWorkflowTest extends TestCase
         $this->assertSame(1, DB::connection('owner')->table('school.enrollment')->where('tenant_id', $school->id)->count());
     }
 
+    public function test_an_enrolled_minor_keeps_a_primary_contact_with_a_phone(): void
+    {
+        [, , $year, $node] = $this->manager();
+        $program = $this->program($year, $node);
+        $student = $this->pupil(['birth_date' => '2012-01-01']);
+        $father = $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550123456'])->assertCreated()->json('data');
+        $link = $this->postJson('/api/students/'.$student['id'].'/guardians', ['guardian_id' => $father['id'], 'relationship' => 'father', 'is_primary_contact' => true])
+            ->assertCreated()->json('data');
+        $this->enroll($student, $program);
+        // FR-ELV-02: the last primary contact, their phone or their link stay while the minor is enrolled.
+        $this->putJson('/api/students/'.$student['id'].'/guardians/'.$link['id'], ['relationship' => 'father', 'is_primary_contact' => false, 'version' => 1])
+            ->assertConflict()->assertJsonPath('code', 'primary_contact_kept')->assertJsonPath('message', __('errors.primary_contact_kept'));
+        $this->postJson('/api/students/'.$student['id'].'/guardians/'.$link['id'].'/archive', ['reason' => 'Erreur de saisie', 'version' => 1])
+            ->assertConflict()->assertJsonPath('code', 'primary_contact_kept');
+        $this->putJson('/api/guardians/'.$father['id'], ['phone' => null, 'version' => 1])->assertConflict()->assertJsonPath('code', 'primary_contact_kept');
+        // Another primary contact named first, the father steps back.
+        $mother = $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Mina', 'phone' => '0661223344'])->assertCreated()->json('data');
+        $this->postJson('/api/students/'.$student['id'].'/guardians', ['guardian_id' => $mother['id'], 'relationship' => 'mother', 'is_primary_contact' => true])->assertCreated();
+        $this->putJson('/api/students/'.$student['id'].'/guardians/'.$link['id'], ['relationship' => 'father', 'is_primary_contact' => false, 'version' => 1])
+            ->assertOk()->assertJsonPath('data.is_primary_contact', false);
+        $this->putJson('/api/guardians/'.$father['id'], ['phone' => null, 'version' => 1])->assertOk();
+    }
+
+    public function test_a_transfer_cancels_the_enrolment_it_leaves_and_links_the_one_it_goes_to_once(): void
+    {
+        [$school, , $year, $node, $site] = $this->manager();
+        $from = $this->program($year, $node);
+        $to = $this->program($year, $node, ['base_price' => '95000.00']);
+        $classFrom = $this->group($from, $site);
+        $classTo = $this->group($to, $site);
+        $student = $this->pupil();
+        $source = $this->enroll($student, $from);
+        $this->assign($source, $classFrom);
+        $source = $this->postJson('/api/enrollments/'.$source['id'].'/validate', ['version' => 1, 'reason' => 'Dossier complet'])->assertOk()->json('data');
+        $key = (string) Str::uuid();
+        $transfer = fn (array $extra = []) => $this->postJson('/api/enrollments/'.$source['id'].'/transfer', ['program_id' => $to['id'],
+            'idempotency_key' => $key, 'version' => $source['version'], 'reason' => 'Changement de filière', ...$extra]);
+        $transfer(['program_id' => $from['id']])->assertConflict()->assertJsonPath('code', 'transfer_same_program');
+        $transfer(['version' => 1])->assertConflict()->assertJsonPath('code', 'stale_version');
+        $inactive = $this->program($year, $node, ['status' => 'inactive']);
+        $transfer(['program_id' => $inactive['id']])->assertConflict()->assertJsonPath('code', 'program_not_active');
+        $this->getJson('/api/enrollments/'.$source['id'])->assertOk()->assertJsonPath('data.status', 'validated')->assertJsonPath('data.main_group.id', $classFrom['id']);
+        // FR-INS-03 AC2: the source cancelled with the reason and its place given back, the target pending at its price, linked.
+        $response = $transfer()->assertCreated()->assertJsonPath('data.status', 'pending')->assertJsonPath('data.transferred_from', $source['id'])
+            ->assertJsonPath('data.terms_snapshot.base_price', '95000.00')->assertJsonPath('data.transfer_source.code', $from['code'])
+            ->assertJsonPath('previous.status', 'cancelled')->assertJsonPath('previous.status_reason', 'Changement de filière');
+        $target = $response->json('data.id');
+        $response->assertJsonPath('previous.transfer_target.id', $target);
+        $this->getJson('/api/groups/'.$classFrom['id'].'/memberships')->assertOk()->assertJsonPath('meta.total', 0);
+        $this->getJson('/api/enrollments/'.$source['id'].'/history')->assertOk()->assertJsonPath('data.2.to_status', 'cancelled')
+            ->assertJsonPath('data.2.reason', 'Changement de filière');
+        // Sent twice (a double click, a retry): the same transfer.
+        $transfer()->assertCreated()->assertJsonPath('data.id', $target);
+        $transfer(['idempotency_key' => (string) Str::uuid()])->assertConflict()->assertJsonPath('code', 'enrollment_cancelled');
+        $this->assertSame(2, DB::connection('owner')->table('school.enrollment')->where('tenant_id', $school->id)->count());
+        $this->assign(['id' => $target], $classTo);
+        $this->getJson('/api/enrollments/'.$target)->assertOk()->assertJsonPath('data.main_group.id', $classTo['id']);
+        // The link is never sent by the client.
+        $this->postJson('/api/enrollments', ['student_id' => $student['id'], 'program_id' => $from['id'], 'idempotency_key' => (string) Str::uuid(),
+            'transferred_from' => $source['id']])->assertUnprocessable();
+    }
+
     public function test_exact_prices_version_and_snapshot_survive_catalogue_changes_and_idempotent_retries(): void
     {
         [, , $year, $node] = $this->manager();

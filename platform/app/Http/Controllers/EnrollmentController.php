@@ -22,7 +22,11 @@ final class EnrollmentController
          FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id) AS student,
         (SELECT jsonb_build_object('id', g.id, 'code', g.code, 'labels', g.labels) FROM school.group_membership m
            JOIN school.study_group g ON g.tenant_id = m.tenant_id AND g.id = m.group_id
-         WHERE m.tenant_id = enrollment.tenant_id AND m.enrollment_id = enrollment.id AND m.is_main AND m.valid_to IS NULL) AS main_group";
+         WHERE m.tenant_id = enrollment.tenant_id AND m.enrollment_id = enrollment.id AND m.is_main AND m.valid_to IS NULL) AS main_group,
+        (SELECT jsonb_build_object('id', t.id, 'code', t.terms_snapshot ->> 'code', 'labels', t.terms_snapshot -> 'labels') FROM school.enrollment t
+         WHERE t.tenant_id = enrollment.tenant_id AND t.id = enrollment.transferred_from) AS transfer_source,
+        (SELECT jsonb_build_object('id', t.id, 'code', t.terms_snapshot ->> 'code', 'labels', t.terms_snapshot -> 'labels') FROM school.enrollment t
+         WHERE t.tenant_id = enrollment.tenant_id AND t.transferred_from = enrollment.id) AS transfer_target";
     // FR-ELV-04: an enrolment is found by its pupil's names or matricule, among the pupils the reader may see.
     private const PUPIL = "(SELECT concat_ws(' ', s.matricule, s.last_name_ar, s.first_name_ar, s.last_name_lat, s.first_name_lat)
         FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id)";
@@ -73,6 +77,27 @@ final class EnrollmentController
         return ['data' => $this->present($changed)];
     }
 
+    /**
+     * FR-INS-03: to another programme, in one go (SQL 027): this enrolment cancelled with the reason
+     * and its places given back, the new one pending at the price of the day, linked to it. The same
+     * key again answers the same transfer. Payments are carried over with lot 3's finance.
+     */
+    public function transfer(Request $request, string $enrollment)
+    {
+        $row = $this->find($enrollment, true);
+        $this->records->global('enrollment.enrollment.create');
+        $this->records->action('enrollment.enrollment.cancel', 'enrollment', $row->id);
+        $data = $request->validate(['program_id' => 'required|uuid', 'idempotency_key' => 'required|uuid', 'version' => 'required|integer|min:1',
+            'reason' => 'required|string|min:3|max:500']);
+        $this->records->find('program', $data['program_id']);
+        $this->records->reason($data['reason']);
+        $id = DB::selectOne('SELECT school.transfer_enrollment(?, ?, ?, ?, ?) AS id',
+            [$row->id, $data['program_id'], $data['idempotency_key'], $data['reason'], $data['version']])->id;
+        // As for a cancellation: the source may now be out of a group-based read scope.
+        $source = DB::selectOne('SELECT '.self::COLUMNS.' FROM school.enrollment WHERE tenant_id = ? AND id = ?', [$this->school->id(), $row->id]);
+        return response()->json(['data' => $this->present($this->find($id)), 'previous' => $source ? $this->present($source) : null], 201);
+    }
+
     public function history(Request $request, string $enrollment)
     {
         $this->find($enrollment);
@@ -93,5 +118,5 @@ final class EnrollmentController
     }
 
     private function find(string $id, bool $lock = false): object { return $this->records->find('enrollment', $id, $lock, self::COLUMNS); }
-    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot', 'student', 'main_group']); }
+    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot', 'student', 'main_group', 'transfer_source', 'transfer_target']); }
 }

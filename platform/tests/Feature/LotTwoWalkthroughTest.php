@@ -115,6 +115,41 @@ final class LotTwoWalkthroughTest extends TestCase
         });
     }
 
+    public function test_a_minor_keeps_their_primary_contact_and_changes_programme_through_the_screens(): void
+    {
+        [$school, $manager] = $this->manager();
+        $year = $this->postJson('/api/years', ['code' => '2026-2027', 'start_date' => '2026-09-01', 'end_date' => '2027-06-30', 'status' => 'current'])->json('data.id');
+        $node = DB::connection('owner')->table('school.ref_node')->where('tenant_id', $school->id)->where('code', '1AS')->value('id');
+        $site = DB::connection('owner')->table('school.site')->where('tenant_id', $school->id)->value('id');
+        [$sciences, $letters] = array_map(fn (string $code) => $this->postJson('/api/programs', ['year_id' => $year, 'node_id' => $node, 'code' => $code,
+            'labels' => ['fr' => $code], 'base_price' => '100000', 'status' => 'active'])->assertCreated()->json('data.id'), ['1AS-SCI', '1AS-LET']);
+        [$classS, $classL] = array_map(fn (array $class) => $this->postJson('/api/groups', ['year_id' => $year, 'group_type' => 'class', 'program_id' => $class[0],
+            'site_id' => $site, 'code' => $class[1], 'labels' => ['fr' => $class[1]], 'capacity' => 25, 'valid_from' => '2026-09-01', 'status' => 'active'])
+            ->assertCreated()->json('data.id'), [[$sciences, 'SCI-A'], [$letters, 'LET-A']]);
+        $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Amine', 'birth_date' => '2012-05-01'])->json('data.id');
+        $father = $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Karim', 'phone' => '0550123456'])->json('data.id');
+        $link = $this->postJson('/api/students/'.$pupil.'/guardians', ['guardian_id' => $father, 'relationship' => 'father', 'is_primary_contact' => true])->json('data.id');
+        $source = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $sciences, 'idempotency_key' => (string) Str::uuid()])->json('data.id');
+        $this->postJson('/api/groups/'.$classS.'/memberships', ['enrollment_id' => $source])->assertCreated();
+        $this->within($school, $manager, function () use ($pupil, $link, $source, $letters, $classL) {
+            // FR-ELV-02: the enrolled minor's only primary contact stays.
+            Livewire::withQueryParams(['student' => $pupil])->test(StudentSheet::class)
+                ->callTableAction('unlink', $link, data: ['reason' => 'Erreur de saisie'])->assertNotified(__('errors.primary_contact_kept'));
+            $this->assertNull(DB::table('school.student_guardian')->where('id', $link)->value('archived_at'));
+            // FR-INS-03: to the letters programme and its class, in one go.
+            Livewire::test(Enrollments::class)->callTableAction('transfer', $source, data: ['program_id' => $letters, 'group_id' => $classL,
+                'reason' => 'Réorientation en lettres'])->assertNotified(__('schooling.transferred'))
+                ->assertTableActionHidden('transfer', $source)->assertTableActionHidden('cancel', $source);
+            $target = DB::table('school.enrollment')->where('transferred_from', $source)->first();
+            $this->assertSame(['cancelled', 'pending'], [DB::table('school.enrollment')->where('id', $source)->value('status'), $target->status]);
+            $this->assertSame($classL, DB::table('school.group_membership')->where('enrollment_id', $target->id)->whereNull('valid_to')->value('group_id'));
+            Livewire::test(Enrollments::class)->mountTableAction('history', $target->id)->assertMountedActionModalSee(__('schooling.transferred_from'))
+                ->assertMountedActionModalSee('1AS-SCI');
+            Livewire::test(Enrollments::class)->mountTableAction('history', $source)->assertMountedActionModalSee(__('schooling.transferred_to'))
+                ->assertMountedActionModalSee('1AS-LET')->assertMountedActionModalSee('Réorientation en lettres');
+        });
+    }
+
     public function test_the_enrolment_form_offers_active_programmes_only_and_the_pages_follow_their_permissions(): void
     {
         [$school, $manager] = $this->manager();

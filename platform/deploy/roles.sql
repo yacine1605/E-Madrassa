@@ -137,6 +137,8 @@ GRANT EXECUTE ON FUNCTION school.student_enrollment_count(uuid) TO school_runtim
 -- Undoing an import of pupils, guardians or enrolments (025): what it created, nothing built on since.
 GRANT EXECUTE ON FUNCTION school.discard_student(uuid), school.discard_guardian(uuid), school.discard_guardian_link(uuid),
   school.discard_enrollment(uuid) TO school_runtime;
+-- A transfer from one programme to another (027): with the writer's rights, each step its permission.
+GRANT EXECUTE ON FUNCTION school.transfer_enrollment(uuid, uuid, uuid, text, integer) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -222,6 +224,10 @@ ALTER FUNCTION school.discard_enrollment(uuid) OWNER TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.setting_value(text) TO platform_provisioner;
 ALTER FUNCTION school.check_student_photo() OWNER TO platform_provisioner;
 ALTER FUNCTION school.retire_student_photo() OWNER TO platform_provisioner;
+-- An enrolled minor's primary contact, a transfer's link (027): rows the writer may not see, the pupil's row locked.
+ALTER FUNCTION school.keep_primary_contact(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_primary_contact() OWNER TO platform_provisioner;
+ALTER FUNCTION school.link_transfer() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

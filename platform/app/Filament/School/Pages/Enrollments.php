@@ -11,14 +11,19 @@ use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 /**
  * FR-INS-01 to FR-INS-03: the enrolments, at the price and terms of their day (BR-11), their
@@ -71,6 +76,7 @@ final class Enrollments extends SchoolingPage
                 $this->stateAction('suspend', 'suspend', 'enrollment.enrollment.suspend', ['validated'], 'warning'),
                 $this->stateAction('cancel', 'cancel', 'enrollment.enrollment.cancel', ['pending', 'validated', 'suspended'], 'danger')
                     ->modalDescription(__('schooling.cancel_help')),
+                $this->transferAction(),
                 Action::make('history')->label(__('schooling.history'))->modalHeading(__('schooling.history'))->modalSubmitAction(false)
                     ->schema(fn (array $record) => $this->history($record)),
             ])]);
@@ -84,6 +90,36 @@ final class Enrollments extends SchoolingPage
             ->schema([$this->reason()])
             ->action(fn (array $record, array $data) => SchoolScreen::changeFor($permission, 'enrollment', $record['id'],
                 fn () => SchoolScreen::call($permission, EnrollmentController::class, $method, [...$data, 'version' => $record['version']], ['enrollment' => $record['id']])));
+    }
+
+    /**
+     * FR-INS-03: to another active programme, with its class at once if the reader may place pupils.
+     * The form's key is made when it opens: sent twice, it makes one transfer (TST-08).
+     */
+    private function transferAction(): Action
+    {
+        return Action::make('transfer')->label(__('schooling.enrollment_actions.transfer'))->modalDescription(__('schooling.transfer_help'))
+            ->visible(fn (array $record) => in_array($record['status'], ['pending', 'validated', 'suspended'], true)
+                && $this->writable('enrollment.enrollment.create') && $this->writableFor('enrollment.enrollment.cancel', 'enrollment', $record['id']))
+            ->schema(fn (array $record) => [
+                Select::make('program_id')->label(__('schooling.transfer_program'))->required()->searchable()->live()->helperText(__('schooling.active_programs_only'))
+                    ->getSearchResultsUsing(fn (string $search) => array_diff_key($this->activePrograms($search), [$record['program_id'] => true]))
+                    ->getOptionLabelUsing(fn ($value) => $this->programName($value))->afterStateUpdated(fn (Set $set) => $set('group_id', null)),
+                Select::make('group_id')->label(__('schooling.main_group'))->helperText(__('schooling.enrol_group_help'))
+                    ->visible(fn (Get $get) => filled($get('program_id')) && $this->writable('group.membership.manage'))
+                    ->options(fn (Get $get) => $this->mainGroups($get('program_id'))),
+                $this->reason(),
+                Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),
+            ])
+            ->action(fn (array $record, array $data) => SchoolScreen::changeFor('enrollment.enrollment.cancel', 'enrollment', $record['id'], function () use ($record, $data) {
+                $target = SchoolScreen::call('enrollment.enrollment.cancel', EnrollmentController::class, 'transfer', ['program_id' => $data['program_id'],
+                    'idempotency_key' => $data['idempotency_key'], 'reason' => $data['reason'], 'version' => $record['version']], ['enrollment' => $record['id']]);
+                // The same form sent again finds the new enrolment already in this group.
+                if (!empty($data['group_id']) && ($target['data']['main_group']['id'] ?? null) !== $data['group_id']) {
+                    SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'store', ['enrollment_id' => $target['data']['id']], ['group' => $data['group_id']]);
+                }
+                return $target;
+            }, fn () => Notification::make()->title(__('schooling.transferred'))->success()));
     }
 
     /** @return array<string, string> the open groups of the enrolment's year: its programme's classes, and any support or option group */
@@ -100,7 +136,12 @@ final class Enrollments extends SchoolingPage
     {
         $states = SchoolScreen::call('enrollment.enrollment.read', EnrollmentController::class, 'history', ['per_page' => 100], ['enrollment' => $record['id']])['data'];
         $groups = SchoolScreen::call('enrollment.enrollment.read', EnrollmentController::class, 'groups', ['per_page' => 100], ['enrollment' => $record['id']])['data'];
+        $link = fn (?array $enrollment) => $enrollment ? $enrollment['code'].' · '.Locales::label($enrollment['labels']) : null;
         return [
+            // FR-INS-03 AC2: the enrolment a transfer came from, or went to.
+            Section::make(__('schooling.transfer'))->compact()->columns(2)->visible($record['transfer_source'] !== null || $record['transfer_target'] !== null)
+                ->schema([TextEntry::make('transferred_from')->label(__('schooling.transferred_from'))->state($link($record['transfer_source']))->visible($record['transfer_source'] !== null),
+                    TextEntry::make('transferred_to')->label(__('schooling.transferred_to'))->state($link($record['transfer_target']))->visible($record['transfer_target'] !== null)]),
             Section::make(__('schooling.status_history'))->compact()->schema([RepeatableEntry::make('states')->hiddenLabel()->columns(3)
                 ->state(array_map(fn ($row) => ['when' => Formats::dateTime($row['changed_at']), 'reason' => $row['reason'],
                     'change' => ($row['from_status'] ? __('schooling.enrollment_states.'.$row['from_status']).' → ' : '').__('schooling.enrollment_states.'.$row['to_status'])], $states))

@@ -661,9 +661,23 @@ On the pupil's sheet, a new guardian who is already recorded (a brother's father
 
 Validation on 12 October 2026: **217 PHP integration tests (6,917 assertions)**, among them the key checked against the database's for French, Arabic and digits; no migration, so the SQL suites, the rollback and the browser screens are unchanged (the new warnings appear in forms only).
 
+## Increment 40 (lot 2): an enrolled minor's primary contact, and a programme transfer
+
+`027_enrolment_continuity.sql`:
+
+- **FR-ELV-02**: a minor enrolled in a year still open keeps at least one primary contact with a phone, as the enrolment required. A link no longer primary, archived or deleted, a guardian whose phone is cleared or who is archived, a birth date that makes the pupil a minor: each is refused (`primary_contact_kept`) if it would leave none. Another contact is named first, then the previous one steps back. The check locks the pupil's row: two secretaries each unsetting one of two contacts at the same moment leave one (native concurrency check). A cancelled enrolment, an adult, a closed year: nothing to keep. A later change of the school's majority age is not rechecked.
+- **FR-INS-03**: `POST /api/enrollments/{id}/transfer` with `program_id`, `idempotency_key`, `version` and `reason` (`enrollment.enrollment.cancel` on the enrolment, `enrollment.enrollment.create` for the whole school). In one transaction, the enrolment is cancelled with the reason and its places given back; the new one is made by the enrolment's own rules (an active programme, the price of the day, the quota, a minor's contact), pending, and linked to it (`transferred_from`, set by the database alone, once per source). If the new enrolment is refused, nothing changed. The same key again answers the same transfer, including two requests at the same moment. Each enrolment shows `transfer_source` and `transfer_target`. Carrying payments over belongs to lot 3.
+
+On screen, the Enrollments list offers **Transfer to another programme** (active programmes, the new class at once), and the history shows where an enrolment came from or went to. The pupil's sheet says why a primary contact cannot be removed.
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-02 | `tests/sql/database.mjs`: unset, archived, phone cleared, guardian archived, birth date corrected, all refused while enrolled; another contact first; two contacts unset at once (native). `AcademicWorkflowTest`, `LotTwoWalkthroughTest`: through the API and the sheet |
+| FR-INS-03 AC2, TST-08 | `tests/sql/database.mjs`: source cancelled with its reason and history, place given back, target at its price and linked; same programme, stale version, second transfer refused; the link not writable nor claimable; two requests at once make one (native). `AcademicWorkflowTest`: an inactive target changes nothing; retry. `LotTwoWalkthroughTest`: from the Enrollments screen with the new class, both histories |
+
 ## Next increments of lot 2
 
-1. Scoped creation, continuing primary-contact validity and the retention decision OD-07.
-2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; programme transfers, payment-based access and annual progression.
+1. Scoped creation (a decision first: what places a new pupil within a site's reach) and the retention decision OD-07.
+2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

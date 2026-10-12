@@ -1318,6 +1318,73 @@ await check('a failed group transfer preserves the source assignment and its pla
   assert.equal((await first('SELECT valid_to FROM school.group_membership WHERE id = $1', [membership])).valid_to, null);
 });
 
+// An enrolment's continuity (SQL 027): an enrolled minor's primary contact kept, a programme left for another.
+const linkOf = async (student, guardian) => (await first('SELECT id FROM school.student_guardian WHERE student_id = $1 AND guardian_id = $2', [student, guardian])).id;
+const UNSET_PRIMARY = 'UPDATE school.student_guardian SET is_primary_contact = false WHERE id = $1';
+await check('an enrolled minor keeps a primary contact with a phone; another one is named first (FR-ELV-02)', async () => {
+  await as('school_runtime', a, 1);
+  const p = await programme('CONTACT');
+  const minor = (await newPupil('Contact', 'Rayan')).id;
+  const father = await contact(minor);
+  // Not enrolled yet: the contact changes freely.
+  await sql(UNSET_PRIMARY, [await linkOf(minor, father)]);
+  await sql('UPDATE school.student_guardian SET is_primary_contact = true WHERE id = $1', [await linkOf(minor, father)]);
+  const enrolment = await enroll(minor, p);
+  await rejects(UNSET_PRIMARY, [await linkOf(minor, father)], '23514', 'primary_contact_kept');
+  await rejects('UPDATE school.student_guardian SET archived_at = now() WHERE id = $1', [await linkOf(minor, father)], '23514', 'primary_contact_kept');
+  await rejects('UPDATE school.guardian SET phone = NULL WHERE id = $1', [father], '23514', 'primary_contact_kept');
+  await rejects("UPDATE school.guardian SET phone = '  ' WHERE id = $1", [father], '23514', 'primary_contact_kept');
+  await rejects('UPDATE school.guardian SET archived_at = now() WHERE id = $1', [father], '23514', 'primary_contact_kept');
+  await sql("UPDATE school.guardian SET phone = '0661 99 88 77' WHERE id = $1", [father]);
+  // The mother named first, the father then steps back.
+  const mother = await contact(minor, '0770 11 22 33');
+  await sql(UNSET_PRIMARY, [await linkOf(minor, father)]);
+  await rejects(UNSET_PRIMARY, [await linkOf(minor, mother)], '23514', 'primary_contact_kept');
+  // Once the enrolment is cancelled, nothing is kept.
+  await sql("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Départ de la famille' WHERE id = $1", [enrolment]);
+  await sql(UNSET_PRIMARY, [await linkOf(minor, mother)]);
+  // An enrolled pupil whose corrected birth date makes them a minor needs a contact.
+  const grown = (await newAdult('Majeur', 'Karim')).id;
+  await enroll(grown, p);
+  await rejects("UPDATE school.student SET birth_date = '2013-01-01' WHERE id = $1", [grown], '23514', 'primary_contact_kept');
+  await sql("UPDATE school.student SET birth_date = '1996-01-01' WHERE id = $1", [grown]);
+});
+const TRANSFER = 'SELECT school.transfer_enrollment($1, $2, $3, $4, $5) AS id';
+const versionOf = async enrolment => (await first('SELECT version FROM school.enrollment WHERE id = $1', [enrolment])).version;
+await check('a transfer cancels the enrolment it leaves and makes the one it goes to, linked, once (FR-INS-03 AC2)', async () => {
+  await as('school_runtime', a, 1);
+  const from = await programme('TRANSFERT-A');
+  const to = await programme('TRANSFERT-B', 95000);
+  const classA = await group('TRANSFERT-A1', from, 5);
+  const pupil = (await newAdult('Transfert', 'Ines')).id;
+  const source = await enroll(pupil, from);
+  await joinGroup(source, classA);
+  await rejects(TRANSFER, [source, from, uuid(), 'Même programme', await versionOf(source)], '23514', 'transfer_same_program');
+  await rejects(TRANSFER, [source, to, uuid(), 'Version ancienne', 99], '23514', 'stale_version');
+  const key = uuid();
+  const target = (await first(TRANSFER, [source, to, key, 'Changement de filière', await versionOf(source)])).id;
+  const rows = Object.fromEntries((await sql(`SELECT id, status, status_reason, transferred_from, agreed_price::text AS price
+    FROM school.enrollment WHERE id IN ($1, $2)`, [source, target])).rows.map(r => [r.id, r]));
+  assert.deepEqual([rows[source].status, rows[source].status_reason, rows[source].transferred_from], ['cancelled', 'Changement de filière', null]);
+  assert.deepEqual([rows[target].status, rows[target].transferred_from, rows[target].price], ['pending', source, '95000.00']);
+  assert.equal(await members(classA), 0, 'the class place is given back');
+  assert.deepEqual((await sql('SELECT from_status, to_status, reason FROM school.enrollment_status_history WHERE enrollment_id = $1 ORDER BY changed_at, from_status NULLS FIRST', [source])).rows
+    .map(r => [r.from_status, r.to_status, r.reason]), [[null, 'pending', null], ['pending', 'cancelled', 'Changement de filière']]);
+  // The same request again: the same transfer, nothing more; another one from a cancelled enrolment: refused.
+  assert.equal((await first(TRANSFER, [source, to, key, 'Changement de filière', 1])).id, target);
+  await rejects(TRANSFER, [source, to, uuid(), 'Encore', await versionOf(source)], '23514', 'enrollment_cancelled');
+  // The link is the database's: the application can neither change it nor claim it for an enrolment it did not cancel just now.
+  await rejects('UPDATE school.enrollment SET transferred_from = NULL WHERE id = $1', [target], '42501');
+  const other = await enroll((await newAdult('Transfert', 'Sami')).id, from);
+  await sql('BEGIN');
+  try {
+    await sql("SELECT set_config('app.transfer_from', $1, true)", [other]);
+    await rejects(ENROLL, [pupil, from, uuid()], '23514', 'transfer_invalid');
+  } finally {
+    await sql('ROLLBACK');
+  }
+});
+
 // The reference import (FR-IMP-01, lot 2 exit; SQL 025): pupils and guardians keep the reference of
 // the school's file; an import is undone while nothing depends on what it created.
 const STUDENT_REF = STUDENT.replace('custom)', 'custom, external_ref)').replace('$7)', '$7, $8)');
@@ -2020,6 +2087,39 @@ if (PgClient) {
       await Promise.all(clients.map(c => c.end()));
       await sql('UPDATE platform.tenant_entitlement SET quota_active_students = $2 WHERE tenant_id = $1', [a, quota]);
     }
+  });
+  await check('two primary contacts unset at once leave one of them to an enrolled minor (FR-ELV-02)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('CONTACT-RACE');
+    const minor = (await newPupil('Course', 'Contact')).id;
+    const guardians = [await contact(minor), await contact(minor, '0770 00 00 00')];
+    await enroll(minor, p);
+    const links = await Promise.all(guardians.map(g => linkOf(minor, g)));
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(UNSET_PRIMARY, [links[i]]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'primary_contact_kept');
+    assert.equal(await count('SELECT count(*) n FROM school.student_guardian WHERE student_id = $1 AND is_primary_contact', [minor]), 1);
+  });
+  await check('a transfer asked for twice at the same moment is made once (FR-INS-03, TST-08)', async () => {
+    await as('school_runtime', a, 1);
+    const [from, to] = [await programme('TRANSFERT-COURSE-A'), await programme('TRANSFERT-COURSE-B')];
+    const source = await enroll((await newAdult('Course', 'Transfert')).id, from);
+    const key = uuid();
+    const version = await versionOf(source);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const ids = await Promise.all(clients.map(c => c.query(TRANSFER, [source, to, key, 'Changement de filière', version]).then(r => r.rows[0].id)));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(ids[0], ids[1]);
+    assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE transferred_from = $1', [source]), 1);
   });
   await check('a concurrent cancellation prevents an assignment from leaving a place occupied (FR-INS-03)', async () => {
     await as('school_runtime', a, 1);
