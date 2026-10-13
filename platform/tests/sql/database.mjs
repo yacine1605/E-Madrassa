@@ -1893,6 +1893,92 @@ await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [scopeSiteB]);
 await as('school_runtime', a, 1);
 
+// Retention per category (SQL 030, decision of 13 October 2026; NFR-DATA-03, FR-ELV-03, BR-17).
+const RETAIN = 'SELECT archived, anonymised, guardians, journal, kept FROM platform.apply_retention(100) WHERE tenant_id = $1';
+// Dates in the past, as years of school life would leave them: written around the rules, by the owner.
+const backdate = async (table, id, values) => {
+  await as(null);
+  await sql(`ALTER TABLE school.${table} DISABLE TRIGGER USER`);
+  for (const [column, value] of Object.entries(values)) await sql(`UPDATE school.${table} SET ${column} = $2 WHERE id = $1`, [id, value]);
+  await sql(`ALTER TABLE school.${table} ENABLE TRIGGER USER`);
+};
+await check('a pupil who leaves has a departure day; neither the application nor the owner passes for the retention run (FR-ELV-03, NFR-DATA-03)', async () => {
+  await as('school_runtime', a, 1);
+  const p = (await newAdult('Depart', 'Date')).id;
+  await sql("UPDATE school.student SET status = 'former' WHERE id = $1", [p]);
+  assert.equal((await first('SELECT left_on::text AS d FROM school.student WHERE id = $1', [p])).d, today);
+  await rejects('UPDATE school.student SET left_on = NULL WHERE id = $1', [p], '42501');
+  await rejects('UPDATE school.student SET anonymised_at = now() WHERE id = $1', [p], '42501');
+  await sql("SELECT set_config('app.retention', 'on', false)");
+  await rejects("UPDATE school.student SET phone = '0550' WHERE id = $1", [p], '23514', 'student_former');
+  await rejects('DELETE FROM school.audit_log WHERE object_id = $1', [p], '42501');
+  await as(null);
+  await sql("SELECT set_config('app.retention', 'on', false)");
+  await rejects('DELETE FROM school.audit_log WHERE object_id = $1', [p], '23514', 'immutable_record');
+  await sql("SELECT set_config('app.retention', '', false)");
+  // Each school sets its durations within the catalogue's bounds: never a journal kept less than five years.
+  await as('school_runtime', a, 1);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'retention.journal_years', '2')", [a], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'retention.finance_years', '5')", [a], '23514', 'setting_invalid');
+});
+await check('the run archives who left, anonymises a pupil after their category\'s years and a guardian after their last pupil, and purges the old journal (NFR-DATA-03)', async () => {
+  await as('school_runtime', a, 1);
+  const p = await programme('RETENTION');
+  const adult = (await newAdult('Retenu', 'Adulte')).id;
+  const minor = (await newPupil('Retenu', 'Mineur', '2015-06-20')).id;
+  const sibling = (await newPupil('Retenu', 'Frere', '2014-03-02')).id;
+  const father = await contact(minor, '0550 99 88 77');
+  await sql("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship, is_primary_contact) VALUES ($1, $2, $3, 'father', true)",
+    [a, sibling, father]);
+  const adultEnrolment = await enroll(adult, p);
+  const minorEnrolment = await enroll(minor, p);
+  for (const id of [adult, minor]) await sql("UPDATE school.student SET status = 'former' WHERE id = $1", [id]);
+  // FR-ELV-03: archived twelve months after leaving, by default.
+  assert.equal((await first(RETAIN, [a])), undefined, 'nothing due on the day they leave');
+  for (const id of [adult, minor]) await backdate('student', id, { left_on: '2020-06-30' });
+  assert.deepEqual(await first(RETAIN, [a]), { archived: 2, anonymised: 0, guardians: 0, journal: 0, kept: 0 });
+  // Archived four years ago: the minor's three years are over, the adult's ten are not.
+  await as('school_runtime', a, 1);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'retention.minor_years', '3')", [a]);
+  assert.deepEqual((await sql('SELECT category, due FROM school.retention_due() ORDER BY 1')).rows,
+    [{ category: 'archive', due: 0 }, { category: 'guardian', due: 0 }, { category: 'journal', due: 0 }, { category: 'pupil', due: 0 }]);
+  for (const id of [adult, minor]) await backdate('student', id, { archived_at: new Date(Date.now() - 4 * 365.25 * 864e5).toISOString() });
+  await as('school_runtime', a, 1);
+  assert.equal((await first("SELECT due FROM school.retention_due() WHERE category = 'pupil'")).due, 1);
+  await as('school_runtime', a, 9);
+  await rejects('SELECT * FROM school.retention_due()', [], '42501', 'permission_denied');
+  await as(null);
+  assert.deepEqual(await first(RETAIN, [a]), { archived: 0, anonymised: 1, guardians: 0, journal: 0, kept: 0 });
+  const anonymous = await first(`SELECT last_name_lat, first_name_lat = matricule AS by_matricule, last_name_ar, birth_date::text AS born, phone, custom,
+    external_ref, site_id IS NOT NULL AS site, anonymised_at IS NOT NULL AS done FROM school.student WHERE id = $1`, [minor]);
+  assert.deepEqual(anonymous, { last_name_lat: 'ANONYME', by_matricule: true, last_name_ar: null, born: '2015-01-01', phone: null, custom: {},
+    external_ref: null, site: true, done: true });
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE id = ANY ($1)', [[adultEnrolment, minorEnrolment]]), 2, 'enrolments stay');
+  assert.equal((await first("SELECT reason FROM school.audit_log WHERE object_type = 'student' AND object_id = $1 ORDER BY occurred_at DESC LIMIT 1", [minor])).reason,
+    'retention');
+  // The brother leaves and is anonymised too; their father stays while the minor still has an enrolment in an open year.
+  await backdate('student', sibling, { status: 'former', left_on: '2020-06-30', archived_at: new Date(Date.now() - 4 * 365.25 * 864e5).toISOString() });
+  assert.deepEqual(await first(RETAIN, [a]), { archived: 0, anonymised: 1, guardians: 0, journal: 0, kept: 1 });
+  assert.equal((await first('SELECT anonymised_at FROM school.guardian WHERE id = $1', [father])).anonymised_at, null);
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Départ de la famille' WHERE id = $1", [minorEnrolment]);
+  await as(null);
+  assert.deepEqual(await first(RETAIN, [a]), { archived: 0, anonymised: 0, guardians: 1, journal: 0, kept: 0 });
+  assert.deepEqual(await first('SELECT last_name_lat, phone, archived_at IS NOT NULL AS archived FROM school.guardian WHERE id = $1', [father]),
+    { last_name_lat: 'ANONYME', phone: null, archived: true });
+  // The journal: what is older than the school's years goes; the run leaves its counts.
+  const old = (await first("INSERT INTO school.audit_log (tenant_id, occurred_at, action, object_type, object_id) VALUES ($1, now() - interval '11 years', 'UPDATE', 'site', $2) RETURNING id",
+    [a, siteA])).id;
+  const recent = (await first("INSERT INTO school.audit_log (tenant_id, occurred_at, action, object_type, object_id) VALUES ($1, now() - interval '9 years', 'UPDATE', 'site', $2) RETURNING id",
+    [a, siteA])).id;
+  assert.deepEqual(await first(RETAIN, [a]), { archived: 0, anonymised: 0, guardians: 0, journal: 1, kept: 0 });
+  assert.deepEqual((await sql('SELECT id FROM school.audit_log WHERE id IN ($1, $2)', [old, recent])).rows.map(r => r.id), [recent]);
+  assert.deepEqual((await first("SELECT after FROM school.audit_log WHERE tenant_id = $1 AND action = 'RETENTION' ORDER BY occurred_at DESC LIMIT 1", [a])).after,
+    { archived: 0, anonymised: 0, guardians: 0, journal: 1, kept: 0 });
+  assert.equal(await first(RETAIN, [a]), undefined, 'a run with nothing to do leaves no entry');
+  await as('school_runtime', a, 1);
+});
+
 // Security review (SECURITY-REVIEW.md): what holds for every table and function, present and future
 await check('every table of a school forces row-level security, even on its owner (BR-01, NFR-TEN-01)', async () => {
   await as(null);

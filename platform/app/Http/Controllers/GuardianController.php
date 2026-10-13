@@ -14,7 +14,7 @@ final class GuardianController
     use HandlesLabels;
 
     private const SELECT = 'SELECT id, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
-        phone, email, profession, custom, site_id, version, archived_at, created_at, updated_at FROM school.guardian';
+        phone, email, profession, custom, site_id, anonymised_at, version, archived_at, created_at, updated_at FROM school.guardian';
     // With the guardian's name and phone, as the reader may see them (FR-ELV-02).
     private const LINKS = "SELECT id, student_id, guardian_id, relationship, is_primary_contact, is_payer,
         emergency_contact, version, archived_at,

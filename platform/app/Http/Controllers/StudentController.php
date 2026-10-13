@@ -14,7 +14,7 @@ final class StudentController
     use HandlesLabels;
 
     private const SELECT = 'SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
-        birth_date, birth_place, gender, phone, email, address, status, status_reason, origin_school, custom, site_id,
+        birth_date, birth_place, gender, phone, email, address, status, status_reason, origin_school, custom, site_id, left_on, anonymised_at,
         photo_file_id IS NOT NULL AS has_photo, version, archived_at, created_at, updated_at FROM school.student';
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records) {}

@@ -63,7 +63,7 @@ php artisan filament:assets                         # the console's styles and s
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
-Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, every minute).
+Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
 
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
@@ -720,9 +720,36 @@ The API takes `site_id` on pupils and guardians (`GET /api/students?site_id=`, `
 
 Validation on 13 October 2026: **223 PHP integration tests (7,410 assertions), 199 embedded SQL checks and 213 native PostgreSQL 16 checks including concurrency**; migration 029 rolled back alone with 594 pupils on 43 sites in place, then with all the others, and applied again (every pupil attached again). Local browser acceptance in Chromium: 140 screens without a problem.
 
+## Increment 43 (lot 2): a retention policy per category
+
+Decision of 13 October 2026: each school defines how long it keeps each category of data (NFR-DATA-03). `030_retention.sql`:
+
+| Setting | Category | Default | Bounds |
+|---|---|---|---|
+| `retention.former_archive_months` | A former pupil is archived (FR-ELV-03) | 12 months after leaving | 1–120 |
+| `retention.pupil_years` | An archived pupil's record is anonymised | 10 years after archiving | 1–50 |
+| `retention.minor_years` | The same, for a pupil who left as a minor (the school's majority age) | 10 years | 1–50 |
+| `retention.journal_years` | The journal's entries are deleted | 10 years | 5–50 |
+| `retention.finance_years` | Financial records, applied with lot 3 | 10 years | 10–50 |
+
+The defaults are proposals, to be validated by each school and a lawyer (OD-07).
+
+- A pupil's departure day (`left_on`) is set by the database when they become a former pupil; pupils who left before were given the day the journal recorded it.
+- `php artisan platform:retention` runs daily (scheduler) for every school, whatever its state: it archives the former pupils due, then anonymises the archived records due. An anonymised pupil keeps their matricule, birth year, gender, site, enrolments and groups; their names become `ANONYME` and their matricule, everything else personal goes (phone, e-mail, address, place of birth, school of origin, the school's own fields, import reference, account link, photo, whose files are then purged). A guardian is anonymised and archived once every pupil linked to them is: only their links remain. Journal entries older than the school's duration are deleted. At most `--limit` records per category and school (1,000 by default); the rest waits for the next night.
+- A record a rule still keeps (an enrolled minor's last primary contact) waits for a later run, counted as kept; any other error stops the run instead of keeping records forever unnoticed. Each run that changed something leaves its counts in the school's journal (`RETENTION`, reason `retention`).
+- Only this run gets past the rules that freeze a former pupil's record, a read-only school, the school's required fields and the journal (`school.retention_run()`: the provisioner, within the run's own flag); neither the application nor a migration does.
+- `GET /api/retention` (`tenant.settings.manage`): the school's durations and what the next run will do, as counts. On screen, **Settings** shows the durations among the other settings and a **Data retention** view of the next run.
+
+Not yet: the purge of an archived school (FR-PLT-01) belongs to the console; finance's duration waits for lot 3's records.
+
+| Requirement | Evidence |
+|---|---|
+| NFR-DATA-03, FR-ELV-03, BR-17 | `tests/sql/database.mjs`: departure day, nothing written by hand, the application and the owner refused the run's bypass, bounds; archived after leaving, a minor anonymised after the minors' years while an adult is not, the record as anonymised, enrolments kept, a guardian kept while an enrolled minor needs them then anonymised, the old journal purged and the run's counts journaled, a run with nothing to do leaving nothing. `RetentionTest`: the preview and its permission, the daily command archiving then anonymising a pupil and their guardian, the Settings view |
+
+Validation on 13 October 2026: **224 PHP integration tests (7,466 assertions), 201 embedded SQL checks and 215 native PostgreSQL 16 checks including concurrency**; migration 030 rolled back alone with anonymised records and retention settings in place, then with all the others, and applied again. Local browser acceptance in Chromium: 140 screens without a problem.
+
 ## Next increments of lot 2
 
-1. A retention policy per category (decision of 13 October 2026, NFR-DATA-03; default durations still to be validated, OD-07).
-2. Staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
+1. Staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

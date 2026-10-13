@@ -150,6 +150,8 @@ GRANT DELETE ON school.program_subject TO school_runtime;
 GRANT INSERT (site_id) ON school.student, school.guardian TO school_runtime;
 GRANT UPDATE (site_id) ON school.student, school.guardian TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.site_scope_ids(text, text) TO school_runtime;
+-- Retention (030): what the next run will do, for whoever manages the settings; the daily run, by the scheduler.
+GRANT EXECUTE ON FUNCTION school.retention_run(), school.retention_due(), platform.apply_retention(integer) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -246,6 +248,18 @@ ALTER FUNCTION school.check_program_subject() OWNER TO platform_provisioner;
 ALTER FUNCTION school.version_program_subject() OWNER TO platform_provisioner;
 -- A pupil's site (029): the sites a grant names, and the pupils, guardians and groups on them, whatever the reader may see.
 ALTER FUNCTION school.site_scope_ids(text, text) OWNER TO platform_provisioner;
+-- Retention (030): the run anonymises pupils and guardians and deletes the journal's old entries, alone (its flag).
+GRANT EXECUTE ON FUNCTION school.retention_run(), school.check_custom_values(text, jsonb), school.search_key(text),
+  school.person_name_valid(text, text, text, text) TO platform_provisioner;
+GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date, birth_place, phone, email, address, origin_school, custom,
+  external_ref, user_id, photo_file_id, photo_thumb_file_id, status_reason, anonymised_at) ON school.student TO platform_provisioner;
+GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, phone, email, profession, custom, external_ref, user_id, anonymised_at)
+  ON school.guardian TO platform_provisioner;
+GRANT DELETE ON school.audit_log TO platform_provisioner;
+ALTER FUNCTION platform.retention_value(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.retention_candidates(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.apply_retention(integer) OWNER TO platform_provisioner;
+ALTER FUNCTION school.retention_due() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

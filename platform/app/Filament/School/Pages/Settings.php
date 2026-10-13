@@ -2,6 +2,7 @@
 
 namespace App\Filament\School\Pages;
 
+use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\SettingController;
 use App\Support\Formats;
 use App\Support\Locales;
@@ -11,7 +12,9 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Section;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -35,7 +38,11 @@ final class Settings extends SchoolPage implements HasTable
     public function table(Table $table): Table
     {
         return $table->records(fn () => collect(SchoolScreen::call('tenant.settings.manage', SettingController::class, 'index')['data'])->keyBy('key')->all())
-            ->paginated(false)->columns([
+            ->paginated(false)->headerActions([
+                // NFR-DATA-03: what the next daily run will do with the school's durations.
+                Action::make('retention')->label(__('admin.retention'))->color('gray')->modalHeading(__('admin.retention'))
+                    ->modalDescription(__('admin.retention_help'))->modalSubmitAction(false)->schema(fn () => $this->retention()),
+            ])->columns([
                 TextColumn::make('labels')->label(__('admin.setting'))->state(fn (array $record) => Locales::label($record['labels'])),
                 TextColumn::make('value')->label(__('admin.value'))->wrap()->state(fn (array $record) => self::shown($record, $record['value'])),
                 TextColumn::make('default_value')->label(__('admin.default'))->wrap()->state(fn (array $record) => self::shown($record, $record['default_value'])),
@@ -47,6 +54,15 @@ final class Settings extends SchoolPage implements HasTable
                         fn () => SchoolScreen::call('tenant.settings.manage', SettingController::class, 'update', ['value' => self::stored($record, $data['value'] ?? null)],
                             ['key' => $record['key']]))),
             ]);
+    }
+
+    /** Counts only: what the next run archives, anonymises and purges. */
+    private function retention(): array
+    {
+        $due = SchoolScreen::call('tenant.settings.manage', RetentionController::class, 'show')['data']['due'];
+        return [Section::make(__('admin.retention_next'))->compact()->columns(['default' => 1, 'sm' => 2])->schema(array_map(
+            fn (string $category) => TextEntry::make('due_'.$category)->label(__('admin.retention_due.'.$category))->state(Formats::number($due[$category] ?? 0)),
+            ['archive', 'pupil', 'guardian', 'journal']))];
     }
 
     /** The form field for the setting's kind of value; the database still checks the value. */

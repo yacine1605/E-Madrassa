@@ -20,6 +20,7 @@ use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\ReferentialController;
+use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SchoolController;
@@ -130,6 +131,8 @@ Route::prefix('api')->group(function () {
 
             Route::get('settings', [SettingController::class, 'index'])->middleware('permission:tenant.settings.manage');
             Route::put('settings/{key}', [SettingController::class, 'update'])->middleware('permission:tenant.settings.manage');
+            // NFR-DATA-03: the retention policy and what its next run will do.
+            Route::get('retention', [RetentionController::class, 'show'])->middleware('permission:tenant.settings.manage');
 
             Route::get('accounts', [AccountController::class, 'index'])->middleware('permission:user.account.read');
             Route::middleware('permission:user.account.create')->group(function () {

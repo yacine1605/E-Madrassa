@@ -203,6 +203,19 @@ Artisan::command('platform:purge-files {--limit=500}', function () {
 
 Schedule::command('platform:purge-files')->daily()->withoutOverlapping();
 
+// NFR-DATA-03, FR-ELV-03: each school's retention policy, applied once a day.
+Artisan::command('platform:retention {--limit=1000}', function () {
+    $schools = 0;
+    foreach (DB::select('SELECT * FROM platform.apply_retention(?)', [(int) $this->option('limit')]) as $run) {
+        $schools++;
+        $this->info("School $run->tenant_id: $run->archived archived, $run->anonymised pupils and $run->guardians guardians anonymised, "
+            ."$run->journal journal entries purged, $run->kept kept by a rule.");
+    }
+    $this->info("Retention applied: $schools school(s) changed.");
+})->purpose("Archive, anonymise and purge what each school's retention policy says is due (as school_runtime)");
+
+Schedule::command('platform:retention')->daily()->withoutOverlapping();
+
 Artisan::command('platform:operator {email} {--revoke}', function (string $email) {
     $owner = DB::connection('owner');
     $user = $owner->table('users')->where('email', mb_strtolower($email))->value('id');
