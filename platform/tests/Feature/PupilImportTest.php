@@ -248,7 +248,7 @@ final class PupilImportTest extends TestCase
             DB::connection('owner')->insert('INSERT INTO school.custom_field (tenant_id, entity, key, field_type, required, is_sensitive, labels, sort_order)
                 VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)', [$school->id, 'student', $key, $type, $required, $sensitive, json_encode(['fr' => $key]), $order]);
         }
-        $this->assertStringStartsWith("\xEF\xBB\xBFexternal_ref;matricule;last_name_ar;first_name_ar;last_name_lat;first_name_lat;birth_date;birth_place;gender;phone;email;address;origin_school;custom_transport;custom_blood_group;duplicate_reason",
+        $this->assertStringStartsWith("\xEF\xBB\xBFexternal_ref;matricule;last_name_ar;first_name_ar;last_name_lat;first_name_lat;birth_date;birth_place;gender;phone;email;address;origin_school;site;custom_transport;custom_blood_group;duplicate_reason",
             $this->get('/api/imports/templates/students')->assertOk()->getContent());
         $file = fn (array $values) => [['external_ref' => 'C-1', 'last_name_lat' => 'Kaci', 'first_name_lat' => 'Nour', 'birth_date' => '2014-06-01', ...$values]];
         $this->assertSame([[2, 'custom_value_required']], $this->refused($this->import('students', $file(['custom_transport' => null, 'custom_blood_group' => 'A+']))));
@@ -265,6 +265,26 @@ final class PupilImportTest extends TestCase
             'custom_transport' => 'non', 'custom_blood_group' => 'O-']]);
         $this->assertSame([[2, 'permission_denied']], $this->refused($batch));
         $this->assertSame(__('errors.import_column_denied', ['column' => 'custom_blood_group']), $this->getJson('/api/imports/'.$batch['id'].'/rows')->json('data.0.error_message'));
+    }
+
+    public function test_a_pupil_is_recorded_on_the_site_its_row_names_and_a_guardian_on_their_pupil_s(): void
+    {
+        [$school] = $this->manager();
+        $annex = $this->postJson('/api/sites', ['code' => 'ANNEXE', 'labels' => ['fr' => 'Annexe']])->assertCreated()->json('data.id');
+        $default = DB::connection('owner')->table('school.site')->where('tenant_id', $school->id)->where('is_default', true)->value('id');
+        $row = fn (string $ref, ?string $site) => ['external_ref' => $ref, 'last_name_lat' => 'Site', 'first_name_lat' => $ref, 'birth_date' => '2001-01-01', 'site' => $site];
+        $this->assertSame([[4, 'reference_unknown']], $this->refused($this->import('students', [$row('S-1', 'ANNEXE'), $row('S-2', ''), $row('S-3', 'NULLE-PART')])));
+        $this->confirmed($this->import('students', [$row('S-1', 'ANNEXE'), $row('S-2', '')]));
+        $site = fn (string $ref) => DB::connection('owner')->table('school.student')->where('tenant_id', $school->id)->where('external_ref', $ref)->value('site_id');
+        $this->assertSame([$annex, $default], [$site('S-1'), $site('S-2')]);
+        $this->confirmed($this->import('guardians', [['external_ref' => 'R-1', 'student_ref' => 'S-1', 'relationship' => 'father',
+            'last_name_lat' => 'Site', 'first_name_lat' => 'Pere', 'phone' => '0550 10 20 30']]));
+        $this->assertSame($annex, DB::connection('owner')->table('school.guardian')->where('tenant_id', $school->id)->where('external_ref', 'R-1')->value('site_id'));
+        // A later file moves a pupil to another site; undone, the import puts them back.
+        $moved = $this->confirmed($this->import('students', [$row('S-2', 'ANNEXE')]));
+        $this->assertSame($annex, $site('S-2'));
+        $this->postJson('/api/imports/'.$moved['id'].'/rollback')->assertOk()->assertJsonPath('data.counts.undone', 1);
+        $this->assertSame($default, $site('S-2'));
     }
 
     public function test_a_pupil_import_needs_its_module_and_the_permission_for_the_whole_school(): void

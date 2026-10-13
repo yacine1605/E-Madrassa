@@ -27,6 +27,7 @@ return [
     'group_type_help' => 'Une classe ou une session est le groupe principal des élèves de son programme.',
     'group_states' => ['draft' => 'brouillon', 'active' => 'ouvert', 'closed' => 'fermé'],
     'site' => 'Site',
+    'record_site_help' => 'Le site qui suit ce dossier : son équipe le lit et le met à jour.',
     'capacity' => 'Places',
     'capacity_help' => 'Jamais moins que le nombre d’élèves affectés.',
     'places' => 'Élèves / places',

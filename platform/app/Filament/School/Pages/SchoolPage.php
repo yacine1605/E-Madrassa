@@ -57,6 +57,7 @@ abstract class SchoolPage extends Page
 
     protected function writable(string $permission): bool { return SchoolScreen::writable($permission); }
     protected function writableFor(string $permission, string $entity, string $id): bool { return SchoolScreen::writableFor($permission, $entity, $id); }
+    protected function creatable(string $permission, ?string $site = null): bool { return SchoolScreen::creatable($permission, $site); }
 
     /** A page of the list the API gives, with its total (NFR-PERF-04): the screen never loads the whole list. */
     protected function apiPage(string|array $permission, string $controller, string $method, array $data, int $page, int $perPage, array $parameters = []): LengthAwarePaginator

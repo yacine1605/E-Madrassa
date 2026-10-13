@@ -29,7 +29,7 @@ trait EnrolsPupils
     /** @param ?string $student the pupil, when the form is the pupil's own (their sheet) */
     protected function enrolAction(?string $student = null): Action
     {
-        return Action::make('enrol')->label(__('schooling.enrol'))->visible(fn () => $this->writable('enrollment.enrollment.create') && $this->enrollable())
+        return Action::make('enrol')->label(__('schooling.enrol'))->visible(fn () => $this->creatable('enrollment.enrollment.create', $this->enrolmentSite()) && $this->enrollable())
             ->schema(fn () => [
                 ...($student === null ? [Select::make('student_id')->label(__('schooling.student'))->required()->searchable()
                     ->getSearchResultsUsing(fn (string $search) => $this->studentOptions($search))->getOptionLabelUsing(fn ($value) => $this->studentLabel($value))] : []),
@@ -37,11 +37,11 @@ trait EnrolsPupils
                     ->getSearchResultsUsing(fn (string $search) => $this->activePrograms($search))->getOptionLabelUsing(fn ($value) => $this->programName($value))
                     ->afterStateUpdated(fn (Set $set) => $set('group_id', null)),
                 Select::make('group_id')->label(__('schooling.main_group'))->helperText(__('schooling.enrol_group_help'))
-                    ->visible(fn (Get $get) => filled($get('program_id')) && $this->writable('group.membership.manage'))
+                    ->visible(fn (Get $get) => filled($get('program_id')) && $this->creatable('group.membership.manage'))
                     ->options(fn (Get $get) => $this->mainGroups($get('program_id'))),
                 Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),
             ])
-            ->action(fn (array $data) => SchoolScreen::change('enrollment.enrollment.create', function () use ($data, $student) {
+            ->action(fn (array $data) => SchoolScreen::changeAt('enrollment.enrollment.create', $this->enrolmentSite(), function () use ($data, $student) {
                 $enrollment = SchoolScreen::call('enrollment.enrollment.create', EnrollmentController::class, 'store',
                     ['student_id' => $student ?? $data['student_id'], 'program_id' => $data['program_id'], 'idempotency_key' => $data['idempotency_key']]);
                 // The same form sent again finds its enrolment already in this group.
@@ -52,6 +52,9 @@ trait EnrolsPupils
                 return $enrollment;
             }, fn () => Notification::make()->title(__('schooling.enrolled'))->success()));
     }
+
+    /** The site of the page's pupil, if any: a grant on that site enrols them (SQL 029); any site of the grant otherwise. */
+    protected function enrolmentSite(): ?string { return null; }
 
     /** Whether the page's pupil, if any, may be enrolled: neither former nor blocked nor archived. */
     protected function enrollable(): bool { return true; }

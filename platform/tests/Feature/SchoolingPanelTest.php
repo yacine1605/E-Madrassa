@@ -191,7 +191,7 @@ final class SchoolingPanelTest extends TestCase
         });
     }
 
-    public function test_a_site_scoped_manager_edits_the_groups_of_their_site_only(): void
+    public function test_a_site_scoped_manager_opens_and_edits_the_groups_of_their_site_only(): void
     {
         [$school, , $year] = $this->setting();
         $annex = $this->postJson('/api/sites', ['code' => 'ANNEXE', 'labels' => ['fr' => 'Annexe']])->assertCreated()->json('data.id');
@@ -204,12 +204,18 @@ final class SchoolingPanelTest extends TestCase
         $this->member($school, $local);
         $this->grant($school, $local, 'academic_hr', 'site', [$annex]);
         $this->signIn($local)->assertOk();
-        $this->within($school, $local, function () use ($groups) {
+        // SQL 029: a group on their site, never on another.
+        $this->postJson('/api/groups', ['year_id' => $year, 'group_type' => 'support', 'site_id' => $this->site($school), 'code' => 'SIEGE',
+            'labels' => ['fr' => 'Siège'], 'capacity' => 10, 'valid_from' => '2026-09-01', 'status' => 'active'])->assertForbidden();
+        $this->within($school, $local, function () use ($groups, $year, $annex) {
             Livewire::test(Groups::class)->assertCanSeeTableRecords([$groups['ANNEX']])->assertCanNotSeeTableRecords([$groups['MAIN']])
-                ->assertTableActionVisible('edit', $groups['ANNEX'])->assertTableActionHidden('create');
+                ->assertTableActionVisible('edit', $groups['ANNEX'])->assertTableActionVisible('create');
             Livewire::test(Groups::class)->callTableAction('edit', $groups['ANNEX'], data: ['labels' => ['fr' => 'Annexe, soutien'], 'capacity' => 12,
                 'status' => 'active', 'version' => 1])->assertNotified(__('school.saved'));
             $this->assertSame(12, DB::table('school.study_group')->where('id', $groups['ANNEX'])->value('capacity'));
+            Livewire::test(Groups::class)->callTableAction('create', data: ['year_id' => $year, 'group_type' => 'support', 'code' => 'ANNEXE-2',
+                'labels' => ['fr' => 'Annexe 2'], 'capacity' => 10, 'valid_from' => '2026-09-01', 'status' => 'active'])->assertNotified(__('school.saved'));
+            $this->assertSame($annex, DB::table('school.study_group')->where('code', 'ANNEXE-2')->value('site_id'));
         });
     }
 
@@ -384,31 +390,44 @@ final class SchoolingPanelTest extends TestCase
         });
     }
 
-    public function test_a_site_scoped_secretary_updates_the_pupils_of_their_site_only(): void
+    public function test_a_site_scoped_secretary_records_and_follows_the_pupils_of_their_site_only(): void
     {
         [$school, , $year] = $this->setting();
         $annex = $this->postJson('/api/sites', ['code' => 'ANNEXE', 'labels' => ['fr' => 'Annexe']])->assertCreated()->json('data.id');
         $program = $this->postJson('/api/programs', ['year_id' => $year, 'node_id' => $this->node($school), 'code' => 'P',
             'labels' => ['fr' => 'P'], 'base_price' => '0', 'status' => 'active'])->assertCreated()->json('data.id');
-        $pupils = [];
+        $pupils = $groups = [];
         foreach (['MAIN' => $this->site($school), 'ANNEX' => $annex] as $code => $site) {
-            $group = $this->postJson('/api/groups', ['year_id' => $year, 'group_type' => 'class', 'program_id' => $program, 'site_id' => $site, 'code' => $code,
+            $groups[$code] = $this->postJson('/api/groups', ['year_id' => $year, 'group_type' => 'class', 'program_id' => $program, 'site_id' => $site, 'code' => $code,
                 'labels' => ['fr' => $code], 'capacity' => 10, 'valid_from' => '2026-09-01', 'status' => 'active'])->assertCreated()->json('data.id');
             $pupils[$code] = $this->postJson('/api/students', ['last_name_lat' => 'Eleve', 'first_name_lat' => $code, 'birth_date' => '2000-01-01'])->json('data.id');
             $enrollment = $this->postJson('/api/enrollments', ['student_id' => $pupils[$code], 'program_id' => $program, 'idempotency_key' => (string) Str::uuid()])->json('data.id');
-            $this->postJson('/api/groups/'.$group.'/memberships', ['enrollment_id' => $enrollment])->assertCreated();
+            $this->postJson('/api/groups/'.$groups[$code].'/memberships', ['enrollment_id' => $enrollment])->assertCreated();
         }
         $secretary = $this->account('annex-secretary');
         $this->member($school, $secretary);
         $this->grant($school, $secretary, 'front_office', 'site', [$annex]);
         $this->signIn($secretary)->assertOk();
         $this->get('/school/student-sheet?student='.$pupils['MAIN'])->assertNotFound();
-        $this->within($school, $secretary, function () use ($pupils) {
+        // Recorded on another site: refused; on theirs, by default.
+        $this->postJson('/api/students', ['last_name_lat' => 'Siege', 'first_name_lat' => 'Refus', 'birth_date' => '2000-03-03', 'site_id' => $this->site($school)])
+            ->assertForbidden()->assertJsonPath('code', 'permission_denied');
+        $this->within($school, $secretary, function () use ($pupils, $annex, $groups, $program) {
             Livewire::test(Students::class)->assertCanSeeTableRecords([$pupils['ANNEX']])->assertCanNotSeeTableRecords([$pupils['MAIN']])
-                ->assertTableActionHidden('create');
+                ->assertTableActionVisible('create');
             Livewire::withQueryParams(['student' => $pupils['ANNEX']])->test(StudentSheet::class)->assertActionVisible('edit')
                 ->callAction('edit', data: ['last_name_lat' => 'Eleve', 'first_name_lat' => 'Annexe', 'birth_date' => '2000-01-01', 'version' => 1])
-                ->assertNotified(__('school.saved'))->assertSee('Eleve Annexe')->assertTableActionHidden('link');
+                ->assertNotified(__('school.saved'))->assertSee('Eleve Annexe')->assertTableActionVisible('link');
+            // SQL 029: their new pupil belongs to their site from the start, then is enrolled and placed there.
+            Livewire::test(Students::class)->callTableAction('create', data: ['last_name_lat' => 'Nouveau', 'first_name_lat' => 'Annexe', 'birth_date' => '2000-02-02'])
+                ->assertNotified();
+            $new = DB::table('school.student')->where('first_name_lat', 'Annexe')->where('last_name_lat', 'Nouveau')->first();
+            $this->assertSame($annex, $new->site_id);
+            Livewire::withQueryParams(['student' => $new->id])->test(StudentSheet::class)->assertSeeText('Annexe')
+                ->callAction('enrol', data: ['program_id' => $program, 'group_id' => $groups['ANNEX']])->assertNotified(__('schooling.enrolled'));
+            $this->assertSame(1, DB::table('school.group_membership')->join('school.enrollment', 'school.enrollment.id', '=', 'school.group_membership.enrollment_id')
+                ->where('school.enrollment.student_id', $new->id)->where('school.group_membership.group_id', $groups['ANNEX'])->count());
+            Livewire::test(Students::class)->filterTable('site_id', $annex)->assertCanSeeTableRecords([$new->id]);
         });
     }
 }

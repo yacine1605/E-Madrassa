@@ -118,6 +118,9 @@ final class StudentSheet extends SchoolingPage
         return SchoolScreen::call('enrollment.enrollment.read', EnrollmentController::class, 'index', ['student_id' => $this->student, 'per_page' => 100])['data'];
     }
 
+    /** The pupil's own site: an enrolment is made by a grant on it (SQL 029). */
+    protected function enrolmentSite(): ?string { return $this->pupil()['site_id']; }
+
     /** A pupil is enrolled while active (FR-INS-01 AC2, FR-ELV-03). */
     protected function enrollable(): bool
     {
@@ -128,7 +131,7 @@ final class StudentSheet extends SchoolingPage
     private function identity(): array
     {
         $pupil = $this->pupil();
-        $rows = [__('schooling.birth_place') => $pupil['birth_place'], __('schooling.gender') => $pupil['gender'] ? __('schooling.genders.'.$pupil['gender']) : null,
+        $rows = [__('schooling.site') => $this->siteName($pupil['site_id']), __('schooling.birth_place') => $pupil['birth_place'], __('schooling.gender') => $pupil['gender'] ? __('schooling.genders.'.$pupil['gender']) : null,
             __('schooling.phone') => $pupil['phone'], __('school.email') => $pupil['email'], __('schooling.address') => $pupil['address'],
             __('schooling.origin_school') => $pupil['origin_school'], __('schooling.block_reason') => $pupil['status_reason']];
         foreach ($this->customDefinitions('student', true) as $field) {
@@ -147,7 +150,11 @@ final class StudentSheet extends SchoolingPage
                 ->url(fn () => Enrollments::getUrl(['tableFilters' => ['student' => ['student_id' => $this->student]]])),
             Action::make('edit')->label(__('school.edit'))->visible(fn () => $this->editable())
                 ->fillForm(fn () => $this->pupil())
-                ->schema(fn () => [...$this->studentFields(), ...$this->customFields('student'), Hidden::make('version')->required()])
+                ->schema(fn () => [...$this->studentFields(),
+                    // Moved to another of the writer's sites (SQL 029); the current one stays shown.
+                    Select::make('site_id')->label(__('schooling.site'))->required()->helperText(__('schooling.record_site_help'))
+                        ->options(fn () => [$this->pupil()['site_id'] => $this->siteName($this->pupil()['site_id']), ...$this->creationSites('student.record.update')]),
+                    ...$this->customFields('student'), Hidden::make('version')->required()])
                 ->action(fn (array $data) => $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student,
                     fn () => SchoolScreen::call('student.record.update', StudentController::class, 'update', $this->sentStudent($data), ['student' => $this->student])))),
             // FR-ELV-03: active ⇄ blocked with a reason, active → former; a block says how many enrolments it leaves as they are (AC1).
@@ -213,7 +220,7 @@ final class StudentSheet extends SchoolingPage
                     ->schema([Select::make('guardian_id')->label(__('schooling.guardian'))->required()->searchable()
                         ->getSearchResultsUsing(fn (string $search) => $this->guardianOptions($search))
                         ->getOptionLabelUsing(fn ($value) => $this->guardianLabel($value)), ...$this->linkFields()])
-                    ->action(fn (array $data) => SchoolScreen::change('guardian.record.create',
+                    ->action(fn (array $data) => SchoolScreen::changeFor('guardian.record.create', 'student', $this->student,
                         fn () => SchoolScreen::call('guardian.record.create', GuardianController::class, 'link', $data, ['student' => $this->student]))),
                 // A new guardian and their link, together or not at all. The same guardian typed again (a
                 // brother's father) is found first, and linked rather than recorded twice (FR-ELV-02 AC1).
@@ -243,9 +250,10 @@ final class StudentSheet extends SchoolingPage
                                 throw new Halt();
                             }
                         }
-                        SchoolScreen::change('guardian.record.create', function () use ($person, $link, $existing) {
-                            $guardian = $existing !== null && $existing !== 'new' ? $existing
-                                : SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson($person, 'guardian'))['data']['id'];
+                        SchoolScreen::changeFor('guardian.record.create', 'student', $this->student, function () use ($person, $link, $existing) {
+                            // A new guardian is recorded on their pupil's site (SQL 029).
+                            $guardian = $existing !== null && $existing !== 'new' ? $existing : SchoolScreen::call('guardian.record.create', GuardianController::class, 'store',
+                                [...$this->sentPerson($person, 'guardian'), 'site_id' => $this->pupil()['site_id']])['data']['id'];
                             return SchoolScreen::call('guardian.record.create', GuardianController::class, 'link', [...$link, 'guardian_id' => $guardian], ['student' => $this->student]);
                         });
                         $this->sameGuardians = [];
@@ -253,7 +261,7 @@ final class StudentSheet extends SchoolingPage
             ])->recordActions([ActionGroup::make([
                 Action::make('editLink')->label(__('schooling.edit_link'))->visible(fn () => $this->linkable('guardian.record.update'))
                     ->fillForm(fn (array $record) => $record)->schema([...$this->linkFields(), Hidden::make('version')->required()])
-                    ->action(fn (array $record, array $data) => SchoolScreen::change('guardian.record.update',
+                    ->action(fn (array $record, array $data) => SchoolScreen::changeFor('guardian.record.update', 'student', $this->student,
                         fn () => SchoolScreen::call('guardian.record.update', GuardianController::class, 'updateLink', $data, ['student' => $this->student, 'link' => $record['id']]))),
                 Action::make('editGuardian')->label(__('schooling.edit_guardian'))
                     ->visible(fn (array $record) => $record['guardian'] !== null && $this->writableFor('guardian.record.update', 'guardian', $record['guardian_id']))
@@ -263,7 +271,7 @@ final class StudentSheet extends SchoolingPage
                         fn () => SchoolScreen::call('guardian.record.update', GuardianController::class, 'update', $this->sentPerson($data, 'guardian'), ['guardian' => $record['guardian_id']]))),
                 Action::make('unlink')->label(__('schooling.unlink'))->color('danger')->requiresConfirmation()->visible(fn () => $this->linkable('guardian.record.update'))
                     ->schema([$this->reason()])
-                    ->action(fn (array $record, array $data) => SchoolScreen::change('guardian.record.update',
+                    ->action(fn (array $record, array $data) => SchoolScreen::changeFor('guardian.record.update', 'student', $this->student,
                         fn () => SchoolScreen::call('guardian.record.update', GuardianController::class, 'unlink', [...$data, 'version' => $record['version']],
                             ['student' => $this->student, 'link' => $record['id']]))),
             ])]);
@@ -274,10 +282,10 @@ final class StudentSheet extends SchoolingPage
         return $this->pupil()['status'] !== 'former' && !$this->pupil()['archived_at'] && $this->writableFor('student.record.update', 'student', $this->student);
     }
 
-    /** A former pupil's guardians stay as they are; links are written by school-wide grants (increment 31). */
+    /** A former pupil's guardians stay as they are; links are written by a grant that reaches the pupil (SQL 029). */
     private function linkable(string $permission): bool
     {
-        return $this->pupil()['status'] !== 'former' && !$this->pupil()['archived_at'] && $this->writable($permission);
+        return $this->pupil()['status'] !== 'former' && !$this->pupil()['archived_at'] && $this->writableFor($permission, 'student', $this->student);
     }
 
     private function linkFields(): array

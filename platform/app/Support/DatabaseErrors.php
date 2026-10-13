@@ -29,6 +29,7 @@ final class DatabaseErrors
         'outside_group_dates', 'group_full', 'idempotency_key_reused', 'student_photo_invalid', 'student_photo_disabled',
         'primary_contact_kept', 'transfer_same_program', 'transfer_invalid', 'subject_archived', 'program_subject_volume_required',
         'program_subject_overlap', 'program_subject_ended', 'program_subject_outside_year', 'program_subject_end_before_start',
+        'site_required', 'site_archived',
     ];
 
     public static function message(string $rule): string

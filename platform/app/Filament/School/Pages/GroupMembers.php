@@ -35,6 +35,7 @@ final class GroupMembers extends SchoolingPage
     protected static string|array $routeMiddleware = ['module:enrollment_groups', 'permission:group.group.read'];
     #[Locked] public string $group = '';
     private ?array $groupRow = null;
+    private ?array $targetRows = null;
 
     public function mount(): void
     {
@@ -81,16 +82,17 @@ final class GroupMembers extends SchoolingPage
                 TextColumn::make('valid_to')->label(__('schooling.member_until'))->formatStateUsing(fn ($state) => Formats::date($state)),
             ])->filters([Filter::make('history')->label(__('schooling.include_history'))->toggle()])
             ->headerActions([
-                Action::make('add')->label(__('schooling.add_member'))->visible(fn () => $this->studyGroup()['status'] === 'active' && $this->writable('group.membership.manage'))
+                Action::make('add')->label(__('schooling.add_member'))
+                    ->visible(fn () => $this->studyGroup()['status'] === 'active' && $this->creatable('group.membership.manage', $this->studyGroup()['site_id']))
                     ->schema([Select::make('enrollment_id')->label(__('schooling.enrollment'))->required()->searchable()->helperText(__('schooling.add_member_help'))
                         ->getSearchResultsUsing(fn (string $search) => $this->assignable($search))])
-                    ->action(fn (array $data) => $this->changed(SchoolScreen::change('group.membership.manage',
+                    ->action(fn (array $data) => $this->changed(SchoolScreen::changeAt('group.membership.manage', $this->studyGroup()['site_id'],
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'store', $data, ['group' => $this->group])))),
             ])->recordActions([ActionGroup::make([
                 Action::make('transfer')->label(__('schooling.transfer'))->modalDescription(__('schooling.transfer_help'))
-                    ->visible(fn (array $record) => $record['valid_to'] === null && $this->writable('group.membership.manage'))
+                    ->visible(fn (array $record) => $record['valid_to'] === null && $this->targets() !== [])
                     ->schema(fn (array $record) => [Select::make('group_id')->label(__('schooling.target_group'))->required()->options($this->targets()), $this->reason()])
-                    ->action(fn (array $record, array $data) => $this->changed(SchoolScreen::change('group.membership.manage',
+                    ->action(fn (array $record, array $data) => $this->changed(SchoolScreen::changeAt('group.membership.manage', $this->targetSite($data['group_id']),
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'transfer', [...$data, 'version' => $record['version']], ['membership' => $record['id']])))),
                 Action::make('end')->label(__('schooling.end_membership'))->color('danger')->requiresConfirmation()
                     ->visible(fn (array $record) => $record['valid_to'] === null && $this->writableFor('group.membership.manage', 'group_membership', $record['id']))
@@ -112,14 +114,29 @@ final class GroupMembers extends SchoolingPage
                 .' · '.$enrollment['terms_snapshot']['code'].' · '.__('schooling.enrollment_states.'.$enrollment['status'])])->all();
     }
 
-    /** @return array<string, string> the open groups a member may move to: of the same year, and of the same programme for a class or a session */
+    /**
+     * @return array<string, string> the open groups a member may move to: of the same year, and of the same programme for a
+     *   class or a session, on a site where the writer places pupils (SQL 029)
+     */
     private function targets(): array
     {
         $group = $this->studyGroup();
-        return collect(SchoolScreen::call('group.group.read', StudyGroupController::class, 'index', ['year_id' => $group['year_id'], 'status' => 'active', 'per_page' => 100])['data'])
-            ->filter(fn ($target) => $target['id'] !== $group['id'] && (!in_array($group['group_type'], ['class', 'session'], true)
+        return collect($this->targetGroups())
+            ->filter(fn ($target) => $target['id'] !== $group['id'] && $this->creatable('group.membership.manage', $target['site_id']) && (!in_array($group['group_type'], ['class', 'session'], true)
                 ? $target['group_type'] === $group['group_type'] : in_array($target['group_type'], ['class', 'session'], true) && $target['program_id'] === $group['program_id']))
             ->mapWithKeys(fn ($target) => [$target['id'] => $this->groupName($target)])->all();
+    }
+
+    /** The year's open groups, read once per request. */
+    private function targetGroups(): array
+    {
+        return $this->targetRows ??= SchoolScreen::call('group.group.read', StudyGroupController::class, 'index',
+            ['year_id' => $this->studyGroup()['year_id'], 'status' => 'active', 'per_page' => 100])['data'];
+    }
+
+    private function targetSite(string $group): ?string
+    {
+        return collect($this->targetGroups())->firstWhere('id', $group)['site_id'] ?? null;
     }
 
     /** After a change, the group's places are read again. */

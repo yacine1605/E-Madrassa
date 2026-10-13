@@ -14,7 +14,7 @@ final class StudentController
     use HandlesLabels;
 
     private const SELECT = 'SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
-        birth_date, birth_place, gender, phone, email, address, status, status_reason, origin_school, custom,
+        birth_date, birth_place, gender, phone, email, address, status, status_reason, origin_school, custom, site_id,
         photo_file_id IS NOT NULL AS has_photo, version, archived_at, created_at, updated_at FROM school.student';
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records) {}
@@ -44,6 +44,7 @@ final class StudentController
         $data = $request->validate($this->rules(true) + ['duplicate_reason' => 'nullable|string|min:3|max:500']);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id'], $data['status'], $data['status_reason']);
         $this->records->name($data);
+        $this->records->site($data);
         // Serialize the warning with the write: simultaneous admissions also see the first dossier.
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 31))', [$this->school->id()]);
         $matches = $this->records->duplicates($data);
@@ -62,6 +63,7 @@ final class StudentController
         $data = $request->validate($this->rules(false) + ['version' => 'required|integer|min:1']);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id'], $data['status'], $data['status_reason'], $data['matricule']);
         $this->records->name(array_replace((array) $current, $data));
+        $this->records->site($data);
         if (array_key_exists('custom', $data)) $data['custom'] = $this->records->custom('student', $data['custom'], $current);
         DB::table('school.student')->where('tenant_id', $this->school->id())->where('id', $current->id)->update($data);
         return $this->show($current->id);

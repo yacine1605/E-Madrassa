@@ -1617,6 +1617,9 @@ await joinGroup(scopeEnrollmentA, scopeGroupA);
 await joinGroup(scopeEnrollmentB, scopeGroupB);
 const scopeGuardianA = await contact(scopeStudentA);
 const scopeGuardianB = await contact(scopeStudentB);
+// The second pupil and their guardian are recorded on site B, where they are taught (SQL 029).
+await sql('UPDATE school.student SET site_id = $2 WHERE id = $1', [scopeStudentB, scopeSiteB]);
+await sql('UPDATE school.guardian SET site_id = $2 WHERE id = $1', [scopeGuardianB, scopeSiteB]);
 await as(null);
 const coreReads = ['student.record.read', 'guardian.record.read', 'program.program.read', 'group.group.read', 'enrollment.enrollment.read', 'audit.log.read'];
 const pupilIdentity = await scopedAccount('student', 'personal', null, coreReads);
@@ -1668,6 +1671,55 @@ await check('a site scope returns only its pupils and enrolments (FR-IAM-04 AC3)
   assert.ok(!(await visibleIds('student')).includes(scopeStudentB));
   assert.ok(!(await visibleIds('enrollment')).includes(scopeEnrollmentB));
   assert.ok(!(await visibleIds('study_group')).includes(scopeGroupB));
+});
+// A pupil's site (SQL 029, decision of 13 October 2026): recorded on a site from their creation.
+await check('a pupil and a guardian are recorded on a site: the school\'s default one, or the writer\'s own for a site\'s grant (FR-IAM-04)', async () => {
+  await as('school_runtime', a, 1);
+  const school = await newAdult('Site', 'Defaut');
+  assert.equal((await first('SELECT site_id FROM school.student WHERE id = $1', [school.id])).site_id, siteA);
+  const desk = await scopedAccount('internal', 'site', [scopeSiteB], ['student.record.read', 'student.record.create', 'student.record.update',
+    'guardian.record.read', 'guardian.record.create', 'guardian.record.update']);
+  await as('school_runtime', a, desk.user);
+  // Their only site, without saying it; their pupil read back at once, with a matricule of the year.
+  const pupil = await newAdult('Site', 'Annexe');
+  assert.match(pupil.matricule, new RegExp(`^${thisYear}\\d{5}$`));
+  assert.equal((await first('SELECT site_id FROM school.student WHERE id = $1', [pupil.id])).site_id, scopeSiteB);
+  await rejects(STUDENT.replace('custom)', 'custom, site_id)').replace('$7)', '$7, $8)'), [a, 'Autre', 'Site', null, null, '1990-01-01', pupilFields, siteA],
+    '42501', 'permission_denied');
+  const parent = (await first("INSERT INTO school.guardian (tenant_id, last_name_lat, first_name_lat, phone) VALUES ($1, 'Annexe', 'Parent', '0661 22 33 44') RETURNING id, site_id",
+    [a])).id;
+  await sql("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship, is_primary_contact) VALUES ($1, $2, $3, 'father', true)", [a, pupil.id, parent]);
+  await rejects("INSERT INTO school.student_guardian (tenant_id, student_id, guardian_id, relationship) VALUES ($1, $2, $3, 'mother')",
+    [a, scopeStudentA, parent], '42501', 'permission_denied');
+  assert.ok((await visibleIds('student')).includes(pupil.id));
+  assert.ok(!(await visibleIds('student')).includes(scopeStudentA));
+  assert.ok(!(await visibleIds('student')).includes(school.id));
+  // Moved to a site out of their grant: refused; by a grant of the whole school: done, journaled.
+  await rejects('UPDATE school.student SET site_id = $2 WHERE id = $1', [pupil.id, siteA], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.student SET site_id = $2 WHERE id = $1', [school.id, scopeSiteB]);
+  assert.deepEqual(await first("SELECT after ->> 'site_id' AS site FROM school.audit_log WHERE object_type = 'student' AND object_id = $1 AND action = 'UPDATE'",
+    [school.id]), { site: scopeSiteB });
+  const closed = (await first("INSERT INTO school.site (tenant_id, code, labels) VALUES ($1, 'FERME-029', '{\"fr\": \"Site fermé\"}') RETURNING id", [a])).id;
+  await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [closed]);
+  await rejects(STUDENT.replace('custom)', 'custom, site_id)').replace('$7)', '$7, $8)'), [a, 'Ferme', 'Site', null, null, '1990-01-01', pupilFields, closed],
+    '23514', 'site_archived');
+});
+await check('a site\'s grant enrols the pupils of its site, places them in its groups and opens groups there, nowhere else (FR-IAM-04)', async () => {
+  await as('school_runtime', a, 1);
+  const theirs = await newAdult('Inscription', 'Annexe');
+  await sql('UPDATE school.student SET site_id = $2 WHERE id = $1', [theirs.id, scopeSiteB]);
+  const office = await scopedAccount('internal', 'site', [scopeSiteB], ['student.record.read', 'program.program.read', 'enrollment.enrollment.read',
+    'enrollment.enrollment.create', 'group.group.read', 'group.membership.manage', 'group.group.manage']);
+  await as('school_runtime', a, office.user);
+  const enrolment = await enroll(theirs.id, scopeProgram);
+  assert.ok((await visibleIds('enrollment')).includes(enrolment));
+  await rejects(ENROLL, [scopeStudentA, scopeProgram, uuid()], '42501', 'permission_denied');
+  await rejects(JOIN_GROUP, [a, enrolment, scopeGroupA], '42501', 'permission_denied');
+  assert.ok(await joinGroup(enrolment, scopeGroupB));
+  assert.ok(await group('ANNEXE-SOUTIEN', null, 8, 'support', scopeSiteB));
+  await rejects(GROUP, [a, lotYear, 'SIEGE-SOUTIEN', JSON.stringify({ fr: 'Soutien' }), 'support', null, siteA, 8], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
 });
 await check('a role manager assigns group scopes without permission to read the group roster', async () => {
   const manager = await scopedAccount('internal', 'tenant', null, ['role.assignment.manage']);
@@ -2119,6 +2171,9 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'last_site');
+    // The default site back in use: the pupils recorded next go there (SQL 029).
+    await as(null);
+    await sql('UPDATE school.site SET archived_at = NULL WHERE id = $1', [siteA]);
   });
   await check('a link used twice at once opens the account once (FR-IAM-02 AC3)', async () => {
     await as('school_runtime', a, 1);

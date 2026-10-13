@@ -68,9 +68,9 @@ final class Enrollments extends SchoolingPage
             ])->headerActions([$this->enrolAction()])
             ->recordActions([ActionGroup::make([
                 Action::make('assign')->label(__('schooling.assign_group'))
-                    ->visible(fn (array $record) => in_array($record['status'], ['pending', 'validated'], true) && $this->writable('group.membership.manage'))
+                    ->visible(fn (array $record) => in_array($record['status'], ['pending', 'validated'], true) && $this->creatable('group.membership.manage'))
                     ->schema(fn (array $record) => [Select::make('group_id')->label(__('schooling.group'))->required()->options($this->yearGroups($record))])
-                    ->action(fn (array $record, array $data) => SchoolScreen::change('group.membership.manage',
+                    ->action(fn (array $record, array $data) => SchoolScreen::changeAt('group.membership.manage', null,
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'store', ['enrollment_id' => $record['id']], ['group' => $data['group_id']]))),
                 $this->stateAction('validate', 'validateEnrollment', 'enrollment.enrollment.validate', ['pending', 'suspended'], 'success'),
                 $this->stateAction('suspend', 'suspend', 'enrollment.enrollment.suspend', ['validated'], 'warning'),
@@ -100,13 +100,13 @@ final class Enrollments extends SchoolingPage
     {
         return Action::make('transfer')->label(__('schooling.enrollment_actions.transfer'))->modalDescription(__('schooling.transfer_help'))
             ->visible(fn (array $record) => in_array($record['status'], ['pending', 'validated', 'suspended'], true)
-                && $this->writable('enrollment.enrollment.create') && $this->writableFor('enrollment.enrollment.cancel', 'enrollment', $record['id']))
+                && $this->creatable('enrollment.enrollment.create') && $this->writableFor('enrollment.enrollment.cancel', 'enrollment', $record['id']))
             ->schema(fn (array $record) => [
                 Select::make('program_id')->label(__('schooling.transfer_program'))->required()->searchable()->live()->helperText(__('schooling.active_programs_only'))
                     ->getSearchResultsUsing(fn (string $search) => array_diff_key($this->activePrograms($search), [$record['program_id'] => true]))
                     ->getOptionLabelUsing(fn ($value) => $this->programName($value))->afterStateUpdated(fn (Set $set) => $set('group_id', null)),
                 Select::make('group_id')->label(__('schooling.main_group'))->helperText(__('schooling.enrol_group_help'))
-                    ->visible(fn (Get $get) => filled($get('program_id')) && $this->writable('group.membership.manage'))
+                    ->visible(fn (Get $get) => filled($get('program_id')) && $this->creatable('group.membership.manage'))
                     ->options(fn (Get $get) => $this->mainGroups($get('program_id'))),
                 $this->reason(),
                 Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),

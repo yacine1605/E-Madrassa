@@ -78,6 +78,17 @@ final class SchoolScreen
     }
 
     /**
+     * For a new record that belongs to a site (SQL 029): granted for the whole school, or for that
+     * site; for any of the grant's sites while the form names none yet. The database decides again.
+     */
+    public static function creatable(string $permission, ?string $site = null): bool
+    {
+        if (!self::writable(null)) return false;
+        $sites = app(Permissions::class)->sites($permission);
+        return $sites === null || ($site === null ? $sites !== [] : in_array($site, $sites, true));
+    }
+
+    /**
      * Savepoint: a refused multi-step action rolls back, and the surrounding render still works.
      *
      * @param ?callable(array): Notification $done what to tell once done, from the result; « saved » by default
@@ -85,6 +96,12 @@ final class SchoolScreen
     public static function change(?string $permission, callable $change, ?callable $done = null): array
     {
         return self::run(fn () => self::writable($permission), $change, $done);
+    }
+
+    /** The same, for a new record on a site (creatable). */
+    public static function changeAt(string $permission, ?string $site, callable $change, ?callable $done = null): array
+    {
+        return self::run(fn () => self::creatable($permission, $site), $change, $done);
     }
 
     /** The same, for an action on one record that a scoped grant may reach (writableFor). */

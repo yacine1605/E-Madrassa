@@ -701,9 +701,28 @@ Copying a programme to the next year with its subjects comes with the annual pro
 
 Validation on 13 October 2026: **222 PHP integration tests (7,326 assertions), 197 embedded SQL checks and 211 native PostgreSQL 16 checks including concurrency**; migration 028 rolled back alone with subjects, their versions and a school's setting in place, then with all the others, and applied again. Local browser acceptance in Chromium: 140 screens without a problem, the programme's subjects included; Firefox and WebKit by CI.
 
+## Increment 42 (lot 2): a pupil's site from their creation
+
+Decision of 13 October 2026: a pupil is attached to a site administratively from the day they are recorded. `029_pupil_sites.sql`:
+
+- **Pupils and guardians belong to a site** (`site_id`). A new record goes to the site the form or the file names; without one, to the writer's only site when their grant names a single site, else to the school's default site (`site_required` when it is archived). Never to an archived site (`site_archived`). Records already there were attached to the site of their current class, else to the default site; a guardian to the site of their first pupil.
+- **A grant limited to sites (FR-IAM-04) now creates there**: pupils and guardians of its sites, a guardian's link between a pupil and a guardian it reaches, an enrolment for a pupil of its sites, a place in a group of its sites, a group on its sites. Elsewhere, `permission_denied`. Moving a record to another site needs the update's grant on that site. A grant limited to groups, levels or one's own record still creates nothing.
+- **What a site's grant reads**: the pupils and guardians recorded on its sites, before any enrolment or class, their enrolments and these enrolments' places in groups, besides what it already read (the groups on the site and their members, 021). A record just created is read back at once: the policies check the row's own site (`school.site_scope_ids`), since a new row is not yet among the IDs computed for the statement that writes it.
+- The checks are `school.attach_site` (pupils, guardians) and `school.authorize_creation` (enrolments, groups, places, guardian links), before the rules that read other rows; the policies repeat them. A matricule is given to whoever may record a pupil somewhere.
+
+The API takes `site_id` on pupils and guardians (`GET /api/students?site_id=`, `GET /api/guardians?site_id=` filter them); creation routes now ask for their permission with any scope, the database checking the site. Imports: a `site` column (the site's code) for pupils, refused when unknown; a guardian is recorded on their pupil's site. On screen: the site is chosen among the writer's when a pupil, guardian or group is created (the default site first), the pupils' list has a Site column and filter, the pupil's sheet shows and moves the site; a site's secretary sees *New pupil*, *Enrol* and the guardian actions for the pupils of their site.
+
+| Requirement | Evidence |
+|---|---|
+| FR-IAM-04 (decision of 13 October) | `tests/sql/database.mjs`: default site, the writer's only site, another site refused, a move refused out of the grant and journaled within it, an archived site refused; a site's office enrols its pupils, places them in its groups and opens a group there, nowhere else. `SchoolingPanelTest`: a site's secretary records a pupil on their site, enrols and places them, and is refused another site; a site's manager opens a group on their site only |
+| FR-IMP-01 | `PupilImportTest`: pupils on the site their row names or the default one, an unknown site refused with its line, a guardian on their pupil's site, a later file moving a pupil undone |
+| NFR-PERF-03 | `tests/sql/scope-cost.mjs` on 2,000 pupils, before and after: the same rows for every reader; a site's lists 7.9 to 14.6 ms instead of 6.5 to 13.0 |
+
+Validation on 13 October 2026: **223 PHP integration tests (7,410 assertions), 199 embedded SQL checks and 213 native PostgreSQL 16 checks including concurrency**; migration 029 rolled back alone with 594 pupils on 43 sites in place, then with all the others, and applied again (every pupil attached again). Local browser acceptance in Chromium: 140 screens without a problem.
+
 ## Next increments of lot 2
 
-1. Scoped creation (a decision first: what places a new pupil within a site's reach) and the retention decision OD-07.
+1. A retention policy per category (decision of 13 October 2026, NFR-DATA-03; default durations still to be validated, OD-07).
 2. Staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

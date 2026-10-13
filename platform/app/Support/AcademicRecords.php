@@ -20,6 +20,12 @@ final class AcademicRecords
         return $row;
     }
 
+    /** Granted somewhere: what the new record reaches (its pupil's site, its group's) is the database's to check (SQL 029). */
+    public function somewhere(string $permission): void
+    {
+        if (!$this->permissions->can($permission)) throw Refusal::permissionDenied();
+    }
+
     public function global(string $permission): void
     {
         if (!$this->permissions->everywhere($permission)) throw Refusal::permissionDenied();

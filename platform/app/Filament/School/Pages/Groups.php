@@ -60,7 +60,7 @@ final class Groups extends SchoolingPage
                 SelectFilter::make('group_type')->label(__('schooling.group_type'))->options(__('schooling.group_types')),
                 SelectFilter::make('status')->label(__('school.status'))->options(__('schooling.group_states')),
             ])->headerActions([
-                Action::make('create')->label(__('schooling.create_group'))->visible(fn () => $this->writable('group.group.manage') && $this->openYears() !== [])
+                Action::make('create')->label(__('schooling.create_group'))->visible(fn () => $this->creatable('group.group.manage') && $this->openYears() !== [])
                     ->schema([
                         Select::make('year_id')->label(__('reference.year'))->required()->live()->options(fn () => $this->openYears())
                             ->afterStateUpdated(fn (Set $set) => $set('program_id', null)),
@@ -70,8 +70,7 @@ final class Groups extends SchoolingPage
                             ->required(fn (Get $get) => in_array($get('group_type'), ['class', 'session'], true))
                             ->getSearchResultsUsing(fn (string $search, Get $get) => $this->programOptions($get('year_id'), $search))
                             ->getOptionLabelUsing(fn ($value) => $this->programLabel($value)),
-                        Select::make('site_id')->label(__('schooling.site'))->required()->default(fn () => collect($this->sites())->firstWhere('is_default', true)['id'] ?? null)
-                            ->options(fn () => collect($this->sites())->whereNull('archived_at')->mapWithKeys(fn ($site) => [$site['id'] => $this->siteName($site['id'])])->all()),
+                        $this->siteField('group.group.manage')->helperText(null),
                         $this->codeField(), ...$this->labelFields(), $this->capacityField(),
                         DatePicker::make('valid_from')->label(__('school.valid_from'))->required()->default(now()),
                         DatePicker::make('valid_to')->label(__('school.valid_until'))->afterOrEqual('valid_from'),
@@ -80,7 +79,7 @@ final class Groups extends SchoolingPage
                     ])
                     ->action(function (array $data) {
                         if (!in_array($data['group_type'], ['class', 'session'], true) && empty($data['program_id'])) unset($data['program_id']);
-                        SchoolScreen::change('group.group.manage', fn () => SchoolScreen::call('group.group.manage', StudyGroupController::class, 'store', $this->sent($data)));
+                        SchoolScreen::changeAt('group.group.manage', $data['site_id'], fn () => SchoolScreen::call('group.group.manage', StudyGroupController::class, 'store', $this->sent($data)));
                     }),
             ])->recordUrl(fn (array $record) => GroupMembers::getUrl(['group' => $record['id']]))->recordActions([
                 Action::make('members')->label(__('schooling.members'))->url(fn (array $record) => GroupMembers::getUrl(['group' => $record['id']])),

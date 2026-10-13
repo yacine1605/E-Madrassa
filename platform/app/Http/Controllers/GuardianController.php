@@ -14,7 +14,7 @@ final class GuardianController
     use HandlesLabels;
 
     private const SELECT = 'SELECT id, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
-        phone, email, profession, custom, version, archived_at, created_at, updated_at FROM school.guardian';
+        phone, email, profession, custom, site_id, version, archived_at, created_at, updated_at FROM school.guardian';
     // With the guardian's name and phone, as the reader may see them (FR-ELV-02).
     private const LINKS = "SELECT id, student_id, guardian_id, relationship, is_primary_contact, is_payer,
         emergency_contact, version, archived_at,
@@ -43,6 +43,7 @@ final class GuardianController
         $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120', 'duplicate_reason' => 'nullable|string|min:3|max:500']);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id']);
         $this->records->name($data);
+        $this->records->site($data);
         // As for pupils: the warning and the write together, against two secretaries entering the same father.
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 32))', [$this->school->id()]);
         $matches = $this->suggestions($data);
@@ -61,6 +62,7 @@ final class GuardianController
         $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120', 'version' => 'required|integer|min:1']);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id']);
         $this->records->name(array_replace((array) $current, $data));
+        $this->records->site($data);
         if (array_key_exists('custom', $data)) $data['custom'] = $this->records->custom('guardian', $data['custom'], $current);
         DB::table('school.guardian')->where('tenant_id', $this->school->id())->where('id', $current->id)->update($data);
         return $this->show($current->id);

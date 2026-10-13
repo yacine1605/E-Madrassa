@@ -48,7 +48,7 @@ final class EnrollmentController
 
     public function store(Request $request)
     {
-        $this->records->global('enrollment.enrollment.create');
+        $this->records->somewhere('enrollment.enrollment.create');
         $data = $request->validate(['student_id' => 'required|uuid', 'program_id' => 'required|uuid', 'idempotency_key' => 'required|uuid',
             ...array_fill_keys(['tenant_id', 'year_id', 'status', 'agreed_price', 'discount_total', 'price_version', 'terms_snapshot', 'transferred_from', 'financial_status'], 'prohibited')]);
         $this->records->find('student', $data['student_id']);
@@ -85,7 +85,7 @@ final class EnrollmentController
     public function transfer(Request $request, string $enrollment)
     {
         $row = $this->find($enrollment, true);
-        $this->records->global('enrollment.enrollment.create');
+        $this->records->somewhere('enrollment.enrollment.create');
         $this->records->action('enrollment.enrollment.cancel', 'enrollment', $row->id);
         $data = $request->validate(['program_id' => 'required|uuid', 'idempotency_key' => 'required|uuid', 'version' => 'required|integer|min:1',
             'reason' => 'required|string|min:3|max:500']);

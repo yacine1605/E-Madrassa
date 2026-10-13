@@ -39,7 +39,7 @@ final class Students extends SchoolingPage
     public function table(Table $table): Table
     {
         return $table->records(fn (?string $search, array $filters, int $page, int $recordsPerPage) => $this->apiPage('student.record.read',
-            StudentController::class, 'index', array_filter(['q' => $search, 'status' => $filters['status']['value'] ?? null,
+            StudentController::class, 'index', array_filter(['q' => $search, 'status' => $filters['status']['value'] ?? null, 'site_id' => $filters['site_id']['value'] ?? null,
                 'birth_date' => $filters['birth']['birth_date'] ?? null, 'include_archived' => ($filters['archived']['isActive'] ?? false) ?: null]), $page, $recordsPerPage))
             ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)
             ->recordUrl(fn (array $record) => StudentSheet::getUrl(['student' => $record['id']]))
@@ -48,20 +48,22 @@ final class Students extends SchoolingPage
                 TextColumn::make('name')->label(__('school.name'))->state(fn (array $record) => $this->personName($record)),
                 TextColumn::make('birth_date')->label(__('schooling.birth_date'))->formatStateUsing(fn ($state) => Formats::date($state)),
                 TextColumn::make('phone')->label(__('schooling.phone'))->formatStateUsing(fn (?string $state) => Formats::isolated($state)),
+                TextColumn::make('site_id')->label(__('schooling.site'))->formatStateUsing(fn (string $state) => $this->siteName($state) ?? ''),
                 TextColumn::make('status')->label(__('school.status'))->badge()
                     ->state(fn (array $record) => $record['archived_at'] ? 'archived' : $record['status'])
                     ->formatStateUsing(fn (string $state) => __('schooling.student_states.'.$state)),
             ])->filters([
                 SelectFilter::make('status')->label(__('school.status'))->options(collect(__('schooling.student_states'))->except('archived')->all()),
+                SelectFilter::make('site_id')->label(__('schooling.site'))->options(fn () => collect($this->sites())->mapWithKeys(fn ($site) => [$site['id'] => $this->siteName($site['id'])])->all()),
                 Filter::make('birth')->schema([DatePicker::make('birth_date')->label(__('schooling.birth_date'))]),
                 Filter::make('archived')->label(__('schooling.include_archived'))->toggle(),
             ])->headerActions([
-                Action::make('create')->label(__('schooling.create_student'))->visible(fn () => $this->writable('student.record.create'))
+                Action::make('create')->label(__('schooling.create_student'))->visible(fn () => $this->creatable('student.record.create'))
                     ->mountUsing(function (?Schema $schema = null) {
                         $this->duplicates = [];
                         $schema?->fill();
                     })
-                    ->schema(fn () => [...$this->studentFields(),
+                    ->schema(fn () => [...$this->studentFields(), $this->siteField('student.record.create'),
                         TextInput::make('matricule')->label(__('schooling.matricule'))->regex('/^[A-Za-z0-9_-]{1,30}$/')->helperText(__('schooling.matricule_help')),
                         ...$this->customFields('student'),
                         Callout::make(__('schooling.duplicates_found'))->warning()->visible(fn () => $this->duplicates !== [])
@@ -82,7 +84,8 @@ final class Students extends SchoolingPage
                                 throw new Halt();
                             }
                         }
-                        $created = SchoolScreen::change('student.record.create', fn () => SchoolScreen::call('student.record.create', StudentController::class, 'store', $data),
+                        $created = SchoolScreen::changeAt('student.record.create', $data['site_id'] ?? null,
+                            fn () => SchoolScreen::call('student.record.create', StudentController::class, 'store', $data),
                             fn (array $result) => Notification::make()->title(__('schooling.student_created', ['matricule' => $result['data']['matricule']]))->success());
                         $this->duplicates = [];
                         $this->redirect(StudentSheet::getUrl(['student' => $created['data']['id']]));

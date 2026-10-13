@@ -64,7 +64,9 @@ final class GuardiansImporter implements Importer
                         .($match['external_ref'] ? ' ('.$match['external_ref'].')' : ''), $matches))]));
             }
             DB::select("SELECT set_config('app.reason', ?, true)", [$matches ? $reason : '']);
-            $id = DB::table('school.guardian')->insertGetId(['tenant_id' => $tenant, 'external_ref' => trim($row['external_ref']), ...$this->columns($values)], 'id');
+            // On the site of the pupil they are recorded for (SQL 029).
+            $id = DB::table('school.guardian')->insertGetId(['tenant_id' => $tenant, 'external_ref' => trim($row['external_ref']), 'site_id' => $pupil->site_id,
+                ...$this->columns($values)], 'id');
             DB::select("SELECT set_config('app.reason', '', true)");
             $previous['created']['guardian'] = $id;
             $previous['guardian'] = ['before' => null, 'after' => $values];

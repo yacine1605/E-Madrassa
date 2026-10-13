@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
  * Pupils by the reference of the school's file (FR-IMP-01, FR-ELV-01): created with their
  * matricule, given or generated, or updated column by column; a column the file leaves out keeps
  * its value. A probable duplicate (same name and birth date, FR-ELV-04) is refused unless the row
- * gives the reason to create it anyway, which the journal keeps. Undone while nothing depends on it.
+ * gives the reason to create it anyway, which the journal keeps. Recorded on the site the `site` column
+ * names by its code, else the school's default site (SQL 029). Undone while nothing depends on it.
  */
 final class StudentsImporter implements Importer
 {
@@ -18,7 +19,7 @@ final class StudentsImporter implements Importer
 
     private const FIELDS = [...PupilRecords::NAMES, 'birth_date', 'birth_place', 'gender', 'phone', 'email', 'address', 'origin_school'];
     private const SELECT = 'SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat, birth_date, birth_place, gender,
-        phone, email, address, origin_school, custom FROM school.student';
+        phone, email, address, origin_school, custom, site_id FROM school.student';
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records) {}
 
@@ -30,7 +31,7 @@ final class StudentsImporter implements Importer
             ...array_fill_keys(PupilRecords::NAMES, 'nullable|string|max:80'), 'birth_date' => ['required', 'string', self::DATE],
             'birth_place' => 'nullable|string|max:120', 'gender' => ['nullable', 'regex:/^[mfMF]$/'], 'phone' => 'nullable|string|max:40',
             'email' => 'nullable|email|max:200', 'address' => 'nullable|string|max:300', 'origin_school' => 'nullable|string|max:200',
-            ...$this->customRules('student'), 'duplicate_reason' => 'nullable|string|min:3|max:500'];
+            'site' => 'nullable|string|max:40', ...$this->customRules('student'), 'duplicate_reason' => 'nullable|string|min:3|max:500'];
     }
 
     public function key(array $row): string { return trim((string) $row['external_ref']); }
@@ -51,6 +52,8 @@ final class StudentsImporter implements Importer
             return ['outcome' => 'updated', 'target_type' => 'student', 'target_id' => $current->id, 'previous' => $changes];
         }
         $values = $this->wanted($row, $this->state(null));
+        // Without a site, the database's default: the school's default site.
+        if ($values['site_id'] === null) unset($values['site_id']);
         if ($matricule !== null && DB::selectOne('SELECT 1 FROM school.student WHERE tenant_id = ? AND matricule = ?', [$this->school->id(), $matricule])) {
             throw new RowRefused('duplicate', __('errors.import_matricule_taken', ['matricule' => $matricule]));
         }
@@ -87,7 +90,7 @@ final class StudentsImporter implements Importer
         if ($current) foreach (self::FIELDS as $field) $state[$field] = $current->$field;
         $custom = $current ? json_decode($current->custom, true, 32, JSON_THROW_ON_ERROR) : [];
         ksort($custom);
-        return [...$state, 'custom' => $custom];
+        return [...$state, 'site_id' => $current?->site_id, 'custom' => $custom];
     }
 
     /** The row's columns over the current values, as the database stores them. */
@@ -102,6 +105,7 @@ final class StudentsImporter implements Importer
                 default => $value,
             };
         }
+        if (($code = $this->text($row['site'] ?? null)) !== null) $state['site_id'] = $this->site($code);
         $state['custom'] = $this->patched($state['custom'], $this->customValues('student', $row));
         $this->named($state);
         return $state;

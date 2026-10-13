@@ -23,7 +23,7 @@ final class PupilRecords
     {
         return array_fill_keys(self::NAMES, 'nullable|string|max:80') + [
             'phone' => 'nullable|string|max:40', 'email' => 'nullable|email|max:200', 'custom' => 'sometimes|array|max:20',
-            'tenant_id' => 'prohibited', 'user_id' => 'prohibited', 'photo_file_id' => 'prohibited',
+            'tenant_id' => 'prohibited', 'user_id' => 'prohibited', 'photo_file_id' => 'prohibited', 'site_id' => 'sometimes|uuid',
         ];
     }
 
@@ -35,10 +35,21 @@ final class PupilRecords
         }
     }
 
-    /** An unlinked new record has no site/group yet: creation stays explicitly school-wide. */
+    /**
+     * Granted somewhere: a new record belongs to a site from its creation (SQL 029), which the
+     * database checks against the grant's sites, and the default site for a grant of the whole school.
+     */
     public function createPermission(string $permission): void
     {
-        if (!$this->permissions->everywhere($permission)) throw Refusal::permissionDenied();
+        if (!$this->permissions->can($permission)) throw Refusal::permissionDenied();
+    }
+
+    /** A site of the school, archived or not (the database refuses an archived one with its reason). */
+    public function site(array $data): void
+    {
+        if (isset($data['site_id']) && !DB::selectOne('SELECT 1 FROM school.site WHERE tenant_id = ? AND id = ?', [$this->school->id(), $data['site_id']])) {
+            throw ValidationException::withMessages(['site_id' => __('errors.site_unknown')]);
+        }
     }
 
     public function requireAction(string $permission, string $entity, string $id): void
@@ -101,7 +112,7 @@ final class PupilRecords
     public function listing(Request $request, string $select, string $entity): array
     {
         $data = $request->validate(Paging::RULES + ['q' => 'nullable|string|max:200', 'include_archived' => 'boolean',
-            'birth_date' => 'nullable|date_format:Y-m-d', 'status' => 'nullable|in:active,former,blocked']);
+            'birth_date' => 'nullable|date_format:Y-m-d', 'status' => 'nullable|in:active,former,blocked', 'site_id' => 'nullable|uuid']);
         $sql = $select.' WHERE tenant_id = ?';
         $bindings = [$this->school->id()];
         if (!$request->boolean('include_archived')) $sql .= ' AND archived_at IS NULL';
@@ -109,7 +120,7 @@ final class PupilRecords
             $sql .= ' AND '.Paging::search([...self::NAMES, 'phone', 'email', ...($entity === 'student' ? ['matricule'] : [])]);
             $bindings[] = $data['q'];
         }
-        foreach ($entity === 'student' ? ['birth_date', 'status'] : [] as $field) {
+        foreach ($entity === 'student' ? ['birth_date', 'status', 'site_id'] : ['site_id'] as $field) {
             if (isset($data[$field])) { $sql .= ' AND '.$field.' = ?'; $bindings[] = $data[$field]; }
         }
         // Domain lists always paginate, even when a caller asks for paginate=0.

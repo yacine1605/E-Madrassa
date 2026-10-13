@@ -35,7 +35,7 @@ final class StudyGroupController
 
     public function store(Request $request)
     {
-        $this->records->global('group.group.manage');
+        $this->records->somewhere('group.group.manage');
         $data = $request->validate($this->labelRules() + $this->rules() + ['year_id' => 'required|uuid', 'site_id' => 'required|uuid',
             'program_id' => 'required_if:group_type,class,session|nullable|uuid', 'group_type' => 'required|in:class,support,option,session',
             'code' => ['required', 'string', 'regex:/^[A-Z0-9_-]{1,30}$/'], 'valid_from' => 'required|date_format:Y-m-d']);

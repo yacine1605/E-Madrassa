@@ -88,6 +88,26 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
         }
     }
 
+    /** @return array<string, string> the sites still in use a new record may belong to, for this permission (SQL 029) */
+    protected function creationSites(string $permission): array
+    {
+        $allowed = app(Permissions::class)->sites($permission);
+        return collect($this->sites())->whereNull('archived_at')->filter(fn (array $site) => $allowed === null || in_array($site['id'], $allowed, true))
+            ->mapWithKeys(fn (array $site) => [$site['id'] => $this->siteName($site['id'])])->all();
+    }
+
+    /** The site a new record belongs to: the school's default one when the writer may use it, else their first. */
+    protected function siteField(string $permission): Select
+    {
+        return Select::make('site_id')->label(__('schooling.site'))->required()->helperText(__('schooling.record_site_help'))
+            ->options(fn () => $this->creationSites($permission))
+            ->default(function () use ($permission) {
+                $sites = $this->creationSites($permission);
+                $default = collect($this->sites())->firstWhere('is_default', true)['id'] ?? null;
+                return isset($sites[$default]) ? $default : array_key_first($sites);
+            });
+    }
+
     protected function money(int|float|string|null $amount): string
     {
         return $amount === null ? '' : Formats::number((float) $amount, 2).' '.__('formats.currency');

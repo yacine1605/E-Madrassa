@@ -98,9 +98,16 @@ trait Columns
     /** A pupil by the reference of the pupils' file, else by matricule (FR-IMP-01: never created by another import). */
     private function pupil(string $reference): object
     {
-        return DB::selectOne('SELECT id, status FROM school.student WHERE tenant_id = school.tenant() AND (external_ref = ? OR matricule = ?)
+        return DB::selectOne('SELECT id, status, site_id FROM school.student WHERE tenant_id = school.tenant() AND (external_ref = ? OR matricule = ?)
             ORDER BY (external_ref IS NOT DISTINCT FROM ?) DESC LIMIT 1', [$reference, $reference, $reference])
             ?? throw new RowRefused('reference_unknown', __('errors.import_student_unknown', ['reference' => $reference]));
+    }
+
+    /** A site of the school still in use, by the code the file gives (SQL 029). */
+    private function site(string $code): string
+    {
+        return DB::selectOne('SELECT id FROM school.site WHERE tenant_id = school.tenant() AND code = ? AND archived_at IS NULL', [$code])?->id
+            ?? throw new RowRefused('reference_unknown', __('errors.import_site_unknown', ['code' => $code]));
     }
 
     /** A full name in Arabic or in Latin letters (FR-ELV-01), as the database requires it. */

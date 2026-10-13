@@ -34,7 +34,7 @@ final class GroupMembershipController
 
     public function store(Request $request, string $group)
     {
-        $this->records->global('group.membership.manage');
+        $this->records->somewhere('group.membership.manage');
         $this->records->find('study_group', $group);
         $data = $request->validate(['enrollment_id' => 'required|uuid', 'valid_from' => 'sometimes|date_format:Y-m-d',
             ...array_fill_keys(['tenant_id', 'group_id', 'is_main', 'valid_to'], 'prohibited')]);
@@ -60,8 +60,8 @@ final class GroupMembershipController
 
     public function transfer(Request $request, string $membership)
     {
-        // The destination is a new membership; schema 021 currently requires a tenant grant.
-        $this->records->global('group.membership.manage');
+        // The destination is a new membership: a group of the writer's sites (SQL 029).
+        $this->records->somewhere('group.membership.manage');
         $row = $this->find($membership, true);
         $data = $request->validate(['group_id' => 'required|uuid', 'version' => 'required|integer|min:1', 'reason' => 'required|string|min:3|max:500']);
         $this->records->version($row, (int) $data['version']);

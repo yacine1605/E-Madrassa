@@ -146,6 +146,10 @@ GRANT INSERT (tenant_id, program_id, subject_id, total_hours, weekly_hours, sess
   valid_from, valid_to) ON school.program_subject TO school_runtime;
 GRANT UPDATE (total_hours, weekly_hours, session_count, session_duration_minutes, coefficient, valid_to, version) ON school.program_subject TO school_runtime;
 GRANT DELETE ON school.program_subject TO school_runtime;
+-- A pupil's site (029): set when they are recorded, within the writer's sites; moved with the update's grant on the new one.
+GRANT INSERT (site_id) ON school.student, school.guardian TO school_runtime;
+GRANT UPDATE (site_id) ON school.student, school.guardian TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.site_scope_ids(text, text) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -240,6 +244,8 @@ GRANT SELECT ON school.program_subject TO platform_provisioner;
 GRANT SELECT, INSERT ON school.program_subject_volume TO platform_provisioner;
 ALTER FUNCTION school.check_program_subject() OWNER TO platform_provisioner;
 ALTER FUNCTION school.version_program_subject() OWNER TO platform_provisioner;
+-- A pupil's site (029): the sites a grant names, and the pupils, guardians and groups on them, whatever the reader may see.
+ALTER FUNCTION school.site_scope_ids(text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

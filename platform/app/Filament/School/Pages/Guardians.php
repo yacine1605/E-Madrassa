@@ -44,12 +44,12 @@ final class Guardians extends SchoolingPage
                 TextColumn::make('profession')->label(__('schooling.profession'))->formatStateUsing(fn (?string $state) => Formats::isolated($state)),
             ])->filters([Filter::make('archived')->label(__('schooling.include_archived'))->toggle()])
             ->headerActions([
-                Action::make('create')->label(__('schooling.create_guardian'))->visible(fn () => $this->writable('guardian.record.create'))
+                Action::make('create')->label(__('schooling.create_guardian'))->visible(fn () => $this->creatable('guardian.record.create'))
                     ->mountUsing(function (?Schema $schema = null) {
                         $this->duplicates = [];
                         $schema?->fill();
                     })
-                    ->schema(fn () => [...$this->guardianFields(), ...$this->customFields('guardian'),
+                    ->schema(fn () => [...$this->guardianFields(), $this->siteField('guardian.record.create'), ...$this->customFields('guardian'),
                         Callout::make(__('schooling.guardian_duplicates_found'))->warning()->visible(fn () => $this->duplicates !== [])
                             ->description(fn () => Formats::list(array_map(fn (array $row) => $this->guardianLine($row), $this->duplicates))),
                         Textarea::make('duplicate_reason')->label(__('schooling.guardian_duplicate_reason'))->helperText(__('schooling.duplicate_reason_help'))
@@ -64,7 +64,7 @@ final class Guardians extends SchoolingPage
                                 throw new Halt();
                             }
                         }
-                        SchoolScreen::change('guardian.record.create',
+                        SchoolScreen::changeAt('guardian.record.create', $data['site_id'] ?? null,
                             fn () => SchoolScreen::call('guardian.record.create', GuardianController::class, 'store', $this->sentPerson($data, 'guardian')));
                         $this->duplicates = [];
                     }),
