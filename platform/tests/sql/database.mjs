@@ -2247,7 +2247,7 @@ if (PgClient) {
     }));
     await Promise.all(clients.map(c => c.end()));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
-    assert.equal(results.find(r => r.status === 'rejected').reason.code, '23P01');
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'program_subject_overlap');
     assert.equal(await count('SELECT count(*) n FROM school.program_subject WHERE program_id = $1', [p]), 1);
   });
   await check('a concurrent cancellation prevents an assignment from leaving a place occupied (FR-INS-03)', async () => {

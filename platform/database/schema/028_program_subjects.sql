@@ -111,6 +111,9 @@ BEGIN
     RAISE EXCEPTION 'program_subject_volume_required' USING ERRCODE = '23514';
   END IF;
   IF TG_OP = 'INSERT' THEN
+    -- The same subject added twice at once: the second waits for the first, then finds its line.
+    -- Left to the exclusion constraint alone, both inserts may wait on each other (a deadlock).
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.program_id::text || NEW.subject_id::text, 28));
     IF EXISTS (SELECT 1 FROM school.program_subject x WHERE x.tenant_id = NEW.tenant_id AND x.program_id = NEW.program_id
                AND x.subject_id = NEW.subject_id AND daterange(x.valid_from, x.valid_to, '[]') && daterange(NEW.valid_from, NEW.valid_to, '[]')) THEN
       RAISE EXCEPTION 'program_subject_overlap' USING ERRCODE = '23514';
