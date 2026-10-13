@@ -27,7 +27,8 @@ final class DatabaseErrors
         'main_group_required', 'program_not_active', 'student_blocked', 'primary_contact_required', 'student_quota_exceeded',
         'membership_ended', 'enrollment_not_assignable', 'group_not_active', 'group_other_year', 'group_other_program',
         'outside_group_dates', 'group_full', 'idempotency_key_reused', 'student_photo_invalid', 'student_photo_disabled',
-        'primary_contact_kept', 'transfer_same_program', 'transfer_invalid',
+        'primary_contact_kept', 'transfer_same_program', 'transfer_invalid', 'subject_archived', 'program_subject_volume_required',
+        'program_subject_overlap', 'program_subject_ended', 'program_subject_outside_year', 'program_subject_end_before_start',
     ];
 
     public static function message(string $rule): string

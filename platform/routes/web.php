@@ -18,6 +18,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
@@ -195,9 +196,18 @@ Route::prefix('api')->group(function () {
                     Route::get('programs', [ProgramController::class, 'index']);
                     Route::get('programs/{program}', [ProgramController::class, 'show']);
                     Route::get('programs/{program}/prices', [ProgramController::class, 'prices']);
+                    Route::get('programs/{program}/subjects', [ProgramSubjectController::class, 'index']);
+                    Route::get('program-subjects/{line}/volumes', [ProgramSubjectController::class, 'volumes']);
                 });
                 Route::post('programs', [ProgramController::class, 'store'])->middleware('permission:program.program.manage');
                 Route::put('programs/{program}', [ProgramController::class, 'update'])->middleware('permission:program.program.manage');
+                // FR-PRG-02: a programme's subjects and their volumes.
+                Route::middleware('permission:program.subject.manage')->group(function () {
+                    Route::post('programs/{program}/subjects', [ProgramSubjectController::class, 'store']);
+                    Route::put('program-subjects/{line}', [ProgramSubjectController::class, 'update']);
+                    Route::post('program-subjects/{line}/end', [ProgramSubjectController::class, 'end']);
+                    Route::delete('program-subjects/{line}', [ProgramSubjectController::class, 'destroy']);
+                });
                 Route::middleware('permission:group.group.read')->group(function () {
                     Route::get('groups', [StudyGroupController::class, 'index']);
                     Route::get('groups/{group}', [StudyGroupController::class, 'show']);

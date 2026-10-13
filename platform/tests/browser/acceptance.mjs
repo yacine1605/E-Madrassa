@@ -149,8 +149,8 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme, a class, a pupil with a guardian in it. The lists then have rows, and the
-// pupil's sheet and the class's members are screens too.
+// year, a programme with a subject, a class, a pupil with a guardian in it. The lists then have
+// rows, and the pupil's sheet, the class's members and the programme's subjects are screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -169,6 +169,9 @@ async function seed(browser, session) {
     const site = (await call('sites')).find(s => s.is_default);
     const program = await call('programs', { year_id: year.id, node_id: grade.id, code: 'ACC-1', status: 'active', base_price: '120000',
       labels: { fr: 'Programme de recette', ar: 'برنامج الاختبار' }, duration_value: 9, duration_unit: 'months' });
+    // A subject of the catalogue in the programme, with its volume (FR-PRG-02).
+    const subject = (await call('subjects'))[0];
+    await call(`programs/${program.id}/subjects`, { subject_id: subject.id, total_hours: '40', session_count: 20 });
     const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
       labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active' });
     const pupil = await call('students', { last_name_lat: 'Benali', first_name_lat: 'Amine', last_name_ar: 'بن علي', first_name_ar: 'أمين',
@@ -193,7 +196,7 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    return { pupil: pupil.id, group: group.id };
+    return { pupil: pupil.id, group: group.id, program: program.id };
   });
   await context.close();
   return records;
@@ -204,7 +207,8 @@ async function run(browser) {
   const sessions = { admin: await signIn(browser, 'admin'), operator: await signIn(browser, 'operator') };
   records ??= await seed(browser, sessions.admin);
   for (const locale of ['fr', 'ar']) {
-    for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`]], ['operator', 'console', consolePages]]) {
+    for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
+      `program-subjects?program=${records.program}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

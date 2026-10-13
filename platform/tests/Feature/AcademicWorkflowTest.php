@@ -343,4 +343,58 @@ final class AcademicWorkflowTest extends TestCase
         $this->postJson('/api/enrollments/'.$enrollment['id'].'/cancel', ['reason' => 'Trop tard', 'version' => 1])
             ->assertConflict()->assertJsonPath('code', 'year_closed');
     }
+
+    public function test_a_programme_s_subjects_keep_each_volume_and_end_or_go_while_nothing_uses_them(): void
+    {
+        [$school, , $year, $node] = $this->manager();
+        $program = $this->program($year, $node);
+        $subject = fn (string $code) => $this->postJson('/api/subjects', ['code' => $code, 'labels' => ['fr' => 'Module '.$code]])->assertCreated()->json('data.id');
+        [$python, $sql] = [$subject('PYTHON'), $subject('SQL')];
+        $lines = '/api/programs/'.$program['id'].'/subjects';
+        // AC4: a programme without subjects; AC2: a line without any volume.
+        $this->getJson($lines)->assertOk()->assertJsonPath('meta.total', 0);
+        $this->postJson($lines, ['subject_id' => $python, 'session_duration_minutes' => 90])->assertConflict()->assertJsonPath('code', 'program_subject_volume_required');
+        foreach ([['total_hours' => '40.555'], ['total_hours' => 0], ['weekly_hours' => 169], ['session_count' => 1.5], ['session_duration_minutes' => 10]] as $wrong)
+            $this->postJson($lines, ['subject_id' => $python, ...$wrong])->assertUnprocessable();
+        // AC1: « Python — 40 h — 20 séances », then 36 h: both versions kept.
+        $line = $this->postJson($lines, ['subject_id' => $python, 'total_hours' => '40', 'session_count' => 20])->assertCreated()
+            ->assertJsonPath('data.total_hours', '40.00')->assertJsonPath('data.session_duration_minutes', 60)->assertJsonPath('data.valid_from', now()->toDateString())
+            ->assertJsonPath('data.subject.code', 'PYTHON')->assertJsonPath('data.volume_version', 1)
+            // 40 h in 20 sessions are sessions of 120 min: a warning, never a refusal.
+            ->assertJsonPath('data.implicit_minutes', '120.0')->assertJsonPath('data.duration_gap', true)->json('data');
+        $this->postJson($lines, ['subject_id' => $python, 'weekly_hours' => 2])->assertConflict()->assertJsonPath('code', 'program_subject_overlap');
+        $path = '/api/program-subjects/'.$line['id'];
+        $this->putJson($path, ['total_hours' => 36, 'session_duration_minutes' => 110, 'version' => 1])->assertOk()
+            ->assertJsonPath('data.volume_version', 2)->assertJsonPath('data.session_count', 20)->assertJsonPath('data.duration_gap', false);
+        $this->putJson($path, ['total_hours' => 30, 'version' => 1])->assertConflict()->assertJsonPath('code', 'stale_version');
+        $this->putJson($path, ['subject_id' => $sql, 'version' => 2])->assertUnprocessable();
+        $this->getJson($path.'/volumes')->assertOk()->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('data.0.total_hours', '36.00')->assertJsonPath('data.1.total_hours', '40.00')->assertJsonPath('data.1.session_duration_minutes', 60);
+        // AC3: an end of validity, final; an ended line leaves the list of what is taught.
+        $this->postJson($path.'/end', ['valid_to' => now()->subDay()->toDateString(), 'version' => 2])
+            ->assertConflict()->assertJsonPath('code', 'program_subject_end_before_start');
+        $this->postJson($path.'/end', ['valid_to' => now()->toDateString(), 'version' => 2])->assertOk()->assertJsonPath('data.volume_version', 2);
+        $this->putJson($path, ['total_hours' => 30, 'version' => 3])->assertConflict()->assertJsonPath('code', 'program_subject_ended');
+        $old = $this->postJson($lines, ['subject_id' => $sql, 'weekly_hours' => '1.5', 'valid_from' => now()->startOfYear()->toDateString(),
+            'valid_to' => now()->subDay()->toDateString()])->assertCreated()->json('data');
+        $this->getJson($lines)->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $line['id']);
+        $this->getJson($lines.'?include_ended=1')->assertJsonPath('meta.total', 2);
+        $this->postJson($lines, ['subject_id' => $sql, 'weekly_hours' => 2, 'valid_from' => now()->addYear()->toDateString()])
+            ->assertConflict()->assertJsonPath('code', 'program_subject_outside_year');
+        // A subject in a programme stays in the catalogue; a line nothing uses goes, with its versions.
+        $this->deleteJson('/api/subjects/'.$sql)->assertConflict()->assertJsonPath('code', 'subject_in_use');
+        $this->deleteJson('/api/program-subjects/'.$old['id'], ['version' => 2])->assertConflict()->assertJsonPath('code', 'stale_version');
+        $this->deleteJson('/api/program-subjects/'.$old['id'], ['version' => 1])->assertNoContent();
+        $this->getJson('/api/program-subjects/'.$old['id'].'/volumes')->assertNotFound();
+        $this->deleteJson('/api/subjects/'.$sql)->assertNoContent();
+        $this->assertSame(1, DB::connection('owner')->table('school.audit_log')->where('tenant_id', $school->id)
+            ->where('object_type', 'program_subject')->where('object_id', $old['id'])->where('action', 'DELETE')->count());
+        // The direction reads the subjects of a programme and changes none (section 3.2).
+        $direction = $this->account('direction');
+        $this->member($school, $direction, 'active', ['direction']);
+        $this->signIn($direction)->assertOk();
+        $this->getJson($lines)->assertOk()->assertJsonPath('meta.total', 1);
+        $this->postJson($lines, ['subject_id' => $python, 'weekly_hours' => 2])->assertForbidden();
+        $this->deleteJson($path, ['version' => 3])->assertForbidden();
+    }
 }

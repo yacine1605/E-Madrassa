@@ -677,9 +677,33 @@ On screen, the Enrollments list offers **Transfer to another programme** (active
 
 Validation on 12 October 2026: **220 PHP integration tests (7,040 assertions), 192 embedded SQL checks and 205 native PostgreSQL 16 checks including concurrency**; migration 027 rolled back alone with transfers in place, then with all the others, and applied again. The Enrollments screen gains an action and a history section only: the browser acceptance was left to CI.
 
+## Increment 41 (lot 2): a programme's subjects and their volumes
+
+`028_program_subjects.sql`:
+
+- **FR-PRG-02**: a programme teaches subjects or modules of the school's catalogue (BR-13), each with at least one of its total hours, weekly hours or number of sessions (`program_subject_volume_required`, AC2), the length of its sessions (by default the school's, the new setting `planning.session_minutes`, 60) and an optional coefficient. Hours have two decimal places (1.50 is an hour and a half), sent and read as decimals, refused rather than rounded beyond. A subject appears once in a programme at any date (`program_subject_overlap`); an exclusion constraint makes one line of two added at the same moment. A programme may have none (AC4).
+- A changed volume is a new version (`volume_version`), kept in `school.program_subject_volume` with the day it was set, written by the database alone and never changed (AC1: 40 h, then 36 h, both kept).
+- A line is taught from `valid_from` (today, or the first day of a year not begun yet) until `valid_to`, within its programme's year. Its end is final (`program_subject_ended`): the subject is added again for a later period. A line nothing uses is deleted with its versions, the journal keeping its values; a subject a line names stays in the catalogue (`subject_in_use`). A closed year freezes its programmes' subjects. With the sessions of lot 4, a line they use will refuse deletion and be ended instead (AC3).
+- The average length its hours and sessions imply (`implicit_minutes`) is given; more than 10 % away from the session's length (`duration_gap`), it is pointed out, never refused.
+- Read with the programme, by scoped readers too and in the journal; changed within the scope of `program.subject.manage` (`academic_hr`, `tenant_admin`).
+
+Routes: `GET` and `POST /api/programs/{program}/subjects` (`include_ended` for the ended lines), `PUT /api/program-subjects/{line}`, `POST /api/program-subjects/{line}/end`, `DELETE /api/program-subjects/{line}` (with `version`), `GET /api/program-subjects/{line}/volumes`.
+
+On screen, a programme's row opens **its subjects**: add one, change its volume, read its versions, end it or remove it. The implied average of a session is shown, coloured with its explanation when it is far from the session's length. The school's administrator manages a programme's subjects without managing the programme (section 3.2).
+
+| Requirement | Evidence |
+|---|---|
+| FR-PRG-02 AC1, AC2, AC4 | `tests/sql/database.mjs`: no volume refused, defaults, ranges, dates within the year, archived or foreign subject refused, overlap refused, two versions kept, versions and their numbers not writable, a programme without subjects enrols; two lines added at once make one (native). `AcademicWorkflowTest`: decimals refused rather than rounded, 40 h then 36 h, the implied 120 min pointed out, stale version. `SchoolingPanelTest`: through the programme's subjects screen |
+| FR-PRG-02 AC3, BR-02 | `tests/sql/database.mjs`, `AcademicWorkflowTest`: an end is final, the subject comes back for a later period; a line nothing uses is deleted with its versions, journal kept; a subject in a programme is not deleted |
+| FR-IAM-04, FR-REF-05 | `tests/sql/database.mjs`: a site-scoped reader reads the subjects and journal of the programmes taught on their site only, a site-scoped manager changes only those; a closed year refuses every change. `AcademicWorkflowTest`: the direction reads and changes nothing |
+
+Copying a programme to the next year with its subjects comes with the annual progression (FR-INS-05).
+
+Validation on 13 October 2026: **222 PHP integration tests (7,326 assertions), 197 embedded SQL checks and 211 native PostgreSQL 16 checks including concurrency**; migration 028 rolled back alone with subjects, their versions and a school's setting in place, then with all the others, and applied again. Local browser acceptance in Chromium: 140 screens without a problem, the programme's subjects included; Firefox and WebKit by CI.
+
 ## Next increments of lot 2
 
 1. Scoped creation (a decision first: what places a new pupil within a site's reach) and the retention decision OD-07.
-2. Programme subjects/volumes, staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
+2. Staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

@@ -139,6 +139,13 @@ GRANT EXECUTE ON FUNCTION school.discard_student(uuid), school.discard_guardian(
   school.discard_enrollment(uuid) TO school_runtime;
 -- A transfer from one programme to another (027): with the writer's rights, each step its permission.
 GRANT EXECUTE ON FUNCTION school.transfer_enrollment(uuid, uuid, uuid, text, integer) TO school_runtime;
+-- A programme's subjects (028): a line's programme, subject and first day stay; its volumes are
+-- versioned by the database. A line never used is deleted (BR-02), as a subject of the catalogue.
+GRANT SELECT ON school.program_subject, school.program_subject_volume TO school_runtime;
+GRANT INSERT (tenant_id, program_id, subject_id, total_hours, weekly_hours, session_count, session_duration_minutes, coefficient,
+  valid_from, valid_to) ON school.program_subject TO school_runtime;
+GRANT UPDATE (total_hours, weekly_hours, session_count, session_duration_minutes, coefficient, valid_to, version) ON school.program_subject TO school_runtime;
+GRANT DELETE ON school.program_subject TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -228,6 +235,11 @@ ALTER FUNCTION school.retire_student_photo() OWNER TO platform_provisioner;
 ALTER FUNCTION school.keep_primary_contact(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.check_primary_contact() OWNER TO platform_provisioner;
 ALTER FUNCTION school.link_transfer() OWNER TO platform_provisioner;
+-- A programme's subjects (028): its year and the lines already there, whatever the writer may read; its volumes.
+GRANT SELECT ON school.program_subject TO platform_provisioner;
+GRANT SELECT, INSERT ON school.program_subject_volume TO platform_provisioner;
+ALTER FUNCTION school.check_program_subject() OWNER TO platform_provisioner;
+ALTER FUNCTION school.version_program_subject() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

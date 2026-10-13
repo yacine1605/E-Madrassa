@@ -60,7 +60,9 @@ final class Programs extends SchoolingPage
                     ])
                     ->action(fn (array $data) => SchoolScreen::change('program.program.manage',
                         fn () => SchoolScreen::call('program.program.manage', ProgramController::class, 'store', $this->sent($data)))),
-            ])->recordActions([
+            ])->recordUrl(fn (array $record) => ProgramSubjects::getUrl(['program' => $record['id']]))->recordActions([
+                // FR-PRG-02: its subjects and their volumes.
+                Action::make('subjects')->label(__('schooling.program_subjects'))->url(fn (array $record) => ProgramSubjects::getUrl(['program' => $record['id']])),
                 Action::make('prices')->label(__('schooling.prices'))->modalHeading(__('schooling.prices'))->modalSubmitAction(false)
                     ->modalContent(fn (array $record) => view('filament.school.program-prices', ['prices' => array_map(fn ($price) => [
                         'version' => Formats::number($price['version']), 'price' => $this->money($price['base_price']), 'since' => Formats::dateTime($price['created_at']),

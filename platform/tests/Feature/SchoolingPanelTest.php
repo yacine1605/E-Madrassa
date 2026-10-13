@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\School\Pages\Groups;
 use App\Filament\School\Pages\Guardians;
 use App\Filament\School\Pages\Programs;
+use App\Filament\School\Pages\ProgramSubjects;
 use App\Filament\School\Pages\Students;
 use App\Filament\School\Pages\StudentSheet;
 use App\Support\CurrentSchool;
@@ -106,6 +107,53 @@ final class SchoolingPanelTest extends TestCase
             $program = DB::table('school.program')->where('code', '1AS-SCI')->value('id');
             Livewire::test(Programs::class)->assertTableActionHidden('edit', $program)->assertTableActionVisible('prices', $program)
                 ->assertTableActionHidden('create');
+        });
+    }
+
+    public function test_a_programme_s_subjects_are_added_versioned_ended_and_removed_on_its_page(): void
+    {
+        [$school, $manager, $year] = $this->setting();
+        $program = $this->postJson('/api/programs', ['year_id' => $year, 'node_id' => $this->node($school), 'code' => 'FS-OCT',
+            'labels' => ['fr' => 'Full Stack, session d’octobre'], 'base_price' => '1000', 'status' => 'active'])->assertCreated()->json('data');
+        $subject = fn (string $code, array $labels) => $this->postJson('/api/subjects', ['code' => $code, 'labels' => $labels])->assertCreated()->json('data.id');
+        [$python, $algo] = [$subject('PYTHON', ['fr' => 'Python', 'ar' => 'بايثون']), $subject('ALGO', ['fr' => 'Algorithmique'])];
+        $this->get('/school/program-subjects?program='.$program['id'])->assertOk()->assertSee(__('schooling.add_program_subject'))
+            ->assertSee(__('schooling.no_program_subject'));
+        $this->get('/school/program-subjects?program='.Str::uuid())->assertNotFound();
+        $this->within($school, $manager, function () use ($program, $python, $algo) {
+            $page = fn () => Livewire::withQueryParams(['program' => $program['id']])->test(ProgramSubjects::class);
+            // AC2: at least one of the total hours, the weekly hours, the sessions.
+            $page()->callTableAction('add', data: ['subject_id' => $python, 'session_duration_minutes' => 90])->assertHasTableActionErrors(['total_hours']);
+            $page()->callTableAction('add', data: ['subject_id' => $python, 'total_hours' => '40', 'session_count' => 20])->assertNotified(__('school.saved'));
+            $line = DB::table('school.program_subject')->where('program_id', $program['id'])->first();
+            $this->assertSame(['40.00', 20, 60, 1], [$line->total_hours, $line->session_count, $line->session_duration_minutes, $line->volume_version]);
+            // 40 h in 20 sessions: 120 min each, pointed out against the school's 60.
+            $page()->assertCanSeeTableRecords([$line->id])->assertSeeText('40 h')->assertSeeText('120 min')->assertSeeText('Python');
+            // AC1: 36 h is a second version; the first stays.
+            $page()->callTableAction('volume', $line->id, data: ['total_hours' => '36', 'session_count' => 20, 'session_duration_minutes' => 110, 'version' => 1])
+                ->assertNotified(__('school.saved'));
+            $page()->mountTableAction('volumes', $line->id)->assertMountedActionModalSee('40 h')->assertMountedActionModalSee('36 h');
+            $page()->callTableAction('add', data: ['subject_id' => $python, 'weekly_hours' => '2'])->assertNotified(__('errors.program_subject_overlap'));
+            // AC3: ended, final; still read, then removed.
+            $page()->callTableAction('end', $line->id, data: ['valid_to' => now()->toDateString()])->assertNotified(__('school.saved'));
+            $page()->assertTableActionHidden('volume', $line->id)->assertTableActionHidden('end', $line->id)->assertTableActionVisible('volumes', $line->id);
+            $page()->callTableAction('remove', $line->id)->assertNotified(__('school.saved'));
+            $this->assertSame(0, DB::table('school.program_subject')->where('id', $line->id)->count());
+            $page()->callTableAction('add', data: ['subject_id' => $algo, 'weekly_hours' => '1.5'])->assertNotified(__('school.saved'));
+        });
+        // The school's administrator manages a programme's subjects without managing the programme (section 3.2).
+        $admin = $this->account('administrator');
+        $this->member($school, $admin, 'active', ['tenant_admin']);
+        $this->within($school, $admin, function () use ($program) {
+            Livewire::test(Programs::class)->assertTableActionHidden('edit', $program['id'])->assertTableActionVisible('subjects', $program['id']);
+            Livewire::withQueryParams(['program' => $program['id']])->test(ProgramSubjects::class)->assertTableActionVisible('add')->assertSeeText('1,5 h');
+        });
+        // A closed year freezes them.
+        $this->postJson('/api/years/'.$year.'/status', ['status' => 'closed', 'reason' => 'Année terminée'])->assertOk();
+        $this->within($school, $manager, function () use ($program) {
+            $line = DB::table('school.program_subject')->where('program_id', $program['id'])->value('id');
+            Livewire::withQueryParams(['program' => $program['id']])->test(ProgramSubjects::class)->assertTableActionHidden('add')
+                ->assertTableActionHidden('volume', $line)->assertTableActionHidden('remove', $line)->assertTableActionVisible('volumes', $line);
         });
     }
 

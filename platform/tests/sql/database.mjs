@@ -1385,6 +1385,97 @@ await check('a transfer cancels the enrolment it leaves and makes the one it goe
   }
 });
 
+// A programme's subjects (FR-PRG-02, SQL 028): a volume for each subject of the catalogue, every
+// change a new version, a subject once in a programme at any date.
+const LINE = `INSERT INTO school.program_subject (tenant_id, program_id, subject_id, total_hours, weekly_hours, session_count, session_duration_minutes,
+  valid_from, valid_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, valid_from::text AS valid_from, session_duration_minutes, volume_version`;
+const line = (program, subject, { total = null, weekly = null, sessions = null, minutes = null, from = null, to = null } = {}) =>
+  first(LINE, [a, program, subject, total, weekly, sessions, minutes, from, to]);
+const volumes = async id => (await sql(`SELECT version, total_hours::text AS total, session_count AS sessions FROM school.program_subject_volume
+  WHERE program_subject_id = $1 ORDER BY version`, [id])).rows;
+await as('school_runtime', a, 1);
+const python = (await first(SUBJECT, [a, 'PYTHON', 'module', JSON.stringify({ fr: 'Python', ar: 'بايثون' })])).id;
+const algo = (await first(SUBJECT, [a, 'ALGO', 'module', JSON.stringify({ fr: 'Algorithmique', ar: 'الخوارزميات' })])).id;
+await check('a programme\'s subject has a volume and appears once at a time; a programme may have none (FR-PRG-02 AC2, AC4)', async () => {
+  await as('school_runtime', a, 1);
+  const p = await programme('MATIERES');
+  // A programme without subjects (a preschool working by activities) takes its pupils.
+  assert.ok(await enroll((await newAdult('Matieres', 'Aucune')).id, p));
+  await rejects(LINE, [a, p, python, null, null, null, 90, null, null], '23514', 'program_subject_volume_required');
+  // Its first day is the year's when the year has not begun; a session lasts the school's length.
+  const made = await line(p, python, { total: 40, sessions: 20 });
+  assert.deepEqual([made.valid_from, made.session_duration_minutes, made.volume_version], ['2027-09-01', 60, 1]);
+  await rejects(LINE, [a, p, python, null, 2, null, null, '2028-01-01', null], '23514', 'program_subject_overlap');
+  assert.ok(await line(p, algo, { weekly: 1.5 }));
+  for (const [total, weekly, sessions, minutes] of [[0, null, null, null], [null, -1, null, null], [null, 169, null, null], [null, null, 0, null], [10, null, null, 10]])
+    await rejects(LINE, [a, p, uuid(), total, weekly, sessions, minutes, null, null], '23514');
+  await rejects(LINE, [a, p, algo, 4, null, null, null, '2027-08-31', null], '23514', 'program_subject_outside_year');
+  await rejects(LINE, [a, await programme('MATIERES-2'), algo, 4, null, null, null, null, '2028-07-01'], '23514', 'program_subject_outside_year');
+  const archived = (await first(SUBJECT, [a, 'ANCIENNE', 'module', JSON.stringify({ fr: 'Ancienne matière' })])).id;
+  await sql('UPDATE school.subject SET archived_at = now() WHERE id = $1', [archived]);
+  await rejects(LINE, [a, p, archived, 4, null, null, null, null, null], '23514', 'subject_archived');
+  await as(null);
+  const foreign = (await first(SUBJECT, [b, 'AILLEURS', 'module', JSON.stringify({ fr: 'Matière de B' })])).id;
+  await as('school_runtime', a, 1);
+  await rejects(LINE, [a, p, foreign, 4, null, null, null, null, null], '23503');
+});
+await check('a changed volume is a new version, the previous one kept; an ended line is final, its subject added again later (FR-PRG-02 AC1, AC3)', async () => {
+  const p = await programme('PYTHON-40');
+  const id = (await line(p, python, { total: 40, sessions: 20, minutes: 120 })).id;
+  await sql('UPDATE school.program_subject SET total_hours = 36 WHERE id = $1', [id]);
+  assert.deepEqual(await volumes(id), [{ version: 1, total: '40.00', sessions: 20 }, { version: 2, total: '36.00', sessions: 20 }]);
+  // An end of validity is no new volume.
+  await rejects("UPDATE school.program_subject SET valid_to = '2027-08-31' WHERE id = $1", [id], '23514', 'program_subject_end_before_start');
+  await sql("UPDATE school.program_subject SET valid_to = '2028-01-31' WHERE id = $1", [id]);
+  assert.equal((await first('SELECT volume_version FROM school.program_subject WHERE id = $1', [id])).volume_version, 2);
+  await rejects('UPDATE school.program_subject SET total_hours = 30 WHERE id = $1', [id], '23514', 'program_subject_ended');
+  await rejects('UPDATE school.program_subject SET valid_to = NULL WHERE id = $1', [id], '23514', 'program_subject_ended');
+  await rejects(LINE, [a, p, python, 10, null, null, null, '2028-01-31', null], '23514', 'program_subject_overlap');
+  const again = await line(p, python, { total: 10, from: '2028-02-01' });
+  assert.equal(again.volume_version, 1);
+  // What the database alone writes.
+  await rejects('UPDATE school.program_subject SET volume_version = 9 WHERE id = $1', [again.id], '42501');
+  await rejects('UPDATE school.program_subject SET subject_id = $2 WHERE id = $1', [again.id, algo], '42501');
+  await rejects('UPDATE school.program_subject_volume SET total_hours = 1 WHERE program_subject_id = $1', [id], '42501');
+  await rejects('DELETE FROM school.program_subject_volume WHERE program_subject_id = $1', [id], '42501');
+  await as(null);
+  await rejects('UPDATE school.program_subject_volume SET total_hours = 1 WHERE program_subject_id = $1', [id], '23514', 'immutable_record');
+  await rejects('UPDATE school.program_subject SET subject_id = $2 WHERE id = $1', [again.id, algo], '23514', 'identity_immutable');
+  await as('school_runtime', a, 1);
+});
+await check('a line never used is deleted with its volumes, its values kept in the journal; a subject in a programme stays (BR-02, FR-REF-03)', async () => {
+  const p = await programme('RETRAIT');
+  const id = (await line(p, algo, { sessions: 12 })).id;
+  await sql('UPDATE school.program_subject SET session_count = 10 WHERE id = $1', [id]);
+  await rejects('DELETE FROM school.subject WHERE id = $1', [algo], '23503');
+  await sql('DELETE FROM school.program_subject WHERE id = $1', [id]);
+  await as(null);
+  assert.equal(await count('SELECT count(*) n FROM school.program_subject_volume WHERE program_subject_id = $1', [id]), 0);
+  assert.deepEqual(await first(`SELECT before ->> 'session_count' AS n FROM school.audit_log
+    WHERE object_type = 'program_subject' AND object_id = $1 AND action = 'DELETE'`, [id]), { n: '10' });
+  await as('school_runtime', a, 1);
+});
+await check('a closed year freezes its programmes\' subjects; the subjects need their permission (FR-PRG-02, FR-REF-05, TST-02)', async () => {
+  await as(null);
+  const old = (await first(YEAR, [a, 'LOT2-MAT', '2021-09-01', '2022-06-30', 'planned'])).id;
+  await as('school_runtime', a, 1);
+  const p = await programme('ANCIEN-MAT', 1000, 'active', old);
+  // A year already over: its last day.
+  const l = await line(p, python, { total: 30 });
+  assert.equal(l.valid_from, '2022-06-30');
+  await as(null);
+  await sql("UPDATE school.academic_year SET status = 'closed' WHERE id = $1", [old]);
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.program_subject SET total_hours = 31 WHERE id = $1', [l.id], '23514', 'year_closed');
+  await rejects('DELETE FROM school.program_subject WHERE id = $1', [l.id], '23514', 'year_closed');
+  await rejects(LINE, [a, p, algo, 5, null, null, null, null, null], '23514', 'year_closed');
+  // A teacher changes no programme.
+  const open = await programme('SANS-DROIT-MAT');
+  await as('school_runtime', a, 9);
+  await rejects(LINE, [a, open, algo, 5, null, null, null, null, null], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+
 // The reference import (FR-IMP-01, lot 2 exit; SQL 025): pupils and guardians keep the reference of
 // the school's file; an import is undone while nothing depends on what it created.
 const STUDENT_REF = STUDENT.replace('custom)', 'custom, external_ref)').replace('$7)', '$7, $8)');
@@ -1612,6 +1703,26 @@ await check('each action uses its own scope, even with several roles (FR-IAM-04)
   await as('school_runtime', a, identity.user);
   await rejects("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Mauvaise portée' WHERE id = $1", [scopeEnrollmentB], '42501', 'permission_denied');
 });
+await check('a programme\'s subjects are read with the programme, journal included, and changed within the scope of their permission (FR-PRG-02, FR-IAM-04)', async () => {
+  await as('school_runtime', a, 1);
+  const outside = await programme('HORS-PORTEE');
+  const seen = (await line(scopeProgram, python, { total: 20 })).id;
+  const hidden = (await line(outside, python, { total: 20 })).id;
+  await as('school_runtime', a, siteIdentity.user);
+  assert.deepEqual(await visibleIds('program_subject'), [seen]);
+  assert.deepEqual((await sql('SELECT DISTINCT program_subject_id AS id FROM school.program_subject_volume')).rows.map(r => r.id), [seen]);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'program_subject' AND object_id = $1", [seen]) > 0);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'program_subject' AND object_id = $1", [hidden]), 0);
+  // The subjects of the programmes taught on their site, and no other.
+  const manager = await scopedAccount('internal', 'site', [siteA], ['program.program.read', 'program.subject.manage']);
+  await as('school_runtime', a, manager.user);
+  await sql('UPDATE school.program_subject SET weekly_hours = 2 WHERE id = $1', [seen]);
+  assert.ok(await line(scopeProgram, algo, { sessions: 4 }));
+  await rejects(LINE, [a, outside, algo, 5, null, null, null, null, null], '42501', 'permission_denied');
+  assert.equal((await sql('UPDATE school.program_subject SET weekly_hours = 2 WHERE id = $1', [hidden])).rowCount ?? 0, 0);
+  assert.equal((await sql('DELETE FROM school.program_subject WHERE id = $1', [hidden])).rowCount ?? 0, 0);
+  await as('school_runtime', a, 1);
+});
 await check('unknown group scopes are refused; expired grants, suspended members and disabled modules expose no records', async () => {
   await as(null);
   await rejects('UPDATE school.role_assignment SET scope_ids = $2 WHERE id = $1', [groupIdentity.assignment, [uuid()]], '23514', 'scope_unknown');
@@ -1635,7 +1746,8 @@ await check('unknown group scopes are refused; expired grants, suspended members
 await check('a school member without a domain permission reads none of the core tables', async () => {
   const identity = await scopedAccount('internal', 'tenant', null, []);
   await as('school_runtime', a, identity.user);
-  for (const table of ['student', 'guardian', 'student_guardian', 'program', 'program_price', 'study_group', 'enrollment', 'enrollment_status_history', 'group_membership'])
+  for (const table of ['student', 'guardian', 'student_guardian', 'program', 'program_price', 'program_subject', 'program_subject_volume', 'study_group',
+    'enrollment', 'enrollment_status_history', 'group_membership'])
     assert.equal(await count(`SELECT count(*) n FROM school.${table}`), 0, table);
   await as('school_runtime', b, 2);
   assert.equal(await count('SELECT count(*) n FROM school.student'), 0, 'another school sees none');
@@ -2120,6 +2232,23 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.equal(ids[0], ids[1]);
     assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE transferred_from = $1', [source]), 1);
+  });
+  await check('a subject added twice to a programme at the same moment makes one line (FR-PRG-02)', async () => {
+    await as('school_runtime', a, 1);
+    const p = await programme('MATIERE-COURSE');
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(LINE, [a, p, python, 30 + i, null, null, null, null, null]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.code, '23P01');
+    assert.equal(await count('SELECT count(*) n FROM school.program_subject WHERE program_id = $1', [p]), 1);
   });
   await check('a concurrent cancellation prevents an assignment from leaving a place occupied (FR-INS-03)', async () => {
     await as('school_runtime', a, 1);
