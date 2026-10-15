@@ -30,6 +30,7 @@ final class DatabaseErrors
         'primary_contact_kept', 'transfer_same_program', 'transfer_invalid', 'subject_archived', 'program_subject_volume_required',
         'program_subject_overlap', 'program_subject_ended', 'program_subject_outside_year', 'program_subject_end_before_start',
         'site_required', 'site_archived',
+        'staff_archived', 'staff_archive_left', 'left_on_future', 'left_before_hire', 'staff_account_linked',
     ];
 
     public static function message(string $rule): string

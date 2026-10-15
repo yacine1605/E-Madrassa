@@ -30,7 +30,7 @@ admin_secret=$(secret direction@acceptance.test Direction)
 operator_secret=$(secret operator@acceptance.test Opérateur)
 [ -n "$admin_secret" ] && [ -n "$operator_secret" ] || { echo "FAIL: no MFA secret" >&2; exit 1; }
 compose run --rm -T migrate php artisan platform:operator operator@acceptance.test >/dev/null
-compose run --rm -T migrate php artisan platform:create-school acceptance-a "École Acceptation" --admin=direction@acceptance.test >/dev/null
+compose run --rm -T migrate php artisan platform:create-school acceptance-a "École Acceptation" --plan=pro --admin=direction@acceptance.test >/dev/null
 compose run --rm -T migrate php artisan platform:membership acceptance-a direction@acceptance.test --role=academic_hr >/dev/null
 
 [ -d tests/browser/node_modules/playwright ] || npm ci --prefix tests/browser --no-audit --no-fund >/dev/null

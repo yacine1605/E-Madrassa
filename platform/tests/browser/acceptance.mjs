@@ -22,12 +22,12 @@ const screens = name => ({
 });
 let viewports;
 let shotsOf;
-const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
+const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
-const rawKey = /\b(?:school|admin|schooling|services|reference|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
+const rawKey = /\b(?:school|admin|schooling|staff|services|reference|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
 
 const failures = [];
 const report = [];
@@ -149,8 +149,9 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme with a subject, a class, a pupil with a guardian in it. The lists then have
-// rows, and the pupil's sheet, the class's members and the programme's subjects are screens too.
+// year, a programme with a subject, a class, a pupil with a guardian in it, a teacher. The lists
+// then have rows, and the pupil's sheet, the class's members and the programme's subjects are
+// screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -196,6 +197,9 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
+    // A teacher's record, without an account (FR-STF-01).
+    await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
+      staff_type: 'teacher_internal', phone: '0550 98 76 54', hire_date: '2020-09-01' });
     return { pupil: pupil.id, group: group.id, program: program.id };
   });
   await context.close();

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-/** Shared data rules for pupil and guardian records. Row access remains enforced by SQL. */
+/** Shared data rules for pupil, guardian and staff records. Row access remains enforced by SQL. */
 final class PupilRecords
 {
     public const NAMES = ['last_name_ar', 'first_name_ar', 'last_name_lat', 'first_name_lat'];
@@ -83,10 +83,22 @@ final class PupilRecords
         return json_encode((object) array_replace($before, $values), JSON_THROW_ON_ERROR);
     }
 
+    /**
+     * Who reads the school's sensitive fields of a record: a pupil's or a guardian's health or
+     * social notes with `student.sensitive.read`; a member of staff's with their contracts,
+     * `staff.contract.read` (the staff's human resources, never their pay).
+     */
+    public static function sensitivePermission(string $entity): string
+    {
+        return $entity === 'staff' ? 'staff.contract.read' : 'student.sensitive.read';
+    }
+
     private function sensitive(string $entity, ?string $id): bool
     {
-        $access = $this->cached('access:'.$entity, fn () => DB::selectOne("SELECT school.can_everywhere('student.sensitive.read') AS everywhere,
-            to_json(school.core_ids('student.sensitive.read', ?)) AS ids", [$entity]));
+        $permission = self::sensitivePermission($entity);
+        $access = $this->cached('access:'.$entity, fn () => $entity === 'staff'
+            ? DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.staff_ids(?)) AS ids', [$permission, $permission])
+            : DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]));
         return $access->everywhere || ($id !== null && in_array($id, json_decode($access->ids, true), true));
     }
 

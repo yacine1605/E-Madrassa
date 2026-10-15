@@ -27,6 +27,7 @@ use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentPhotoController;
@@ -265,6 +266,22 @@ Route::prefix('api')->group(function () {
                     Route::put('guardians/{guardian}', [GuardianController::class, 'update']);
                     Route::put('students/{student}/guardians/{link}', [GuardianController::class, 'updateLink']);
                     Route::post('students/{student}/guardians/{link}/archive', [GuardianController::class, 'unlink']);
+                });
+            });
+
+            // FR-STF-01: the staff's records, with or without an account (P7).
+            Route::middleware('module:staff')->group(function () {
+                Route::get('staff/accounts', [StaffController::class, 'accounts'])->middleware('permission:staff.profile.update');
+                Route::middleware('permission:staff.profile.read')->group(function () {
+                    Route::get('staff', [StaffController::class, 'index']);
+                    Route::get('staff/{staff}', [StaffController::class, 'show']);
+                });
+                Route::post('staff', [StaffController::class, 'store'])->middleware('permission:staff.profile.create');
+                Route::middleware('permission:staff.profile.update')->group(function () {
+                    Route::put('staff/{staff}', [StaffController::class, 'update']);
+                    Route::post('staff/{staff}/status', [StaffController::class, 'status']);
+                    Route::post('staff/{staff}/account', [StaffController::class, 'account']);
+                    Route::post('staff/{staff}/archive', [StaffController::class, 'archive']);
                 });
             });
 

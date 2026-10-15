@@ -748,8 +748,29 @@ Not yet: the purge of an archived school (FR-PLT-01) belongs to the console; fin
 
 Validation on 13 October 2026: **224 PHP integration tests (7,466 assertions), 201 embedded SQL checks and 215 native PostgreSQL 16 checks including concurrency**; migration 030 rolled back alone with anonymised records and retention settings in place, then with all the others, and applied again. Local browser acceptance in Chromium: 140 screens without a problem.
 
+## Increment 44 (lot 2): the staff's records
+
+`031_staff.sql`, module `staff` (plans Pro and Complete):
+
+- **FR-STF-01**: a record for each member of staff, internal or external teacher, administrative or other (`staff_type`), with or without an account (principle P7): a name in Arabic or Latin letters, or both, phone, e-mail, the day they were hired and the school's own fields (FR-REF-04, entity `staff`). Its number (`staff_number`) is the school's, given once and never changed, or made by the database: `P0001`, `P0002`… after the highest one made, one creation at a time. Pay is never here (module REM, lot 3).
+- **States**: active, on leave (`on_leave`) or left; a departure has its day (`left_on`), today unless told, never in the future (`left_on_future`) nor before the hiring (`left_before_hire`); coming back (`left` → `active`) clears it; a member on leave may leave without coming back first. The reason of each change goes to the journal. Nothing is ever deleted (BR-02): the sessions, hours and pay of lots 3 and 4 will keep pointing at the record; only a member who left is archived (`staff_archive_left`), and an archived record no longer changes (`staff_archived`).
+- **A site**, as a pupil's (029): the record belongs to the site the form names, the writer's only site, or the school's default site. A grant limited to sites records, reads and changes the staff of its sites; a personal grant reads the holder's own record (a teacher's), once their account is linked to it.
+- **The account**: linked or unlinked by `staff.profile.update`, among the school's members not revoked (`membership_revoked`); one record per account (`staff_account_linked`), and nobody links their own (`self_account`). The link opens nothing by itself: a personal grant does.
+- **The journal**: domain `staff`, read with `staff.profile.read` (direction), by a scoped reader for the records they reach; names, contact details and the school's fields masked. The school's sensitive fields of a staff record are read and written with `staff.contract.read` (the staff's human resources: academic_hr, direction); the accountant reads the record's identity without them (section 3.3).
+
+Routes: `GET /api/staff` (`q` on names in either alphabet, number, phone, e-mail; `status`, `staff_type`, `site_id`, `include_archived`; by pages), `GET /api/staff/{staff}`, `POST /api/staff`, `PUT /api/staff/{staff}` (with `version`), `POST /api/staff/{staff}/status` (`status`, `reason`, `left_on`, `version`), `POST /api/staff/{staff}/account` (`user_id` or null, `version`), `POST /api/staff/{staff}/archive` (`reason`, `version`), `GET /api/staff/accounts` (the members an account link may name). On screen, a **Staff** section with its **Staff** page: the list with its number, function, phone, site, account and state, filters by state, function and site; create, edit (the site among the writer's), change the state with the day of a departure, link or unlink the account, archive a member who left.
+
+| Requirement | Evidence |
+|---|---|
+| FR-STF-01, BR-02, BR-18 | `tests/sql/database.mjs`: a record without an account, numbers made after the highest and given ones kept, unique and never changed, a name in either alphabet, the type from its list, the school's required fields; on leave, left with its day, never in the future nor before the hiring, back again, archived only once left and then frozen, never deleted, every change journaled; two records made at once get two numbers (native). `StaffTest`: the same through the API, the reason in the journal, a departure's day kept, lists searched and filtered, the page creating, editing, linking, unlinking, recording a departure and archiving |
+| FR-IAM-04, FR-IAM-05, FR-AUD-01 | `tests/sql/database.mjs`: a site's grant records on its site and reads and changes its staff only, never moves one away; a personal grant reads one's own record and its journal entries, nobody else's; the technical administrator reads none of the staff's entries; an account linked to one record, never by its holder, never a revoked one; without the module, nothing. `StaffTest`: the same through the API and the page, a teacher reading their own record until unlinked, the accountant without the sensitive fields, the administrator and a school without the module refused |
+
+Validation on 15 October 2026: **231 PHP integration tests (7,790 assertions), 206 embedded SQL checks and 221 native PostgreSQL 16 checks including concurrency**; migration 031 rolled back alone with 11 staff records and their journal in place, then with all the others, and applied again. Local browser acceptance in Chromium: 144 screens without a problem, the staff's page included.
+
+Not yet: qualifications (FR-STF-02), availability (FR-STF-03), contracts and leave (FR-STF-04), the import of staff, a group's lead teacher and the implicit scopes of teachers and replacements that come with them (TST-03), the retention of a staff record that left.
+
 ## Next increments of lot 2
 
-1. Staff/qualifications and implicit teacher/replacement scopes (the rest of TST-03), rooms and CRM/conversion; payment-based access and annual progression.
+1. Qualifications (FR-STF-02), a group's lead teacher and the implicit teacher/replacement scopes (the rest of TST-03); availability, contracts and leave (FR-STF-03/04); rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05).
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

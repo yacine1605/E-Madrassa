@@ -5,6 +5,7 @@ return [
     'sections' => [
         'personal' => 'فضائي',
         'schooling' => 'الشؤون الدراسية',
+        'staff' => 'الموظفون',
         'data' => 'الاستيراد والتصدير',
         'people' => 'الأشخاص والصلاحيات',
         'referential' => 'المرجع',

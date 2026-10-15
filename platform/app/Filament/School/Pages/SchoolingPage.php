@@ -11,6 +11,7 @@ use App\Http\Controllers\SiteController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\Permissions;
+use App\Support\PupilRecords;
 use App\Support\SchoolScreen;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -174,7 +175,7 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
     /** The inputs of the school's own fields; a sensitive one only for whoever may read it. */
     protected function customFields(string $entity): array
     {
-        $sensitive = app(Permissions::class)->everywhere('student.sensitive.read');
+        $sensitive = app(Permissions::class)->everywhere(PupilRecords::sensitivePermission($entity));
         return array_values(array_filter(array_map(function (array $field) use ($sensitive) {
             if ($field['is_sensitive'] && !$sensitive) return null;
             $name = 'custom.'.$field['key'];

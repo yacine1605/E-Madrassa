@@ -152,6 +152,14 @@ GRANT UPDATE (site_id) ON school.student, school.guardian TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.site_scope_ids(text, text) TO school_runtime;
 -- Retention (030): what the next run will do, for whoever manages the settings; the daily run, by the scheduler.
 GRANT EXECUTE ON FUNCTION school.retention_run(), school.retention_due(), platform.apply_retention(integer) TO school_runtime;
+-- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
+-- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
+GRANT SELECT ON school.staff TO school_runtime;
+GRANT INSERT (tenant_id, staff_number, last_name_ar, first_name_ar, last_name_lat, first_name_lat, staff_type, phone, email, hire_date,
+  site_id, custom, user_id) ON school.staff TO school_runtime;
+GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, staff_type, phone, email, hire_date, status, left_on, site_id,
+  custom, user_id, version, archived_at) ON school.staff TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.staff_ids(text), school.require_staff(text, uuid), school.next_staff_number(uuid) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -260,6 +268,11 @@ ALTER FUNCTION platform.retention_value(uuid, text) OWNER TO platform_provisione
 ALTER FUNCTION platform.retention_candidates(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.apply_retention(integer) OWNER TO platform_provisioner;
 ALTER FUNCTION school.retention_due() OWNER TO platform_provisioner;
+-- Staff (031): the records a scope reaches, the next number and an account's one record, whatever the writer may read.
+GRANT SELECT ON school.staff TO platform_provisioner;
+ALTER FUNCTION school.staff_ids(text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.next_staff_number(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_staff_account() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

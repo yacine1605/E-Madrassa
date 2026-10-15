@@ -70,7 +70,10 @@ final class SchoolScreen
         // One reading per permission and table for the whole list, not one per row.
         $key = $permission.':'.$entity;
         if (!array_key_exists($key, $scopes)) {
-            $row = DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]);
+            // A member of staff by their site or their own account (SQL 031); the other records by 021's scopes.
+            $row = $entity === 'staff'
+                ? DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.staff_ids(?)) AS ids', [$permission, $permission])
+                : DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]);
             $scopes[$key] = $row->everywhere ? null : json_decode($row->ids, true, 4, JSON_THROW_ON_ERROR);
             self::$scopes[$request] = $scopes;
         }

@@ -1979,6 +1979,121 @@ await check('the run archives who left, anonymises a pupil after their category\
   await as('school_runtime', a, 1);
 });
 
+// The staff (SQL 031, FR-STF-01): a record with or without an account (P7), on a site, never deleted.
+await as('platform_admin', null, 6);
+await sql("SELECT platform.enable_module($1, 'staff')", [a]);
+await as('school_runtime', a, 1);
+const STAFF = 'INSERT INTO school.staff (tenant_id, last_name_lat, first_name_lat, staff_type) VALUES ($1, $2, $3, $4) RETURNING id, staff_number, site_id';
+const newStaff = async (last, given = 'Karim', type = 'teacher_internal') => first(STAFF, [a, last, given, type]);
+const staffSiteB = (await first("INSERT INTO school.site (tenant_id, code, labels) VALUES ($1, 'STAFF-B', '{\"fr\": \"Annexe du personnel\"}') RETURNING id", [a])).id;
+await check('a member of staff has a record without an account, a number given once, a name in either alphabet (FR-STF-01)', async () => {
+  const first1 = await newStaff('Meziane');
+  const second = await newStaff('Ouali', 'Nadia', 'administrative');
+  assert.deepEqual([first1.staff_number, second.staff_number, first1.site_id], ['P0001', 'P0002', siteA]);
+  assert.equal((await first('SELECT user_id, status FROM school.staff WHERE id = $1', [first1.id])).user_id, null);
+  // A number of the school's own is kept; the next one made follows the highest made.
+  assert.equal((await first("INSERT INTO school.staff (tenant_id, staff_number, last_name_lat, first_name_lat, staff_type) VALUES ($1, 'RH-12', 'Haddad', 'Sami', 'other') RETURNING staff_number", [a])).staff_number, 'RH-12');
+  assert.equal((await first("INSERT INTO school.staff (tenant_id, staff_number, last_name_lat, first_name_lat, staff_type) VALUES ($1, 'P0100', 'Brahimi', 'Leila', 'teacher_external') RETURNING staff_number", [a])).staff_number, 'P0100');
+  assert.equal((await newStaff('Kaci')).staff_number, 'P0101');
+  await rejects("INSERT INTO school.staff (tenant_id, staff_number, last_name_lat, first_name_lat, staff_type) VALUES ($1, 'RH-12', 'Autre', 'Personne', 'other')", [a], '23505');
+  assert.ok((await first("INSERT INTO school.staff (tenant_id, last_name_ar, first_name_ar, staff_type) VALUES ($1, 'مزيان', 'كريم', 'teacher_internal') RETURNING id", [a])).id);
+  await rejects("INSERT INTO school.staff (tenant_id, last_name_lat, staff_type) VALUES ($1, 'Incomplet', 'other')", [a], '23514');
+  await rejects("INSERT INTO school.staff (tenant_id, last_name_lat, first_name_lat, staff_type) VALUES ($1, 'Sans', 'Type', 'cook')", [a], '23514');
+  await rejects("UPDATE school.staff SET staff_number = 'X' WHERE id = $1", [first1.id], '42501');
+  await rejects('DELETE FROM school.staff WHERE id = $1', [first1.id], '42501');
+  await as(null);
+  await rejects("UPDATE school.staff SET staff_number = 'X' WHERE id = $1", [first1.id], '23514', 'code_immutable');
+  await as('school_runtime', a, 1);
+  // The school's own fields on staff records (FR-REF-04).
+  const field = (await first("INSERT INTO school.custom_field (tenant_id, entity, key, field_type, required, labels) VALUES ($1, 'staff', 'diploma', 'text', true, '{\"fr\": \"Diplôme\"}') RETURNING id", [a])).id;
+  await rejects(STAFF, [a, 'Sans', 'Diplome', 'teacher_internal'], '23514', 'custom_value_required');
+  assert.ok((await first("INSERT INTO school.staff (tenant_id, last_name_lat, first_name_lat, staff_type, custom) VALUES ($1, 'Avec', 'Diplome', 'teacher_internal', '{\"diploma\": \"Licence\"}') RETURNING id", [a])).id);
+  await sql('UPDATE school.custom_field SET archived_at = now() WHERE id = $1', [field]);
+});
+await check('a departure keeps the record with its day; only a member who left is archived, then it no longer changes (FR-STF-01, BR-02)', async () => {
+  const member = await newStaff('Depart');
+  await sql("UPDATE school.staff SET hire_date = '2020-09-01' WHERE id = $1", [member.id]);
+  await sql("UPDATE school.staff SET status = 'on_leave' WHERE id = $1", [member.id]);
+  await rejects("UPDATE school.staff SET status = 'left', left_on = current_date + 1 WHERE id = $1", [member.id], '23514', 'left_on_future');
+  await rejects("UPDATE school.staff SET status = 'left', left_on = '2019-06-30' WHERE id = $1", [member.id], '23514', 'left_before_hire');
+  await rejects('UPDATE school.staff SET archived_at = now() WHERE id = $1', [member.id], '23514', 'staff_archive_left');
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [member.id]);
+  assert.deepEqual(await first('SELECT status, left_on::text AS left_on FROM school.staff WHERE id = $1', [member.id]), { status: 'left', left_on: today });
+  await rejects("UPDATE school.staff SET status = 'on_leave' WHERE id = $1", [member.id], '23514', 'status_transition_refused');
+  // Back again: the record is the same, without the day of the departure.
+  await sql("UPDATE school.staff SET status = 'active' WHERE id = $1", [member.id]);
+  assert.equal((await first('SELECT left_on FROM school.staff WHERE id = $1', [member.id])).left_on, null);
+  await sql("UPDATE school.staff SET status = 'left', left_on = '2026-01-31' WHERE id = $1", [member.id]);
+  await sql('UPDATE school.staff SET archived_at = now() WHERE id = $1', [member.id]);
+  await rejects("UPDATE school.staff SET phone = '0550' WHERE id = $1", [member.id], '23514', 'staff_archived');
+  await rejects("UPDATE school.staff SET archived_at = NULL WHERE id = $1", [member.id], '23514', 'staff_archived');
+  assert.deepEqual((await sql("SELECT action, after ->> 'status' AS status FROM school.audit_log WHERE object_type = 'staff' AND object_id = $1 AND after ? 'status' ORDER BY occurred_at, id",
+    [member.id])).rows.map(r => r.status), ['on_leave', 'left', 'active', 'left']);
+});
+await check('an account is one member of staff\'s, never linked by its own holder (FR-STF-01, FR-IAM-05)', async () => {
+  const teacher = await newStaff('Compte');
+  const other = await newStaff('Autre');
+  await sql('UPDATE school.staff SET user_id = 4 WHERE id = $1', [teacher.id]);
+  await rejects('UPDATE school.staff SET user_id = 4 WHERE id = $1', [other.id], '23514', 'staff_account_linked');
+  await rejects('UPDATE school.staff SET user_id = 1 WHERE id = $1', [other.id], '23514', 'self_account');
+  await as(null);
+  const gone = (await first("INSERT INTO public.users (name, email, password) VALUES ('Parti', $1, 'hash') RETURNING id", [uuid() + '@example.test'])).id;
+  await sql("INSERT INTO school.membership (tenant_id, user_id, status) VALUES ($1, $2, 'revoked')", [a, gone]);
+  const stranger = (await first("INSERT INTO public.users (name, email, password) VALUES ('Ailleurs', $1, 'hash') RETURNING id", [uuid() + '@example.test'])).id;
+  await sql("INSERT INTO school.membership (tenant_id, user_id, status) VALUES ($1, $2, 'active')", [b, stranger]);
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.staff SET user_id = $2 WHERE id = $1', [other.id, gone], '23514', 'membership_revoked');
+  await rejects('UPDATE school.staff SET user_id = $2 WHERE id = $1', [other.id, stranger], '23503');
+  // Unlinked, the account may serve another record.
+  await sql('UPDATE school.staff SET user_id = NULL WHERE id = $1', [teacher.id]);
+  await sql('UPDATE school.staff SET user_id = 4 WHERE id = $1', [other.id]);
+});
+await check('a site\'s grant records and follows the staff of its sites; a personal grant reads one\'s own record and its journal (FR-IAM-04, FR-AUD-01)', async () => {
+  const main = await newStaff('Principal');
+  const desk = await scopedAccount('internal', 'site', [staffSiteB], ['staff.profile.read', 'staff.profile.create', 'staff.profile.update']);
+  await as('school_runtime', a, desk.user);
+  // Their only site, without saying it; read back at once.
+  const theirs = await newStaff('Annexe');
+  assert.equal(theirs.site_id, staffSiteB);
+  assert.deepEqual((await sql('SELECT id FROM school.staff')).rows.map(r => r.id), [theirs.id]);
+  await rejects(STAFF.replace('staff_type)', 'staff_type, site_id)').replace('$4)', '$4, $5)'), [a, 'Ailleurs', 'Karim', 'other', siteA], '42501', 'permission_denied');
+  assert.equal((await sql("UPDATE school.staff SET phone = 'intrusion' WHERE id = $1", [main.id])).rowCount ?? 0, 0);
+  await sql("UPDATE school.staff SET phone = '0661 00 00 00' WHERE id = $1", [theirs.id]);
+  await rejects('UPDATE school.staff SET site_id = $2 WHERE id = $1', [theirs.id, siteA], '42501', 'permission_denied');
+  await rejects('SELECT school.require_staff($1, $2)', ['staff.profile.update', main.id], '42501', 'permission_denied');
+  // A teacher reads their own record, linked by someone else, and its journal; nobody else's.
+  const self = await scopedAccount('internal', 'personal', null, ['staff.profile.read', 'audit.log.read']);
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.staff SET user_id = $2, phone = '0770 11 22 33' WHERE id = $1", [main.id, self.user]);
+  assert.deepEqual(await first("SELECT before ->> 'phone' AS before, after ->> 'phone' AS after FROM school.audit_log WHERE object_type = 'staff' AND object_id = $1 AND action = 'UPDATE' ORDER BY occurred_at DESC LIMIT 1",
+    [main.id]), { before: '[masqué]', after: '[masqué]' });
+  await as('school_runtime', a, self.user);
+  assert.deepEqual((await sql('SELECT id FROM school.staff')).rows.map(r => r.id), [main.id]);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'staff' AND object_id = $1", [main.id]) > 0);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'staff' AND object_id <> $1", [main.id]), 0);
+  assert.equal((await sql("UPDATE school.staff SET phone = 'moi' WHERE id = $1", [main.id])).rowCount ?? 0, 0);
+  // The journal's technical reader, without the staff's records, reads none of their entries.
+  const technical = await scopedAccount('internal', 'tenant', null, ['audit.log.read']);
+  await as('school_runtime', a, technical.user);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'staff'"), 0);
+  await as('school_runtime', a, 1);
+});
+await check('without the staff module, nobody reads or writes a staff record (TST-04)', async () => {
+  await as('platform_admin', null, 6);
+  await sql("SELECT platform.disable_module($1, 'staff')", [a]);
+  await as('school_runtime', a, 1);
+  assert.equal(await count('SELECT count(*) n FROM school.staff'), 0);
+  await rejects(STAFF, [a, 'Hors', 'Module', 'other'], '42501', 'permission_denied');
+  await as('platform_admin', null, 6);
+  await sql("SELECT platform.enable_module($1, 'staff')", [a]);
+  await as('school_runtime', a, 1);
+  assert.ok(await count('SELECT count(*) n FROM school.staff') > 0);
+});
+// The last-site concurrency test below expects the school's two sites of before.
+await as(null);
+await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);
+await as('school_runtime', a, 1);
+
 // Security review (SECURITY-REVIEW.md): what holds for every table and function, present and future
 await check('every table of a school forces row-level security, even on its owner (BR-01, NFR-TEN-01)', async () => {
   await as(null);
@@ -2407,6 +2522,21 @@ if (PgClient) {
     } finally {
       await Promise.all(clients.map(c => c.end()));
     }
+  });
+  await check('two members of staff recorded at once receive two numbers (FR-STF-01)', async () => {
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const numbers = await Promise.all(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        const made = (await c.query(STAFF, [a, 'Course', 'Personne ' + i, 'other'])).rows[0].staff_number;
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+        return made;
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.notEqual(numbers[0], numbers[1]);
+    assert.deepEqual(numbers.map(n => /^P\d{4,}$/.test(n)), [true, true]);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);
