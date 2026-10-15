@@ -166,6 +166,8 @@ GRANT SELECT, DELETE ON school.qualification TO school_runtime;
 GRANT INSERT (tenant_id, staff_id, subject_id, node_id, valid_from, valid_to) ON school.qualification TO school_runtime;
 GRANT UPDATE (valid_to, version) ON school.qualification TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.qualified(uuid, uuid, uuid, date) TO school_runtime;
+-- A group's lead teacher (033): named with the group, among the teachers the writer reads.
+GRANT INSERT (lead_teacher_id), UPDATE (lead_teacher_id) ON school.study_group TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -282,6 +284,8 @@ ALTER FUNCTION school.check_staff_account() OWNER TO platform_provisioner;
 -- A teacher's qualifications (032): the teacher's state, the catalogue's and the lines already there, whatever the writer may read.
 GRANT SELECT ON school.qualification TO platform_provisioner;
 ALTER FUNCTION school.check_qualification() OWNER TO platform_provisioner;
+-- A group's lead teacher (033): the teacher's state, whatever the writer may read.
+ALTER FUNCTION school.check_lead_teacher() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

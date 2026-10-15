@@ -68,7 +68,7 @@ return [
     'scope' => 'Portée',
     'scope_targets' => 'Éléments couverts',
     'scopes' => ['tenant' => 'Tout l’établissement', 'site' => 'Sites sélectionnés', 'level' => 'Nœuds du référentiel et descendants',
-        'subject' => 'Matières sélectionnées', 'personal' => 'Données personnelles uniquement'],
+        'subject' => 'Matières sélectionnées', 'personal' => 'Données personnelles uniquement, et ses groupes pour un enseignant'],
     'valid_from' => 'Début de validité',
     'valid_until' => 'Fin de validité',
     'create_assignment' => 'Attribuer un rôle',

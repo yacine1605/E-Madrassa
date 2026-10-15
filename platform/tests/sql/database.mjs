@@ -58,8 +58,9 @@ const as = async (role, tenant, user, claims = {}) => {
   // A new identity starts outside any support session (FR-PLT-04).
   await sql("SELECT set_config('app.context', $1, false)", [tenant == null && user == null ? '' : context(tenant, user, claims)]);
 };
-const today = new Date().toISOString().slice(0, 10);
-const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+// The database's days, in its own time zone: the embedded engine takes the computer's, and near
+// midnight that day is not UTC's.
+const { today, yesterday, tomorrow, lastYear } = await first("SELECT current_date::text AS today, (current_date - 1)::text AS yesterday, (current_date + 1)::text AS tomorrow, (current_date - 365)::text AS \"lastYear\"");
 const CREATE = 'SELECT platform.create_tenant($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11, $12, $13) AS id';
 const create = async (key, slug, name, plan, admin, profile = null) =>
   (await first(CREATE, [key, slug, name, 'fr', plan, today, null, 500, 1024, 'MAIN', 'Site principal', admin, profile])).id;
@@ -216,8 +217,6 @@ const assign = async (user, code, scope = 'tenant', ids = null, from = null, unt
 const can = async p => (await first('SELECT school.can($1) AS c', [p])).c;
 const everywhere = async p => (await first('SELECT school.can_everywhere($1) AS c', [p])).c;
 const permissions = async () => (await sql('SELECT DISTINCT permission FROM school.my_permissions()')).rows.map(r => r.permission);
-const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-const lastYear = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
 await check('a new school receives its own copy of the school roles and their permissions (FR-IAM-03)', async () => {
   assert.deepEqual(Object.keys(roles).sort(), ['academic_hr', 'accountant', 'direction', 'front_office', 'parent', 'stock_manager',
     'student', 'supervisor', 'teacher', 'tenant_admin']);
@@ -1090,7 +1089,7 @@ const members = groupId => count('SELECT count(*) n FROM school.group_membership
 // User 1 also runs the pupils and enrolments (academic_hr, section 3.2): nobody grants themselves a role.
 await sql("INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type) VALUES ($1, 1, $2, 'tenant')", [a, roles.academic_hr]);
 await as('school_runtime', a, 1);
-const thisYear = String(new Date().getFullYear());
+const thisYear = today.slice(0, 4);
 
 await check('a pupil receives a matricule of the year, never changed; a name in Arabic or Latin letters is needed (FR-ELV-01 AC1)', async () => {
   const first1 = await newPupil('Benali', 'Amine');
@@ -2168,6 +2167,110 @@ await check('a site\'s grant qualifies the teachers of its site only; a teacher 
   await as('school_runtime', a, self.user);
   assert.deepEqual((await sql('SELECT id FROM school.qualification')).rows.map(r => r.id), [line]);
   await rejects(QUALIFY, [a, theirs.id, physics, node, null, null], '42501');
+  await as('school_runtime', a, 1);
+});
+// A group's lead teacher (SQL 033, FR-GRP-01) and the groups it opens to them (FR-IAM-04 AC1, TST-03).
+const LEAD = 'UPDATE school.study_group SET lead_teacher_id = $2 WHERE id = $1';
+const leadProgram = await programme('LEAD-033');
+await check('a group\'s lead teacher is a teacher still with the school, whom the writer reads (FR-GRP-01)', async () => {
+  const lead = await group('LEAD-A', leadProgram, 10);
+  const teacher = await newStaff('Titulaire');
+  await sql(LEAD, [lead, teacher.id]);
+  assert.equal((await first("SELECT after ->> 'lead_teacher_id' AS lead FROM school.audit_log WHERE object_type = 'study_group' AND object_id = $1 AND action = 'UPDATE' ORDER BY occurred_at DESC LIMIT 1",
+    [lead])).lead, teacher.id);
+  await sql(LEAD, [lead, null]);
+  await rejects(LEAD, [lead, (await newStaff('Bureau', 'Amel', 'administrative')).id], '23514', 'lead_teacher_not_teacher');
+  const gone = await newStaff('Parti');
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [gone.id]);
+  await rejects(LEAD, [lead, gone.id], '23514', 'staff_left');
+  await sql('UPDATE school.staff SET archived_at = now() WHERE id = $1', [gone.id]);
+  await rejects(LEAD, [lead, gone.id], '23514', 'staff_archived');
+  await rejects(LEAD, [lead, uuid()], '23503');
+  // Who leaves later stays the lead teacher in the group's history.
+  const leaving = await newStaff('Sortant');
+  await sql(LEAD, [lead, leaving.id]);
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [leaving.id]);
+  assert.equal((await first('SELECT lead_teacher_id FROM school.study_group WHERE id = $1', [lead])).lead_teacher_id, leaving.id);
+  // A site's grant names the teachers of its site only; it is told nothing of the others.
+  const annex = await group('LEAD-B', leadProgram, 10, 'support', staffSiteB);
+  const elsewhere = await newStaff('Siege', 'Rania');
+  const desk = await scopedAccount('internal', 'site', [staffSiteB], ['group.group.read', 'group.group.manage', 'staff.profile.read', 'staff.profile.create']);
+  await as('school_runtime', a, desk.user);
+  await rejects(LEAD, [annex, elsewhere.id], '42501', 'permission_denied');
+  const theirs = await newStaff('Annexe', 'Yacine');
+  await sql(LEAD, [annex, theirs.id]);
+  await as('school_runtime', a, 1);
+});
+await check('a teacher\'s personal grant reads the groups they lead, their pupils and programmes, nothing else, until they leave (FR-IAM-04 AC1, TST-03)', async () => {
+  const [mine, other] = [await group('LEAD-MINE', leadProgram, 10), await group('LEAD-OTHER', leadProgram, 10)];
+  const [pupil, classmate] = [(await newAdult('Eleve', 'Ines')).id, (await newAdult('Autre', 'Samir')).id];
+  const [enrolment, elsewhere] = [await enroll(pupil, leadProgram), await enroll(classmate, leadProgram)];
+  const place = await joinGroup(enrolment, mine);
+  await joinGroup(elsewhere, other);
+  const [guardian] = [await contact(pupil), await contact(classmate)];
+  const record = await newStaff('Enseignant', 'Nadir');
+  const teacher = await scopedAccount('internal', 'personal', null, [...coreReads, 'staff.profile.read', 'group.group.manage']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [record.id, teacher.user]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual(await visibleIds('study_group'), [], 'no group before leading one');
+  assert.deepEqual(await visibleIds('student'), []);
+  await as('school_runtime', a, 1);
+  await sql(LEAD, [mine, record.id]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual(await visibleIds('study_group'), [mine]);
+  assert.deepEqual(await visibleIds('student'), [pupil]);
+  assert.deepEqual(await visibleIds('guardian'), [guardian]);
+  assert.deepEqual(await visibleIds('enrollment'), [enrolment]);
+  assert.deepEqual(await visibleIds('group_membership'), [place]);
+  assert.deepEqual(await visibleIds('program'), [leadProgram]);
+  assert.deepEqual(await visibleIds('staff'), [record.id]);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'study_group' AND object_id = $1", [mine]) > 0);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type IN ('study_group', 'student') AND object_id IN ($1, $2)", [other, classmate]), 0);
+  // What the grant holds acts on these groups only; it never names itself lead teacher of another.
+  await sql("UPDATE school.study_group SET labels = '{\"fr\": \"Ma classe\"}' WHERE id = $1", [mine]);
+  assert.equal((await sql('UPDATE school.study_group SET capacity = 5 WHERE id = $1', [other])).rowCount ?? 0, 0);
+  await rejects("INSERT INTO school.study_group (tenant_id, year_id, code, labels, group_type, program_id, site_id, capacity, valid_from) VALUES ($1, $2, 'LEAD-NEW', '{\"fr\": \"Nouveau\"}', 'class', $3, $4, 10, current_date)",
+    [a, lotYear, leadProgram, siteA], '42501');
+  // Another lead teacher, and the group is no longer theirs.
+  await as('school_runtime', a, 1);
+  await sql(LEAD, [mine, (await newStaff('Remplacant')).id]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual(await visibleIds('study_group'), []);
+  assert.deepEqual(await visibleIds('student'), []);
+  // Back as its lead teacher, then gone from the school: nothing more.
+  await as('school_runtime', a, 1);
+  await sql(LEAD, [mine, record.id]);
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [record.id]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual(await visibleIds('study_group'), []);
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.staff SET status = 'active' WHERE id = $1", [record.id]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual(await visibleIds('study_group'), [mine]);
+  await as('school_runtime', a, 1);
+});
+await check('the teacher\'s role reads their pupils, these pupils\' guardians and their own record, within its personal scope (section 3.3)', async () => {
+  for (const permission of ['student.record.read', 'guardian.record.read', 'staff.profile.read', 'group.group.read', 'program.program.read']) {
+    assert.equal(await count('SELECT count(*) n FROM school.role_permission WHERE tenant_id = $1 AND role_id = $2 AND permission_code = $3',
+      [a, roles.teacher, permission]), 1, permission);
+  }
+  const lead = await group('LEAD-ROLE', leadProgram, 10);
+  const pupil = (await newAdult('Classe', 'Lilia')).id;
+  await joinGroup(await enroll(pupil, leadProgram), lead);
+  const record = await newStaff('Role', 'Walid');
+  await as(null);
+  const user = (await first("INSERT INTO public.users (name, email, password) VALUES ('Teacher', $1, 'hash') RETURNING id", [uuid() + '@example.test'])).id;
+  await sql("INSERT INTO school.membership (tenant_id, user_id, status) VALUES ($1, $2, 'active')", [a, user]);
+  await assign(user, 'teacher', 'personal');
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [record.id, user]);
+  await sql(LEAD, [lead, record.id]);
+  await as('school_runtime', a, user);
+  assert.deepEqual(await visibleIds('study_group'), [lead]);
+  assert.deepEqual(await visibleIds('student'), [pupil]);
+  assert.deepEqual(await visibleIds('staff'), [record.id]);
+  assert.deepEqual(await visibleIds('enrollment'), [], 'enrolments are not the teacher\'s');
   await as('school_runtime', a, 1);
 });
 // The last-site concurrency test below expects the school's two sites of before.

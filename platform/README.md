@@ -790,8 +790,25 @@ Validation on 15 October 2026: **233 PHP integration tests (7,962 assertions), 2
 
 AC1 (a session's teacher qualified for its subject and level) comes with the sessions of lot 4, which will call `school.qualified` from their rules.
 
+## Increment 46 (lot 2): a group's lead teacher, and the teacher's own groups
+
+`033_lead_teachers.sql`:
+
+- **FR-GRP-01**: a group (class, support or option group, training session) has an optional lead teacher (`lead_teacher_id`), named with the group by `group.group.manage` while it is open: a teacher, internal or external, still with the school (`lead_teacher_not_teacher`, `staff_left`, `staff_archived`), among the records the writer reads with `staff.profile.read` (a grant limited to sites names the teachers of its sites). Who leaves later stays the lead teacher in the group's history.
+- **FR-IAM-04 AC1, TST-03**: a personal grant reads, beside one's own records, the groups one leads through one's own staff record (linked to the account, FR-STF-01), as a grant on these groups would: their members, their current pupils and these pupils' guardians, their programmes, the journal's entries of these, for the permissions the grant holds. Another lead teacher, or a departure from the school, and the groups are no longer theirs. Such a grant never creates a group or a pupil. Replacements' groups come with the sessions of lot 4.
+- **Section 3.3**: the `teacher` role, as the template and the schools' copies made from it, also reads pupils, guardians and staff records (`student.record.read`, `guardian.record.read`, `staff.profile.read`); assigned with the personal scope (« Données personnelles uniquement, et ses groupes pour un enseignant »), it reads its pupils and its own record, never enrolments.
+
+Routes: `POST /api/groups` and `PUT /api/groups/{group}` take `lead_teacher_id`; `GET /api/groups` filters by `lead_teacher_id`; a group's reply has `lead_teacher` (number and names) when the reader reads that record. On screen, the **Groups and classes** list shows the lead teacher, and the creation and edit forms choose one among the teachers still with the school; a teacher signed in sees their groups and their pupils only.
+
+| Requirement | Evidence |
+|---|---|
+| FR-GRP-01, FR-STF-01 | `tests/sql/database.mjs`: a teacher named, changed in the journal, removed; an administrative member, a member who left, an archived record, an unknown one refused; who leaves later kept in the group; a site's grant names a teacher of its site, not of another. `LeadTeacherTest`: the same through the API (a validation error for a record the writer cannot read), the list filtered by lead teacher, the edit form naming one and the column showing them |
+| FR-IAM-04 AC1, TST-03, section 3.3 | `tests/sql/database.mjs`: a teacher reads no group before leading one, then that group, its pupil, guardian, enrolment, place and programme, their own record and the group's journal, nothing of the other group; changes what their grant allows on that group only, creates none; loses it all to another lead teacher or on leaving, gets it back on returning; the `teacher` role assigned with the personal scope reads its pupils and own record, no enrolment. `LeadTeacherTest`: the same through the API and the screens (Groups and classes, Pupils) for a teacher with the school's own `teacher` role |
+
+Validation on 16 October 2026: **235 PHP integration tests (8,065 assertions), 213 embedded SQL checks and 229 native PostgreSQL 16 checks including concurrency**; migration 033 rolled back alone with 3 lead teachers and the groups' 55 journal entries in place (the groups and their journal kept, the teacher roles' new permissions removed), then with all the others, and applied again (the schools in use extended again, as by 015). Local browser acceptance in Chromium: 148 screens without a problem, the groups' list with its lead teacher included.
+
 ## Next increments of lot 2
 
-1. A group's lead teacher and the implicit teacher scopes (the rest of TST-03; replacements with lot 4's sessions); availability, contracts and leave (FR-STF-03/04); the import of staff; rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05).
+1. Availability, contracts and leave (FR-STF-03/04); the import of staff; rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05). Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

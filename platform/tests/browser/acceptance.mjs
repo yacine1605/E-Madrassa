@@ -149,7 +149,7 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme with a subject, a class, a pupil with a guardian in it, a qualified teacher.
+// year, a programme with a subject, a qualified teacher leading a class, a pupil with a guardian in it.
 // The lists then have rows, and the pupil's sheet, the class's members, the programme's subjects
 // and the teacher's qualifications are screens too.
 async function seed(browser, session) {
@@ -173,8 +173,13 @@ async function seed(browser, session) {
     // A subject of the catalogue in the programme, with its volume (FR-PRG-02).
     const subject = (await call('subjects'))[0];
     await call(`programs/${program.id}/subjects`, { subject_id: subject.id, total_hours: '40', session_count: 20 });
+    // A teacher's record, without an account (FR-STF-01), qualified for the programme's subject at its level (FR-STF-02).
+    const teacher = await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
+      staff_type: 'teacher_internal', phone: '0550 98 76 54', hire_date: '2020-09-01' });
+    await call(`staff/${teacher.id}/qualifications`, { subject_id: subject.id, node_id: grade.id });
+    // The class they lead (FR-GRP-01).
     const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
-      labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active' });
+      labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active', lead_teacher_id: teacher.id });
     const pupil = await call('students', { last_name_lat: 'Benali', first_name_lat: 'Amine', last_name_ar: 'بن علي', first_name_ar: 'أمين',
       birth_date: '2012-05-01', birth_place: 'Alger', gender: 'm', phone: '0550 12 34 56', address: '12 rue des Oliviers, Alger' });
     const guardian = await call('guardians', { last_name_lat: 'Benali', first_name_lat: 'Karim', last_name_ar: 'بن علي', first_name_ar: 'كريم',
@@ -197,10 +202,6 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    // A teacher's record, without an account (FR-STF-01), qualified for the programme's subject at its level (FR-STF-02).
-    const teacher = await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
-      staff_type: 'teacher_internal', phone: '0550 98 76 54', hire_date: '2020-09-01' });
-    await call(`staff/${teacher.id}/qualifications`, { subject_id: subject.id, node_id: grade.id });
     return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id };
   });
   await context.close();

@@ -3,9 +3,11 @@
 namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudyGroupController;
 use App\Support\Formats;
 use App\Support\Locales;
+use App\Support\Permissions;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -17,11 +19,13 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * FR-GRP-01: classes, support and option groups, training sessions, each on a site for a year,
  * with its places. A class or a session is the main group of its programme's pupils; fewer
- * places than members is refused (AC2), and a closed group keeps its composition.
+ * places than members is refused (AC2), and a closed group keeps its composition. Its lead teacher,
+ * one of the staff's teachers, reads it with its pupils through a personal grant (SQL 033).
  */
 final class Groups extends SchoolingPage
 {
@@ -47,6 +51,9 @@ final class Groups extends SchoolingPage
                 TextColumn::make('labels')->label(__('school.name'))->state(fn (array $record) => Locales::label($record['labels'])),
                 TextColumn::make('group_type')->label(__('schooling.group_type'))->formatStateUsing(fn (string $state) => __('schooling.group_types.'.$state)),
                 TextColumn::make('program_code')->label(__('schooling.program')),
+                TextColumn::make('lead_teacher')->label(__('schooling.lead_teacher'))->visible(fn () => $this->readsStaff())
+                    ->state(fn (array $record) => $record['lead_teacher'] ? $this->personName($record['lead_teacher'])
+                        : ($record['lead_teacher_id'] ? __('schooling.lead_teacher_hidden') : null)),
                 TextColumn::make('site_id')->label(__('schooling.site'))->formatStateUsing(fn (string $state) => $this->siteName($state) ?? ''),
                 TextColumn::make('year_id')->label(__('reference.year'))->formatStateUsing(fn (string $state) => $this->years()[$state]['code'] ?? ''),
                 TextColumn::make('members')->label(__('schooling.places'))
@@ -70,7 +77,7 @@ final class Groups extends SchoolingPage
                             ->required(fn (Get $get) => in_array($get('group_type'), ['class', 'session'], true))
                             ->getSearchResultsUsing(fn (string $search, Get $get) => $this->programOptions($get('year_id'), $search))
                             ->getOptionLabelUsing(fn ($value) => $this->programLabel($value)),
-                        $this->siteField('group.group.manage')->helperText(null),
+                        $this->siteField('group.group.manage')->helperText(null), $this->leadTeacherField(),
                         $this->codeField(), ...$this->labelFields(), $this->capacityField(),
                         DatePicker::make('valid_from')->label(__('school.valid_from'))->required()->default(now()),
                         DatePicker::make('valid_to')->label(__('school.valid_until'))->afterOrEqual('valid_from'),
@@ -88,6 +95,7 @@ final class Groups extends SchoolingPage
                         && $this->writableFor('group.group.manage', 'study_group', $record['id']))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->labelFields(), $this->capacityField()->helperText(__('schooling.capacity_help')),
+                        $this->leadTeacherField(),
                         DatePicker::make('valid_to')->label(__('school.valid_until'))->minDate($record['valid_from']),
                         Select::make('status')->label(__('school.status'))->required()
                             ->options(collect(__('schooling.group_states'))->only(self::NEXT[$record['status']])->all()),
@@ -100,6 +108,37 @@ final class Groups extends SchoolingPage
     private function capacityField(): TextInput
     {
         return TextInput::make('capacity')->label(__('schooling.capacity'))->required()->numeric()->integer()->minValue(1)->maxValue(100000);
+    }
+
+    /** FR-GRP-01: optional, among the teachers whose records the writer reads, still with the school. */
+    private function leadTeacherField(): Select
+    {
+        return Select::make('lead_teacher_id')->label(__('schooling.lead_teacher'))->searchable()->helperText(__('schooling.lead_teacher_help'))
+            ->visible(fn () => $this->readsStaff())
+            ->getSearchResultsUsing(fn (string $search) => $this->teacherOptions($search))
+            ->getOptionLabelUsing(fn ($value) => $this->teacherLabel($value));
+    }
+
+    private function readsStaff(): bool { return app(Permissions::class)->can('staff.profile.read'); }
+
+    /** @return array<string, string> the teachers still with the school matching the search, at most 50 */
+    private function teacherOptions(string $search): array
+    {
+        return collect(SchoolScreen::call('staff.profile.read', StaffController::class, 'index', ['q' => $search, 'per_page' => 100])['data'])
+            ->filter(fn (array $staff) => in_array($staff['staff_type'], ['teacher_internal', 'teacher_external'], true) && $staff['status'] !== 'left')
+            ->take(50)->mapWithKeys(fn (array $staff) => [$staff['id'] => $staff['staff_number'].' · '.$this->personName($staff)])->all();
+    }
+
+    /** A teacher of another site may lead a group of the writer's: named without their record then. */
+    private function teacherLabel(?string $staff): ?string
+    {
+        if (!$staff) return null;
+        try {
+            $row = SchoolScreen::call('staff.profile.read', StaffController::class, 'show', parameters: ['staff' => $staff])['data'];
+        } catch (NotFoundHttpException) {
+            return __('schooling.lead_teacher_hidden');
+        }
+        return $row['staff_number'].' · '.$this->personName($row);
     }
 
     /** @return array<string, string> the year's programmes matching the search, at most 50 */
