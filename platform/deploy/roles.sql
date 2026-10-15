@@ -160,6 +160,12 @@ GRANT INSERT (tenant_id, staff_number, last_name_ar, first_name_ar, last_name_la
 GRANT UPDATE (last_name_ar, first_name_ar, last_name_lat, first_name_lat, staff_type, phone, email, hire_date, status, left_on, site_id,
   custom, user_id, version, archived_at) ON school.staff TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.staff_ids(text), school.require_staff(text, uuid), school.next_staff_number(uuid) TO school_runtime;
+-- A teacher's qualifications (032): a line keeps its teacher, subject, node and first day; it ends, or is deleted while
+-- nothing uses it (a configuration line, as a programme's subject). Its coverage of a node's descendants is computed.
+GRANT SELECT, DELETE ON school.qualification TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, subject_id, node_id, valid_from, valid_to) ON school.qualification TO school_runtime;
+GRANT UPDATE (valid_to, version) ON school.qualification TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.qualified(uuid, uuid, uuid, date) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -273,6 +279,9 @@ GRANT SELECT ON school.staff TO platform_provisioner;
 ALTER FUNCTION school.staff_ids(text) OWNER TO platform_provisioner;
 ALTER FUNCTION school.next_staff_number(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.check_staff_account() OWNER TO platform_provisioner;
+-- A teacher's qualifications (032): the teacher's state, the catalogue's and the lines already there, whatever the writer may read.
+GRANT SELECT ON school.qualification TO platform_provisioner;
+ALTER FUNCTION school.check_qualification() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

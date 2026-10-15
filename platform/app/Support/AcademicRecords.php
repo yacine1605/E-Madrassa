@@ -46,11 +46,13 @@ final class AcademicRecords
         DB::select("SELECT set_config('app.reason', ?, true)", [$reason]);
     }
 
-    public function listing(Request $request, string $select, array $filters, array $search, string $order, callable $present): array
+    /** @param ?array{0: string, 1: list<mixed>} $where a further condition and its bindings, which the controller validated */
+    public function listing(Request $request, string $select, array $filters, array $search, string $order, callable $present, ?array $where = null): array
     {
         $data = $request->validate(Paging::RULES + $filters + ['q' => 'nullable|string|max:200', 'include_archived' => 'boolean']);
         $sql = $select.' WHERE tenant_id = ?';
         $bindings = [$this->school->id()];
+        if ($where) { $sql .= ' AND '.$where[0]; array_push($bindings, ...$where[1]); }
         if (!$request->boolean('include_archived')) $sql .= ' AND archived_at IS NULL';
         foreach ($filters as $column => $_) {
             if (isset($data[$column])) { $sql .= ' AND '.$column.' = ?'; $bindings[] = $data[$column]; }

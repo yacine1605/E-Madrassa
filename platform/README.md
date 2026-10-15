@@ -769,8 +769,29 @@ Validation on 15 October 2026: **231 PHP integration tests (7,790 assertions), 2
 
 Not yet: qualifications (FR-STF-02), availability (FR-STF-03), contracts and leave (FR-STF-04), the import of staff, a group's lead teacher and the implicit scopes of teachers and replacements that come with them (TST-03), the retention of a staff record that left.
 
+## Increment 45 (lot 2): a teacher's qualifications
+
+`032_qualifications.sql`:
+
+- **FR-STF-02**: a teacher, internal or external, is qualified for a subject or module of the catalogue (BR-13) at a node of the referential: a level (1AS), a cycle (Primaire), a track or a specialty (Data Science), from `valid_from` (today by default, or a day in the past) until `valid_to` (included). A qualification at a node covers its descendants, computed when asked, never copied: `school.qualified(staff, subject, node, day)` (AC2: a qualification at Primaire covers 3AP). The same subject at the same node is given once at any date (`qualification_overlap`), even by two requests at once.
+- A line keeps its teacher, subject, node and first day; its end is final (`qualification_ended`), the qualification is given again for a later period. A line nothing uses is deleted, the journal keeping its values; with the sessions of lot 4, a line they use will be ended instead, and a session will take only a teacher qualified for its subject and its group's level on its day (AC1). A subject a qualification names stays in the catalogue.
+- Only a teacher (`qualification_not_teacher`) still with the school (`staff_left`) receives one; a member who left keeps theirs as history, and an archived record's no longer change. An archived subject or node is refused.
+- Read with the teacher's record (`staff.profile.read`, a teacher's own with a personal grant); given, ended and removed within the scope of `staff.qualification.manage` on that teacher (academic_hr, a site's grant for the teachers of its sites). The journal's entries belong to the staff's domain.
+
+Routes: `GET /api/staff/{staff}/qualifications` (`include_ended`), `POST /api/staff/{staff}/qualifications` (`subject_id`, `node_id`, `valid_from`, `valid_to`), `POST /api/qualifications/{line}/end` (`valid_to`, `version`), `DELETE /api/qualifications/{line}` (`version`); `GET /api/staff?subject_id=&node_id=&on=` keeps the teachers qualified for that subject at that node on that day. On screen, a teacher's row opens **their qualifications**: add one, end it, remove it; the **Staff** list filters the teachers qualified for a subject at a level.
+
+| Requirement | Evidence |
+|---|---|
+| FR-STF-02 AC2, BR-13 | `tests/sql/database.mjs`: Primaire covers 3AP, not Moyen nor another subject nor the day before; a past qualification covers its days only; overlaps refused, a later period accepted; the same qualification given twice at once recorded once (native). `StaffTest`: the same through the list's filter, a cycle's qualification finding the teacher at a level, the page giving, ending and removing |
+| FR-STF-02, FR-STF-01, BR-02 | `tests/sql/database.mjs`: teacher, subject, node and first day never change, an end is final and not before the first day, a line nothing uses deleted and journaled; an administrative member, a member who left, an archived subject refused; an archived record's lines frozen; a subject in a qualification not deleted. `StaffTest`: the same refusals through the API, history listed with `include_ended` |
+| FR-IAM-04 | `tests/sql/database.mjs`: a site's grant qualifies the teachers of its site only and is told nothing of the others; a teacher reads their own qualifications and gives none. `StaffTest`: the accountant reads them and changes none |
+
+Validation on 15 October 2026: **233 PHP integration tests (7,962 assertions), 210 embedded SQL checks and 226 native PostgreSQL 16 checks including concurrency**; migration 032 rolled back alone with a qualification and its 7 journal entries in place, then with all the others, and applied again. Local browser acceptance in Chromium: 148 screens without a problem, a teacher's qualifications included.
+
+AC1 (a session's teacher qualified for its subject and level) comes with the sessions of lot 4, which will call `school.qualified` from their rules.
+
 ## Next increments of lot 2
 
-1. Qualifications (FR-STF-02), a group's lead teacher and the implicit teacher/replacement scopes (the rest of TST-03); availability, contracts and leave (FR-STF-03/04); rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05).
+1. A group's lead teacher and the implicit teacher scopes (the rest of TST-03; replacements with lot 4's sessions); availability, contracts and leave (FR-STF-03/04); the import of staff; rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05).
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

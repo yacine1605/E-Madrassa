@@ -8,6 +8,7 @@ use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\SubjectController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\Permissions;
@@ -107,6 +108,13 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
                 $default = collect($this->sites())->firstWhere('is_default', true)['id'] ?? null;
                 return isset($sites[$default]) ? $default : array_key_first($sites);
             });
+    }
+
+    /** @return array<string, string> the catalogue's subjects and modules still in use (FR-REF-03) */
+    protected function subjectOptions(): array
+    {
+        return collect($this->lookup(fn () => SchoolScreen::call('referential.node.read', SubjectController::class, 'index')['data']))->whereNull('archived_at')
+            ->mapWithKeys(fn (array $subject) => [$subject['id'] => $subject['code'].' · '.Locales::label($subject['labels'])])->all();
     }
 
     protected function money(int|float|string|null $amount): string

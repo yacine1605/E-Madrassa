@@ -4,7 +4,6 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgramSubjectController;
-use App\Http\Controllers\SubjectController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
@@ -93,7 +92,7 @@ final class ProgramSubjects extends SchoolingPage
             ->headerActions([
                 Action::make('add')->label(__('schooling.add_program_subject'))->visible(fn () => $this->changeable())
                     ->schema([
-                        Select::make('subject_id')->label(__('schooling.program_subject'))->required()->searchable()->options(fn () => $this->subjects()),
+                        Select::make('subject_id')->label(__('schooling.program_subject'))->required()->searchable()->options(fn () => $this->subjectOptions()),
                         ...$this->volumeFields(),
                         DatePicker::make('valid_from')->label(__('schooling.taught_from'))->helperText(__('schooling.valid_from_help')),
                     ])
@@ -142,12 +141,6 @@ final class ProgramSubjects extends SchoolingPage
         ];
     }
 
-    /** @return array<string, string> the catalogue's subjects still in use */
-    private function subjects(): array
-    {
-        return collect(SchoolScreen::call('referential.node.read', SubjectController::class, 'index')['data'])->whereNull('archived_at')
-            ->mapWithKeys(fn ($subject) => [$subject['id'] => $subject['code'].' · '.Locales::label($subject['labels'])])->all();
-    }
 
     /** FR-PRG-02 AC1: each volume the line has had, newest first, from the day it was set. */
     private function volumes(array $record): array

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\School\Pages\Staff;
+use App\Filament\School\Pages\StaffQualifications;
 use App\Support\CurrentSchool;
 use App\Support\Formats;
 use Filament\Facades\Filament;
@@ -185,6 +186,82 @@ final class StaffTest extends TestCase
             Livewire::test(Staff::class)->callTableAction('create', data: ['last_name_lat' => 'Ecran', 'first_name_lat' => 'Annexe', 'staff_type' => 'administrative'])
                 ->assertHasNoTableActionErrors()->assertNotified(__('staff.created', ['number' => 'P0003']));
             $this->assertSame($annex, DB::table('school.staff')->where('last_name_lat', 'Ecran')->value('site_id'));
+        });
+    }
+
+    private function node(object $school, string $code): string
+    {
+        return DB::connection('owner')->table('school.ref_node')->where('tenant_id', $school->id)->where('code', $code)->value('id');
+    }
+
+    private function subject(object $school): string
+    {
+        return DB::connection('owner')->table('school.subject')->where('tenant_id', $school->id)->whereNull('archived_at')->orderBy('code')->value('id');
+    }
+
+    public function test_a_teacher_qualified_for_a_cycle_teaches_its_levels_until_the_qualification_ends(): void
+    {
+        [$school] = $this->setting();
+        $subject = $this->subject($school);
+        $teacher = $this->postJson('/api/staff', $this->teacher())->json('data.id');
+        $line = $this->postJson("/api/staff/$teacher/qualifications", ['subject_id' => $subject, 'node_id' => $this->node($school, 'PRIMAIRE')])->assertCreated()
+            ->assertJsonPath('data.valid_from', now()->toDateString())->assertJsonPath('data.node.code', 'PRIMAIRE')->json('data');
+        // FR-STF-02 AC2: Primaire covers 3AP; not Moyen, nor yesterday.
+        $qualified = fn (string $node, array $extra = []) => $this->getJson('/api/staff?'.http_build_query(['subject_id' => $subject, 'node_id' => $this->node($school, $node), ...$extra]));
+        $qualified('3AP')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $teacher);
+        $qualified('MOYEN')->assertOk()->assertJsonPath('meta.total', 0);
+        $qualified('3AP', ['on' => now()->subDay()->toDateString()])->assertOk()->assertJsonPath('meta.total', 0);
+        $this->getJson('/api/staff?subject_id='.$subject)->assertUnprocessable()->assertJsonValidationErrors('node_id');
+        $this->postJson("/api/staff/$teacher/qualifications", ['subject_id' => $subject, 'node_id' => $this->node($school, 'PRIMAIRE')])
+            ->assertConflict()->assertJsonPath('code', 'qualification_overlap');
+        $this->postJson("/api/staff/$teacher/qualifications", ['subject_id' => (string) Str::uuid(), 'node_id' => $this->node($school, '3AP')])->assertNotFound();
+        $clerk = $this->postJson('/api/staff', $this->teacher(['staff_type' => 'administrative', 'first_name_lat' => 'Amel']))->json('data.id');
+        $this->postJson("/api/staff/$clerk/qualifications", ['subject_id' => $subject, 'node_id' => $this->node($school, '3AP')])
+            ->assertConflict()->assertJsonPath('code', 'qualification_not_teacher');
+        // Ended: final, and history once its last day has passed.
+        $this->postJson("/api/qualifications/{$line['id']}/end", ['valid_to' => now()->toDateString(), 'version' => 1])->assertOk()
+            ->assertJsonPath('data.valid_to', now()->toDateString());
+        $this->postJson("/api/qualifications/{$line['id']}/end", ['valid_to' => now()->addMonth()->toDateString(), 'version' => 2])
+            ->assertConflict()->assertJsonPath('code', 'qualification_ended');
+        $past = $this->postJson("/api/staff/$teacher/qualifications", ['subject_id' => $subject, 'node_id' => $this->node($school, 'MOYEN'),
+            'valid_from' => now()->subYear()->toDateString(), 'valid_to' => now()->subDay()->toDateString()])->assertCreated()->json('data.id');
+        $this->getJson("/api/staff/$teacher/qualifications")->assertOk()->assertJsonPath('meta.total', 1);
+        $this->getJson("/api/staff/$teacher/qualifications?include_ended=1")->assertOk()->assertJsonPath('meta.total', 2);
+        $this->deleteJson("/api/qualifications/$past", ['version' => 2])->assertConflict()->assertJsonPath('code', 'stale_version');
+        $this->deleteJson("/api/qualifications/$past", ['version' => 1])->assertNoContent();
+        $this->assertSame(1, DB::connection('owner')->table('school.audit_log')->where('object_type', 'qualification')->where('object_id', $past)
+            ->where('action', 'DELETE')->count());
+        // Read with the record; given and ended by human resources only.
+        $accountant = $this->account('accountant');
+        $this->member($school, $accountant, 'active', ['accountant']);
+        $this->signIn($accountant)->assertOk();
+        $this->getJson("/api/staff/$teacher/qualifications")->assertOk()->assertJsonPath('meta.total', 1);
+        $this->postJson("/api/staff/$teacher/qualifications", ['subject_id' => $subject, 'node_id' => $this->node($school, '1AS')])->assertForbidden();
+        $this->deleteJson("/api/qualifications/{$line['id']}", ['version' => 2])->assertForbidden();
+    }
+
+    public function test_the_qualifications_page_gives_ends_and_removes_them_and_the_list_finds_who_is_qualified(): void
+    {
+        [$school, $manager] = $this->setting();
+        $subject = $this->subject($school);
+        [$primary, $third] = [$this->node($school, 'PRIMAIRE'), $this->node($school, '3AP')];
+        $teacher = $this->postJson('/api/staff', $this->teacher())->json('data.id');
+        $clerk = $this->postJson('/api/staff', $this->teacher(['staff_type' => 'administrative', 'first_name_lat' => 'Amel']))->json('data.id');
+        $this->get('/school/staff-qualifications?staff='.$teacher)->assertOk()->assertSee(__('staff.add_qualification'));
+        $this->get('/school/staff-qualifications?staff='.Str::uuid())->assertNotFound();
+        $this->within($school, $manager, function () use ($teacher, $clerk, $subject, $primary, $third) {
+            Livewire::test(Staff::class)->assertTableActionVisible('qualifications', $teacher)->assertTableActionHidden('qualifications', $clerk);
+            Livewire::withQueryParams(['staff' => $teacher])->test(StaffQualifications::class)
+                ->callTableAction('add', data: ['subject_id' => $subject, 'node_id' => $primary])->assertNotified(__('school.saved'));
+            $line = DB::table('school.qualification')->where('staff_id', $teacher)->value('id');
+            Livewire::test(Staff::class)->filterTable('qualified', ['subject_id' => $subject, 'node_id' => $third])
+                ->assertCanSeeTableRecords([$teacher])->assertCanNotSeeTableRecords([$clerk]);
+            Livewire::withQueryParams(['staff' => $teacher])->test(StaffQualifications::class)->assertCanSeeTableRecords([$line])
+                ->callTableAction('end', $line, data: ['valid_to' => now()->toDateString()])->assertNotified(__('school.saved'))
+                ->assertTableActionHidden('end', $line)->callTableAction('remove', $line)->assertNotified(__('school.saved'));
+            $this->assertSame(0, DB::table('school.qualification')->where('staff_id', $teacher)->count());
+            // An administrative member receives none.
+            Livewire::withQueryParams(['staff' => $clerk])->test(StaffQualifications::class)->assertTableActionHidden('add');
         });
     }
 

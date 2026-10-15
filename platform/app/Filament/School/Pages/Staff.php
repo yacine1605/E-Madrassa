@@ -45,7 +45,8 @@ final class Staff extends SchoolingPage
         return $table->records(fn (?string $search, array $filters, int $page, int $recordsPerPage) => $this->apiPage('staff.profile.read',
             StaffController::class, 'index', array_filter(['q' => $search, 'status' => $filters['status']['value'] ?? null,
                 'staff_type' => $filters['staff_type']['value'] ?? null, 'site_id' => $filters['site_id']['value'] ?? null,
-                'include_archived' => ($filters['archived']['isActive'] ?? false) ?: null]), $page, $recordsPerPage))
+                'include_archived' => ($filters['archived']['isActive'] ?? false) ?: null, ...$this->qualifiedFilter($filters['qualified'] ?? [])]),
+                $page, $recordsPerPage))
             ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
                 TextColumn::make('staff_number')->label(__('staff.number'))->searchable(),
                 // The account the member signs in with, under their name.
@@ -63,6 +64,13 @@ final class Staff extends SchoolingPage
                 SelectFilter::make('staff_type')->label(__('staff.type'))->options(__('staff.types')),
                 SelectFilter::make('site_id')->label(__('schooling.site'))->options(fn () => collect($this->sites())->mapWithKeys(fn ($site) => [$site['id'] => $this->siteName($site['id'])])->all()),
                 Filter::make('archived')->label(__('schooling.include_archived'))->toggle(),
+                // FR-STF-02 AC2: the teachers qualified for a subject at a level, a cycle's qualification covering its levels.
+                Filter::make('qualified')->schema([
+                    Select::make('subject_id')->label(__('staff.qualified_for'))->searchable()->options(fn () => $this->subjectOptions()),
+                    Select::make('node_id')->label(__('staff.node'))->searchable()->options(fn () => collect($this->nodes())->whereNull('archived_at')
+                        ->mapWithKeys(fn (array $node) => [$node['id'] => $this->nodeName($node['id'])])->all()),
+                    DatePicker::make('on')->label(__('staff.qualified_on')),
+                ]),
             ])->headerActions([
                 Action::make('create')->label(__('staff.create'))->visible(fn () => $this->creatable('staff.profile.create'))
                     ->schema(fn () => [...$this->staffFields(), $this->siteField('staff.profile.create')->helperText(__('staff.site_help')),
@@ -72,6 +80,9 @@ final class Staff extends SchoolingPage
                         fn () => SchoolScreen::call('staff.profile.create', StaffController::class, 'store', $this->sentStaff($data)),
                         fn (array $result) => Notification::make()->title(__('staff.created', ['number' => $result['data']['staff_number']]))->success())),
             ])->recordActions([ActionGroup::make([
+                Action::make('qualifications')->label(__('staff.qualifications'))
+                    ->visible(fn (array $record) => in_array($record['staff_type'], ['teacher_internal', 'teacher_external'], true))
+                    ->url(fn (array $record) => StaffQualifications::getUrl(['staff' => $record['id']])),
                 Action::make('edit')->label(__('school.edit'))->visible(fn (array $record) => $this->changeable($record))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->staffFields(),
@@ -140,6 +151,15 @@ final class Staff extends SchoolingPage
         return collect(SchoolScreen::call('staff.profile.update', StaffController::class, 'accounts', ['q' => $search, 'per_page' => 50])['data'])
             ->mapWithKeys(fn (array $account) => [$account['id'] => $account['name'].($account['email'] ? ' · '.$account['email'] : '')])->all();
     }
+
+    /** The qualification filter as the API takes it: a subject and a node together, a day if given. */
+    private function qualifiedFilter(array $filter): array
+    {
+        if (empty($filter['subject_id']) || empty($filter['node_id'])) return [];
+        return ['subject_id' => $filter['subject_id'], 'node_id' => $filter['node_id'],
+            'on' => empty($filter['on']) ? null : substr((string) $filter['on'], 0, 10)];
+    }
+
 
     private function accountLabel(int $user): ?string
     {

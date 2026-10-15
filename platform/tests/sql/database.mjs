@@ -2089,6 +2089,87 @@ await check('without the staff module, nobody reads or writes a staff record (TS
   await as('school_runtime', a, 1);
   assert.ok(await count('SELECT count(*) n FROM school.staff') > 0);
 });
+// A teacher's qualifications (SQL 032, FR-STF-02): a subject at a node of the referential, its descendants covered.
+const QUALIFY = 'INSERT INTO school.qualification (tenant_id, staff_id, subject_id, node_id, valid_from, valid_to) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, valid_from::text';
+const nodeOf = async code => (await first('SELECT id FROM school.ref_node WHERE tenant_id = $1 AND code = $2', [a, code])).id;
+const [maths, physics] = (await sql('SELECT id FROM school.subject WHERE tenant_id = $1 AND archived_at IS NULL ORDER BY code LIMIT 2', [a])).rows.map(r => r.id);
+const QUALIFIED = 'SELECT school.qualified($1, $2, $3, $4::date) AS ok';
+await check('a qualification at a cycle covers its levels, on its dates, computed rather than copied (FR-STF-02 AC2)', async () => {
+  const teacher = await newStaff('Habilite');
+  const [primary, third, middle] = [await nodeOf('PRIMAIRE'), await nodeOf('3AP'), await nodeOf('MOYEN')];
+  const line = await first(QUALIFY, [a, teacher.id, maths, primary, null, null]);
+  assert.equal(line.valid_from, today);
+  for (const [subject, node, day, ok] of [[maths, third, today, true], [maths, primary, today, true], [maths, middle, today, false],
+    [physics, third, today, false], [maths, third, yesterday, false]]) {
+    assert.equal((await first(QUALIFIED, [teacher.id, subject, node, day])).ok, ok, `${node} ${day}`);
+  }
+  assert.equal(await count('SELECT count(*) n FROM school.qualification WHERE staff_id = $1', [teacher.id]), 1);
+  // A past qualification, ended: covered on its days only.
+  await first(QUALIFY, [a, teacher.id, physics, middle, '2020-09-01', '2024-06-30']);
+  assert.equal((await first(QUALIFIED, [teacher.id, physics, middle, '2023-01-10'])).ok, true);
+  assert.equal((await first(QUALIFIED, [teacher.id, physics, middle, today])).ok, false);
+  await rejects(QUALIFY, [a, teacher.id, maths, primary, '2030-01-01', null], '23514', 'qualification_overlap');
+  await rejects(QUALIFY, [a, teacher.id, physics, middle, '2024-06-30', null], '23514', 'qualification_overlap');
+  assert.ok(await first(QUALIFY, [a, teacher.id, physics, middle, '2024-07-01', null]));
+  await rejects(QUALIFY, [a, teacher.id, maths, middle, '2026-01-10', '2026-01-01'], '23514');
+});
+await check('a qualification keeps its teacher, subject, node and first day; its end is final; one nothing uses is deleted, journaled (FR-STF-02, BR-02)', async () => {
+  const teacher = await newStaff('Fin');
+  const node = await nodeOf('3AP');
+  const line = (await first(QUALIFY, [a, teacher.id, maths, node, '2025-09-01', null])).id;
+  await rejects('UPDATE school.qualification SET node_id = $2 WHERE id = $1', [line, await nodeOf('MOYEN')], '42501');
+  await as(null);
+  await rejects('UPDATE school.qualification SET valid_from = $2 WHERE id = $1', [line, '2025-01-01'], '23514', 'identity_immutable');
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.qualification SET valid_to = '2025-08-01' WHERE id = $1", [line], '23514', 'qualification_end_before_start');
+  await sql("UPDATE school.qualification SET valid_to = '2026-06-30' WHERE id = $1", [line]);
+  await rejects("UPDATE school.qualification SET valid_to = '2026-07-31' WHERE id = $1", [line], '23514', 'qualification_ended');
+  await sql('DELETE FROM school.qualification WHERE id = $1', [line]);
+  assert.deepEqual(await first("SELECT before ->> 'subject_id' AS subject, before ->> 'valid_to' AS until FROM school.audit_log WHERE object_type = 'qualification' AND object_id = $1 AND action = 'DELETE'",
+    [line]), { subject: maths, until: '2026-06-30' });
+});
+await check('only a teacher still with the school is qualified, for a subject and a node in use (FR-STF-02, FR-STF-01)', async () => {
+  const node = await nodeOf('3AP');
+  const clerk = await newStaff('Bureau', 'Amel', 'administrative');
+  await rejects(QUALIFY, [a, clerk.id, maths, node, null, null], '23514', 'qualification_not_teacher');
+  const gone = await newStaff('Parti');
+  const kept = (await first(QUALIFY, [a, gone.id, maths, node, '2024-09-01', null])).id;
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [gone.id]);
+  await rejects(QUALIFY, [a, gone.id, physics, node, null, null], '23514', 'staff_left');
+  // Who left keeps their qualifications as history; ended, then frozen with the archived record.
+  await sql('UPDATE school.qualification SET valid_to = current_date WHERE id = $1', [kept]);
+  await sql('UPDATE school.staff SET archived_at = now() WHERE id = $1', [gone.id]);
+  await rejects('DELETE FROM school.qualification WHERE id = $1', [kept], '23514', 'staff_archived');
+  const teacher = await newStaff('Catalogue');
+  const subject = async code => (await first("INSERT INTO school.subject (tenant_id, code, kind, labels) VALUES ($1, $2, 'subject', $3) RETURNING id",
+    [a, code, JSON.stringify({ fr: 'Matière ' + code })])).id;
+  const old = await subject('ANCIENNE_032');
+  await sql('UPDATE school.subject SET archived_at = now() WHERE id = $1', [old]);
+  await rejects(QUALIFY, [a, teacher.id, old, node, null, null], '23514', 'subject_archived');
+  // A subject a qualification names stays in the catalogue.
+  const taught = await subject('QUALIF_032');
+  await first(QUALIFY, [a, teacher.id, taught, node, null, null]);
+  await rejects('DELETE FROM school.subject WHERE id = $1', [taught], '23503');
+});
+await check('a site\'s grant qualifies the teachers of its site only; a teacher reads their own qualifications (FR-IAM-04)', async () => {
+  const node = await nodeOf('3AP');
+  const elsewhere = await newStaff('Siege');
+  const office = await scopedAccount('internal', 'site', [staffSiteB], ['staff.profile.read', 'staff.profile.create', 'staff.qualification.manage']);
+  await as('school_runtime', a, office.user);
+  const theirs = await newStaff('Annexe', 'Lina');
+  const line = (await first(QUALIFY, [a, theirs.id, maths, node, null, null])).id;
+  await rejects(QUALIFY, [a, elsewhere.id, maths, node, null, null], '42501');
+  assert.deepEqual((await sql('SELECT id FROM school.qualification')).rows.map(r => r.id), [line]);
+  assert.equal((await first(QUALIFIED, [theirs.id, maths, node, today])).ok, true);
+  assert.equal((await first(QUALIFIED, [elsewhere.id, maths, node, today])).ok, false, 'what the reader cannot see');
+  const self = await scopedAccount('internal', 'personal', null, ['staff.profile.read']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [theirs.id, self.user]);
+  await as('school_runtime', a, self.user);
+  assert.deepEqual((await sql('SELECT id FROM school.qualification')).rows.map(r => r.id), [line]);
+  await rejects(QUALIFY, [a, theirs.id, physics, node, null, null], '42501');
+  await as('school_runtime', a, 1);
+});
 // The last-site concurrency test below expects the school's two sites of before.
 await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);
@@ -2537,6 +2618,24 @@ if (PgClient) {
     await Promise.all(clients.map(c => c.end()));
     assert.notEqual(numbers[0], numbers[1]);
     assert.deepEqual(numbers.map(n => /^P\d{4,}$/.test(n)), [true, true]);
+  });
+  await check('the same qualification given twice at once is recorded once (FR-STF-02)', async () => {
+    await as('school_runtime', a, 1);
+    const teacher = await newStaff('Course', 'Habilitation');
+    const node = await nodeOf('4AP');
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async c => {
+      await c.query('BEGIN');
+      try {
+        await c.query(QUALIFY, [a, teacher.id, maths, node, null, null]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'qualification_overlap');
+    assert.equal(await count('SELECT count(*) n FROM school.qualification WHERE staff_id = $1', [teacher.id]), 1);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

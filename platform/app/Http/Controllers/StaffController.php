@@ -29,11 +29,16 @@ final class StaffController
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records, private AcademicRecords $academic) {}
 
+    /** FR-STF-02 AC2: `subject_id` with `node_id` (and `on`, today by default) keeps the teachers qualified for them, a parent node's qualification covering its children. */
     public function index(Request $request)
     {
+        $qualified = $request->validate(['subject_id' => 'nullable|uuid|required_with:node_id', 'node_id' => 'nullable|uuid|required_with:subject_id',
+            'on' => 'nullable|date_format:Y-m-d']);
+        $where = isset($qualified['subject_id']) ? ['school.qualified(id, ?::uuid, ?::uuid, coalesce(?::date, current_date))',
+            [$qualified['subject_id'], $qualified['node_id'], $qualified['on'] ?? null]] : null;
         return $this->academic->listing($request, self::SELECT, ['status' => 'nullable|in:active,on_leave,left',
             'staff_type' => 'nullable|in:'.implode(',', self::TYPES), 'site_id' => 'nullable|uuid'],
-            [...PupilRecords::NAMES, 'phone', 'email', 'staff_number'], 'name_key, id', fn ($row) => $this->present($row));
+            [...PupilRecords::NAMES, 'phone', 'email', 'staff_number'], 'name_key, id', fn ($row) => $this->present($row), $where);
     }
 
     public function show(string $staff) { return ['data' => $this->present($this->find($staff))]; }

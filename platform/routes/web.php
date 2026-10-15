@@ -19,6 +19,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgramSubjectController;
+use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\RoleAssignmentController;
@@ -275,6 +276,7 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:staff.profile.read')->group(function () {
                     Route::get('staff', [StaffController::class, 'index']);
                     Route::get('staff/{staff}', [StaffController::class, 'show']);
+                    Route::get('staff/{staff}/qualifications', [QualificationController::class, 'index']);
                 });
                 Route::post('staff', [StaffController::class, 'store'])->middleware('permission:staff.profile.create');
                 Route::middleware('permission:staff.profile.update')->group(function () {
@@ -282,6 +284,12 @@ Route::prefix('api')->group(function () {
                     Route::post('staff/{staff}/status', [StaffController::class, 'status']);
                     Route::post('staff/{staff}/account', [StaffController::class, 'account']);
                     Route::post('staff/{staff}/archive', [StaffController::class, 'archive']);
+                });
+                // FR-STF-02: a teacher's qualifications.
+                Route::middleware('permission:staff.qualification.manage')->group(function () {
+                    Route::post('staff/{staff}/qualifications', [QualificationController::class, 'store']);
+                    Route::post('qualifications/{line}/end', [QualificationController::class, 'end']);
+                    Route::delete('qualifications/{line}', [QualificationController::class, 'destroy']);
                 });
             });
 

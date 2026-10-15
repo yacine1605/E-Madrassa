@@ -149,9 +149,9 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme with a subject, a class, a pupil with a guardian in it, a teacher. The lists
-// then have rows, and the pupil's sheet, the class's members and the programme's subjects are
-// screens too.
+// year, a programme with a subject, a class, a pupil with a guardian in it, a qualified teacher.
+// The lists then have rows, and the pupil's sheet, the class's members, the programme's subjects
+// and the teacher's qualifications are screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -197,10 +197,11 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    // A teacher's record, without an account (FR-STF-01).
-    await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
+    // A teacher's record, without an account (FR-STF-01), qualified for the programme's subject at its level (FR-STF-02).
+    const teacher = await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
       staff_type: 'teacher_internal', phone: '0550 98 76 54', hire_date: '2020-09-01' });
-    return { pupil: pupil.id, group: group.id, program: program.id };
+    await call(`staff/${teacher.id}/qualifications`, { subject_id: subject.id, node_id: grade.id });
+    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id };
   });
   await context.close();
   return records;
@@ -212,7 +213,7 @@ async function run(browser) {
   records ??= await seed(browser, sessions.admin);
   for (const locale of ['fr', 'ar']) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
-      `program-subjects?program=${records.program}`]], ['operator', 'console', consolePages]]) {
+      `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();
