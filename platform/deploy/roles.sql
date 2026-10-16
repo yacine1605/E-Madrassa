@@ -168,6 +168,14 @@ GRANT UPDATE (valid_to, version) ON school.qualification TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.qualified(uuid, uuid, uuid, date) TO school_runtime;
 -- A group's lead teacher (033): named with the group, among the teachers the writer reads.
 GRANT INSERT (lead_teacher_id), UPDATE (lead_teacher_id) ON school.study_group TO school_runtime;
+-- A teacher's availability (034): a declaration or a day off is decided once (status and its reason), withdrawn while
+-- pending; one in force never changes. Its state, its decision's author and day are the database's.
+GRANT SELECT, DELETE ON school.availability, school.unavailability TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, valid_from, slots, min_weekly_hours, max_daily_hours, max_weekly_hours) ON school.availability TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, date_from, date_to, reason) ON school.unavailability TO school_runtime;
+GRANT UPDATE (status, decision_reason, version) ON school.availability, school.unavailability TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.is_own_staff(uuid), school.availability_in_force(uuid), school.availability_slots(jsonb),
+  school.availability_hours(jsonb), school.availability_on(uuid, date), school.available(uuid, date, time, time) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -286,6 +294,10 @@ GRANT SELECT ON school.qualification TO platform_provisioner;
 ALTER FUNCTION school.check_qualification() OWNER TO platform_provisioner;
 -- A group's lead teacher (033): the teacher's state, whatever the writer may read.
 ALTER FUNCTION school.check_lead_teacher() OWNER TO platform_provisioner;
+-- A teacher's availability (034): the teacher's state, whether a record is the caller's own, the declarations and days off already there.
+GRANT SELECT ON school.availability, school.unavailability TO platform_provisioner;
+ALTER FUNCTION school.is_own_staff(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_availability() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

@@ -23,19 +23,31 @@ final class StaffController
     // With the linked account's name and e-mail, as the reader may see the school's people (020).
     private const SELECT = "SELECT id, staff_number, last_name_ar, first_name_ar, last_name_lat, first_name_lat, staff_type, phone, email,
         hire_date, status, left_on, site_id, custom, user_id, version, archived_at, created_at, updated_at,
-        (SELECT jsonb_build_object('name', u.name, 'email', u.email) FROM public.users u WHERE u.id = staff.user_id) AS account
+        (SELECT jsonb_build_object('name', u.name, 'email', u.email) FROM public.users u WHERE u.id = staff.user_id) AS account,
+        ".self::PENDING." AS availability_pending
         FROM school.staff";
+    // FR-STF-03: a declaration or a day off of theirs waits for an approver.
+    private const PENDING = "(EXISTS (SELECT 1 FROM school.availability a WHERE a.tenant_id = staff.tenant_id AND a.staff_id = staff.id AND a.status = 'pending')
+        OR EXISTS (SELECT 1 FROM school.unavailability v WHERE v.tenant_id = staff.tenant_id AND v.staff_id = staff.id AND v.status = 'pending'))";
     public const TYPES = ['teacher_internal', 'teacher_external', 'administrative', 'other'];
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records, private AcademicRecords $academic) {}
 
-    /** FR-STF-02 AC2: `subject_id` with `node_id` (and `on`, today by default) keeps the teachers qualified for them, a parent node's qualification covering its children. */
+    /**
+     * FR-STF-02 AC2: `subject_id` with `node_id` (and `on`, today by default) keeps the teachers qualified for them, a parent node's
+     * qualification covering its children. FR-STF-03: `availability_pending` keeps those whose availability waits for an approver.
+     */
     public function index(Request $request)
     {
         $qualified = $request->validate(['subject_id' => 'nullable|uuid|required_with:node_id', 'node_id' => 'nullable|uuid|required_with:subject_id',
-            'on' => 'nullable|date_format:Y-m-d']);
-        $where = isset($qualified['subject_id']) ? ['school.qualified(id, ?::uuid, ?::uuid, coalesce(?::date, current_date))',
-            [$qualified['subject_id'], $qualified['node_id'], $qualified['on'] ?? null]] : null;
+            'on' => 'nullable|date_format:Y-m-d', 'availability_pending' => 'boolean']);
+        $conditions = $bindings = [];
+        if (isset($qualified['subject_id'])) {
+            $conditions[] = 'school.qualified(id, ?::uuid, ?::uuid, coalesce(?::date, current_date))';
+            array_push($bindings, $qualified['subject_id'], $qualified['node_id'], $qualified['on'] ?? null);
+        }
+        if ($request->boolean('availability_pending')) $conditions[] = self::PENDING;
+        $where = $conditions ? [implode(' AND ', $conditions), $bindings] : null;
         return $this->academic->listing($request, self::SELECT, ['status' => 'nullable|in:active,on_leave,left',
             'staff_type' => 'nullable|in:'.implode(',', self::TYPES), 'site_id' => 'nullable|uuid'],
             [...PupilRecords::NAMES, 'phone', 'email', 'staff_number'], 'name_key, id', fn ($row) => $this->present($row), $where);

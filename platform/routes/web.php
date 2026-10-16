@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountLinkController;
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\StudentPhotoController;
 use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
+use App\Http\Controllers\UnavailabilityController;
 use Illuminate\Support\Facades\Route;
 
 // The deployment URL opens the school sign-in by default; publisher operators use /console.
@@ -277,6 +279,8 @@ Route::prefix('api')->group(function () {
                     Route::get('staff', [StaffController::class, 'index']);
                     Route::get('staff/{staff}', [StaffController::class, 'show']);
                     Route::get('staff/{staff}/qualifications', [QualificationController::class, 'index']);
+                    Route::get('staff/{staff}/availabilities', [AvailabilityController::class, 'index']);
+                    Route::get('staff/{staff}/unavailabilities', [UnavailabilityController::class, 'index']);
                 });
                 Route::post('staff', [StaffController::class, 'store'])->middleware('permission:staff.profile.create');
                 Route::middleware('permission:staff.profile.update')->group(function () {
@@ -290,6 +294,20 @@ Route::prefix('api')->group(function () {
                     Route::post('staff/{staff}/qualifications', [QualificationController::class, 'store']);
                     Route::post('qualifications/{line}/end', [QualificationController::class, 'end']);
                     Route::delete('qualifications/{line}', [QualificationController::class, 'destroy']);
+                });
+                // FR-STF-03: a teacher's availability, declared by them or their manager; decided by an approver when the school asks for it.
+                Route::middleware('permission:staff.availability.manage')->group(function () {
+                    Route::post('staff/{staff}/availabilities', [AvailabilityController::class, 'store']);
+                    Route::delete('availabilities/{declaration}', [AvailabilityController::class, 'destroy']);
+                    Route::post('staff/{staff}/unavailabilities', [UnavailabilityController::class, 'store']);
+                    Route::post('unavailabilities/{unavailability}/cancel', [UnavailabilityController::class, 'cancel']);
+                    Route::delete('unavailabilities/{unavailability}', [UnavailabilityController::class, 'destroy']);
+                });
+                Route::middleware('permission:staff.availability.approve')->group(function () {
+                    Route::post('availabilities/{declaration}/approve', [AvailabilityController::class, 'approve']);
+                    Route::post('availabilities/{declaration}/reject', [AvailabilityController::class, 'reject']);
+                    Route::post('unavailabilities/{unavailability}/approve', [UnavailabilityController::class, 'approve']);
+                    Route::post('unavailabilities/{unavailability}/reject', [UnavailabilityController::class, 'reject']);
                 });
             });
 

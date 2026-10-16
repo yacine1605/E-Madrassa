@@ -33,6 +33,9 @@ final class DatabaseErrors
         'staff_archived', 'staff_archive_left', 'left_on_future', 'left_before_hire', 'staff_account_linked',
         'qualification_not_teacher', 'staff_left', 'qualification_overlap', 'qualification_ended', 'qualification_end_before_start',
         'lead_teacher_not_teacher',
+        'availability_not_teacher', 'availability_past', 'availability_slots_invalid', 'availability_slots_overlap',
+        'availability_below_minimum', 'availability_same_day', 'availability_decided', 'unavailability_overlap', 'unavailability_ended',
+        'self_approval', 'approval_required',
     ];
 
     public static function message(string $rule): string

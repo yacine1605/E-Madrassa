@@ -3,7 +3,6 @@
 namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\QualificationController;
-use App\Http\Controllers\StaffController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
@@ -14,50 +13,17 @@ use Filament\Forms\Components\Select;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
-use Illuminate\Support\Str;
-use Livewire\Attributes\Locked;
 
 /**
  * FR-STF-02: the subjects a teacher may teach, each at a level, a cycle or a specialty of the
  * referential, whose descendants it covers; from a day, until another. A qualification ends, or is
  * removed while nothing uses it.
  */
-final class StaffQualifications extends SchoolingPage
+final class StaffQualifications extends StaffMemberPage
 {
     protected static bool $isDiscovered = true;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $section = 'staff';
-    protected static array $permissions = ['staff.profile.read'];
-    protected static ?string $module = 'staff';
-    protected static string|array $routeMiddleware = ['module:staff', 'permission:staff.profile.read'];
-    #[Locked] public string $staff = '';
-    private ?array $staffRow = null;
 
-    public function mount(): void
-    {
-        parent::mount();
-        $this->staff = (string) request()->query('staff', '');
-        $this->member();
-    }
-
-    /** The member of staff as the reader may see them; one out of their reach is not found. */
-    public function member(): array
-    {
-        abort_unless(Str::isUuid($this->staff), 404);
-        return $this->staffRow ??= SchoolScreen::call('staff.profile.read', StaffController::class, 'show', parameters: ['staff' => $this->staff])['data'];
-    }
-
-    public function getTitle(): string
-    {
-        return $this->personName($this->member()).' · '.$this->member()['staff_number'];
-    }
-
-    public function getSubheading(): ?string
-    {
-        $member = $this->member();
-        return Formats::list(array_filter([__('staff.qualifications'), __('staff.types.'.$member['staff_type']), $this->siteName($member['site_id']),
-            $member['archived_at'] ? __('staff.states.archived') : __('staff.states.'.$member['status'])]));
-    }
+    protected function subject(): string { return __('staff.qualifications'); }
 
     public function table(Table $table): Table
     {
@@ -99,18 +65,10 @@ final class StaffQualifications extends SchoolingPage
     }
 
     /** Whoever may change this teacher's qualifications, while the record is in use. */
-    private function changeable(): bool
-    {
-        return !$this->member()['archived_at'] && $this->writableFor('staff.qualification.manage', 'staff', $this->staff);
-    }
+    private function changeable(): bool { return $this->changeableWith('staff.qualification.manage'); }
 
     /** A teacher still with the school receives new qualifications (FR-STF-01, FR-STF-02). */
-    private function qualifiable(): bool
-    {
-        $member = $this->member();
-        return $this->changeable() && $member['status'] !== 'left' && in_array($member['staff_type'], ['teacher_internal', 'teacher_external'], true);
-    }
-
+    private function qualifiable(): bool { return $this->changeable() && $this->teaching(); }
 
     /** @return array<string, string> the referential's nodes still in use: levels, cycles, tracks, specialties */
     private function nodeOptions(): array

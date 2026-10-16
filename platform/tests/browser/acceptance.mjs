@@ -149,9 +149,10 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme with a subject, a qualified teacher leading a class, a pupil with a guardian in it.
-// The lists then have rows, and the pupil's sheet, the class's members, the programme's subjects
-// and the teacher's qualifications are screens too.
+// year, a programme with a subject, a qualified teacher with their week and a day off leading a
+// class, a pupil with a guardian in it. The lists then have rows, and the pupil's sheet, the class's
+// members, the programme's subjects and the teacher's qualifications, availability and days off are
+// screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -177,6 +178,10 @@ async function seed(browser, session) {
     const teacher = await call('staff', { last_name_lat: 'Meziane', first_name_lat: 'Karim', last_name_ar: 'مزيان', first_name_ar: 'كريم',
       staff_type: 'teacher_internal', phone: '0550 98 76 54', hire_date: '2020-09-01' });
     await call(`staff/${teacher.id}/qualifications`, { subject_id: subject.id, node_id: grade.id });
+    // Their week and a day off (FR-STF-03).
+    await call(`staff/${teacher.id}/availabilities`, { slots: [{ weekday: 0, start_time: '08:00', end_time: '12:00' },
+      { weekday: 2, start_time: '14:00', end_time: '17:00' }], max_daily_hours: '6', max_weekly_hours: '18' });
+    await call(`staff/${teacher.id}/unavailabilities`, { date_from: day(7), date_to: day(8), reason: 'Formation des enseignants' });
     // The class they lead (FR-GRP-01).
     const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
       labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active', lead_teacher_id: teacher.id });
@@ -214,7 +219,8 @@ async function run(browser) {
   records ??= await seed(browser, sessions.admin);
   for (const locale of ['fr', 'ar']) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
-      `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`]], ['operator', 'console', consolePages]]) {
+      `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
+      `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

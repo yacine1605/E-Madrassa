@@ -45,7 +45,8 @@ final class Staff extends SchoolingPage
         return $table->records(fn (?string $search, array $filters, int $page, int $recordsPerPage) => $this->apiPage('staff.profile.read',
             StaffController::class, 'index', array_filter(['q' => $search, 'status' => $filters['status']['value'] ?? null,
                 'staff_type' => $filters['staff_type']['value'] ?? null, 'site_id' => $filters['site_id']['value'] ?? null,
-                'include_archived' => ($filters['archived']['isActive'] ?? false) ?: null, ...$this->qualifiedFilter($filters['qualified'] ?? [])]),
+                'include_archived' => ($filters['archived']['isActive'] ?? false) ?: null, ...$this->qualifiedFilter($filters['qualified'] ?? []),
+                'availability_pending' => ($filters['availability_pending']['isActive'] ?? false) ?: null]),
                 $page, $recordsPerPage))
             ->paginationPageOptions([25, 50, 100])->defaultPaginationPageOption(25)->columns([
                 TextColumn::make('staff_number')->label(__('staff.number'))->searchable(),
@@ -58,7 +59,9 @@ final class Staff extends SchoolingPage
                 TextColumn::make('status')->label(__('school.status'))->badge()
                     ->state(fn (array $record) => $record['archived_at'] ? 'archived' : $record['status'])
                     ->formatStateUsing(fn (string $state, array $record) => $state === 'left'
-                        ? __('staff.left_since', ['date' => Formats::date($record['left_on'])]) : __('staff.states.'.$state)),
+                        ? __('staff.left_since', ['date' => Formats::date($record['left_on'])]) : __('staff.states.'.$state))
+                    // FR-STF-03: a declaration or a day off waits for an approver.
+                    ->description(fn (array $record) => $record['availability_pending'] ? __('staff.availability_pending') : null),
             ])->filters([
                 SelectFilter::make('status')->label(__('school.status'))->options(collect(__('staff.states'))->except('archived')->all()),
                 SelectFilter::make('staff_type')->label(__('staff.type'))->options(__('staff.types')),
@@ -71,6 +74,7 @@ final class Staff extends SchoolingPage
                         ->mapWithKeys(fn (array $node) => [$node['id'] => $this->nodeName($node['id'])])->all()),
                     DatePicker::make('on')->label(__('staff.qualified_on')),
                 ]),
+                Filter::make('availability_pending')->label(__('staff.availability_pending'))->toggle(),
             ])->headerActions([
                 Action::make('create')->label(__('staff.create'))->visible(fn () => $this->creatable('staff.profile.create'))
                     ->schema(fn () => [...$this->staffFields(), $this->siteField('staff.profile.create')->helperText(__('staff.site_help')),
@@ -83,6 +87,9 @@ final class Staff extends SchoolingPage
                 Action::make('qualifications')->label(__('staff.qualifications'))
                     ->visible(fn (array $record) => in_array($record['staff_type'], ['teacher_internal', 'teacher_external'], true))
                     ->url(fn (array $record) => StaffQualifications::getUrl(['staff' => $record['id']])),
+                Action::make('availability')->label(__('staff.availability'))
+                    ->visible(fn (array $record) => in_array($record['staff_type'], ['teacher_internal', 'teacher_external'], true))
+                    ->url(fn (array $record) => StaffAvailability::getUrl(['staff' => $record['id']])),
                 Action::make('edit')->label(__('school.edit'))->visible(fn (array $record) => $this->changeable($record))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->staffFields(),

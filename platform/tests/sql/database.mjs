@@ -2273,6 +2273,142 @@ await check('the teacher\'s role reads their pupils, these pupils\' guardians an
   assert.deepEqual(await visibleIds('enrollment'), [], 'enrolments are not the teacher\'s');
   await as('school_runtime', a, 1);
 });
+// A teacher's availability (SQL 034, FR-STF-03): weekly slots from a day on, days off that prevail, bounds, an approval when asked.
+const DECLARE = 'INSERT INTO school.availability (tenant_id, staff_id, valid_from, slots, min_weekly_hours, max_daily_hours, max_weekly_hours) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status, valid_from::text, slots, decided_by';
+const DAY_OFF = 'INSERT INTO school.unavailability (tenant_id, staff_id, date_from, date_to, reason) VALUES ($1, $2, $3, $4, $5) RETURNING id, status';
+const AVAILABLE = 'SELECT school.available($1, $2::date, $3::time, $4::time) AS ok';
+const slot = (weekday, start_time, end_time) => ({ weekday, start_time, end_time });
+// The next Sunday from today (today if it is one), and the days after it.
+const sunday = (await first("SELECT (current_date + (7 - extract(dow FROM current_date)::integer) % 7)::text AS d")).d;
+const dayAfter = async (day, n) => (await first('SELECT ($1::date + $2::integer)::text AS d', [day, n])).d;
+await check('a weekly availability is in force from its first day, adjacent slots joined, until a later one; a day off prevails (FR-STF-03)', async () => {
+  const teacher = await newStaff('Dispo', 'Rym');
+  const [monday, tuesday, nextWeek] = [await dayAfter(sunday, 1), await dayAfter(sunday, 2), await dayAfter(sunday, 7)];
+  assert.equal((await first(AVAILABLE, [teacher.id, sunday, '07:00', '20:00'])).ok, true, 'nothing declared: availability unknown, not empty');
+  const week = await first(DECLARE, [a, teacher.id, null, JSON.stringify([slot(2, '14:00', '17:00'), slot(0, '10:00', '12:00'), slot(0, '08:00', '10:00')]), 4, 6, 10]);
+  // In force at once (no approval asked), its slots in the week's order.
+  assert.deepEqual([week.status, week.valid_from, Number(week.decided_by)], ['approved', today, 1]);
+  assert.deepEqual(week.slots, [slot(0, '08:00', '10:00'), slot(0, '10:00', '12:00'), slot(2, '14:00', '17:00')]);
+  assert.equal((await first('SELECT id FROM school.availability_on($1)', [teacher.id])).id, week.id);
+  assert.equal((await first('SELECT school.availability_hours(slots)::text AS h FROM school.availability WHERE id = $1', [week.id])).h, '7.00');
+  for (const [day, from, until, ok] of [[sunday, '09:00', '11:00', true], [sunday, '11:00', '13:00', false], [tuesday, '14:00', '17:00', true],
+    [monday, '08:00', '09:00', false]]) {
+    assert.equal((await first(AVAILABLE, [teacher.id, day, from, until])).ok, ok, `${day} ${from}-${until}`);
+  }
+  // A later declaration, here with no slot: available at no time from its first day; the first one holds until then.
+  await first(DECLARE, [a, teacher.id, nextWeek, '[]', null, null, null]);
+  assert.equal((await first(AVAILABLE, [teacher.id, nextWeek, '09:00', '10:00'])).ok, false);
+  assert.equal((await first(AVAILABLE, [teacher.id, sunday, '09:00', '10:00'])).ok, true);
+  // A day off prevails over the week (AC1 with lot 4's sessions); cancelled until its last day, the week holds again.
+  const off = await first(DAY_OFF, [a, teacher.id, sunday, sunday, 'Formation des enseignants']);
+  assert.equal(off.status, 'approved');
+  assert.equal((await first(AVAILABLE, [teacher.id, sunday, '09:00', '10:00'])).ok, false);
+  await rejects(DAY_OFF, [a, teacher.id, sunday, monday, 'Autre absence'], '23514', 'unavailability_overlap');
+  await rejects(DAY_OFF, [a, teacher.id, yesterday, yesterday, 'Hier'], '23514', 'availability_past');
+  await rejects(DAY_OFF, [a, teacher.id, monday, sunday, 'A l\'envers'], '23514', 'unavailability_end_before_start');
+  await rejects(DAY_OFF, [a, teacher.id, monday, monday, '  '], '23514', 'reason_required');
+  await rejects('DELETE FROM school.unavailability WHERE id = $1', [off.id], '23514', 'availability_decided');
+  await rejects("UPDATE school.unavailability SET date_to = date_to + 1 WHERE id = $1", [off.id], '42501');
+  await sql("UPDATE school.unavailability SET status = 'cancelled' WHERE id = $1", [off.id]);
+  assert.ok((await first('SELECT cancelled_at FROM school.unavailability WHERE id = $1', [off.id])).cancelled_at);
+  assert.equal((await first(AVAILABLE, [teacher.id, sunday, '09:00', '10:00'])).ok, true);
+  await rejects("UPDATE school.unavailability SET status = 'approved' WHERE id = $1", [off.id], '23514', 'availability_decided');
+  // What a declaration says, checked; one in force never changes, nor goes.
+  for (const [slots, rule] of [[[slot(0, '08:00', '10:00'), slot(0, '09:30', '11:00')], 'availability_slots_overlap'],
+    [[slot(0, '8:00', '10:00')], 'availability_slots_invalid'], [[slot(0, '10:00', '10:00')], 'availability_slots_invalid'],
+    [[slot(7, '08:00', '10:00')], 'availability_slots_invalid'], [[{ ...slot(1, '08:00', '10:00'), room: 'A1' }], 'availability_slots_invalid'],
+    [{ weekday: 1 }, 'availability_slots_invalid']]) {
+    await rejects(DECLARE, [a, teacher.id, tomorrow, JSON.stringify(slots), null, null, null], '23514', rule);
+  }
+  assert.deepEqual((await first(DECLARE, [a, teacher.id, await dayAfter(nextWeek, 1), JSON.stringify([slot(6, '20:00', '24:00')]), null, 4, 4])).slots,
+    [slot(6, '20:00', '24:00')]);
+  await rejects(DECLARE, [a, teacher.id, yesterday, '[]', null, null, null], '23514', 'availability_past');
+  await rejects(DECLARE, [a, teacher.id, nextWeek, '[]', null, null, null], '23514', 'availability_same_day');
+  await rejects(DECLARE, [a, teacher.id, tomorrow, JSON.stringify([slot(1, '08:00', '10:00')]), 3, null, null], '23514', 'availability_below_minimum');
+  await rejects(DECLARE, [a, teacher.id, tomorrow, '[]', null, 8, 6], '23514');
+  await rejects("UPDATE school.availability SET slots = '[]' WHERE id = $1", [week.id], '42501');
+  await rejects("UPDATE school.availability SET status = 'rejected', decision_reason = 'Trop tard' WHERE id = $1", [week.id], '23514', 'availability_decided');
+  await rejects('DELETE FROM school.availability WHERE id = $1', [week.id], '23514', 'availability_decided');
+  // A teacher's only: an administrative member, one who left, an archived record declare nothing.
+  await rejects(DECLARE, [a, (await newStaff('Bureau', 'Amel', 'administrative')).id, null, '[]', null, null, null], '23514', 'availability_not_teacher');
+  const gone = await newStaff('Parti', 'Omar');
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [gone.id]);
+  await rejects(DECLARE, [a, gone.id, null, '[]', null, null, null], '23514', 'staff_left');
+  await rejects(DAY_OFF, [a, gone.id, tomorrow, tomorrow, 'Absent'], '23514', 'staff_left');
+});
+await check('when the school asks for it, a teacher\'s change waits for an approver, never approved by its own teacher (FR-STF-03)', async () => {
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'staff.availability.require_approval', 'true')", [a]);
+  const record = await newStaff('Validation', 'Selma');
+  const self = await scopedAccount('internal', 'personal', null, ['staff.profile.read', 'staff.availability.manage']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [record.id, self.user]);
+  // The manager's change is in force at once; the teacher's waits.
+  const off = await first(DAY_OFF, [a, record.id, sunday, sunday, 'Jury d\'examen']);
+  assert.equal(off.status, 'approved');
+  await as('school_runtime', a, self.user);
+  const week = await first(DECLARE, [a, record.id, null, JSON.stringify([slot(0, '08:00', '12:00')]), null, null, null]);
+  const other = await first(DECLARE, [a, record.id, tomorrow, '[]', null, null, null]);
+  const dayOff = await first(DAY_OFF, [a, record.id, await dayAfter(sunday, 3), await dayAfter(sunday, 4), 'Rendez-vous']);
+  assert.deepEqual([week.status, week.decided_by, other.status, dayOff.status], ['pending', null, 'pending', 'pending']);
+  assert.equal((await first(AVAILABLE, [record.id, await dayAfter(sunday, 1), '15:00', '16:00'])).ok, true, 'pending: not in force');
+  assert.equal((await sql("UPDATE school.availability SET status = 'approved' WHERE id = $1", [week.id])).rowCount ?? 0, 0);
+  await rejects("UPDATE school.unavailability SET status = 'cancelled' WHERE id = $1", [off.id], '23514', 'approval_required');
+  // Withdrawn while pending; the journal keeps it.
+  await sql('DELETE FROM school.unavailability WHERE id = $1', [dayOff.id]);
+  await as('school_runtime', a, 1);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'unavailability' AND object_id = $1 AND action = 'DELETE'", [dayOff.id]), 1);
+  await rejects("UPDATE school.availability SET status = 'rejected' WHERE id = $1", [other.id], '23514', 'reason_required');
+  await sql("UPDATE school.availability SET status = 'rejected', decision_reason = 'Créneaux à revoir' WHERE id = $1", [other.id]);
+  await sql("UPDATE school.availability SET status = 'approved' WHERE id = $1", [week.id]);
+  assert.deepEqual(await first('SELECT status, decided_by::int AS by, valid_from::text AS since FROM school.availability WHERE id = $1', [week.id]),
+    { status: 'approved', by: 1, since: today });
+  assert.equal((await first(AVAILABLE, [record.id, await dayAfter(sunday, 1), '15:00', '16:00'])).ok, false);
+  // The day refused is free again.
+  assert.equal((await first(DECLARE, [a, record.id, tomorrow, '[]', null, null, null])).status, 'approved');
+  // An approver's own record: their change waits for another approver; another teacher's is in force at once.
+  const hr = await scopedAccount('internal', 'tenant', null, ['staff.profile.read', 'staff.availability.manage', 'staff.availability.approve']);
+  await as('school_runtime', a, 1);
+  const theirs = await newStaff('Responsable', 'Nadia');
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [theirs.id, hr.user]);
+  await as('school_runtime', a, hr.user);
+  const own = await first(DECLARE, [a, theirs.id, null, '[]', null, null, null]);
+  assert.equal(own.status, 'pending');
+  await rejects("UPDATE school.availability SET status = 'approved' WHERE id = $1", [own.id], '23514', 'self_approval');
+  const stage = await dayAfter(sunday, 10);
+  assert.equal((await first(DAY_OFF, [a, record.id, stage, stage, 'Stage'])).status, 'approved');
+  // Approved after its first day, a declaration takes effect from the day it is approved, once a day.
+  await as(null);
+  await sql('ALTER TABLE school.availability DISABLE TRIGGER USER');
+  const late = (await first("INSERT INTO school.availability (tenant_id, staff_id, valid_from, slots, created_at, updated_at) VALUES ($1, $2, current_date - 3, '[]', now(), now()) RETURNING id",
+    [a, theirs.id])).id;
+  await sql('ALTER TABLE school.availability ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.availability SET status = 'approved' WHERE id = $1", [late], '23514', 'availability_same_day');
+  await sql("UPDATE school.availability SET status = 'rejected', decision_reason = 'Remplacée' WHERE id = $1", [own.id]);
+  await sql("UPDATE school.availability SET status = 'approved' WHERE id = $1", [late]);
+  assert.equal((await first('SELECT valid_from::text AS since FROM school.availability WHERE id = $1', [late])).since, today);
+  await sql("UPDATE school.setting SET value = 'false' WHERE tenant_id = $1 AND key = 'staff.availability.require_approval'", [a]);
+});
+await check('a site\'s grant keeps the availability of its site\'s teachers; a teacher reads their own and its journal (FR-IAM-04)', async () => {
+  const elsewhere = await newStaff('Siege', 'Hind');
+  const office = await scopedAccount('internal', 'site', [staffSiteB], ['staff.profile.read', 'staff.profile.create', 'staff.availability.manage']);
+  await as('school_runtime', a, office.user);
+  const theirs = await newStaff('Annexe', 'Walid');
+  const week = (await first(DECLARE, [a, theirs.id, null, '[]', null, null, null])).id;
+  await rejects(DECLARE, [a, elsewhere.id, null, '[]', null, null, null], '42501');
+  await rejects(DAY_OFF, [a, elsewhere.id, tomorrow, tomorrow, 'Ailleurs'], '42501');
+  assert.deepEqual((await sql('SELECT id FROM school.availability')).rows.map(r => r.id), [week]);
+  assert.equal((await first(AVAILABLE, [elsewhere.id, sunday, '08:00', '09:00'])).ok, true, 'what the reader cannot see');
+  const self = await scopedAccount('internal', 'personal', null, ['staff.profile.read', 'audit.log.read']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [theirs.id, self.user]);
+  await as('school_runtime', a, self.user);
+  assert.deepEqual((await sql('SELECT id FROM school.availability')).rows.map(r => r.id), [week]);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'availability' AND object_id = $1", [week]), 1);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type IN ('availability', 'unavailability') AND object_id <> $1", [week]), 0);
+  await rejects(DECLARE, [a, theirs.id, tomorrow, '[]', null, null, null], '42501');
+  await as('school_runtime', a, 1);
+});
 // The last-site concurrency test below expects the school's two sites of before.
 await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);
@@ -2739,6 +2875,27 @@ if (PgClient) {
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'qualification_overlap');
     assert.equal(await count('SELECT count(*) n FROM school.qualification WHERE staff_id = $1', [teacher.id]), 1);
+  });
+  await check('two declarations of the same day, or two overlapping days off, made at once are recorded once (FR-STF-03)', async () => {
+    await as('school_runtime', a, 1);
+    const teacher = await newStaff('Course', 'Disponibilite');
+    for (const [statement, values, rule] of [[DECLARE, [a, teacher.id, tomorrow, '[]', null, null, null], 'availability_same_day'],
+      [DAY_OFF, [a, teacher.id, tomorrow, tomorrow, 'Absence annoncée'], 'unavailability_overlap']]) {
+      const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+      const results = await Promise.allSettled(clients.map(async c => {
+        await c.query('BEGIN');
+        try {
+          await c.query(statement, values);
+          await c.query('SELECT pg_sleep(0.15)');
+          await c.query('COMMIT');
+        } catch (e) { await c.query('ROLLBACK'); throw e; }
+      }));
+      await Promise.all(clients.map(c => c.end()));
+      assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+      assert.equal(results.find(r => r.status === 'rejected').reason.message, rule);
+    }
+    assert.equal(await count('SELECT count(*) n FROM school.availability WHERE staff_id = $1', [teacher.id]), 1);
+    assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE staff_id = $1', [teacher.id]), 1);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);
