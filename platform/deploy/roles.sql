@@ -217,6 +217,8 @@ GRANT INSERT (tenant_id, kind, code, labels, sort_order) ON school.lead_option T
 GRANT UPDATE (labels, sort_order, version, archived_at) ON school.lead_option TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.lead_status_reserved(text), school.lead_status_closed(text), school.lead_assignees(uuid),
   school.lead_assignee_valid(bigint, uuid), school.lead_in_scope(text, uuid), platform.notify_due_reminders(integer) TO school_runtime;
+-- Access to courses (039): computed when asked, from the enrolment's state, its payments and the school's setting.
+GRANT EXECUTE ON FUNCTION school.enrollment_paid(uuid, text), school.access_open(text, uuid), school.access_granted(uuid) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.

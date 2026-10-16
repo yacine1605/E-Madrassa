@@ -80,6 +80,8 @@ final class Settings extends SchoolPage implements HasTable
             'day_set' => CheckboxList::make('value')->label($label)->options(__('admin.days'))->required()->columns(4),
             'language_set' => CheckboxList::make('value')->label($label)->required()
                 ->options(array_intersect_key(Locales::NAMES, array_flip(Locales::AVAILABLE))),
+            'code' => Select::make('value')->label($label)->required()
+                ->options(collect($record['allowed_values'])->mapWithKeys(fn (string $code) => [$code => self::code($record, $code)])->all()),
             'code_set' => CheckboxList::make('value')->label($label)->required()->columns(3)
                 ->options(collect($record['allowed_values'])->mapWithKeys(fn (string $code) => [$code => self::code($record, $code)])->all()),
         };
@@ -91,7 +93,7 @@ final class Settings extends SchoolPage implements HasTable
         return match ($record['value_type']) {
             'integer' => (int) $value,
             'boolean' => (bool) $value,
-            'text' => (string) ($value ?? ''),
+            'text', 'code' => (string) ($value ?? ''),
             'day_set' => array_map('intval', array_values($value ?? [])),
             default => array_values($value ?? []),
         };
@@ -106,6 +108,7 @@ final class Settings extends SchoolPage implements HasTable
             'text' => $value === '' || $value === null ? '—' : (string) $value,
             'day_set' => Formats::list(array_map(fn ($day) => __('admin.days.'.$day), $value)),
             'language_set' => Formats::list(array_map(fn ($locale) => Locales::NAMES[$locale] ?? $locale, $value)),
+            'code' => self::code($record, (string) $value),
             'code_set' => Formats::list(array_map(fn ($code) => self::code($record, $code), $value)),
         };
     }

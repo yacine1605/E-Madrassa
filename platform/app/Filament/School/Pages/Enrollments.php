@@ -19,6 +19,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -59,6 +60,8 @@ final class Enrollments extends SchoolingPage
                     ->url(fn (array $record) => isset($record['main_group']) ? GroupMembers::getUrl(['group' => $record['main_group']['id']]) : null),
                 TextColumn::make('agreed_price')->label(__('schooling.agreed_price'))->formatStateUsing(fn ($state) => $this->money($state)),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('schooling.enrollment_states.'.$state)),
+                // FR-INS-04: whether it opens the pupil's courses, computed when read.
+                IconColumn::make('access_granted')->label(__('schooling.access_granted'))->boolean()->tooltip(__('schooling.access_granted_help')),
                 TextColumn::make('created_at')->label(__('schooling.enrolled_on'))->formatStateUsing(fn ($state) => Formats::date($state)),
             ])->filters([
                 SelectFilter::make('status')->label(__('school.status'))->options(__('schooling.enrollment_states')),

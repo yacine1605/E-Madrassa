@@ -96,12 +96,14 @@ final class StudentSheet extends SchoolingPage
             ]),
             // FR-ELV-01: the sheet shows the pupil's enrolments and groups, as far as the reader may see them.
             Section::make(__('schooling.enrollments'))->visible($enrollments !== null)->schema([RepeatableEntry::make('enrollments')->hiddenLabel()
-                ->columns(['default' => 2, 'sm' => 4])->placeholder(__('schooling.no_enrollment'))->state(array_map(fn (array $enrollment) => [
+                ->columns(['default' => 2, 'sm' => 5])->placeholder(__('schooling.no_enrollment'))->state(array_map(fn (array $enrollment) => [
                     'program' => $enrollment['terms_snapshot']['code'].' · '.Locales::label($enrollment['terms_snapshot']['labels']),
                     'year' => $this->years()[$enrollment['year_id']]['code'] ?? null, 'status' => __('schooling.enrollment_states.'.$enrollment['status']),
-                    'group' => $enrollment['main_group']['code'] ?? null], $enrollments ?? []))
+                    'group' => $enrollment['main_group']['code'] ?? null,
+                    'access' => __($enrollment['access_granted'] ? 'admin.yes' : 'admin.no')], $enrollments ?? []))
                 ->schema([TextEntry::make('program')->label(__('schooling.program')), TextEntry::make('year')->label(__('reference.year')),
-                    TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group'))])]),
+                    TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group')),
+                    TextEntry::make('access')->label(__('schooling.access_granted'))])]),
             // FR-CRM-02 AC2: the prospect the pupil came from, its interactions with the family, for whoever reads prospects.
             Section::make(__('admission.origin'))->description(__('admission.origin_help'))->visible($origin !== null)
                 ->headerActions([Action::make('lead')->label(__('admission.see_lead'))->link()

@@ -26,6 +26,9 @@ return [
             'types' => ['pdf' => 'PDF', 'jpeg' => 'صورة JPEG', 'png' => 'صورة PNG', 'webp' => 'صورة WebP', 'docx' => 'مستند Word',
                 'xlsx' => 'مصنف Excel', 'csv' => 'ملف CSV'],
         ],
+        'enrollment' => [
+            'access' => ['require_payment' => ['none' => 'لا شيء: يكفي التسجيل المصادق عليه', 'first_installment' => 'القسط الأول', 'full' => 'كامل المبلغ']],
+        ],
     ],
 
     // FR-REF-04.

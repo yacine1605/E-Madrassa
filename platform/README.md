@@ -912,9 +912,24 @@ Routes: `GET /api/leads` (`q` on the contact's or a child's name, phone or e-mai
 
 Validation on 16 October 2026: **254 PHP integration tests (10,120 assertions), 227 embedded SQL checks and 247 native PostgreSQL 16 checks including concurrency** (two conversions of a child at once); migration 038 rolled back alone with 6 prospects, 2 of their children converted, their interactions, reminders, a reminder's notification, 2,531 list entries and their journal in place, among 255 schools of which 6 not in use (the 601 pupils kept, `enable_module` as 037 wrote it, the direction's and head of studies' `crm.lead.read` taken back), applied again, then rolled back with all the others and applied again. Local browser acceptance in Chromium: 188 screens without a problem, Prospects, a prospect's sheet and Sources and steps of prospects included.
 
+## Increment 52 (lot 2): access to courses and payment
+
+`039_access_policy.sql`:
+
+- **FR-INS-04**: whether an enrolment opens its pupil's courses (`access_granted`, for lot 5's courses and the parents' portal), **computed when asked, never stored**: validated, and paid as far as the school asks. The school's setting **Payment required for access to courses** (`enrollment.access.require_payment`: `none`, `first_installment`, `full`; `none` by default, each school's to decide, OD-05) is a new kind of setting, one code of a list (`code`), checked by the database (`setting_invalid`). A pending, suspended (FR-INS-03) or cancelled enrolment opens nothing; one out of the reader's reach neither.
+- What the payments cover is `school.enrollment_paid(enrollment, level)`: lot 3's finance records payments and schedules and replaces it. Until then no payment is validated, so with a payment required only an enrolment that owes nothing (a free programme, a full discount) opens its courses (AC1).
+
+The enrolments' replies (`GET /api/enrollments`, `GET /api/enrollments/{enrollment}`, and those of their changes) carry `access_granted`; `school.access_granted(enrollment)` gives it to the database's own callers. On screen, **Enrolments** and the pupil's sheet show it; **Settings** offers the policy's three choices.
+
+| Requirement | Evidence |
+|---|---|
+| FR-INS-04 AC1, OD-05 | `tests/sql/database.mjs`: a pending enrolment closed, a validated one open by default; with the first instalment or all of it required, a validated enrolment without a validated payment closed, a free programme's open; a code outside the list, or a list, refused; a suspended enrolment closed; an enrolment out of the reader's reach closed. `AccessPolicyTest`: the same through the API (the setting read and changed, each reply's `access_granted`, the suspension) and the Settings page's choices |
+
+Validation on 16 October 2026: **256 PHP integration tests (10,185 assertions)**, **228 embedded SQL checks and 248 native PostgreSQL 16 checks including concurrency**; migration 039 rolled back alone with 2 schools' values of the setting and 538 enrolments in place (the settings' guard as 011 wrote it), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a column on Enrolments and on the pupil's sheet, a row in Settings.
+
 ## Next increments of lot 2
 
-1. Payment-based access (FR-INS-04) and annual progression (FR-INS-05); notifications of a group's composition. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
+1. Annual progression (FR-INS-05); notifications of a group's composition. Payments themselves, which `access_granted` will read, come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The prospects' import (section 3.3, « élèves, CRM ») and their retention (NFR-DATA-03: a lost prospect's data are kept until then); the dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

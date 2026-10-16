@@ -13,10 +13,11 @@ final class EnrollmentController
 {
     use HandlesLabels;
 
-    // With the pupil as the reader may see them (null otherwise) and the current main group.
+    // With whether it opens the pupil's courses (FR-INS-04), the pupil as the reader may see them (null otherwise) and the current main group.
     private const COLUMNS = "id, student_id, program_id, year_id, status, status_reason, agreed_price, discount_total,
         price_version, terms_snapshot || jsonb_build_object('base_price', agreed_price::text) AS terms_snapshot,
         validated_by, validated_at, transferred_from, version, archived_at, created_at, updated_at,
+        school.access_open(status, id) AS access_granted,
         (SELECT jsonb_build_object('matricule', s.matricule, 'last_name_ar', s.last_name_ar, 'first_name_ar', s.first_name_ar,
            'last_name_lat', s.last_name_lat, 'first_name_lat', s.first_name_lat)
          FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id) AS student,

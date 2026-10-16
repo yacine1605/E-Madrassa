@@ -2638,6 +2638,43 @@ await check('a group\'s main room is on its site, available when named and never
   await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [annex]);
   await rejects(ROOM, [a, annex, 'C-2', '{"fr": "Salle"}', 10, 'CLASSROOM', []], '23514', 'site_archived');
 });
+// Access to courses (SQL 039, FR-INS-04): computed when asked from the enrolment's state, its payments and the school's setting.
+await check('a validated enrolment opens its courses; with a payment required, one without a validated payment does not (FR-INS-04 AC1)', async () => {
+  const p = await programme('ACCES');
+  const free = await programme('ACCES-LIBRE', 0);
+  const g = await group('ACCES-1', p, 5);
+  const gFree = await group('ACCES-2', free, 5);
+  const e = await enroll((await newAdult('Acces', 'Nadia')).id, p);
+  const eFree = await enroll((await newAdult('Acces', 'Sofiane')).id, free);
+  const access = async id => (await first('SELECT school.access_granted($1) AS ok', [id])).ok;
+  const policy = async value => {
+    await as(null);
+    await sql(`INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'enrollment.access.require_payment', $2::jsonb)
+      ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value`, [a, JSON.stringify(value)]);
+    await as('school_runtime', a, 1);
+  };
+  assert.equal(await access(e), false, 'pending');
+  await joinGroup(e, g);
+  await joinGroup(eFree, gFree);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = ANY ($1)", [[e, eFree]]);
+  // By default (`none`), validated is enough.
+  assert.deepEqual([await access(e), await access(eFree)], [true, true]);
+  // AC1: the first instalment asked for, and none paid (lot 3 records payments); a free programme owes nothing.
+  await policy('first_installment');
+  assert.deepEqual([await access(e), await access(eFree)], [false, true]);
+  await policy('full');
+  assert.deepEqual([await access(e), await access(eFree)], [false, true]);
+  await as(null);
+  await rejects("UPDATE school.setting SET value = '\"half\"' WHERE tenant_id = $1 AND key = 'enrollment.access.require_payment'", [a], '23514', 'setting_invalid');
+  await rejects("UPDATE school.setting SET value = '[\"none\"]' WHERE tenant_id = $1 AND key = 'enrollment.access.require_payment'", [a], '23514', 'setting_invalid');
+  await policy('none');
+  // Suspended, nothing; an enrolment the reader does not see, nothing either.
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Impayé' WHERE id = $1", [eFree]);
+  assert.equal(await access(eFree), false);
+  await as('school_runtime', a, 4);
+  assert.equal(await access(e), false, 'out of the reader\'s reach');
+  await as('school_runtime', a, 1);
+});
 // Admissions (SQL 038, FR-CRM-01, FR-CRM-02): prospects on a site, their children, interactions and reminders; the conversion, once.
 const PROSPECT = 'INSERT INTO school.lead (tenant_id, site_id, last_name, first_name, phone, source, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status';
 const prospect = async (site = siteA, last = 'Prospect', source = 'word_of_mouth', assigned = null) =>

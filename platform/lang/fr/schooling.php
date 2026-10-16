@@ -109,6 +109,8 @@ return [
     'active_programs_only' => 'Seuls les programmes actifs sont proposés.',
     'enrol_group_help' => 'Facultatif : la classe ou la session du programme, à laquelle l’élève est affecté en même temps.',
     'main_group' => 'Classe principale',
+    'access_granted' => 'Accès aux cours',
+    'access_granted_help' => 'Inscription validée, et payée autant que l’établissement l’exige (paramètre « Paiement exigé pour l’accès aux cours »).',
     'agreed_price' => 'Tarif convenu',
     'enrolled_on' => 'Inscrit le',
     'enrollment_states' => ['pending' => 'en attente', 'validated' => 'validée', 'suspended' => 'suspendue', 'cancelled' => 'annulée'],

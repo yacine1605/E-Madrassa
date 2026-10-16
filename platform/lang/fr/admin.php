@@ -26,6 +26,9 @@ return [
             'types' => ['pdf' => 'PDF', 'jpeg' => 'Image JPEG', 'png' => 'Image PNG', 'webp' => 'Image WebP', 'docx' => 'Document Word',
                 'xlsx' => 'Classeur Excel', 'csv' => 'Fichier CSV'],
         ],
+        'enrollment' => [
+            'access' => ['require_payment' => ['none' => 'Aucun : l’inscription validée suffit', 'first_installment' => 'La première échéance', 'full' => 'La totalité']],
+        ],
     ],
 
     // FR-REF-04.
