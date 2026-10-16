@@ -72,7 +72,21 @@ final class Programs extends SchoolingPage
                     ->fillForm(fn (array $record) => $record)->schema([...$this->fields(true), Hidden::make('version')->required()])
                     ->action(fn (array $record, array $data) => SchoolScreen::changeFor('program.program.manage', 'program', $record['id'],
                         fn () => SchoolScreen::call('program.program.manage', ProgramController::class, 'update', $this->sent($data), ['program' => $record['id']]))),
+                // FR-PRG-02: a draft in a later year, with its subjects and volumes.
+                Action::make('copy')->label(__('schooling.copy_program'))->modalDescription(__('schooling.copy_program_help'))
+                    ->visible(fn (array $record) => $this->writable('program.program.manage') && $this->laterYears($record['year_id']) !== [])
+                    ->schema(fn (array $record) => [Select::make('year_id')->label(__('schooling.copy_year'))->required()->options($this->laterYears($record['year_id']))])
+                    ->action(fn (array $record, array $data) => SchoolScreen::change('program.program.manage',
+                        fn () => SchoolScreen::call('program.program.manage', ProgramController::class, 'copy', $data, ['program' => $record['id']]))),
             ]);
+    }
+
+    /** @return array<string, string> the years still open that begin after this one */
+    private function laterYears(string $year): array
+    {
+        $start = $this->years()[$year]['start_date'] ?? null;
+        return collect($this->years())->filter(fn (array $other) => $start !== null && $other['start_date'] > $start && $other['status'] !== 'closed')
+            ->pluck('code', 'id')->all();
     }
 
     private function fields(bool $existing = false): array

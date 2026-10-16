@@ -15,7 +15,7 @@ final class ProgramController
     use HandlesLabels;
 
     private const COLUMNS = 'id, year_id, node_id, code, labels, description, duration_value, duration_unit,
-        base_price, payment_terms, price_version, status, version, archived_at, created_at, updated_at';
+        base_price, payment_terms, price_version, status, copied_from, version, archived_at, created_at, updated_at';
 
     public function __construct(private CurrentSchool $school, private AcademicRecords $records) {}
 
@@ -51,6 +51,20 @@ final class ProgramController
         $this->duration(array_replace((array) $row, $data));
         DB::table('school.program')->where('tenant_id', $this->school->id())->where('id', $row->id)->update($this->encoded($data));
         return $this->show($row->id);
+    }
+
+    /**
+     * FR-PRG-02: a copy in a later year, a draft with the subjects and volumes in force at the source
+     * year's end (SQL 044); the same copy asked again answers the first one.
+     */
+    public function copy(Request $request, string $program)
+    {
+        $row = $this->find($program);
+        $this->records->global('program.program.manage');
+        $data = $request->validate(['year_id' => 'required|uuid']);
+        $this->records->find('academic_year', $data['year_id']);
+        $id = DB::selectOne('SELECT school.copy_program(?, ?) AS id', [$row->id, $data['year_id']])->id;
+        return response()->json($this->show($id), 201);
     }
 
     public function prices(Request $request, string $program)

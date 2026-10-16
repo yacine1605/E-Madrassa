@@ -216,6 +216,7 @@ Route::prefix('api')->group(function () {
                 });
                 Route::post('programs', [ProgramController::class, 'store'])->middleware('permission:program.program.manage');
                 Route::put('programs/{program}', [ProgramController::class, 'update'])->middleware('permission:program.program.manage');
+                Route::post('programs/{program}/copy', [ProgramController::class, 'copy'])->middleware('permission:program.program.manage');
                 // FR-PRG-02: a programme's subjects and their volumes.
                 Route::middleware('permission:program.subject.manage')->group(function () {
                     Route::post('programs/{program}/subjects', [ProgramSubjectController::class, 'store']);

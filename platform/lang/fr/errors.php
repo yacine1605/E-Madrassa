@@ -113,6 +113,8 @@ return [
     'progression_level_same' => 'Un passage change de niveau : choisissez une classe du niveau suivant.',
     'progression_target_enrolled' => 'Cet élève est déjà inscrit dans le programme de la classe cible.',
     'lead_anonymised' => 'Ce prospect est anonymisé : il ne change plus.',
+    'program_copy_year' => 'La copie d’un programme va dans une année qui commence après la sienne.',
+    'program_code_taken' => 'Un autre programme de cette année a déjà ce code.',
     'photo_invalid' => 'Choisissez une photo au format JPEG, PNG ou WebP.',
     'photo_too_large' => 'La photo dépasse 2 Mo. Choisissez une image plus légère.',
     'photo_dimensions' => 'Cette image a trop de pixels (16 millions au plus). Réduisez-la avant de l’envoyer.',

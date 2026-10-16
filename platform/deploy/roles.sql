@@ -156,6 +156,9 @@ GRANT EXECUTE ON FUNCTION platform.apply_lead_retention(integer) TO school_runti
 -- The prospects' import (043): a prospect keeps the reference of its file; one an import created is undone by its function.
 GRANT INSERT (external_ref) ON school.lead TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.discard_lead(uuid) TO school_runtime;
+-- A programme copied to a later year (044), with the caller's rights; the copy keeps its source.
+GRANT INSERT (copied_from) ON school.program TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.copy_program(uuid, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;

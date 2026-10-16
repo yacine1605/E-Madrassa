@@ -45,6 +45,7 @@ final class DatabaseErrors
         'interaction_future', 'interaction_body_required', 'reminder_past',
         'progression_decided', 'progression_not_validated', 'progression_target_required', 'progression_target_invalid', 'progression_same_year',
         'progression_level_changed', 'progression_level_same', 'progression_target_enrolled', 'lead_anonymised',
+        'program_copy_year', 'program_code_taken',
     ];
 
     public static function message(string $rule): string

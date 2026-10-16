@@ -2764,6 +2764,30 @@ await check('a pupil joining or leaving a group notifies its lead teacher, by th
   await sql(JOIN_GROUP, [a, enrolment, led]);
   assert.equal((await notes()).length, 2);
 });
+// A programme copied to a later year (SQL 044, FR-PRG-02): a draft with its subjects and volumes in force at the source year's end.
+await check('a programme copied to a later year is a draft with its subjects and volumes, once; never to an earlier year (FR-PRG-02)', async () => {
+  await as(null);
+  const next = (await first("INSERT INTO school.academic_year (tenant_id, code, start_date, end_date, status) VALUES ($1, 'COPIE-N1', '2030-09-01', '2031-06-30', 'planned') RETURNING id", [a])).id;
+  const subjects = (await sql('SELECT id FROM school.subject WHERE tenant_id = $1 AND archived_at IS NULL ORDER BY code LIMIT 2', [a])).rows.map(r => r.id);
+  await as('school_runtime', a, 1);
+  const source = await programme('COPIE-A', 150000, 'active');
+  const LINE = 'INSERT INTO school.program_subject (tenant_id, program_id, subject_id, total_hours, session_count, session_duration_minutes) VALUES ($1, $2, $3, $4, $5, 60) RETURNING id';
+  await sql(LINE, [a, source, subjects[0], 40, 20]);
+  await sql(LINE, [a, source, subjects[1], 30, 15]);
+  const copy = (await first('SELECT school.copy_program($1, $2) AS id', [source, next])).id;
+  assert.deepEqual(await first('SELECT code, status, base_price::text AS price, copied_from, year_id FROM school.program WHERE id = $1', [copy]),
+    { code: 'COPIE-A', status: 'draft', price: '150000.00', copied_from: source, year_id: next });
+  assert.deepEqual((await sql('SELECT total_hours::text AS h, session_count AS n, valid_from::text AS f FROM school.program_subject WHERE program_id = $1 ORDER BY total_hours', [copy])).rows,
+    [{ h: '30.00', n: 15, f: '2030-09-01' }, { h: '40.00', n: 20, f: '2030-09-01' }]);
+  // Asked again, the same copy; modifiable as any programme of its year; the source as it was.
+  assert.equal((await first('SELECT school.copy_program($1, $2) AS id', [source, next])).id, copy);
+  await sql("UPDATE school.program_subject SET total_hours = 36 WHERE program_id = $1 AND total_hours = 40", [copy]);
+  assert.equal(await count('SELECT count(*) n FROM school.program_subject WHERE program_id = $1 AND total_hours = 40', [source]), 1);
+  await rejects('SELECT school.copy_program($1, $2)', [copy, lotYear], '23514', 'program_copy_year');
+  const taken = await programme('COPIE-B');
+  await sql(PROGRAM, [a, next, grade, 'COPIE-B', '{"fr": "Déjà là"}', 1000, 'draft']);
+  await rejects('SELECT school.copy_program($1, $2)', [taken, next], '23514', 'program_code_taken');
+});
 // Admissions (SQL 038, FR-CRM-01, FR-CRM-02): prospects on a site, their children, interactions and reminders; the conversion, once.
 const PROSPECT = 'INSERT INTO school.lead (tenant_id, site_id, last_name, first_name, phone, source, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status';
 const prospect = async (site = siteA, last = 'Prospect', source = 'word_of_mouth', assigned = null) =>

@@ -378,7 +378,7 @@ Every screen is now checked in Chromium, Firefox and WebKit, Safari's engine (fi
 
 The smoke and acceptance tests also run from Git Bash on Windows, in a folder whose name holds `&`: their files stay in the project's folder, and Playwright is called without `npx`.
 
-The screens' font, Inter, has no Arabic letters: Arabic is shown in the system's font, which differs between browsers (a serif in WebKit on Windows). Whether to ship an Arabic font is for the review of the Arabic labels.
+The screens' font, Inter, has no Arabic letters: Arabic is shown in the system's font, which differs between browsers (a serif in WebKit on Windows). Decided on 16 October 2026: no Arabic font is shipped; Arabic keeps the system's font.
 
 ## Increment 25 (lot 2): credentials apart
 
@@ -993,9 +993,23 @@ No new route: `GET /api/imports/templates/leads` and `POST /api/imports` (`kind`
 
 Validation on 16 October 2026: **261 PHP integration tests (10,428 assertions), 232 embedded SQL checks and 253 native PostgreSQL 16 checks including concurrency**; migration 043 rolled back alone with 9 prospects, 2 of them imported, and 3 imports in place (the prospects kept without their reference, the frozen codes as 001 wrote them), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a kind more on Imports.
 
+## Increment 57 (lot 2): a programme copied to a later year
+
+`044_program_copy.sql`:
+
+- **FR-PRG-02** (its edge case « copie d'un programme vers l'année suivante »), **FR-PRG-01**: a programme is **copied** into a later year still open (`program_copy_year` otherwise): the same level, code, names, description, duration, price and payment terms, as a **draft** to review, with each subject's line in force at the source year's end (its volumes, session length and coefficient) from the target year's first day; all of it modifiable afterwards, the source as it was. The copy keeps the programme it came from (`copied_from`); the same copy asked again answers the first one; a code already taken in the target year is refused (`program_code_taken`). With the caller's rights: `program.program.manage` for the programme, `program.subject.manage` for its subjects.
+
+Route: `POST /api/programs/{program}/copy` (`year_id`); a programme's reply has `copied_from`. On screen, **Programmes** copies a programme to one of the later years.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PRG-02, FR-PRG-01 | `tests/sql/database.mjs`: a copy a draft at the same price, in the target year, with its two subjects and their volumes from the year's first day; asked again, the same copy; a copy's volume changed, the source's kept; an earlier year and a code taken refused. `ProgramCopyTest`: the same through the API and from the Programmes screen |
+
+Validation on 16 October 2026: **262 PHP integration tests (10,478 assertions), 233 embedded SQL checks and 254 native PostgreSQL 16 checks including concurrency**; migration 044 rolled back alone with 82 programmes, 2 of them copies, in place (the copies kept as programmes of their year), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, an action on Programmes.
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The dashboard's conversion rate comes with lot 5's dashboards.
 
-Lot 1's last exit item: the Arabic labels were confirmed by a native speaker on 16 October 2026; the choice of an Arabic font stays open.
+Lot 1's last exit item is closed: the Arabic labels were confirmed by a native speaker on 16 October 2026, and Arabic keeps the system's font (decision of the same day).
