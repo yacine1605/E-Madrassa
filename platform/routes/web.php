@@ -13,6 +13,8 @@ use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\GroupMembershipController;
+use App\Http\Controllers\LeadController;
+use App\Http\Controllers\LeadOptionController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
@@ -275,6 +277,34 @@ Route::prefix('api')->group(function () {
                     Route::put('students/{student}/guardians/{link}', [GuardianController::class, 'updateLink']);
                     Route::post('students/{student}/guardians/{link}/archive', [GuardianController::class, 'unlink']);
                 });
+                // FR-CRM-01, FR-CRM-02: prospects, their children, interactions and reminders; the conversion; the lists of sources and statuses.
+                Route::middleware('permission:crm.lead.read')->group(function () {
+                    Route::get('leads', [LeadController::class, 'index']);
+                    Route::get('leads/{lead}', [LeadController::class, 'show']);
+                    Route::post('leads/duplicates', [LeadController::class, 'duplicates']);
+                    Route::get('leads/{lead}/interactions', [LeadController::class, 'interactions']);
+                    Route::get('leads/{lead}/reminders', [LeadController::class, 'reminders']);
+                    Route::get('lead-assignees', [LeadController::class, 'assignees']);
+                    Route::get('lead-options', [LeadOptionController::class, 'index']);
+                    Route::get('students/{student}/lead', [LeadController::class, 'forStudent']);
+                });
+                Route::post('leads', [LeadController::class, 'store'])->middleware('permission:crm.lead.create');
+                Route::middleware('permission:crm.lead.update')->group(function () {
+                    Route::put('leads/{lead}', [LeadController::class, 'update']);
+                    Route::post('leads/{lead}/status', [LeadController::class, 'status']);
+                    Route::post('leads/{lead}/children', [LeadController::class, 'addChild']);
+                    Route::put('lead-children/{child}', [LeadController::class, 'updateChild']);
+                    Route::post('lead-children/{child}/archive', [LeadController::class, 'archiveChild']);
+                    Route::post('leads/{lead}/interactions', [LeadController::class, 'addInteraction']);
+                    Route::post('leads/{lead}/reminders', [LeadController::class, 'addReminder']);
+                    Route::post('lead-reminders/{reminder}/done', [LeadController::class, 'completeReminder']);
+                    Route::post('lead-reminders/{reminder}/cancel', [LeadController::class, 'cancelReminder']);
+                    Route::post('lead-options', [LeadOptionController::class, 'store']);
+                    Route::post('lead-options/defaults', [LeadOptionController::class, 'defaults']);
+                    Route::put('lead-options/{option}', [LeadOptionController::class, 'update']);
+                    Route::post('lead-options/{option}/archive', [LeadOptionController::class, 'archive']);
+                });
+                Route::post('lead-children/{child}/convert', [LeadController::class, 'convert'])->middleware('permission:crm.lead.convert');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

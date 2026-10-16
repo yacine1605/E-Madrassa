@@ -190,6 +190,14 @@ Artisan::command('platform:outbox {--limit=50}', function (Outbox $outbox) {
 
 Schedule::command('platform:outbox')->everyMinute()->withoutOverlapping();
 
+// FR-CRM-01 AC1: the prospects' reminders that are due notify their assignee, once.
+Artisan::command('platform:lead-reminders {--limit=500}', function () {
+    $sent = DB::selectOne('SELECT platform.notify_due_reminders(?) AS n', [(int) $this->option('limit')])->n;
+    $this->info("Reminders notified: $sent.");
+})->purpose('Notify the assignees of the reminders of prospects that are due (as school_runtime)');
+
+Schedule::command('platform:lead-reminders')->everyMinute()->withoutOverlapping();
+
 // FR-IMP-02: temporary files (exports) leave storage once expired.
 Artisan::command('platform:purge-files {--limit=500}', function () {
     $purged = 0;

@@ -27,12 +27,22 @@ final class PupilRecords
         ];
     }
 
-    public function name(array $data): void
+    public function name(array $data, string $prefix = ''): void
     {
         if (!(($data['last_name_ar'] ?? null) && ($data['first_name_ar'] ?? null))
             && !(($data['last_name_lat'] ?? null) && ($data['first_name_lat'] ?? null))) {
-            throw ValidationException::withMessages(['last_name_lat' => __('errors.person_name_required')]);
+            throw ValidationException::withMessages([$prefix.'last_name_lat' => __('errors.person_name_required')]);
         }
+    }
+
+    /** The fields of a record, validated; their errors named `$prefix` and the field, a conversion's `student.birth_date` for one. */
+    public function validate(array $input, array $rules, string $prefix = ''): array
+    {
+        $validator = Validator::make($input, $rules);
+        if ($validator->fails()) {
+            throw ValidationException::withMessages(collect($validator->errors()->messages())->mapWithKeys(fn ($messages, $field) => [$prefix.$field => $messages])->all());
+        }
+        return $validator->validated();
     }
 
     /**
@@ -96,9 +106,12 @@ final class PupilRecords
     private function sensitive(string $entity, ?string $id): bool
     {
         $permission = self::sensitivePermission($entity);
-        $access = $this->cached('access:'.$entity, fn () => $entity === 'staff'
-            ? DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.staff_ids(?)) AS ids', [$permission, $permission])
-            : DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]));
+        $access = $this->cached('access:'.$entity, fn () => match ($entity) {
+            'staff' => DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.staff_ids(?)) AS ids', [$permission, $permission]),
+            // A prospect's sensitive fields: for whoever reads the pupils' for the whole school.
+            'lead' => DB::selectOne("SELECT school.can_everywhere(?) AS everywhere, '[]' AS ids", [$permission]),
+            default => DB::selectOne('SELECT school.can_everywhere(?) AS everywhere, to_json(school.core_ids(?, ?)) AS ids', [$permission, $permission, $entity]),
+        });
         return $access->everywhere || ($id !== null && in_array($id, json_decode($access->ids, true), true));
     }
 

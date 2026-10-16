@@ -116,6 +116,11 @@ return [
         'room' => 'قاعة',
         'room_closure' => 'غلق قاعة',
         'room_option' => 'نوع قاعة أو تجهيز',
+        'lead' => 'مترشح',
+        'lead_child' => 'ابن مترشح',
+        'lead_interaction' => 'تواصل مع مترشح',
+        'lead_reminder' => 'تذكير خاص بمترشح',
+        'lead_option' => 'مصدر أو مرحلة المترشحين',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

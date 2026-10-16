@@ -39,10 +39,18 @@ final class GuardianController
 
     public function store(Request $request)
     {
+        $id = $this->admit($request->all());
+        return response()->json($this->show($id), 201);
+    }
+
+    /** A new guardian, as the API records one (FR-ELV-02); also a prospect's contact at its conversion (FR-CRM-02), named `$prefix`. */
+    public function admit(array $input, string $prefix = ''): string
+    {
         $this->records->createPermission('guardian.record.create');
-        $data = $request->validate($this->records->rules() + ['profession' => 'nullable|string|max:120', 'duplicate_reason' => 'nullable|string|min:3|max:500']);
+        $data = $this->records->validate($input, $this->records->rules() + ['profession' => 'nullable|string|max:120',
+            'duplicate_reason' => 'nullable|string|min:3|max:500'], $prefix);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id']);
-        $this->records->name($data);
+        $this->records->name($data, $prefix);
         $this->records->site($data);
         // As for pupils: the warning and the write together, against two secretaries entering the same father.
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 32))', [$this->school->id()]);
@@ -51,8 +59,7 @@ final class GuardianController
         if ($matches) DB::select("SELECT set_config('app.reason', ?, true)", [$data['duplicate_reason']]);
         unset($data['duplicate_reason']);
         $data['custom'] = $this->records->custom('guardian', $data['custom'] ?? []);
-        $id = DB::table('school.guardian')->insertGetId(['tenant_id' => $this->school->id(), ...$data], 'id');
-        return response()->json($this->show($id), 201);
+        return DB::table('school.guardian')->insertGetId(['tenant_id' => $this->school->id(), ...$data], 'id');
     }
 
     public function update(Request $request, string $guardian)

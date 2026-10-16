@@ -5,6 +5,7 @@ namespace App\Filament\School\Pages;
 use App\Filament\School\Pages\Concerns\EnrolsPupils;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\GuardianController;
+use App\Http\Controllers\LeadController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentPhotoController;
 use App\Support\Formats;
@@ -85,6 +86,7 @@ final class StudentSheet extends SchoolingPage
     {
         $rows = $this->identity();
         $enrollments = $this->enrollments();
+        $origin = $this->origin();
         return $schema->components([Section::make(__('schooling.identity'))->columns(['default' => 1, 'sm' => 2])
             ->schema([
                 // FR-ELV-01: the photo's thumbnail, or the initials of a pupil without one.
@@ -100,7 +102,24 @@ final class StudentSheet extends SchoolingPage
                     'group' => $enrollment['main_group']['code'] ?? null], $enrollments ?? []))
                 ->schema([TextEntry::make('program')->label(__('schooling.program')), TextEntry::make('year')->label(__('reference.year')),
                     TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group'))])]),
+            // FR-CRM-02 AC2: the prospect the pupil came from, its interactions with the family, for whoever reads prospects.
+            Section::make(__('admission.origin'))->description(__('admission.origin_help'))->visible($origin !== null)
+                ->headerActions([Action::make('lead')->label(__('admission.see_lead'))->link()
+                    ->url(fn () => $origin ? LeadSheet::getUrl(['lead' => $origin['data']['id']]) : null)])
+                ->schema([RepeatableEntry::make('interactions')->hiddenLabel()->columns(['default' => 1, 'sm' => 4])->placeholder(__('admission.no_interaction'))
+                    ->state(array_map(fn (array $row) => ['occurred_at' => Formats::dateTime($row['occurred_at']), 'kind' => __('admission.interaction_kinds.'.$row['kind']),
+                        'author' => Formats::isolated($row['author']), 'body' => Formats::isolated($row['body'])], $origin['interactions'] ?? []))
+                    ->schema([TextEntry::make('occurred_at')->label(__('admission.occurred_at')), TextEntry::make('kind')->label(__('admission.interaction_kind')),
+                        TextEntry::make('author')->label(__('admission.author')), TextEntry::make('body')->label(__('admission.body'))])]),
         ]);
+    }
+
+    /** @return ?array the prospect the pupil came from and its interactions, or null (none, or a reader without prospects) */
+    private function origin(): ?array
+    {
+        if (!app(Permissions::class)->can('crm.lead.read') || !DB::selectOne('SELECT school.module_enabled(?) AS enabled', ['students_crm'])->enabled) return null;
+        $origin = SchoolScreen::call('crm.lead.read', LeadController::class, 'forStudent', parameters: ['student' => $this->student]);
+        return $origin['data'] === null ? null : $origin;
     }
 
     /** The thumbnail through the pupil's own route (never a public link), named by version so that a new photo shows at once. */

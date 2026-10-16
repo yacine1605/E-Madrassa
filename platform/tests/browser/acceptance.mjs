@@ -23,7 +23,7 @@ const screens = name => ({
 let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
-  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -216,7 +216,16 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id };
+    // A family who called, with their child, a visit and a reminder (FR-CRM-01); a brother converted into a pupil (FR-CRM-02).
+    const lead = await call('leads', { last_name: 'Haddad', first_name: 'Samia', phone: '0661 22 33 44', relationship: 'mother', source: 'social_media',
+      children: [{ first_name: 'Yanis', last_name: 'Haddad', birth_date: '2014-02-10', level_id: grade.id }, { first_name: 'Lina', birth_date: '2016-09-01' }] });
+    await call(`leads/${lead.id}/interactions`, { kind: 'call', body: 'Demande de renseignements sur la classe de recette.' });
+    await call(`leads/${lead.id}/interactions`, { kind: 'visit', body: 'Visite de l’école avec les deux enfants.' });
+    await call(`leads/${lead.id}/reminders`, { due_at: day(3) + 'T09:00:00Z', body: 'Rappeler pour les pièces du dossier' });
+    await call(`lead-children/${lead.children[0].id}/convert`, { idempotency_key: crypto.randomUUID(), program_id: program.id,
+      student: { last_name_lat: 'Haddad', first_name_lat: 'Yanis', birth_date: '2014-02-10' },
+      guardian: { last_name_lat: 'Haddad', first_name_lat: 'Samia', phone: '0661 22 33 44' }, relationship: 'mother' });
+    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id };
   });
   await context.close();
   return records;
@@ -230,7 +239,7 @@ async function run(browser) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
       `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
       `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`,
-      `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`]], ['operator', 'console', consolePages]]) {
+      `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`, `lead-sheet?lead=${records.lead}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

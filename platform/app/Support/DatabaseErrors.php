@@ -40,6 +40,9 @@ final class DatabaseErrors
         'leave_overlap', 'leave_end_before_start', 'leave_ended', 'leave_kept', 'unavailability_from_leave',
         'room_option_unknown', 'room_option_archived', 'room_archived', 'room_in_use', 'room_too_small', 'room_other_site', 'room_unavailable',
         'room_closure_past', 'room_closure_end_before_start', 'room_closure_overlap', 'room_closure_ended', 'site_has_rooms',
+        'lead_option_unknown', 'lead_option_archived', 'lead_status_reserved', 'lead_closed', 'lead_not_converted', 'reopen_reason_required',
+        'lost_reason_required', 'lead_assignee_invalid', 'lead_already_converted', 'lead_conversion_mismatch', 'lead_child_archived',
+        'interaction_future', 'interaction_body_required', 'reminder_past',
     ];
 
     public static function message(string $rule): string

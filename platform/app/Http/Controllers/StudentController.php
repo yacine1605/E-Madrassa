@@ -40,10 +40,21 @@ final class StudentController
 
     public function store(Request $request)
     {
+        $id = $this->admit($request->all());
+        return response()->json($this->show($id), 201);
+    }
+
+    /**
+     * A new pupil from the given fields, as the API records one: the warning of a probable
+     * duplicate, unless a reason is given (FR-ELV-04). Also the conversion of a prospect's child
+     * (FR-CRM-02), whose fields are named `$prefix`.
+     */
+    public function admit(array $input, string $prefix = ''): string
+    {
         $this->records->createPermission('student.record.create');
-        $data = $request->validate($this->rules(true) + ['duplicate_reason' => 'nullable|string|min:3|max:500']);
+        $data = $this->records->validate($input, $this->rules(true) + ['duplicate_reason' => 'nullable|string|min:3|max:500'], $prefix);
         unset($data['tenant_id'], $data['user_id'], $data['photo_file_id'], $data['status'], $data['status_reason']);
-        $this->records->name($data);
+        $this->records->name($data, $prefix);
         $this->records->site($data);
         // Serialize the warning with the write: simultaneous admissions also see the first dossier.
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 31))', [$this->school->id()]);
@@ -52,8 +63,7 @@ final class StudentController
         if ($matches) DB::select("SELECT set_config('app.reason', ?, true)", [$data['duplicate_reason']]);
         unset($data['duplicate_reason']);
         $data['custom'] = $this->records->custom('student', $data['custom'] ?? []);
-        $id = DB::table('school.student')->insertGetId(['tenant_id' => $this->school->id(), ...$data], 'id');
-        return response()->json($this->show($id), 201);
+        return DB::table('school.student')->insertGetId(['tenant_id' => $this->school->id(), ...$data], 'id');
     }
 
     public function update(Request $request, string $student)

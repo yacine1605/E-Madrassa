@@ -199,6 +199,24 @@ GRANT INSERT (tenant_id, kind, code, labels, sort_order) ON school.room_option T
 GRANT UPDATE (labels, sort_order, version, archived_at) ON school.room_option TO school_runtime;
 GRANT INSERT (main_room_id), UPDATE (main_room_id) ON school.study_group TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.room_available(uuid, date) TO school_runtime;
+-- Admissions (038): a prospect, its children, interactions and reminders, on a site; never deleted. An interaction
+-- never changes; a reminder is done or cancelled; a child is converted once, its pupil and enrolment linked for good.
+-- The school's lists of sources and statuses, archived, never deleted. The run notifies the reminders due.
+GRANT SELECT ON school.lead, school.lead_child, school.lead_interaction, school.lead_reminder, school.lead_reminder_notice, school.lead_option,
+  platform.lead_option_default TO school_runtime;
+GRANT INSERT (tenant_id, site_id, last_name, first_name, phone, email, relationship, source, status, assigned_to, custom) ON school.lead TO school_runtime;
+GRANT UPDATE (site_id, last_name, first_name, phone, email, relationship, source, status, lost_reason, assigned_to, custom, version)
+  ON school.lead TO school_runtime;
+GRANT INSERT (tenant_id, lead_id, last_name, first_name, birth_date, level_id) ON school.lead_child TO school_runtime;
+GRANT UPDATE (last_name, first_name, birth_date, level_id, student_id, enrollment_id, conversion_key, version, archived_at)
+  ON school.lead_child TO school_runtime;
+GRANT INSERT (tenant_id, lead_id, kind, occurred_at, body) ON school.lead_interaction TO school_runtime;
+GRANT INSERT (tenant_id, lead_id, due_at, body) ON school.lead_reminder TO school_runtime;
+GRANT UPDATE (status, version) ON school.lead_reminder TO school_runtime;
+GRANT INSERT (tenant_id, kind, code, labels, sort_order) ON school.lead_option TO school_runtime;
+GRANT UPDATE (labels, sort_order, version, archived_at) ON school.lead_option TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.lead_status_reserved(text), school.lead_status_closed(text), school.lead_assignees(uuid),
+  school.lead_assignee_valid(bigint, uuid), school.lead_in_scope(text, uuid), platform.notify_due_reminders(integer) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -330,6 +348,18 @@ GRANT UPDATE (archived_at), DELETE ON school.staff TO platform_provisioner;
 ALTER FUNCTION school.discard_staff(uuid) OWNER TO platform_provisioner;
 -- Rooms (037): a school's lists of room types and equipment, given with the sites and rooms module (enable_module).
 GRANT SELECT, INSERT ON school.room_option TO platform_provisioner;
+-- Admissions (038): the schools' lists of sources and statuses (enable_module); who reads a site's prospects, whatever the
+-- writer may read; a closed prospect's reminders cancelled, whoever closed it; the reminders due notified once by the run.
+GRANT SELECT, INSERT ON school.lead_option TO platform_provisioner;
+GRANT SELECT ON school.lead TO platform_provisioner;
+GRANT SELECT, UPDATE (status) ON school.lead_reminder TO platform_provisioner;
+GRANT SELECT, INSERT ON school.lead_reminder_notice TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.lead_status_reserved(text), school.lead_status_closed(text), school.lead_in_scope(text, uuid) TO platform_provisioner;
+ALTER FUNCTION platform.lead_reader(uuid, bigint, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.lead_assignees(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.lead_assignee_valid(bigint, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.close_lead_reminders() OWNER TO platform_provisioner;
+ALTER FUNCTION platform.notify_due_reminders(integer) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

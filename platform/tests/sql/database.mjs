@@ -2638,6 +2638,125 @@ await check('a group\'s main room is on its site, available when named and never
   await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [annex]);
   await rejects(ROOM, [a, annex, 'C-2', '{"fr": "Salle"}', 10, 'CLASSROOM', []], '23514', 'site_archived');
 });
+// Admissions (SQL 038, FR-CRM-01, FR-CRM-02): prospects on a site, their children, interactions and reminders; the conversion, once.
+const PROSPECT = 'INSERT INTO school.lead (tenant_id, site_id, last_name, first_name, phone, source, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status';
+const prospect = async (site = siteA, last = 'Prospect', source = 'word_of_mouth', assigned = null) =>
+  first(PROSPECT, [a, site, last, 'Famille', '0550 12 34 56', source, assigned]);
+const CHILD = 'INSERT INTO school.lead_child (tenant_id, lead_id, first_name, last_name, level_id) VALUES ($1, $2, $3, $4, $5) RETURNING id';
+const REMINDER = 'INSERT INTO school.lead_reminder (tenant_id, lead_id, due_at, body) VALUES ($1, $2, $3, $4) RETURNING id';
+const reason = text => sql("SELECT set_config('app.reason', $1, false)", [text]);
+// User 1 also receives the families (the front office's permissions, section 3.2; this school's front office lost one above).
+await as(null);
+const admissions = (await first("INSERT INTO school.role (tenant_id, code, kind, labels) VALUES ($1, 'admissions', 'internal', '{\"fr\": \"Admissions\"}') RETURNING id", [a])).id;
+for (const permission of ['crm.lead.read', 'crm.lead.create', 'crm.lead.update', 'crm.lead.convert'])
+  await sql('INSERT INTO school.role_permission (tenant_id, role_id, permission_code) VALUES ($1, $2, $3)', [a, admissions, permission]);
+await sql("INSERT INTO school.role_assignment (tenant_id, user_id, role_id, scope_type) VALUES ($1, 1, $2, 'tenant')", [a, admissions]);
+await as('school_runtime', a, 1);
+await check('a prospect has a source and status of the school\'s lists; lost with a reason, registered by conversion only, reopened with a reason (FR-CRM-01 AC2)', async () => {
+  assert.deepEqual((await sql("SELECT kind, count(*)::int AS n FROM school.lead_option WHERE tenant_id = $1 GROUP BY kind ORDER BY kind", [a])).rows,
+    [{ kind: 'source', n: 4 }, { kind: 'status', n: 6 }]);
+  const family = await prospect();
+  assert.equal(family.status, 'new');
+  await rejects(PROSPECT, [a, siteA, 'Inconnu', 'X', '0550', 'radio', null], '23514', 'lead_option_unknown');
+  await rejects("INSERT INTO school.lead (tenant_id, site_id, last_name, phone, source, status) VALUES ($1, $2, 'Ferme', '0550', 'other', 'registered')",
+    [a, siteA], '23514', 'status_transition_refused');
+  await rejects("INSERT INTO school.lead (tenant_id, site_id, last_name, source) VALUES ($1, $2, 'Sans contact', 'other')", [a, siteA], '23514');
+  // The school's own step, between two of the publisher's; the pipeline's own statuses stay.
+  const callBack = (await first("INSERT INTO school.lead_option (tenant_id, kind, code, labels, sort_order) VALUES ($1, 'status', 'call_back', '{\"fr\": \"À rappeler\"}', 2) RETURNING id", [a])).id;
+  await sql("UPDATE school.lead SET status = 'call_back' WHERE id = $1", [family.id]);
+  await sql('UPDATE school.lead_option SET archived_at = now() WHERE id = $1', [callBack]);
+  await rejects("UPDATE school.lead SET status = 'call_back' WHERE id = $1", [(await prospect()).id], '23514', 'lead_option_unknown');
+  await rejects("UPDATE school.lead_option SET archived_at = now() WHERE tenant_id = $1 AND kind = 'status' AND code = 'lost'", [a], '23514', 'lead_status_reserved');
+  // AC2: closed without its reason, refused.
+  await rejects("UPDATE school.lead SET status = 'lost' WHERE id = $1", [family.id], '23514', 'lost_reason_required');
+  await rejects("UPDATE school.lead SET status = 'lost', lost_reason = '  ' WHERE id = $1", [family.id], '23514', 'lost_reason_required');
+  await sql("UPDATE school.lead SET status = 'lost', lost_reason = 'Trop loin du domicile' WHERE id = $1", [family.id]);
+  assert.ok((await first('SELECT closed_at FROM school.lead WHERE id = $1', [family.id])).closed_at);
+  await rejects("UPDATE school.lead SET phone = '0660' WHERE id = $1", [family.id], '23514', 'lead_closed');
+  await rejects("UPDATE school.lead SET status = 'contacted' WHERE id = $1", [family.id], '23514', 'reopen_reason_required');
+  await reason('La famille a rappelé');
+  await sql("UPDATE school.lead SET status = 'contacted' WHERE id = $1", [family.id]);
+  await reason('');
+  assert.deepEqual(await first('SELECT lost_reason, closed_at FROM school.lead WHERE id = $1', [family.id]), { lost_reason: null, closed_at: null });
+  await rejects("UPDATE school.lead SET status = 'registered' WHERE id = $1", [family.id], '23514', 'lead_not_converted');
+});
+await check('a prospect is assigned to a member who reads its site; its interactions never change; its reminders are for later, cancelled when it closes', async () => {
+  const office = await scopedAccount('internal', 'site', [staffSiteB], ['crm.lead.read', 'crm.lead.create', 'crm.lead.update']);
+  await as('school_runtime', a, 1);
+  await rejects(PROSPECT, [a, siteA, 'Ailleurs', 'X', '0550', 'other', office.user], '23514', 'lead_assignee_invalid');
+  await rejects(PROSPECT, [a, siteA, 'Suspendu', 'X', '0550', 'other', 5], '23514', 'lead_assignee_invalid');
+  const annex = await prospect(staffSiteB, 'Annexe', 'poster', office.user);
+  assert.ok((await sql('SELECT school.lead_assignees($1) AS u', [staffSiteB])).rows.some(r => Number(r.u) === Number(office.user)));
+  assert.ok(!(await sql('SELECT school.lead_assignees($1) AS u', [siteA])).rows.some(r => Number(r.u) === Number(office.user)));
+  const said = (await first("INSERT INTO school.lead_interaction (tenant_id, lead_id, kind, body) VALUES ($1, $2, 'call', 'Premier appel') RETURNING id", [a, annex.id])).id;
+  await rejects("UPDATE school.lead_interaction SET body = 'Autre chose' WHERE id = $1", [said], '42501');
+  await rejects("INSERT INTO school.lead_interaction (tenant_id, lead_id, kind, occurred_at, body) VALUES ($1, $2, 'visit', now() + interval '1 day', 'Demain')",
+    [a, annex.id], '23514', 'interaction_future');
+  await rejects(REMINDER, [a, annex.id, '2020-01-01T10:00:00Z', 'Trop tard'], '23514', 'reminder_past');
+  const later = (await first(REMINDER, [a, annex.id, `${tomorrow}T10:00:00Z`, 'Rappeler pour la visite'])).id;
+  const done = (await first(REMINDER, [a, annex.id, `${tomorrow}T11:00:00Z`, 'Envoyer la brochure'])).id;
+  await sql("UPDATE school.lead_reminder SET status = 'done' WHERE id = $1", [done]);
+  await rejects("UPDATE school.lead_reminder SET status = 'planned' WHERE id = $1", [done], '23514', 'status_transition_refused');
+  await rejects("UPDATE school.lead_reminder SET due_at = due_at + interval '1 hour' WHERE id = $1", [later], '42501');
+  await sql("UPDATE school.lead SET status = 'lost', lost_reason = 'Inscrit ailleurs' WHERE id = $1", [annex.id]);
+  assert.deepEqual((await sql('SELECT status FROM school.lead_reminder WHERE lead_id = $1 ORDER BY due_at', [annex.id])).rows.map(r => r.status), ['cancelled', 'done']);
+  await rejects(REMINDER, [a, annex.id, `${tomorrow}T12:00:00Z`, 'Encore'], '23514', 'lead_closed');
+  // The site's grant: its own prospects, read, recorded and followed; none elsewhere.
+  await as('school_runtime', a, office.user);
+  assert.ok((await sql('SELECT id, site_id FROM school.lead')).rows.every(r => r.site_id === staffSiteB));
+  assert.ok((await first(PROSPECT, [a, staffSiteB, 'Local', 'X', '0770', 'other', null])).id);
+  await rejects(PROSPECT, [a, siteA, 'Siege', 'X', '0770', 'other', null], '42501');
+  await as('school_runtime', a, 1);
+});
+await check('a due reminder notifies its prospect\'s assignee once, never someone who no longer reads it (FR-CRM-01 AC1)', async () => {
+  const follower = await scopedAccount('internal', 'tenant', null, ['crm.lead.read', 'crm.lead.update']);
+  const gone = await scopedAccount('internal', 'tenant', null, ['crm.lead.read']);
+  await as('school_runtime', a, 1);
+  const followed = await prospect(siteA, 'Suivi', 'other', follower.user);
+  const due = (await first(REMINDER, [a, followed.id, new Date().toISOString(), 'Rappeler la famille'])).id;
+  const orphan = await prospect(siteA, 'Orphelin', 'other', gone.user);
+  await sql(REMINDER, [a, orphan.id, new Date().toISOString(), 'Personne pour lire']);
+  await as(null);
+  await sql("UPDATE school.membership SET status = 'suspended' WHERE tenant_id = $1 AND user_id = $2", [a, gone.user]);
+  // The run, as the scheduler starts it: outside any school.
+  await as('school_runtime', null, null);
+  assert.ok(Number((await first('SELECT platform.notify_due_reminders(100) AS n')).n) >= 1);
+  assert.equal(Number((await first('SELECT platform.notify_due_reminders(100) AS n')).n), 0, 'once');
+  await as('school_runtime', a, follower.user);
+  assert.deepEqual((await sql("SELECT event, data FROM school.notification WHERE event = 'crm.reminder_due'")).rows,
+    [{ event: 'crm.reminder_due', data: { lead_id: followed.id, reminder_id: due } }]);
+  await as(null);
+  assert.equal(await count('SELECT count(*) n FROM school.notification WHERE user_id = $1', [gone.user]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.lead_reminder_notice WHERE tenant_id = $1 AND user_id IS NULL', [a]), 1);
+  await as('school_runtime', a, 1);
+});
+await check('a prospect\'s child is converted once into its pupil and enrolment, unless the prospect was lost (FR-CRM-02 AC1)', async () => {
+  const program = await programme('CRM-CONV');
+  const family = await prospect(siteA, 'Conversion');
+  const child = (await first(CHILD, [a, family.id, 'Yasmine', 'Conversion', grade])).id;
+  const sibling = (await first(CHILD, [a, family.id, 'Rayan', 'Conversion', grade])).id;
+  const pupil = (await newAdult('Conversion', 'Yasmine')).id;
+  const other = (await newAdult('Conversion', 'Autre')).id;
+  const enrolment = await enroll(pupil, program);
+  const CONVERT = 'UPDATE school.lead_child SET student_id = $2, enrollment_id = $3, conversion_key = $4 WHERE id = $1';
+  await rejects(CONVERT, [child, other, enrolment, uuid()], '23514', 'lead_conversion_mismatch');
+  await sql(CONVERT, [child, pupil, enrolment, uuid()]);
+  await sql("UPDATE school.lead SET status = 'registered' WHERE id = $1", [family.id]);
+  assert.ok((await first('SELECT converted_at FROM school.lead_child WHERE id = $1', [child])).converted_at);
+  await rejects(CONVERT, [child, other, await enroll(other, program), uuid()], '23514', 'lead_already_converted');
+  await rejects("UPDATE school.lead_child SET first_name = 'Autre' WHERE id = $1", [child], '23514', 'lead_already_converted');
+  // A registered prospect's other child is still converted; a lost one's is not.
+  const second = (await newAdult('Conversion', 'Rayan')).id;
+  await sql(CONVERT, [sibling, second, await enroll(second, program), uuid()]);
+  const lost = await prospect(siteA, 'Perdue');
+  const lostChild = (await first(CHILD, [a, lost.id, 'Lina', null, null])).id;
+  await sql("UPDATE school.lead SET status = 'lost', lost_reason = 'Plus de nouvelles' WHERE id = $1", [lost.id]);
+  const third = (await newAdult('Perdue', 'Lina')).id;
+  await rejects(CONVERT, [lostChild, third, await enroll(third, program), uuid()], '23514', 'lead_closed');
+  await rejects(CHILD, [a, lost.id, 'Nouveau', null, null], '23514', 'lead_closed');
+  // AC3: a prospect is no pupil, in no group's headcount: only its converted children are enrolled.
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE student_id IN (SELECT student_id FROM school.lead_child WHERE lead_id = $1)', [family.id]), 2);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -3169,6 +3288,27 @@ if (PgClient) {
     assert.equal(await count('SELECT count(*) n FROM school.room_closure WHERE room_id = $1', [hall]), 1);
     // Its site free to be archived again (FR-SLL-01).
     await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [hall]);
+  });
+  await check('two conversions of a prospect\'s child at once make one pupil; the other\'s pupil is undone with it (FR-CRM-02 AC1)', async () => {
+    await as('school_runtime', a, 1);
+    const program = await programme('CRM-RACE');
+    const family = await prospect(siteA, 'Course');
+    const child = (await first(CHILD, [a, family.id, 'Double', 'Clic', null])).id;
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        const pupil = (await c.query(STUDENT, [a, 'Clic', 'Double' + i, null, null, '1995-03-14', pupilFields])).rows[0].id;
+        const enrolment = (await c.query(ENROLL, [pupil, program, uuid()])).rows[0].id;
+        await c.query('UPDATE school.lead_child SET student_id = $2, enrollment_id = $3, conversion_key = $4 WHERE id = $1', [child, pupil, enrolment, uuid()]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'lead_already_converted');
+    assert.equal(await count("SELECT count(*) n FROM school.student WHERE last_name_lat = 'Clic'"), 1);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

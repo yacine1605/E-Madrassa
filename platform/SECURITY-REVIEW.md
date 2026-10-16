@@ -61,6 +61,8 @@ Increment 49 imports the staff and their qualifications (schema 036) through the
 
 Increment 50 adds rooms (schema 037) and sixteen routes under the `sites_rooms` module, three of them screens: reading rooms, their closures and the school's lists of room types and equipment (`referential.node.read`, as the sites), and writing them (`room.room.manage`). A room and its closures are written within that permission's scope, the room's site or the whole school, by restrictive policies (`school.site_scope_ids`) and by the controllers before any lock (a row another site's grant may not update is not locked, the answer is `permission_denied`); the lists are the whole school's and changed only with the permission for the whole school. A room's site and code never change; a list's kind and code neither; both are archived, never deleted, and closures cancelled. A room's type and equipment must be entries of the lists still in use when given. The provisioner's `platform.enable_module` (which the console and `create_tenant` call) now also gives a school in use the publisher's lists when it receives the module, through `INSERT` on `school.room_option` (it already bypasses RLS); a school not in use writes nothing and receives the module without them, then takes them back itself with `POST /api/room-options/defaults` (`room.room.manage` for the whole school, reading `platform.room_option_default`); `school.guard_room_option` lets the provisioner through and nobody else without the permission for the whole school. A group's main room (`main_room_id`) is written with the group (`group.group.manage`): `school.check_main_room`, in the writer's rights (rooms are read by every member), keeps it on the group's site, in use, available when named, and never smaller than the group, whichever changes (FR-SLL-02 AC1). A site with rooms in use is not archived (FR-SLL-01). `school.room_available` runs with the caller's rights, for lot 4's sessions (AC2). The journal's `room`, `room_closure` and `room_option` entries belong to the referential's domain.
 
+Increment 51 adds prospects (schema 038) and twenty-six routes under the `students_crm` module, three of them screens: reading prospects, their children, interactions and reminders, the members they may be assigned to and the school's lists of sources and steps (`crm.lead.read`), recording one (`crm.lead.create`), following it (`crm.lead.update`) and converting a child (`crm.lead.convert`). A prospect belongs to a site, as a pupil: restrictive policies read and write it within each permission's scope (`school.site_scope_ids`), and its children, interactions and reminders follow it through the prospect's own visibility; the guards check again, per permission and site (`school.lead_in_scope`), that the update of a contact needs `crm.lead.update` and the registration of a conversion `crm.lead.convert` on the prospect's site, so that a grant of one permission on a site and of another elsewhere does not combine. An interaction has no `UPDATE` privilege; a reminder only changes its state. Whom a prospect is assigned to is checked by `school.lead_assignee_valid` (the provisioner's, over the member's roles of the day: an active member reading the prospect's site), and the members offered by `school.lead_assignees`, for whoever reads prospects, as identifiers the school's people view names. The conversion runs in the request's single transaction: it locks the child first, creates the pupil and the guardian through the same code and rules as their own routes (permissions checked again by their policies), links them, enrols through `school.enroll`, then sets the child's link; `school.guard_lead_child` sets that link once, to the pupil's own enrolment (`lead_conversion_mismatch`), so a second conversion fails and rolls back whatever it created, even at once. A closed prospect's planned reminders are cancelled by `school.close_lead_reminders`, the provisioner's (`UPDATE (status)` on the reminders), because the conversion's writer may not change reminders. The scheduler's `platform.notify_due_reminders` (the provisioner's, called by `school_runtime` outside any school) reads the due reminders of the schools in use only, records each one's notice once in `school.lead_reminder_notice` (no privilege for the application but `SELECT` within its school), and notifies the assignee only while they read the prospect's site; the notification holds the prospect's and reminder's identifiers, never a name or phone (BR-19). `platform.enable_module` gives a school in use the lists of sources and steps as it gives the rooms' (`INSERT` on `school.lead_option`); the pipeline's own steps are never archived. The direction's and head of studies' role templates gain `crm.lead.read` (section 3.3); their roles in the schools in use receive it. The journal's `lead*` entries belong to the pedagogy domain, read with `crm.lead.read`, a scoped reader reading those of the prospects they see; their names, phone, e-mail, birth dates, what was said (`body`) and the school's fields are masked.
+
 ## Access matrix
 
 Every route of the API and every screen, with who may reach it. Generated by `php artisan platform:access-matrix`; `PermissionCoverageTest` fails when this table and the code differ, so a route cannot be added without appearing here.
@@ -108,6 +110,12 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 | GET | `/api/imports` | member of the school | `import.job.create, import.job.read` |  |
 | GET | `/api/jobs/{job}` | member of the school | (own records) |  |
 | GET | `/api/jobs` | member of the school | (own records) |  |
+| GET | `/api/lead-assignees` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/api/lead-options` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/api/leads/{lead}/interactions` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/api/leads/{lead}/reminders` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/api/leads/{lead}` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/api/leads` | member of the school | `crm.lead.read` | students_crm |
 | GET | `/api/me` | member of the school | (own records) |  |
 | GET | `/api/notifications/preferences` | member of the school | (own records) |  |
 | GET | `/api/notifications` | member of the school | (own records) |  |
@@ -139,6 +147,7 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 | GET | `/api/staff/{staff}` | member of the school | `staff.profile.read` | staff |
 | GET | `/api/staff` | member of the school | `staff.profile.read` | staff |
 | GET | `/api/students/{student}/guardians` | member of the school | `guardian.record.read` | students_crm |
+| GET | `/api/students/{student}/lead` | member of the school | `crm.lead.read` | students_crm |
 | GET | `/api/students/{student}/photo` | member of the school | `student.record.read` | students_crm |
 | GET | `/api/students/{student}` | member of the school | `student.record.read` | students_crm |
 | GET | `/api/students` | member of the school | `student.record.read` | students_crm |
@@ -166,6 +175,9 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 | GET | `/school/home` | member of the school | (own records) |  |
 | GET | `/school/imports` | member of the school | `import.job.create, import.job.read` |  |
 | GET | `/school/journal` | member of the school | `audit.log.read` |  |
+| GET | `/school/lead-options` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/school/lead-sheet` | member of the school | `crm.lead.read` | students_crm |
+| GET | `/school/leads` | member of the school | `crm.lead.read` | students_crm |
 | GET | `/school/login` | public |  |  |
 | GET | `/school/notifications` | member of the school | (own records) |  |
 | GET | `/school/periods` | member of the school | `referential.node.read` |  |
@@ -229,6 +241,19 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 | POST | `/api/imports` | member of the school | `import.job.create` |  |
 | POST | `/api/jobs/{job}/cancel` | member of the school | (own records) |  |
 | POST | `/api/jobs/{job}/retry` | member of the school | (own records) |  |
+| POST | `/api/lead-children/{child}/archive` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/lead-children/{child}/convert` | member of the school | `crm.lead.convert` | students_crm |
+| POST | `/api/lead-options/defaults` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/lead-options/{option}/archive` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/lead-options` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/lead-reminders/{reminder}/cancel` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/lead-reminders/{reminder}/done` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/leads/duplicates` | member of the school | `crm.lead.read` | students_crm |
+| POST | `/api/leads/{lead}/children` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/leads/{lead}/interactions` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/leads/{lead}/reminders` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/leads/{lead}/status` | member of the school | `crm.lead.update` | students_crm |
+| POST | `/api/leads` | member of the school | `crm.lead.create` | students_crm |
 | POST | `/api/leaves/{leave}/cancel` | member of the school | `staff.leave.manage` | staff |
 | POST | `/api/notifications/read` | member of the school | (own records) |  |
 | POST | `/api/notifications/{notification}/read` | member of the school | (own records) |  |
@@ -293,6 +318,9 @@ Livewire's update endpoint is not listed: it runs again the middleware of the pa
 | PUT | `/api/custom-fields/{field}` | member of the school | `custom_field.definition.manage` |  |
 | PUT | `/api/groups/{group}` | member of the school | `group.group.manage` | enrollment_groups |
 | PUT | `/api/guardians/{guardian}` | member of the school | `guardian.record.update` | students_crm |
+| PUT | `/api/lead-children/{child}` | member of the school | `crm.lead.update` | students_crm |
+| PUT | `/api/lead-options/{option}` | member of the school | `crm.lead.update` | students_crm |
+| PUT | `/api/leads/{lead}` | member of the school | `crm.lead.update` | students_crm |
 | PUT | `/api/notifications/preferences` | member of the school | (own records) |  |
 | PUT | `/api/periods/{period}` | member of the school | `referential.node.manage` |  |
 | PUT | `/api/program-subjects/{line}` | member of the school | `program.subject.manage` | enrollment_groups |

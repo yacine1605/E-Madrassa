@@ -117,6 +117,11 @@ return [
         'room' => 'Salle',
         'room_closure' => 'Fermeture d’une salle',
         'room_option' => 'Type de salle ou équipement',
+        'lead' => 'Prospect',
+        'lead_child' => 'Enfant d’un prospect',
+        'lead_interaction' => 'Échange avec un prospect',
+        'lead_reminder' => 'Rappel d’un prospect',
+        'lead_option' => 'Source ou étape des prospects',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.
