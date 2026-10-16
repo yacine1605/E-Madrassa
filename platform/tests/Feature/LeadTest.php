@@ -185,6 +185,27 @@ final class LeadTest extends TestCase
         $this->assertSame(1, DB::connection('owner')->table('school.guardian')->where('tenant_id', $school->id)->count());
     }
 
+    /** NFR-DATA-03 (SQL 042): a prospect lost for longer than the school's duration keeps nothing personal. */
+    public function test_a_prospect_lost_long_enough_is_anonymised_by_the_retention_run(): void
+    {
+        [$school] = $this->setting();
+        $lead = $this->postJson('/api/leads', $this->lead())->assertCreated()->json('data');
+        $this->postJson("/api/leads/{$lead['id']}/interactions", ['kind' => 'call', 'body' => 'La mère travaille à Oran'])->assertCreated();
+        $lead = $this->postJson("/api/leads/{$lead['id']}/status", ['status' => 'lost', 'lost_reason' => 'Déménagement', 'version' => $lead['version']])->assertOk()->json('data');
+        $this->getJson('/api/retention')->assertOk()->assertJsonPath('data.due.lead', 0)->assertJsonPath('data.durations.lead_months', 24);
+        $owner = DB::connection('owner');
+        $owner->unprepared('ALTER TABLE school.lead DISABLE TRIGGER USER');
+        $owner->table('school.lead')->where('id', $lead['id'])->update(['closed_at' => now()->subMonths(25)]);
+        $owner->unprepared('ALTER TABLE school.lead ENABLE TRIGGER USER');
+        $this->getJson('/api/retention')->assertOk()->assertJsonPath('data.due.lead', 1);
+        $this->artisan('platform:retention')->assertSuccessful()->expectsOutputToContain('1 lost prospects anonymised');
+        $this->getJson("/api/leads/{$lead['id']}")->assertOk()->assertJsonPath('data.last_name', 'ANONYME')->assertJsonPath('data.phone', null)
+            ->assertJsonPath('data.lost_reason', 'ANONYME')->assertJsonPath('data.children.0.first_name', 'ANONYME')->assertJsonPath('data.children.0.birth_date', null);
+        $this->getJson("/api/leads/{$lead['id']}/interactions")->assertOk()->assertJsonPath('data.0.body', 'ANONYME');
+        $this->postJson("/api/leads/{$lead['id']}/status", ['status' => 'contacted', 'reason' => 'La famille revient', 'version' => $lead['version'] + 1])
+            ->assertConflict()->assertJsonPath('code', 'lead_anonymised');
+    }
+
     public function test_the_pages_record_a_prospect_follow_it_and_name_the_lists(): void
     {
         [$school, $desk, $site] = $this->setting();

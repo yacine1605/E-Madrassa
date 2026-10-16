@@ -962,9 +962,24 @@ No new route. On screen, a composition's notification opens **the group**.
 
 Validation on 16 October 2026: **259 PHP integration tests (10,360 assertions), 230 embedded SQL checks and 251 native PostgreSQL 16 checks including concurrency**; migration 041 rolled back alone with 2 of its notifications and 541 memberships in place (the memberships kept), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, an action on a notification.
 
+## Increment 55 (lot 2): the prospects' retention
+
+`042_lead_retention.sql`:
+
+- **NFR-DATA-03, BR-17**: a **lost** prospect is kept as long as the school says (**Anonymise a lost prospect after (months)**, `retention.lead_months`, 24 by default, a proposal to validate with OD-07), counted from its closure, then **anonymised** by the daily run (`platform:retention`, after the pupils'): the contact's names, phone, e-mail and the school's fields, the reason of its loss, its children's names and birth dates, what was said in its interactions and reminders. What stays: its site, source, step, dates, its children's levels, and the number of its interactions. The run's counts go to the school's journal; an anonymised prospect changes no more (`lead_anonymised`). An open prospect is not touched; a registered one stays with its pupil, whose own policy applies (030).
+- The settings' retention summary counts the lost prospects the next run will anonymise.
+
+No new route.
+
+| Requirement | Evidence |
+|---|---|
+| NFR-DATA-03, BR-17 | `tests/sql/database.mjs`: a prospect lost 25 months ago counted, then anonymised with its child, interaction and reminder, once, outside any school; one lost lately and an open one kept; the run's counts in the journal; the anonymised prospect not reopened. `LeadTest`: the same through the API, `platform:retention` and the retention summary |
+
+Validation on 16 October 2026: **260 PHP integration tests (10,387 assertions), 231 embedded SQL checks and 252 native PostgreSQL 16 checks including concurrency**; migration 042 rolled back alone with 7 prospects, one of them anonymised, in place (the anonymised one kept as it is), applied again, rolled back and applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a row in Settings and in its retention summary.
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
-2. The prospects' import (section 3.3, « élèves, CRM ») and their retention (NFR-DATA-03: a lost prospect's data are kept until then); the dashboard's conversion rate comes with lot 5's dashboards.
+2. The prospects' import (section 3.3, « élèves, CRM »); the dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

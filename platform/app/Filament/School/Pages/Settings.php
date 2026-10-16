@@ -62,7 +62,7 @@ final class Settings extends SchoolPage implements HasTable
         $due = SchoolScreen::call('tenant.settings.manage', RetentionController::class, 'show')['data']['due'];
         return [Section::make(__('admin.retention_next'))->compact()->columns(['default' => 1, 'sm' => 2])->schema(array_map(
             fn (string $category) => TextEntry::make('due_'.$category)->label(__('admin.retention_due.'.$category))->state(Formats::number($due[$category] ?? 0)),
-            ['archive', 'pupil', 'guardian', 'journal']))];
+            ['archive', 'pupil', 'guardian', 'journal', 'lead']))];
     }
 
     /** The form field for the setting's kind of value; the database still checks the value. */

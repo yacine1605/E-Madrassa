@@ -44,7 +44,7 @@ final class DatabaseErrors
         'lost_reason_required', 'lead_assignee_invalid', 'lead_already_converted', 'lead_conversion_mismatch', 'lead_child_archived',
         'interaction_future', 'interaction_body_required', 'reminder_past',
         'progression_decided', 'progression_not_validated', 'progression_target_required', 'progression_target_invalid', 'progression_same_year',
-        'progression_level_changed', 'progression_level_same', 'progression_target_enrolled',
+        'progression_level_changed', 'progression_level_same', 'progression_target_enrolled', 'lead_anonymised',
     ];
 
     public static function message(string $rule): string

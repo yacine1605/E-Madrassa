@@ -219,6 +219,10 @@ Artisan::command('platform:retention {--limit=1000}', function () {
         $this->info("School $run->tenant_id: $run->archived archived, $run->anonymised pupils and $run->guardians guardians anonymised, "
             ."$run->journal journal entries purged, $run->kept kept by a rule.");
     }
+    // The prospects lost long enough (SQL 042).
+    foreach (DB::select('SELECT * FROM platform.apply_lead_retention(?)', [(int) $this->option('limit')]) as $run) {
+        $this->info("School $run->tenant_id: $run->leads lost prospects anonymised.");
+    }
     $this->info("Retention applied: $schools school(s) changed.");
 })->purpose("Archive, anonymise and purge what each school's retention policy says is due (as school_runtime)");
 

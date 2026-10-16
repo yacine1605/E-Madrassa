@@ -89,7 +89,7 @@ return [
     'retention_help' => 'Chaque nuit, les anciens élèves sont archivés, puis leurs dossiers et ceux de leurs responsables anonymisés, et le journal allégé, selon les durées ci-dessous. Les durées par défaut restent à valider (OD-07).',
     'retention_next' => 'À la prochaine exécution',
     'retention_due' => ['archive' => 'Anciens élèves à archiver', 'pupil' => 'Dossiers élèves à anonymiser', 'guardian' => 'Responsables à anonymiser',
-        'journal' => 'Entrées du journal à supprimer'],
+        'journal' => 'Entrées du journal à supprimer', 'lead' => 'Prospects perdus à anonymiser'],
     'actions' => [
         'INSERT' => 'Création',
         'UPDATE' => 'Modification',

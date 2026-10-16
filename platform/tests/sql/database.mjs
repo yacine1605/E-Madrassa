@@ -1940,7 +1940,8 @@ await check('the run archives who left, anonymises a pupil after their category\
   await as('school_runtime', a, 1);
   await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'retention.minor_years', '3')", [a]);
   assert.deepEqual((await sql('SELECT category, due FROM school.retention_due() ORDER BY 1')).rows,
-    [{ category: 'archive', due: 0 }, { category: 'guardian', due: 0 }, { category: 'journal', due: 0 }, { category: 'pupil', due: 0 }]);
+    [{ category: 'archive', due: 0 }, { category: 'guardian', due: 0 }, { category: 'journal', due: 0 }, { category: 'lead', due: 0 },
+     { category: 'pupil', due: 0 }]);
   for (const id of [adult, minor]) await backdate('student', id, { archived_at: new Date(Date.now() - 4 * 365.25 * 864e5).toISOString() });
   await as('school_runtime', a, 1);
   assert.equal((await first("SELECT due FROM school.retention_due() WHERE category = 'pupil'")).due, 1);
@@ -2881,6 +2882,40 @@ await check('a prospect\'s child is converted once into its pupil and enrolment,
   await rejects(CHILD, [a, lost.id, 'Nouveau', null, null], '23514', 'lead_closed');
   // AC3: a prospect is no pupil, in no group's headcount: only its converted children are enrolled.
   assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE student_id IN (SELECT student_id FROM school.lead_child WHERE lead_id = $1)', [family.id]), 2);
+});
+await check('a prospect lost for longer than the school\'s duration is anonymised by the retention run, with its children and what was said (NFR-DATA-03)', async () => {
+  const lost = await prospect(siteA, 'Retention');
+  const child = (await first(CHILD, [a, lost.id, 'Yanis', 'Retention', grade])).id;
+  await sql("INSERT INTO school.lead_interaction (tenant_id, lead_id, kind, body) VALUES ($1, $2, 'call', 'Le père travaille à Oran')", [a, lost.id]);
+  await sql(REMINDER, [a, lost.id, `${tomorrow}T09:00:00Z`, 'Rappeler le père']);
+  await sql("UPDATE school.lead SET status = 'lost', lost_reason = 'Déménagement à Oran' WHERE id = $1", [lost.id]);
+  const recent = await prospect(siteA, 'Recent');
+  await sql("UPDATE school.lead SET status = 'lost', lost_reason = 'Trop cher' WHERE id = $1", [recent.id]);
+  const open = await prospect(siteA, 'Ouvert');
+  await as(null);
+  await sql('ALTER TABLE school.lead DISABLE TRIGGER USER');
+  await sql("UPDATE school.lead SET closed_at = now() - interval '25 months' WHERE id = $1", [lost.id]);
+  await sql('ALTER TABLE school.lead ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  assert.equal((await sql('SELECT due FROM school.retention_due() WHERE category = $1', ['lead'])).rows[0].due, 1);
+  await as('school_runtime', null, null);
+  const runs = (await sql('SELECT tenant_id, leads FROM platform.apply_lead_retention(100)')).rows;
+  assert.deepEqual(runs.find(r => r.tenant_id === a), { tenant_id: a, leads: 1 });
+  assert.equal((await sql('SELECT * FROM platform.apply_lead_retention(100)')).rows.length, 0, 'once');
+  await as(null);
+  assert.deepEqual(await first('SELECT last_name, first_name, phone, email, lost_reason, anonymised_at IS NOT NULL AS done, status, source FROM school.lead WHERE id = $1', [lost.id]),
+    { last_name: 'ANONYME', first_name: null, phone: null, email: null, lost_reason: 'ANONYME', done: true, status: 'lost', source: 'word_of_mouth' });
+  assert.deepEqual(await first('SELECT first_name, last_name, birth_date, level_id FROM school.lead_child WHERE id = $1', [child]),
+    { first_name: 'ANONYME', last_name: null, birth_date: null, level_id: grade });
+  assert.deepEqual((await sql('SELECT body FROM school.lead_interaction WHERE lead_id = $1 UNION ALL SELECT body FROM school.lead_reminder WHERE lead_id = $1', [lost.id])).rows.map(r => r.body),
+    ['ANONYME', 'ANONYME']);
+  // A prospect lost lately, or still open, is kept as it is; the journal keeps the run's counts.
+  assert.equal(await count('SELECT count(*) n FROM school.lead WHERE id = ANY ($1) AND anonymised_at IS NULL', [[recent.id, open.id]]), 2);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND action = 'RETENTION' AND after ? 'leads'", [a]), 1);
+  await as('school_runtime', a, 1);
+  await reason('La famille revient');
+  await rejects("UPDATE school.lead SET status = 'contacted' WHERE id = $1", [lost.id], '23514', 'lead_anonymised');
+  await reason('');
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
