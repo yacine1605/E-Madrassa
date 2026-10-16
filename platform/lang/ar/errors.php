@@ -268,6 +268,9 @@ return [
     'import_group_unknown' => 'فوج غير معروف لهذه السنة: :code.',
     'import_enrollment_exists' => 'التلميذ مسجل مسبقًا في هذا البرنامج ضمن فوج آخر: تُجرى تغييراته من الشاشة.',
     'import_lead_duplicate' => 'هذا الهاتف معروف مسبقًا: :names. استعمل مرجعه، أو اكتب سببًا في العمود duplicate_reason لتسجيل مترشح آخر.',
+    'import_code_differs' => 'لا يتغيّر العمود :column لهذا السجل بالاستيراد.',
+    'import_teacher_unknown' => 'أستاذ غير معروف: :reference. استورد الموظفين أولًا، أو أعطِ رقمه.',
+    'import_room_unknown' => 'قاعة غير معروفة في موقع الفوج: :code.',
 
     // The framework's own refusals.
     'not_found' => 'غير موجود.',

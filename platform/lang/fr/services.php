@@ -45,7 +45,7 @@ return [
     'import_kind' => 'Données',
     'import_kinds' => ['accounts' => 'Comptes', 'referential' => 'Référentiel', 'students' => 'Élèves', 'guardians' => 'Responsables légaux',
         'enrollments' => 'Inscriptions', 'staff' => 'Personnel', 'qualifications' => 'Habilitations des enseignants',
-        'leads' => 'Prospects'],
+        'leads' => 'Prospects', 'programs' => 'Programmes', 'groups' => 'Groupes et classes'],
     'import_validation' => 'Validée à l’import',
     'import_states' => ['previewing' => 'aperçu en cours', 'previewed' => 'à confirmer', 'importing' => 'import en cours', 'imported' => 'importé',
         'failed' => 'en échec', 'rolled_back' => 'annulé', 'cancelled' => 'abandonné'],

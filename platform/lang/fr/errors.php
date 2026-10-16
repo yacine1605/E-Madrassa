@@ -268,6 +268,9 @@ return [
     'import_group_unknown' => 'Groupe inconnu pour cette année : :code.',
     'import_enrollment_exists' => 'Élève déjà inscrit à ce programme, dans un autre groupe : ses changements se font à l’écran.',
     'import_lead_duplicate' => 'Ce téléphone est déjà connu : :names. Reprenez sa référence, ou indiquez un motif dans la colonne duplicate_reason pour enregistrer un autre prospect.',
+    'import_code_differs' => 'La colonne :column de cet enregistrement ne change pas par l’import.',
+    'import_teacher_unknown' => 'Enseignant inconnu : :reference. Importez le personnel d’abord, ou donnez son numéro.',
+    'import_room_unknown' => 'Salle inconnue sur le site du groupe : :code.',
 
     // The framework's own refusals.
     'not_found' => 'Introuvable.',

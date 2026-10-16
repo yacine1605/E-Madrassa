@@ -159,6 +159,8 @@ GRANT EXECUTE ON FUNCTION school.discard_lead(uuid) TO school_runtime;
 -- A programme copied to a later year (044), with the caller's rights; the copy keeps its source.
 GRANT INSERT (copied_from) ON school.program TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.copy_program(uuid, uuid) TO school_runtime;
+-- Programmes and groups from files (045): one an import created is undone by its function.
+GRANT EXECUTE ON FUNCTION school.discard_program(uuid), school.discard_group(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -387,6 +389,11 @@ ALTER FUNCTION platform.apply_lead_retention(integer) OWNER TO platform_provisio
 GRANT UPDATE (external_ref), DELETE ON school.lead TO platform_provisioner;
 GRANT DELETE ON school.lead_child TO platform_provisioner;
 ALTER FUNCTION school.discard_lead(uuid) OWNER TO platform_provisioner;
+-- Programmes and groups from files (045): one an import created, deleted by these functions alone (a programme with its first price).
+GRANT DELETE ON school.program, school.program_price, school.study_group TO platform_provisioner;
+GRANT SELECT ON school.progression TO platform_provisioner;
+ALTER FUNCTION school.discard_program(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.discard_group(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

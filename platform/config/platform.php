@@ -57,6 +57,9 @@ return [
         'qualifications' => App\Imports\QualificationsImporter::class,
         // The prospects (section 3.3: the front office imports « élèves, CRM »).
         'leads' => App\Imports\LeadsImporter::class,
+        // The programmes of a year, then their groups (section 3.3: the head of studies imports « staff, groupes »).
+        'programs' => App\Imports\ProgramsImporter::class,
+        'groups' => App\Imports\GroupsImporter::class,
     ],
 
     // FR-IMP-02: what can be exported, and from how many rows an export runs in the background.

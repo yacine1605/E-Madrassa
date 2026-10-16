@@ -1007,6 +1007,23 @@ Route: `POST /api/programs/{program}/copy` (`year_id`); a programme's reply has 
 
 Validation on 16 October 2026: **262 PHP integration tests (10,478 assertions), 233 embedded SQL checks and 254 native PostgreSQL 16 checks including concurrency**; migration 044 rolled back alone with 82 programmes, 2 of them copies, in place (the copies kept as programmes of their year), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, an action on Programmes.
 
+## Increment 58 (lot 2): programmes and groups from files
+
+`045_program_group_imports.sql`, `app/Imports/ProgramsImporter.php`, `app/Imports/GroupsImporter.php`:
+
+- **FR-IMP-01, FR-PRG-01** (section 3.3: the head of studies imports « staff, groupes »): **Programmes** is a new kind of import, by `program.program.manage` for the whole school. A row is a programme by its `year` and `code` (in any case): its `level` by the referential's code, never changed afterwards; its names (`label_fr`, `label_ar`), `description`, duration (`duration_value`, `duration_unit`), `base_price` (« 120000,50 » or « 120000.50 ») and `status`. Created, or updated column by column: a new price makes a new version (BR-11), the enrolments made keeping theirs; an empty state or price keeps the current one.
+- **FR-IMP-01, FR-GRP-01**: **Groups and classes** is a new kind of import, by `group.group.manage` for the whole school. A row is a group by its `year` and `code`: its `group_type`, `program` and `site` by code (never changed afterwards), names, `capacity`, `valid_from` (the year's first day without one), `valid_to`, `status`, its `lead_teacher` by the staff's file reference or number and its `main_room` by its code on the group's site. The database applies the screen's rules: a class needs its programme, places never below the members, a lead teacher still with the school, a main room seating the group (`room_too_small`).
+- The same file again changes nothing (BR-05). An import is undone while nothing has been built on what it created: a programme without enrolment, group, subject or copy (with its prices, `school.discard_program`), a group nobody was placed in nor a promotion aimed at (`school.discard_group`); an update while its values are still in place.
+
+No new route: the engine's `GET /api/imports/templates/{kind}` and `POST /api/imports` (`kind` `programs` or `groups`).
+
+| Requirement | Evidence |
+|---|---|
+| FR-IMP-01, FR-PRG-01, BR-05, BR-11 | `ProgramGroupImportTest`: programmes by year and code in any case, the level by its code, an unknown one refused with its line; the price as the school writes it; the same file unchanged; a new price a new version, undone to the former one |
+| FR-IMP-01, FR-GRP-01, FR-GRP-01 AC2 | `ProgramGroupImportTest`: a class with its programme, lead teacher by number and main room by code; a support group without programme; a class without programme, a room smaller than the class, an unknown programme refused with their line; the same file unchanged; the programmes not undone while their groups stand, then the groups, then the programmes and their prices |
+
+Validation on 16 October 2026: **263 PHP integration tests (10,548 assertions), 233 embedded SQL checks and 254 native PostgreSQL 16 checks including concurrency**; migration 045 rolled back alone with 82 programmes, 62 groups and 5 of their imports in place (the programmes and groups kept, their prices immutable again), applied again, then rolled back with all the others and applied again. Local browser acceptance in Chromium: 188 screens without a problem, the Programmes' copy and the import kinds included. The CI could not start its jobs (the GitHub account's billing), so the screens in Firefox and WebKit were not run for increments 57 and 58.
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
