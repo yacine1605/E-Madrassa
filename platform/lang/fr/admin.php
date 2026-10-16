@@ -138,6 +138,9 @@ return [
         'payment' => 'Paiement d’une inscription',
         'refund' => 'Remboursement d’une inscription',
         'receipt' => 'Reçu',
+        'finance_period' => 'Clôture d’un mois',
+        'expense_category' => 'Catégorie de dépenses',
+        'expense' => 'Dépense',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

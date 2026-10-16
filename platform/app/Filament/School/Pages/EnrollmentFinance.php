@@ -392,19 +392,6 @@ final class EnrollmentFinance extends SchoolingPage
             ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])->maxSize(10240);
     }
 
-    /** An amount in dinars, two decimals at most, as the school writes it (« 12 500,50 »). */
-    private function amountField(string $name): TextInput
-    {
-        return TextInput::make($name)->label(__('finance.amount'))->required()->suffix(__('formats.currency'))
-            ->regex('/^\s*[0-9][0-9\s]{0,15}([.,][0-9]{1,2})?\s*$/')->helperText(__('finance.amount_help'));
-    }
-
-    private function sentAmount(string $amount): string
-    {
-        // Spaces between thousands and a decimal comma, as written in Algeria; the API checks the rest.
-        return str_replace([' ', "\u{00A0}", "\u{202F}", ','], ['', '', '', '.'], trim($amount));
-    }
-
     private function changed(array $result): array
     {
         $this->financeRow = null;

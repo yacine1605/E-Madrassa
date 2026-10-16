@@ -196,6 +196,15 @@ GRANT UPDATE (status, reopen_reason, version) ON school.finance_period TO school
 GRANT EXECUTE ON FUNCTION school.close_period(date), school.reconciliation(date), school.period_closed(uuid, date) TO school_runtime;
 -- A payment's document (054): set or replaced by its author while it waits; the replaced one archived by the database.
 GRANT UPDATE (attachment_file_id) ON school.payment TO school_runtime;
+-- Expenses (055): categories named by whoever validates for the whole school; an expense entered once per key,
+-- corrected and submitted by its author, decided by someone else; never deleted.
+GRANT SELECT ON school.expense_category, platform.expense_category_default, school.expense TO school_runtime;
+GRANT INSERT (tenant_id, code, labels, needs_label, sort_order) ON school.expense_category TO school_runtime;
+GRANT UPDATE (labels, needs_label, sort_order, version, archived_at) ON school.expense_category TO school_runtime;
+GRANT INSERT (tenant_id, expense_date, amount, category_id, label, beneficiary, reason, program_id, idempotency_key) ON school.expense TO school_runtime;
+GRANT UPDATE (expense_date, amount, category_id, label, beneficiary, reason, program_id, status, decision_reason, version) ON school.expense TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.check_expense(school.expense), school.expense_category_system(text),
+  school.record_expense(date, numeric, uuid, text, text, text, uuid, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -476,6 +485,10 @@ ALTER FUNCTION school.close_period(date) OWNER TO platform_provisioner;
 -- A payment's document (054): checked and retired with the payment, whoever may read the file.
 ALTER FUNCTION school.check_payment_attachment() OWNER TO platform_provisioner;
 ALTER FUNCTION school.retire_payment_attachment() OWNER TO platform_provisioner;
+-- Expenses (055): the publisher's categories given with the module; an expense's documents checked against it.
+GRANT SELECT, INSERT ON school.expense_category TO platform_provisioner;
+GRANT SELECT ON school.expense TO platform_provisioner;
+ALTER FUNCTION school.guard_expense_file() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

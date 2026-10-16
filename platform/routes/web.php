@@ -10,6 +10,8 @@ use App\Http\Controllers\ContractController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\ExpenseCategoryController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FinancePeriodController;
 use App\Http\Controllers\EnrollmentController;
@@ -361,6 +363,30 @@ Route::prefix('api')->group(function () {
                 Route::get('finance-periods/reconciliation', [FinancePeriodController::class, 'reconciliation'])->middleware('permission:finance.payment.read,finance.period.close');
                 Route::post('finance-periods', [FinancePeriodController::class, 'store'])->middleware('permission:finance.period.close');
                 Route::post('finance-periods/{period}/reopen', [FinancePeriodController::class, 'reopen'])->middleware('permission:finance.period.reopen');
+            });
+
+            // FR-DEP-01, FR-DEP-02: the school's expense categories and expenses, decided by someone else than their author.
+            Route::middleware('module:expenses')->group(function () {
+                $readers = 'permission:expense.expense.read,expense.expense.create,expense.expense.validate,expense.expense.approve';
+                Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($readers);
+                Route::middleware('permission:expense.expense.validate')->group(function () {
+                    Route::post('expense-categories', [ExpenseCategoryController::class, 'store']);
+                    Route::post('expense-categories/defaults', [ExpenseCategoryController::class, 'defaults']);
+                    Route::put('expense-categories/{category}', [ExpenseCategoryController::class, 'update']);
+                    Route::post('expense-categories/{category}/archive', [ExpenseCategoryController::class, 'archive']);
+                });
+                Route::get('expenses', [ExpenseController::class, 'index'])->middleware($readers);
+                Route::get('expenses/{expense}', [ExpenseController::class, 'show'])->middleware($readers);
+                Route::middleware('permission:expense.expense.create')->group(function () {
+                    Route::post('expenses', [ExpenseController::class, 'store']);
+                    Route::put('expenses/{expense}', [ExpenseController::class, 'update']);
+                    Route::post('expenses/{expense}/submit', [ExpenseController::class, 'submit']);
+                    Route::post('expenses/{expense}/attachments', [ExpenseController::class, 'attach']);
+                });
+                Route::post('expenses/{expense}/validate', [ExpenseController::class, 'validateExpense'])->middleware('permission:expense.expense.validate,expense.expense.approve');
+                Route::post('expenses/{expense}/reject', [ExpenseController::class, 'reject'])->middleware('permission:expense.expense.validate,expense.expense.approve');
+                // AC3: a document, for `expense.attachment.read` only.
+                Route::get('expenses/{expense}/attachments/{file}', [ExpenseController::class, 'document'])->middleware('permission:expense.attachment.read');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

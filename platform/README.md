@@ -1226,9 +1226,30 @@ Routes: `POST /api/payments/{payment}/attachment`, `GET /api/payments/{payment}/
 
 Validation on 16 October 2026: **276 PHP integration tests (12,043 assertions), 244 embedded SQL checks and 268 native PostgreSQL 16 checks including concurrency**; migration 054 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 212 screens without a problem. The CI could not start (the GitHub account's billing).
 
+## Increment 69 (lot 3): expenses, their categories and validation
+
+**FR-DEP-01**, **FR-DEP-02** (SQL 055), module `expenses`.
+
+- **Categories** (FR-DEP-01): the publisher's six (`salaries`, `advertising`, `missions`, `rent`, `equipment`, `other`), given with the module to a school in use (a school not in use takes them back itself), named, ordered and archived by whoever validates expenses for the whole school; a code never changes; an archived category stays on its expenses. **AC1**: `salaries` is the payroll's (FR-REM-04): never entered by hand, never archived (`expense_category_system`). A category may ask what the expense is (`other`: its label).
+- **An expense** (FR-DEP-02): its day (never to come, never in a closed month), amount, category, label, beneficiary, reason, the programme it is charged to if any; entered once per key (BR-05), a draft its author corrects and documents, then submits. It waits as it is, then is validated or rejected with its reason by `expense.expense.validate`, never by its author (**AC1**, sod rule `expense`); beyond the school's amount (new setting `expense.approval_amount`, 50,000 DA by default, OD-09 proposal), by the new permission `expense.expense.approve` (the direction). **AC2**: decided, it never changes, and is never deleted.
+- **Documents**: files of the expense (PDF or image, real type checked), added by its author while it is a draft; **AC3**: read only with `expense.attachment.read`, even with their address; a teacher, or a reader of payments without that permission, sees none.
+- Screens: **Expenses** in the Finance section (filters by state, category, period, beneficiary; entry, correction, documents, submission, decision) and **Expense categories**, opened from it.
+
+Routes: `GET|POST /api/expense-categories`, `POST /api/expense-categories/defaults`, `PUT /api/expense-categories/{category}`, `POST /api/expense-categories/{category}/archive`, `GET|POST /api/expenses`, `GET|PUT /api/expenses/{expense}`, `POST /api/expenses/{expense}/submit`, `/validate`, `/reject`, `/attachments`, `GET /api/expenses/{expense}/attachments/{file}`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-DEP-01 AC1 | `ExpenseTest`, tests/sql: `salaries` refused by hand and never archived; an archived category refused |
+| FR-DEP-02 AC1 | `ExpenseTest`, tests/sql: the author refused (`segregation_of_duties`); validated by another accountant, by the direction beyond the threshold |
+| FR-DEP-02 AC2 | `ExpenseTest`, tests/sql: a submitted, validated or rejected expense never changes; no deletion |
+| FR-DEP-02 AC3 | `ExpenseTest`, tests/sql: a teacher and a payments' reader see no document, by the expense's route or the files' one |
+| BR-05, BR-15 | `ExpenseTest`, tests/sql: one expense per key; none dated to come or in a closed month |
+
+VALIDATION_69
+
 ## Next increments of lot 3
 
-1. Expenses (FR-DEP-01 to 03): categories, entry and validation, linked corrections; the closed months apply to them.
+1. Expenses' payments and corrections (FR-DEP-02, FR-DEP-03): committed and paid expenses told apart, payments of a validated expense (`unpaid`, `partially_paid`, `paid`), a linked reversal with its reason that keeps the original, closed months applied; filters and exports.
 2. Remunerations (FR-REM): rules, rates by level, monthly runs and payouts (TST-12, TST-13, TST-19).
 
 ## Next increments of lot 2

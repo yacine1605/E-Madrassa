@@ -122,6 +122,19 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
         return $amount === null ? '' : Formats::number((float) $amount, 2).' '.__('formats.currency');
     }
 
+    /** An amount in dinars, two decimals at most, as the school writes it (« 12 500,50 »). */
+    protected function amountField(string $name): TextInput
+    {
+        return TextInput::make($name)->label(__('finance.amount'))->required()->suffix(__('formats.currency'))
+            ->regex('/^\s*[0-9][0-9\s]{0,15}([.,][0-9]{1,2})?\s*$/')->helperText(__('finance.amount_help'));
+    }
+
+    protected function sentAmount(string $amount): string
+    {
+        // Spaces between thousands and a decimal comma, as written in Algeria; the API checks the rest.
+        return str_replace([' ', "\u{00A0}", "\u{202F}", ','], ['', '', '', '.'], trim($amount));
+    }
+
     protected function labelFields(): array
     {
         return [TextInput::make('labels.fr')->label(__('school.label_fr'))->requiredWithout('labels.ar')->maxLength(150),

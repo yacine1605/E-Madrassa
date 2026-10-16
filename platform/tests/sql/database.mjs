@@ -3466,6 +3466,87 @@ await check("a payment's document is its author's while it waits, frozen once va
   assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = ANY ($1::uuid[])', [[scan, better, stray]]), 0);
   await as('school_runtime', a, 1);
 });
+// Expenses (SQL 055, FR-DEP-01, FR-DEP-02): the school's categories, an expense entered, submitted, decided by someone else; its documents.
+const EXPENSE = 'SELECT school.record_expense($1::date, $2::numeric, $3, $4, $5, $6, $7, $8) AS id';
+await check('an expense is its author\'s draft, submitted, then decided by someone else, the direction beyond the threshold; never changed after (FR-DEP-01 AC1, FR-DEP-02 AC1–AC3)', async () => {
+  const clerk = await scopedAccount('internal', 'tenant', null, ['expense.expense.create', 'expense.expense.read', 'expense.attachment.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['expense.expense.create', 'expense.expense.validate', 'expense.expense.read', 'expense.attachment.read']);
+  const director = await scopedAccount('internal', 'tenant', null, ['expense.expense.validate', 'expense.expense.approve', 'expense.expense.read']);
+  const cashier = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create']);
+  await as('school_runtime', a, clerk.user);
+  // FR-DEP-01: the publisher's six categories, `salaries` the payroll's; named by whoever validates for the whole school.
+  const category = async code => (await first('SELECT id FROM school.expense_category WHERE tenant_id = $1 AND code = $2', [a, code])).id;
+  assert.deepEqual((await sql('SELECT code FROM school.expense_category WHERE tenant_id = $1 ORDER BY sort_order', [a])).rows.map(r => r.code),
+    ['salaries', 'advertising', 'missions', 'rent', 'equipment', 'other']);
+  const CATEGORY = `INSERT INTO school.expense_category (tenant_id, code, labels) VALUES ($1, $2, '{"fr": "Transport"}') RETURNING id`;
+  await rejects(CATEGORY, [a, 'transport'], '42501', 'permission_denied');
+  await as('school_runtime', a, validator.user);
+  const transport = (await first(CATEGORY, [a, 'transport'])).id;
+  await rejects('UPDATE school.expense_category SET archived_at = now() WHERE id = $1', [await category('salaries')], '23514', 'expense_category_system');
+  await rejects("UPDATE school.expense_category SET code = 'bus' WHERE id = $1", [transport], '42501');
+  await sql('UPDATE school.expense_category SET archived_at = now() WHERE id = $1', [transport]);
+  // AC1 of FR-DEP-01: never `salaries` by hand; `other` names what it is; no day to come, none in a closed month, no archived category.
+  await as('school_runtime', a, clerk.user);
+  const rent = await category('rent');
+  await rejects(EXPENSE, ['today', '1000', await category('salaries'), null, 'Prof. Amrani', 'Salaire de mars', null, uuid()], '23514', 'expense_category_system');
+  await rejects(EXPENSE, ['today', '1000', await category('other'), null, 'Quincaillerie', 'Divers', null, uuid()], '23514', 'expense_label_required');
+  await rejects(EXPENSE, ['2099-01-01', '1000', rent, null, 'SCI Les Pins', 'Loyer', null, uuid()], '23514', 'expense_future_date');
+  await rejects(EXPENSE, ['2025-03-10', '1000', rent, null, 'SCI Les Pins', 'Loyer de mars', null, uuid()], '23514', 'period_closed');
+  await rejects(EXPENSE, ['today', '1000', transport, null, 'Bus', 'Sortie', null, uuid()], '23514', 'expense_category_archived');
+  // Once per key (BR-05).
+  const key = uuid();
+  const lease = (await first(EXPENSE, ['today', '30000', rent, null, 'SCI Les Pins', 'Loyer du mois', null, key])).id;
+  assert.equal((await first(EXPENSE, ['today', '30000', rent, null, 'SCI Les Pins', 'Loyer du mois', null, key])).id, lease);
+  await rejects(EXPENSE, ['today', '31000', rent, null, 'SCI Les Pins', 'Loyer du mois', null, key], '23514', 'idempotency_key_reused');
+  await sql("UPDATE school.expense SET amount = 32000, label = '  ' WHERE id = $1", [lease]);
+  // Its documents: added by its author while a draft, read only with `expense.attachment.read` (AC3).
+  const FILE = `INSERT INTO school.file_object (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256, owner_type, owner_id)
+    VALUES ($1, 'finance_attachment', $2, 'quittance.pdf', 'pdf', 'application/pdf', 1000, repeat('b', 64), 'expense', $3) RETURNING id`;
+  const receipt = (await first(FILE, [a, `tenant/${a}/finance_attachment/${uuid()}`, lease])).id;
+  await as('school_runtime', a, validator.user);
+  await rejects("UPDATE school.expense SET amount = 1 WHERE id = $1", [lease], '23514', 'expense_not_author');
+  await rejects("UPDATE school.expense SET status = 'validated' WHERE id = $1", [lease], '23514', 'expense_immutable');
+  await rejects(FILE, [a, `tenant/${a}/finance_attachment/${uuid()}`, lease], '23514', 'expense_not_author');
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [receipt]), 1);
+  for (const reader of [cashier.user, director.user, 4]) {
+    await as('school_runtime', a, reader);
+    assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [receipt]), 0, 'AC3: no document without expense.attachment.read');
+  }
+  // Submitted by its author: it waits as it is.
+  await as('school_runtime', a, clerk.user);
+  await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [lease]);
+  assert.equal((await first('SELECT needs_approval FROM school.expense WHERE id = $1', [lease])).needs_approval, false);
+  await rejects('UPDATE school.expense SET amount = 1 WHERE id = $1', [lease], '23514', 'expense_immutable');
+  await rejects(FILE, [a, `tenant/${a}/finance_attachment/${uuid()}`, lease], '23514', 'expense_immutable');
+  await rejects("UPDATE school.expense SET status = 'validated' WHERE id = $1", [lease], '42501', 'permission_denied');
+  // AC1: never validated by its author.
+  await as('school_runtime', a, validator.user);
+  const own = (await first(EXPENSE, ['today', '2000', await category('missions'), null, 'Hôtel', 'Mission à Oran', null, uuid()])).id;
+  await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [own]);
+  await rejects("UPDATE school.expense SET status = 'validated' WHERE id = $1", [own], '23514', 'segregation_of_duties');
+  await sql("UPDATE school.expense SET status = 'validated' WHERE id = $1", [lease]);
+  const decided = await first('SELECT status, decided_by::int AS by, amount::text AS amount FROM school.expense WHERE id = $1', [lease]);
+  assert.deepEqual([decided.status, decided.by, decided.amount], ['validated', Number(validator.user), '32000.00']);
+  // AC2: validated, it never changes, nor goes.
+  await rejects('UPDATE school.expense SET amount = 1 WHERE id = $1', [lease], '23514', 'expense_immutable');
+  await rejects("UPDATE school.expense SET status = 'rejected', decision_reason = 'Erreur' WHERE id = $1", [lease], '23514', 'expense_immutable');
+  await rejects('DELETE FROM school.expense WHERE id = $1', [lease], '42501');
+  // Beyond the threshold (50,000 DA by default), the direction's.
+  await as('school_runtime', a, clerk.user);
+  const laptops = (await first(EXPENSE, ['today', '80000', await category('equipment'), null, 'Informatique Plus', 'Deux ordinateurs', null, uuid()])).id;
+  await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [laptops]);
+  assert.equal((await first('SELECT needs_approval FROM school.expense WHERE id = $1', [laptops])).needs_approval, true);
+  await as('school_runtime', a, validator.user);
+  await rejects("UPDATE school.expense SET status = 'validated' WHERE id = $1", [laptops], '42501', 'permission_denied');
+  await as('school_runtime', a, director.user);
+  await rejects("UPDATE school.expense SET status = 'rejected' WHERE id = $1", [laptops], '23514', 'reason_required');
+  await sql("UPDATE school.expense SET status = 'rejected', decision_reason = 'Un seul ordinateur suffit' WHERE id = $1", [laptops]);
+  await rejects("UPDATE school.expense SET status = 'validated' WHERE id = $1", [laptops], '23514', 'expense_immutable');
+  // Whoever reads no expense reads none.
+  await as('school_runtime', a, cashier.user);
+  assert.equal(await count('SELECT count(*) n FROM school.expense WHERE id = ANY ($1::uuid[])', [[lease, laptops]]), 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

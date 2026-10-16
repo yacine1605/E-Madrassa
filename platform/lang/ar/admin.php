@@ -137,6 +137,9 @@ return [
         'payment' => 'دفعة تسجيل',
         'refund' => 'استرداد تسجيل',
         'receipt' => 'وصل',
+        'finance_period' => 'إقفال شهر',
+        'expense_category' => 'فئة النفقات',
+        'expense' => 'نفقة',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.
