@@ -339,6 +339,11 @@ Route::prefix('api')->group(function () {
                 Route::post('payments/{payment}/cancel', [PaymentController::class, 'cancel'])->middleware('permission:finance.payment.create,finance.payment.create.delegated');
                 Route::post('payments/{payment}/validate', [PaymentController::class, 'validatePayment'])->middleware('permission:finance.payment.validate');
                 Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->middleware('permission:finance.payment.reverse');
+                // FR-FIN-02: a payment's supporting document, added by its author while it waits, read with the payment.
+                Route::post('payments/{payment}/attachment', [PaymentController::class, 'attachment'])
+                    ->middleware('permission:finance.payment.create,finance.payment.create.delegated');
+                Route::get('payments/{payment}/attachment', [PaymentController::class, 'document'])
+                    ->middleware('permission:finance.payment.read,finance.payment.validate,finance.payment.reverse,finance.payment.create,finance.payment.create.delegated');
                 // FR-FIN-06: the open balances and overdue instalments, as at a date.
                 Route::get('arrears', [ArrearsController::class, 'index'])->middleware('permission:finance.payment.read');
                 // FR-FIN-05: a receipt, issued by its first download, a duplicate afterwards.

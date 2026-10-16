@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\Refusal;
 use App\Support\CurrentSchool;
+use App\Support\Files;
 use App\Support\Paging;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ final class PaymentController
 {
     private const PAYMENTS = "SELECT p.id, p.enrollment_id, p.kind, p.reverses_payment_id, p.reference, p.amount::text AS amount, p.paid_on::text AS paid_on,
         p.method_code, p.external_ref, p.overpayment, p.reason, p.status, p.delegated, p.validated_at, p.self_validated, p.cancel_reason, p.version,
-        p.created_by, p.created_at, (SELECT u.name FROM public.users u WHERE u.id = p.created_by) AS author,
+        p.created_by, p.created_at, p.attachment_file_id, (SELECT u.name FROM public.users u WHERE u.id = p.created_by) AS author,
         (SELECT u.name FROM public.users u WHERE u.id = p.validated_by) AS validator,
         (SELECT r.id FROM school.payment r WHERE r.tenant_id = p.tenant_id AND r.reverses_payment_id = p.id AND r.status <> 'cancelled') AS reversal_id,
         (SELECT x.reference FROM school.payment x WHERE x.tenant_id = p.tenant_id AND x.id = p.reverses_payment_id) AS reverses_reference,
@@ -32,7 +33,10 @@ final class PaymentController
     // Positive, two decimals at most: « 0 » and « 0.00 » are refused with the format.
     private const AMOUNT = ['required', 'string', 'regex:/^(?!0+(\.0+)?$)(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$/'];
 
-    public function __construct(private CurrentSchool $school) {}
+    // FR-FIN-02: an optional supporting document (a cheque, a transfer's notice), as the files' service takes it.
+    private const ATTACHMENT = 'nullable|file|max:51200';
+
+    public function __construct(private CurrentSchool $school, private Files $files) {}
 
     /** The payments the reader may see: the validation queue (`pending_validation`), or another state, of one enrolment or all. */
     public function index(Request $request)
@@ -51,11 +55,42 @@ final class PaymentController
     {
         abort_unless(Str::isUuid($enrollment), 404);
         $data = $request->validate(['amount' => self::AMOUNT, 'paid_on' => 'required|date_format:Y-m-d|before_or_equal:today', 'method_code' => 'required|string|max:20',
-            'external_ref' => 'nullable|string|max:100', 'overpayment' => 'sometimes|boolean', 'idempotency_key' => 'required|uuid']);
+            'external_ref' => 'nullable|string|max:100', 'overpayment' => 'sometimes|boolean', 'idempotency_key' => 'required|uuid', 'attachment' => self::ATTACHMENT]);
         abort_unless(DB::selectOne('SELECT 1 AS found FROM school.enrollment WHERE tenant_id = ? AND id = ?', [$this->school->id(), $enrollment]), 404);
         $id = DB::selectOne('SELECT school.record_payment(?, ?::numeric, ?::date, ?, ?, ?, ?) AS id', [$enrollment, $data['amount'], $data['paid_on'], $data['method_code'],
             $data['external_ref'] ?? null, (bool) ($data['overpayment'] ?? false), $data['idempotency_key']])->id;
-        return response()->json(['data' => $this->payment($id)], 201);
+        $payment = $this->payment($id);
+        // Its document comes with it; the same key sent again with one keeps the first.
+        if ($request->hasFile('attachment') && $payment['attachment_file_id'] === null) $payment = $this->attach($payment, $request, (int) $payment['version']);
+        return response()->json(['data' => $payment], 201);
+    }
+
+    /** FR-FIN-02: its author adds or replaces the supporting document while the payment waits; the former one is archived. */
+    public function attachment(Request $request, string $payment)
+    {
+        $current = $this->payment($payment);
+        $data = $request->validate(['version' => 'required|integer|min:1', 'attachment' => 'required|file|max:51200']);
+        if ($data['version'] !== (int) $current['version']) throw Refusal::of('stale_version');
+        return ['data' => $this->attach($current, $request, $data['version'])];
+    }
+
+    /** The document, for whoever reads the payment: its author, or the finance of the pupil's site (FR-FIC-01 AC2). */
+    public function document(string $payment)
+    {
+        $current = $this->payment($payment);
+        abort_unless($current['attachment_file_id'], 404);
+        $file = DB::selectOne('SELECT storage_key, original_name, media_type, size_bytes FROM school.file_object
+            WHERE tenant_id = ? AND id = ? AND purged_at IS NULL', [$this->school->id(), $current['attachment_file_id']]) ?? abort(404);
+        return $this->files->download($file->storage_key, $file->original_name, $file->media_type, (int) $file->size_bytes);
+    }
+
+    private function attach(array $current, Request $request, int $version): array
+    {
+        $file = $this->files->upload($request->file('attachment'), 'finance_attachment', 'payment', $current['id']);
+        $changed = DB::update('UPDATE school.payment SET attachment_file_id = ?, version = ? WHERE tenant_id = ? AND id = ?',
+            [$file->id, $version, $this->school->id(), $current['id']]);
+        if (!$changed) throw Refusal::permissionDenied();
+        return $this->payment($current['id']);
     }
 
     /** FR-FIN-03: its author corrects a payment while it waits. */

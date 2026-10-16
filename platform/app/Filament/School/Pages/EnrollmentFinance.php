@@ -12,6 +12,7 @@ use App\Support\Permissions;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -139,7 +140,7 @@ final class EnrollmentFinance extends SchoolingPage
     public function paymentsInfolist(Schema $schema): Schema
     {
         return $schema->components([Section::make(__('finance.payments'))->description(__('finance.payments_help'))->schema([RepeatableEntry::make('payments')->hiddenLabel()
-            ->columns(['default' => 2, 'sm' => 6])->placeholder(__('finance.no_payment'))
+            ->columns(['default' => 2, 'sm' => 7])->placeholder(__('finance.no_payment'))
             ->state(array_map(fn (array $row) => [
                 'reference' => $row['reference'].($row['kind'] === 'reversal' ? ' · '.__('finance.reversal_of', ['reference' => $row['reverses_reference']]) : ''),
                 'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
@@ -151,10 +152,14 @@ final class EnrollmentFinance extends SchoolingPage
                 'by' => Formats::list(array_filter([Formats::isolated($row['author']).($row['delegated'] ? ' ('.__('finance.delegated').')' : ''),
                     $row['validator'] ? Formats::isolated($row['validator']) : null])),
                 // FR-FIN-05: a validated payment's receipt, issued by its first download.
-                'receipt' => $row['kind'] === 'payment' && $row['validated_at'] ? url('/api/payments/'.$row['id'].'/receipt') : null], $this->finance()['payments']))
+                'receipt' => $row['kind'] === 'payment' && $row['validated_at'] ? url('/api/payments/'.$row['id'].'/receipt') : null,
+                // FR-FIN-02: its supporting document, read with the payment.
+                'document' => $row['attachment_file_id'] ? url('/api/payments/'.$row['id'].'/attachment') : null], $this->finance()['payments']))
             ->schema([TextEntry::make('reference')->label(__('finance.reference')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('paid')->label(__('finance.paid_on')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry()])])]);
+                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry(),
+                TextEntry::make('document')->label(__('finance.attachment'))->formatStateUsing(fn () => __('finance.open_attachment'))
+                    ->url(fn (?string $state) => $state, shouldOpenInNewTab: true)->color('primary')])])]);
     }
 
     /** The refunds and carry-overs, newest first, with their decision and execution. */
@@ -213,11 +218,17 @@ final class EnrollmentFinance extends SchoolingPage
                     Select::make('method_code')->label(__('finance.method'))->required()->options($this->methods()),
                     TextInput::make('external_ref')->label(__('finance.external_ref'))->maxLength(100)->helperText(__('finance.external_ref_help')),
                     Toggle::make('overpayment')->label(__('finance.overpayment'))->helperText(__('finance.overpayment_help')),
-                    Hidden::make('idempotency_key')])
+                    $this->attachmentField()->helperText(__('finance.attachment_help')), Hidden::make('idempotency_key')])
                 ->action(fn (array $data) => $this->changed(SchoolScreen::change(null, fn () => SchoolScreen::call(['finance.payment.create', 'finance.payment.create.delegated'],
-                    PaymentController::class, 'store', ['amount' => $this->sentAmount($data['amount']), 'paid_on' => substr((string) $data['paid_on'], 0, 10),
+                    PaymentController::class, 'store', array_filter(['amount' => $this->sentAmount($data['amount']), 'paid_on' => substr((string) $data['paid_on'], 0, 10),
                         'method_code' => $data['method_code'], 'external_ref' => $data['external_ref'] ?: null, 'overpayment' => (bool) $data['overpayment'],
-                        'idempotency_key' => $data['idempotency_key']], ['enrollment' => $this->enrollment])))),
+                        'idempotency_key' => $data['idempotency_key'], 'attachment' => $data['attachment'] ?? null], fn ($value) => $value !== null),
+                    ['enrollment' => $this->enrollment])))),
+            // FR-FIN-02: its author adds or replaces the supporting document of a waiting payment.
+            Action::make('attach_document')->label(__('finance.attach_document'))->color('gray')->visible(fn () => $this->ownWaiting() !== [])
+                ->schema(fn () => [Select::make('payment')->label(__('finance.payment'))->required()->options($this->ownWaiting()), $this->attachmentField()->required()])
+                ->action(fn (array $data) => $this->onPayment($data['payment'], ['finance.payment.create', 'finance.payment.create.delegated'], 'attachment',
+                    ['attachment' => $data['attachment']])),
             // FR-FIN-03 AC3: validated by someone else than its author, unless the school allows it.
             Action::make('validate_payment')->label(__('finance.validate_payment'))->visible(fn () => $this->writable('finance.payment.validate') && $this->validatable() !== [])
                 ->schema(fn () => [Select::make('payment')->label(__('finance.payment'))->required()->options($this->validatable())])
@@ -372,6 +383,13 @@ final class EnrollmentFinance extends SchoolingPage
         abort_unless($row, 404);
         return $this->changed(SchoolScreen::change(null, fn () => SchoolScreen::call($permission, PaymentController::class, $method,
             ['version' => $row['version'], ...$data], ['payment' => $row['id']])));
+    }
+
+    /** A payment's document: a PDF or an image of it, as the school accepts its files (FR-FIC-01). No preview, which the CSP refuses. */
+    private function attachmentField(): FileUpload
+    {
+        return FileUpload::make('attachment')->label(__('finance.attachment'))->storeFiles(false)->previewable(false)
+            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])->maxSize(10240);
     }
 
     /** An amount in dinars, two decimals at most, as the school writes it (« 12 500,50 »). */

@@ -3417,6 +3417,55 @@ await check('a closed month refuses what is dated in it, keeps its reconciliatio
   await rejects("UPDATE school.finance_period SET status = 'reopened', reopen_reason = 'Encore' WHERE id = $1", [again], '23514', 'segregation_of_duties');
   await as('school_runtime', a, 1);
 });
+// A payment's supporting document (SQL 054, FR-FIN-02, FR-FIC-01 AC2): added by its author while it waits, read with the payment only.
+await check("a payment's document is its author's while it waits, frozen once validated, read only by whoever reads the payment (FR-FIN-02, FR-FIC-01 AC2)", async () => {
+  const cashier = await scopedAccount('internal', 'tenant', null, ['finance.payment.create.delegated', 'enrollment.enrollment.read']);
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'enrollment.enrollment.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'enrollment.enrollment.read']);
+  const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['finance.payment.read', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  const e = await enroll((await newAdult('Justif', 'Lina')).id, await programme('JUSTIF', 60000));
+  const FILE = `INSERT INTO school.file_object (tenant_id, category, storage_key, original_name, file_type, media_type, size_bytes, sha256, owner_type, owner_id)
+    VALUES ($1, 'finance_attachment', $2, $3, 'pdf', 'application/pdf', 1000, repeat('a', 64), 'payment', $4) RETURNING id`;
+  const file = async (payment, name) => (await first(FILE, [a, `tenant/${a}/finance_attachment/${uuid()}`, name, payment])).id;
+  await as('school_runtime', a, accountant.user);
+  const others = (await first(RECORD, [e, '1000', 'today', 'cash', null, false, uuid()])).id;
+  await as('school_runtime', a, cashier.user);
+  const paid = (await first(RECORD, [e, '20000', 'today', 'cheque', 'CHQ 12', false, uuid()])).id;
+  // A cashier on delegation adds the document of their own payment, never of another's.
+  await rejects(FILE, [a, `tenant/${a}/finance_attachment/${uuid()}`, 'autre.pdf', others], '42501');
+  const scan = await file(paid, 'cheque.pdf');
+  await rejects('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [paid, uuid()], '23514', 'payment_attachment_invalid');
+  await sql('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [paid, scan]);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [scan]), 1, 'its author reads it without reading the finance');
+  // Replaced while it waits: the former one archived, kept.
+  const better = await file(paid, 'cheque-net.pdf');
+  await sql('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [paid, better]);
+  await as(null);
+  assert.deepEqual(await first('SELECT archived_at IS NOT NULL AS archived, purged_at IS NULL AS kept FROM school.file_object WHERE id = $1', [scan]), { archived: true, kept: true });
+  // Only a file of this payment: not another's, not one archived.
+  await as('school_runtime', a, accountant.user);
+  const stray = await file(others, 'autre.pdf');
+  await sql('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [others, stray]);
+  await as('school_runtime', a, cashier.user);
+  await rejects('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [paid, scan], '23514', 'payment_attachment_invalid');
+  await as('school_runtime', a, validator.user);
+  await rejects('UPDATE school.payment SET attachment_file_id = NULL WHERE id = $1', [paid], '23514', 'payment_not_author');
+  await as('school_runtime', a, accountant.user);
+  await rejects('UPDATE school.payment SET attachment_file_id = $2 WHERE id = $1', [others, better], '23514', 'payment_attachment_invalid');
+  // TST-11: once validated, it never changes.
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [paid]);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = $1', [better]), 1);
+  await as('school_runtime', a, cashier.user);
+  await rejects('UPDATE school.payment SET attachment_file_id = NULL WHERE id = $1', [paid], '23514', 'payment_immutable');
+  // AC2: a reader of another site's payments, a teacher, read none of it.
+  await as('school_runtime', a, elsewhere.user);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = ANY ($1::uuid[])', [[scan, better, stray]]), 0);
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.file_object WHERE id = ANY ($1::uuid[])', [[scan, better, stray]]), 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

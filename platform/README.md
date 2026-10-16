@@ -1205,10 +1205,31 @@ Routes: `GET /api/finance-periods`, `GET /api/finance-periods/reconciliation?mon
 
 Validation on 16 October 2026: **275 PHP integration tests (11,959 assertions), 243 embedded SQL checks and 267 native PostgreSQL 16 checks including concurrency**; migration 053 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 212 screens without a problem, Closures included. The CI could not start (the GitHub account's billing).
 
+## Increment 68 (lot 3): a payment's supporting document
+
+**FR-FIN-02** (« justificatif optionnel »), **FR-FIC-01 AC2** (SQL 054).
+
+- **Optional document**: a cheque, a transfer's notice or a deposit slip (PDF or image, the school's file types and size, its real type checked), sent with the payment or added afterwards by its author while the payment waits for its validation; a cashier on delegation adds the one of the payment they collected. The same key sent again keeps the first document. Replaced while it waits, the former one is archived, not deleted: it stays a financial record.
+- **Frozen once validated** (TST-11): neither changed nor removed by anyone (`payment_immutable`); someone else than its author adds none (`payment_not_author`); only a file made for this payment is accepted (`payment_attachment_invalid`).
+- **AC2**: the document follows its payment: whoever reads the payment reads it (its author, or the finance of the pupil's site), nobody else, whatever the category's permission says: a teacher or a reader of another site's payments sees nothing, through the payment's route or the files' one.
+- Screens: the enrolment's Finance takes a document with *Record a payment* and offers *Attach a document* for one's own waiting payments, with a link on each payment; *Payments to validate* shows which carry one and opens it before deciding.
+
+Routes: `POST /api/payments/{payment}/attachment`, `GET /api/payments/{payment}/attachment`; `POST /api/enrollments/{enrollment}/payments` takes an optional `attachment`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-02 document | `PaymentAttachmentTest`, tests/sql: sent with the payment, kept on a repeated key, replaced while it waits with the former archived |
+| TST-11 | `PaymentAttachmentTest`, tests/sql: frozen once validated; refused to another than its author |
+| FR-FIC-01 AC1 | `PaymentAttachmentTest`: an executable named .pdf refused |
+| FR-FIC-01 AC2 | `PaymentAttachmentTest`, tests/sql: a teacher and another site's reader see nothing; a cashier on delegation reads their own |
+| Screens | `PaymentAttachmentTest`: recorded with its document, added afterwards, opened from the validations |
+
+Validation on 16 October 2026: **276 PHP integration tests (12,043 assertions), 244 embedded SQL checks and 268 native PostgreSQL 16 checks including concurrency**; migration 054 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 212 screens without a problem. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. A payment's optional supporting document (FR-FIN-02), on the files' service.
-2. Expenses (FR-DEP-01 to 03): categories, entry and validation, linked corrections; the closed months apply to them.
+1. Expenses (FR-DEP-01 to 03): categories, entry and validation, linked corrections; the closed months apply to them.
+2. Remunerations (FR-REM): rules, rates by level, monthly runs and payouts (TST-12, TST-13, TST-19).
 
 ## Next increments of lot 2
 

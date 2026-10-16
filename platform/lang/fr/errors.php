@@ -137,6 +137,7 @@ return [
     'period_closed' => 'Ce mois est clôturé : aucune opération n’y est datée. Corrigez par une opération liée dans la période ouverte.',
     'period_not_ended' => 'Un mois se clôture une fois terminé.',
     'period_has_pending' => 'Des paiements datés de ce mois attendent leur validation : validez-les ou retirez-les avant la clôture.',
+    'payment_attachment_invalid' => 'Ce justificatif n’est pas celui de ce paiement. Ajoutez-le depuis le paiement.',
     'photo_invalid' => 'Choisissez une photo au format JPEG, PNG ou WebP.',
     'photo_too_large' => 'La photo dépasse 2 Mo. Choisissez une image plus légère.',
     'photo_dimensions' => 'Cette image a trop de pixels (16 millions au plus). Réduisez-la avant de l’envoyer.',

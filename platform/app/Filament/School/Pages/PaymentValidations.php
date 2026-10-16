@@ -49,7 +49,8 @@ final class PaymentValidations extends SchoolingPage
                     // What the validator checks against: the means and its reference (a cheque's number), or a reversal's reason.
                     ->description(fn (array $record) => $record['method_code'] ? Formats::list(array_filter([__('finance.methods.'.$record['method_code']),
                         $record['external_ref'] ? Formats::isolated($record['external_ref']) : null])) : Formats::isolated((string) $record['reason'])),
-                TextColumn::make('author')->label(__('finance.by'))->description(fn (array $record) => Formats::dateTime($record['created_at']))
+                TextColumn::make('author')->label(__('finance.by'))
+                    ->description(fn (array $record) => Formats::list(array_filter([Formats::dateTime($record['created_at']), $record['attachment_file_id'] ? __('finance.attachment') : null])))
                     ->formatStateUsing(fn ($state, array $record) => Formats::isolated((string) $state).($record['delegated'] ? ' ('.__('finance.delegated').')' : '')),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('finance.payment_states.'.$state))
                     ->color(fn (string $state) => match ($state) { 'validated' => 'success', 'reversed', 'cancelled' => 'gray', default => 'warning' }),
@@ -61,6 +62,9 @@ final class PaymentValidations extends SchoolingPage
                         && ((int) $record['created_by'] !== (int) auth()->id() || ($record['kind'] === 'payment' && $this->selfAllowed())))
                     ->action(fn (array $record) => SchoolScreen::change('finance.payment.validate', fn () => SchoolScreen::call('finance.payment.validate',
                         PaymentController::class, 'validatePayment', ['version' => $record['version']], ['payment' => $record['id']]))),
+                // FR-FIN-02: its supporting document, read before deciding.
+                Action::make('document')->label(__('finance.open_attachment'))->visible(fn (array $record) => $record['attachment_file_id'] !== null)
+                    ->url(fn (array $record) => url('/api/payments/'.$record['id'].'/attachment'), shouldOpenInNewTab: true),
                 Action::make('open')->label(__('finance.enrollment_finance'))->url(fn (array $record) => EnrollmentFinance::getUrl(['enrollment' => $record['enrollment_id']])),
             ])]);
     }

@@ -194,6 +194,8 @@ GRANT EXECUTE ON FUNCTION school.arrears(date, uuid), platform.notify_installmen
 GRANT SELECT ON school.finance_period TO school_runtime;
 GRANT UPDATE (status, reopen_reason, version) ON school.finance_period TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.close_period(date), school.reconciliation(date), school.period_closed(uuid, date) TO school_runtime;
+-- A payment's document (054): set or replaced by its author while it waits; the replaced one archived by the database.
+GRANT UPDATE (attachment_file_id) ON school.payment TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -471,6 +473,9 @@ ALTER FUNCTION school.period_closed(uuid, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.reconciliation(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.reconciliation(date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.close_period(date) OWNER TO platform_provisioner;
+-- A payment's document (054): checked and retired with the payment, whoever may read the file.
+ALTER FUNCTION school.check_payment_attachment() OWNER TO platform_provisioner;
+ALTER FUNCTION school.retire_payment_attachment() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

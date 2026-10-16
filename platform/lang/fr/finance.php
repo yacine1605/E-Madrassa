@@ -130,4 +130,8 @@ return [
     'refunds_total' => 'Total des remboursements',
     'reopen_period' => 'Rouvrir',
     'reopen_period_help' => 'La réouverture est exceptionnelle : son motif est journalisé. Le mois accepte de nouveau des opérations datées jusqu’à sa prochaine clôture.',
+    'attachment' => 'Justificatif',
+    'attachment_help' => 'Facultatif : le chèque, l’avis de virement ou le reçu de versement, en PDF ou en image.',
+    'attach_document' => 'Joindre un justificatif',
+    'open_attachment' => 'Ouvrir le justificatif',
 ];
