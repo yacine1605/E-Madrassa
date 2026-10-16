@@ -4,6 +4,7 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\FinancePeriodController;
 use App\Support\Formats;
+use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -16,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * FR-FIN-07, BR-15: the closed months of the school, each with its reconciliation. The finance
@@ -31,6 +33,7 @@ final class FinancePeriods extends SchoolingPage
     protected static array $permissions = ['finance.payment.read', 'finance.period.close', 'finance.period.reopen'];
     protected static ?string $module = 'student_finance';
     protected static string|array $routeMiddleware = ['module:student_finance', 'permission:finance.payment.read,finance.period.close,finance.period.reopen'];
+    private ?array $categoryNames = null;
 
     public static function getNavigationLabel(): string { return __('finance.periods'); }
     public function getTitle(): string { return __('finance.periods'); }
@@ -93,6 +96,13 @@ final class FinancePeriods extends SchoolingPage
         return $months;
     }
 
+    /** An expense category's name, its code for whoever reads no expense. */
+    private function category(string $code): string
+    {
+        $this->categoryNames ??= collect(DB::select('SELECT code, labels FROM school.expense_category'))->mapWithKeys(fn ($row) => [$row->code => Locales::label($row->labels)])->all();
+        return $this->categoryNames[$code] ?? $code;
+    }
+
     /** « mars 2025 », « مارس 2025 ». */
     private function month(string $day): string
     {
@@ -114,6 +124,17 @@ final class FinancePeriods extends SchoolingPage
             __('finance.reconciliation_total', ['label' => __('finance.refunds_total'), 'amount' => $this->money($report['refunds_total'])]),
             (int) $report['carry_overs']['count'] > 0 ? $line(__('finance.reconciliation_carry_overs'), $report['carry_overs']) : null,
             __('finance.reconciliation_total', ['label' => __('finance.net'), 'amount' => $this->money($report['net'])]),
+            // SQL 056: the expenses validated with a day in the month, what was paid of them, the month's cash balance.
+            ...(isset($report['expenses']) ? [
+                ...array_map(fn (string $code, array $row) => $line(__('finance.reconciliation_expenses', ['category' => $this->category($code)]), $row),
+                    array_keys($report['expenses']), $report['expenses']),
+                __('finance.reconciliation_total', ['label' => __('finance.expenses_total'), 'amount' => $this->money($report['expenses_total'])]),
+                ...array_map(fn (string $code, array $row) => $line(__('finance.reconciliation_expense_payments', ['method' => $means($code)]), $row),
+                    array_keys($report['expense_payments']), $report['expense_payments']),
+                (int) $report['expense_reversals']['count'] > 0 ? $line(__('finance.reconciliation_expense_reversals'), $report['expense_reversals']) : null,
+                __('finance.reconciliation_total', ['label' => __('finance.expenses_paid'), 'amount' => $this->money($report['expenses_paid'])]),
+                __('finance.reconciliation_total', ['label' => __('finance.cash_balance'), 'amount' => $this->money($report['cash_balance'])]),
+            ] : []),
             ($report['pending'] ?? 0) > 0 ? __('finance.reconciliation_pending', ['count' => Formats::number((int) $report['pending'])]) : null,
         ], fn ($line) => $line !== null));
     }

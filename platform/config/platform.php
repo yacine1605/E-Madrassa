@@ -68,6 +68,8 @@ return [
         'referential' => App\Exports\ReferentialExport::class,
         // FR-FIN-06: the arrears, for whoever reads the payments.
         'arrears' => App\Exports\ArrearsExport::class,
+        // FR-DEP-02: the expenses, for whoever reads them.
+        'expenses' => App\Exports\ExpensesExport::class,
     ],
     'export_background_rows' => 2000,
 

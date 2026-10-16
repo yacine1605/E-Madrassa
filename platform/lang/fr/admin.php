@@ -141,6 +141,7 @@ return [
         'finance_period' => 'Clôture d’un mois',
         'expense_category' => 'Catégorie de dépenses',
         'expense' => 'Dépense',
+        'expense_payment' => 'Paiement d’une dépense',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

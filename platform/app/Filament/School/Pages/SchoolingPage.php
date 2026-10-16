@@ -21,6 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Lot 2's screens (programmes, groups, pupils, enrolments): lists by pages from the API, the
@@ -127,6 +128,13 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
     {
         return TextInput::make($name)->label(__('finance.amount'))->required()->suffix(__('formats.currency'))
             ->regex('/^\s*[0-9][0-9\s]{0,15}([.,][0-9]{1,2})?\s*$/')->helperText(__('finance.amount_help'));
+    }
+
+    /** @return array<string, string> the school's means of payment, for what comes in and what goes out */
+    protected function methods(): array
+    {
+        $codes = json_decode((string) DB::selectOne("SELECT school.setting_value('finance.payment.methods')::text AS v")->v, true) ?: [];
+        return collect($codes)->mapWithKeys(fn (string $code) => [$code => __('finance.methods.'.$code)])->all();
     }
 
     protected function sentAmount(string $amount): string

@@ -12,6 +12,7 @@ use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpensePaymentController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FinancePeriodController;
 use App\Http\Controllers\EnrollmentController;
@@ -367,7 +368,7 @@ Route::prefix('api')->group(function () {
 
             // FR-DEP-01, FR-DEP-02: the school's expense categories and expenses, decided by someone else than their author.
             Route::middleware('module:expenses')->group(function () {
-                $readers = 'permission:expense.expense.read,expense.expense.create,expense.expense.validate,expense.expense.approve';
+                $readers = 'permission:expense.expense.read,expense.expense.create,expense.expense.validate,expense.expense.approve,expense.expense.pay,expense.expense.reverse';
                 Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($readers);
                 Route::middleware('permission:expense.expense.validate')->group(function () {
                     Route::post('expense-categories', [ExpenseCategoryController::class, 'store']);
@@ -387,6 +388,13 @@ Route::prefix('api')->group(function () {
                 Route::post('expenses/{expense}/reject', [ExpenseController::class, 'reject'])->middleware('permission:expense.expense.validate,expense.expense.approve');
                 // AC3: a document, for `expense.attachment.read` only.
                 Route::get('expenses/{expense}/attachments/{file}', [ExpenseController::class, 'document'])->middleware('permission:expense.attachment.read');
+                // FR-DEP-02: a validated expense paid; a payment taken back by its reversal, decided by someone else (BR-08).
+                Route::get('expenses/{expense}/payments', [ExpenseController::class, 'payments'])->middleware($readers);
+                Route::post('expenses/{expense}/payments', [ExpenseController::class, 'pay'])->middleware('permission:expense.expense.pay');
+                Route::get('expense-payments', [ExpensePaymentController::class, 'index'])->middleware($readers);
+                Route::post('expense-payments/{payment}/reverse', [ExpensePaymentController::class, 'reverse'])->middleware('permission:expense.expense.reverse');
+                Route::post('expense-payments/{payment}/validate', [ExpensePaymentController::class, 'validateReversal'])->middleware('permission:expense.expense.validate');
+                Route::post('expense-payments/{payment}/reject', [ExpensePaymentController::class, 'reject'])->middleware('permission:expense.expense.validate');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

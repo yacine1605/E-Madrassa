@@ -22,10 +22,16 @@ final class ExpenseController
     private const EXPENSES = "SELECT x.id, x.expense_date::text AS expense_date, x.amount::text AS amount, x.category_id, c.code AS category_code, c.labels AS category_labels,
         x.label, x.beneficiary, x.reason, x.program_id, (SELECT p.code FROM school.program p WHERE p.tenant_id = x.tenant_id AND p.id = x.program_id) AS program,
         x.status, x.needs_approval, x.submitted_at, x.decided_at, x.decision_reason, x.version, x.created_by, x.created_at,
-        (SELECT u.name FROM public.users u WHERE u.id = x.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = x.decided_by) AS decider
-        FROM school.expense x JOIN school.expense_category c ON c.tenant_id = x.tenant_id AND c.id = x.category_id";
-    public const RULES = ['status' => 'nullable|in:draft,submitted,validated,rejected', 'category' => 'nullable|uuid', 'program' => 'nullable|uuid',
-        'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'search' => 'nullable|string|max:100'];
+        (SELECT u.name FROM public.users u WHERE u.id = x.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = x.decided_by) AS decider,
+        y.paid::text AS paid, (x.amount - y.paid)::numeric(14, 2)::text AS left_to_pay, school.expense_payment_state(x.status, x.amount, y.paid) AS payment_state
+        FROM school.expense x JOIN school.expense_category c ON c.tenant_id = x.tenant_id AND c.id = x.category_id
+        CROSS JOIN LATERAL (SELECT school.expense_paid(x.tenant_id, x.id) AS paid) y";
+    public const RULES = ['status' => 'nullable|in:draft,submitted,validated,rejected', 'payment' => 'nullable|in:unpaid,partially_paid,paid', 'category' => 'nullable|uuid',
+        'program' => 'nullable|uuid', 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'search' => 'nullable|string|max:100'];
+    public const PAYMENTS = "SELECT y.id, y.expense_id, y.kind, y.reverses_payment_id, y.amount::text AS amount, y.paid_on::text AS paid_on, y.method_code, y.external_ref,
+        y.reason, y.status, y.decided_at, y.decision_reason, y.version, y.created_by, y.created_at, x.beneficiary, x.expense_date::text AS expense_date,
+        (SELECT u.name FROM public.users u WHERE u.id = y.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = y.decided_by) AS decider
+        FROM school.expense_payment y JOIN school.expense x ON x.tenant_id = y.tenant_id AND x.id = y.expense_id";
     // Positive, two decimals at most.
     private const AMOUNT = ['required', 'string', 'regex:/^(?!0+(\.0+)?$)(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$/'];
     private const FIELDS = ['expense_date' => 'required|date_format:Y-m-d|before_or_equal:today', 'category_id' => 'required|uuid', 'label' => 'nullable|string|max:200',
@@ -38,17 +44,46 @@ final class ExpenseController
     {
         $data = $request->validate(Paging::RULES + self::RULES);
         $request->merge(['paginate' => true]);
+        [$sql, $bindings] = self::query($this->school->id(), $data);
+        return Paging::select($request, $sql, $bindings, self::ORDER, fn ($row) => self::shape($row));
+    }
+
+    public const ORDER = 'x.expense_date DESC, x.created_at DESC, x.id';
+
+    /** @return array{0: string, 1: array} the expenses asked for, as the screen and the export list them; by payment state, the validated ones */
+    public static function query(string $tenant, array $filters): array
+    {
         $sql = self::EXPENSES.' WHERE x.tenant_id = ?';
-        $bindings = [$this->school->id()];
-        foreach (['status' => 'x.status = ?', 'category' => 'x.category_id = ?', 'program' => 'x.program_id = ?', 'from' => 'x.expense_date >= ?::date',
-            'to' => 'x.expense_date <= ?::date'] as $key => $clause) {
-            if (isset($data[$key])) { $sql .= ' AND '.$clause; $bindings[] = $data[$key]; }
+        $bindings = [$tenant];
+        foreach (['status' => 'x.status = ?', 'payment' => 'school.expense_payment_state(x.status, x.amount, y.paid) = ?', 'category' => 'x.category_id = ?',
+            'program' => 'x.program_id = ?', 'from' => 'x.expense_date >= ?::date', 'to' => 'x.expense_date <= ?::date'] as $key => $clause) {
+            if (isset($filters[$key])) { $sql .= ' AND '.$clause; $bindings[] = $filters[$key]; }
         }
-        if (isset($data['search']) && trim($data['search']) !== '') {
+        if (isset($filters['search']) && trim($filters['search']) !== '') {
             $sql .= ' AND '.Paging::search(['x.beneficiary', 'x.label', 'x.reason']);
-            $bindings[] = $data['search'];
+            $bindings[] = $filters['search'];
         }
-        return Paging::select($request, $sql, $bindings, 'x.expense_date DESC, x.created_at DESC, x.id', fn ($row) => self::shape($row));
+        return [$sql, $bindings];
+    }
+
+    /** An expense's payments and their reversals, the latest first. */
+    public function payments(string $expense)
+    {
+        $current = $this->expense($expense);
+        return ['data' => array_map(fn ($row) => (array) $row, DB::select(self::PAYMENTS.' WHERE y.tenant_id = ? AND y.expense_id = ? ORDER BY y.created_at DESC, y.id',
+            [$this->school->id(), $current['id']]))];
+    }
+
+    /** A validated expense paid, at once or in parts, never beyond what is left; once per key (BR-05). */
+    public function pay(Request $request, string $expense)
+    {
+        $current = $this->expense($expense);
+        $data = $request->validate(['amount' => self::AMOUNT, 'paid_on' => 'required|date_format:Y-m-d|before_or_equal:today', 'method_code' => 'required|string|regex:/^[a-z_]{1,20}$/',
+            'external_ref' => 'nullable|string|max:100', 'idempotency_key' => 'required|uuid']);
+        $id = DB::selectOne('SELECT school.record_expense_payment(?, ?::numeric, ?::date, ?, ?, ?) AS id', [$current['id'], $data['amount'], $data['paid_on'],
+            $data['method_code'], $data['external_ref'] ?? null, $data['idempotency_key']])->id;
+        return response()->json(['data' => (array) DB::selectOne(self::PAYMENTS.' WHERE y.tenant_id = ? AND y.id = ?', [$this->school->id(), $id]),
+            'expense' => $this->expense($current['id'])], 201);
     }
 
     public function show(string $expense)

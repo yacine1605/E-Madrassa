@@ -323,13 +323,6 @@ final class EnrollmentFinance extends SchoolingPage
             ->mapWithKeys(fn (array $row) => [$row['id'] => __('finance.kinds.'.$row['kind']).' · '.$this->money($row['amount']).' · '.Str::limit($row['reason'], 40)])->all();
     }
 
-    /** @return array<string, string> the school's means of payment */
-    private function methods(): array
-    {
-        $codes = json_decode((string) DB::selectOne("SELECT school.setting_value('finance.payment.methods')::text AS v")->v, true) ?: [];
-        return collect($codes)->mapWithKeys(fn (string $code) => [$code => __('finance.methods.'.$code)])->all();
-    }
-
     /** @return array<string, string> the waiting payments the reader may validate: someone else's, or their own payment if the school allows it */
     private function validatable(): array
     {

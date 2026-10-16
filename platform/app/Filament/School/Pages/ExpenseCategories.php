@@ -22,10 +22,10 @@ final class ExpenseCategories extends ReferencePage
 {
     protected static bool $isDiscovered = true;
     protected static bool $shouldRegisterNavigation = false;
-    protected static array $permissions = ['expense.expense.read', 'expense.expense.create', 'expense.expense.validate', 'expense.expense.approve'];
+    protected static array $permissions = ['expense.expense.read', 'expense.expense.create', 'expense.expense.validate', 'expense.expense.approve', 'expense.expense.pay', 'expense.expense.reverse'];
     protected static ?string $section = 'finance';
     protected static ?string $module = 'expenses';
-    protected static string|array $routeMiddleware = ['module:expenses', 'permission:expense.expense.read,expense.expense.create,expense.expense.validate,expense.expense.approve'];
+    protected static string|array $routeMiddleware = ['module:expenses', 'permission:expense.expense.read,expense.expense.create,expense.expense.validate,expense.expense.approve,expense.expense.pay,expense.expense.reverse'];
 
     public static function getNavigationLabel(): string { return __('expenses.categories'); }
     public function getTitle(): string { return __('expenses.categories'); }

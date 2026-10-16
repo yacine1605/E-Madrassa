@@ -52,6 +52,7 @@ final class DatabaseErrors
         'refund_target_invalid', 'refund_execution_incomplete', 'credit_exceeded', 'receipt_not_validated',
         'period_closed', 'period_not_ended', 'period_has_pending', 'payment_attachment_invalid',
         'expense_category_system', 'expense_category_archived', 'expense_label_required', 'expense_future_date', 'expense_immutable', 'expense_not_author',
+        'expense_not_payable', 'expense_payment_immutable',
     ];
 
     public static function message(string $rule): string

@@ -205,6 +205,14 @@ GRANT INSERT (tenant_id, expense_date, amount, category_id, label, beneficiary, 
 GRANT UPDATE (expense_date, amount, category_id, label, beneficiary, reason, program_id, status, decision_reason, version) ON school.expense TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.check_expense(school.expense), school.expense_category_system(text),
   school.record_expense(date, numeric, uuid, text, text, text, uuid, uuid) TO school_runtime;
+-- An expense's payments (056): paid by `expense.expense.pay`, a payment taken back by its linked reversal,
+-- decided by someone else; never changed nor deleted.
+GRANT SELECT ON school.expense_payment TO school_runtime;
+GRANT INSERT (tenant_id, expense_id, kind, reverses_payment_id, amount, paid_on, method_code, external_ref, reason, idempotency_key)
+  ON school.expense_payment TO school_runtime;
+GRANT UPDATE (status, decision_reason, version) ON school.expense_payment TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.expense_paid(uuid, uuid), school.expense_payment_state(text, numeric, numeric),
+  school.record_expense_payment(uuid, numeric, date, text, text, uuid), school.reverse_expense_payment(uuid, text, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -489,6 +497,9 @@ ALTER FUNCTION school.retire_payment_attachment() OWNER TO platform_provisioner;
 GRANT SELECT, INSERT ON school.expense_category TO platform_provisioner;
 GRANT SELECT ON school.expense TO platform_provisioner;
 ALTER FUNCTION school.guard_expense_file() OWNER TO platform_provisioner;
+-- An expense's payments (056): read by a month's reconciliation and closure.
+GRANT SELECT ON school.expense_payment TO platform_provisioner;
+ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

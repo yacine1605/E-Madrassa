@@ -1247,9 +1247,33 @@ Routes: `GET|POST /api/expense-categories`, `POST /api/expense-categories/defaul
 
 Validation on 16 October 2026: **277 PHP integration tests (12,320 assertions), 245 embedded SQL checks and 269 native PostgreSQL 16 checks including concurrency**; migration 055 rolled back alone on the database the suite had filled (its first rollback failed: the checks of an expense depended on its table, now dropped first), then applied again; local browser acceptance in Chromium: 220 screens without a problem, Expenses and Expense categories included. The CI could not start (the GitHub account's billing).
 
+## Increment 70 (lot 3): an expense's payments
+
+**FR-DEP-02** (SQL 056), with **FR-FIN-07** and **BR-15** for the expenses; module `expenses`.
+
+- **Committed and paid told apart**: a validated expense is committed; what is paid of it comes from its payments, computed, never entered: `unpaid`, `partially_paid`, `paid` (`payment_state`, with what is paid and what is left).
+- **A payment** (`expense.expense.pay`, for the whole school): of a validated expense, by a means the school accepts (`finance.payment.methods`), with its reference (a cheque, a transfer), on a day not to come and not in a closed month, never beyond what is left; at once or in parts; recorded once per key (BR-05), even sent five times at once, and two payments at once never pass what is left (TST-10). It takes effect when recorded and never changes nor goes (TST-11).
+- **Its reversal** (`expense.expense.reverse`): the whole amount of a payment, dated the day it is asked for, with its reason, one at a time; it waits for its validation by `expense.expense.validate`, never by whoever asked for it (BR-08, new sod rule `expense_payment_reversal`), or is rejected with a reason. Validated, it takes the payment back; the payment is kept, `reversed`.
+- **Readers**: whoever reads, validates, pays or takes back the expenses reads their payments; a payments' reader or a teacher sees none.
+- **Filters and exports**: the expenses also filtered by payment state, and exported as listed (`expenses`, CSV, Excel or PDF) by whoever reads them and exports, logged.
+- **Closed months** (FR-FIN-07): a month closes once nothing dated in it waits for a decision, the submitted expenses and the reversals asked for included; an expense entered or submitted holds the closing lock like a payment. Its reconciliation adds the expenses validated with a day in it by category, what was paid of them by means, the reversals, and the month's cash balance (what came in net, less the expenses paid net).
+- Screens: **Expenses** (payment state column and filter, *Pay*, *Payments*, *Export*), **Expense payments** (reversal, validation, rejection), **Closures** (the expense lines of a reconciliation).
+
+Routes: `GET|POST /api/expenses/{expense}/payments`, `GET /api/expense-payments`, `POST /api/expense-payments/{payment}/reverse`, `/validate`, `/reject`; export kind `expenses`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-DEP-02 (pay) | `ExpensePaymentTest`, tests/sql: not before its validation; in parts; never beyond what is left; payment state computed |
+| BR-05, TST-10 | `ExpensePaymentTest`, tests/sql natifs: the same key answers the first payment, five sendings at once record one, two payments at once never pass what is left |
+| TST-11, BR-08 | `ExpensePaymentTest`, tests/sql: a payment never changed nor deleted; its reversal never validated by whoever asked for it, the original kept `reversed` |
+| FR-DEP-02 (exports) | `ExpensePaymentTest`: the expenses filtered by payment state exported and logged; refused to a teacher |
+| FR-FIN-07, BR-15 | tests/sql (and natifs): a month with a submitted expense not closed; its report with the expenses, their payments and the cash balance; nothing paid with a day in it afterwards; a closure and a payment dated in its month at once: the payment refused, or the closure waits for it and reports it |
+
+Validation on 16 October 2026: **278 PHP integration tests (12,551 assertions), 247 embedded SQL checks and 272 native PostgreSQL 16 checks including concurrency**; migration 056 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 224 screens without a problem, Expense payments included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Expenses' payments and corrections (FR-DEP-02, FR-DEP-03): committed and paid expenses told apart, payments of a validated expense (`unpaid`, `partially_paid`, `paid`), a linked reversal with its reason that keeps the original, closed months applied; filters and exports.
+1. Expenses' corrections (FR-DEP-03): a validated expense corrected or cancelled by a linked negative entry with its reason, the original kept, never below what is paid; closed months applied.
 2. Remunerations (FR-REM): rules, rates by level, monthly runs and payouts (TST-12, TST-13, TST-19).
 
 ## Next increments of lot 2
