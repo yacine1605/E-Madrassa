@@ -138,11 +138,4 @@ final class StaffAvailability extends StaffMemberPage
             $record['max_weekly_hours'] === null ? null : __('staff.bound_max_weekly', ['hours' => $this->hours($record['max_weekly_hours'])]),
         ]));
     }
-
-    private function hours(int|float|string|null $hours): string
-    {
-        if ($hours === null) return '';
-        $value = (float) $hours;
-        return __('staff.hours', ['hours' => Formats::number($value, floor($value) == $value ? 0 : 2)]);
-    }
 }

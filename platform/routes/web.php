@@ -5,6 +5,7 @@ use App\Http\Controllers\AccountLinkController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ContractController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\GroupMembershipController;
+use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
@@ -308,6 +310,19 @@ Route::prefix('api')->group(function () {
                     Route::post('availabilities/{declaration}/reject', [AvailabilityController::class, 'reject']);
                     Route::post('unavailabilities/{unavailability}/approve', [UnavailabilityController::class, 'approve']);
                     Route::post('unavailabilities/{unavailability}/reject', [UnavailabilityController::class, 'reject']);
+                });
+                // FR-STF-04: contracts without any amount, and planned absences; each read and written with its own permission.
+                Route::get('staff/{staff}/contracts', [ContractController::class, 'index'])->middleware('permission:staff.contract.read');
+                Route::middleware('permission:staff.contract.manage')->group(function () {
+                    Route::post('staff/{staff}/contracts', [ContractController::class, 'store']);
+                    Route::post('contracts/{contract}/amend', [ContractController::class, 'amend']);
+                    Route::post('contracts/{contract}/end', [ContractController::class, 'end']);
+                    Route::delete('contracts/{contract}', [ContractController::class, 'destroy']);
+                });
+                Route::get('staff/{staff}/leaves', [LeaveController::class, 'index'])->middleware('permission:staff.leave.read');
+                Route::middleware('permission:staff.leave.manage')->group(function () {
+                    Route::post('staff/{staff}/leaves', [LeaveController::class, 'store']);
+                    Route::post('leaves/{leave}/cancel', [LeaveController::class, 'cancel']);
                 });
             });
 

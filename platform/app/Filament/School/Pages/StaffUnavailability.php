@@ -19,7 +19,7 @@ use Filament\Tables\Table;
 /**
  * FR-STF-03: the days a teacher may not teach, from one day until another, with the reason; they
  * prevail over the weekly availability. Declared and decided as the availability; one in force is
- * cancelled until its last day.
+ * cancelled until its last day. A leave's follows its leave (FR-STF-04).
  */
 final class StaffUnavailability extends StaffMemberPage
 {
@@ -39,7 +39,9 @@ final class StaffUnavailability extends StaffMemberPage
             ->columns([
                 TextColumn::make('date_from')->label(__('staff.unavailable_from'))->formatStateUsing(fn ($state) => Formats::date($state)),
                 TextColumn::make('date_to')->label(__('staff.unavailable_until'))->formatStateUsing(fn ($state) => Formats::date($state)),
-                TextColumn::make('reason')->label(__('school.reason'))->wrap(),
+                // A leave's says nothing of the leave (FR-STF-04): its type is read with the leave.
+                TextColumn::make('reason')->label(__('school.reason'))->wrap()
+                    ->state(fn (array $record) => $record['leave_id'] === null ? $record['reason'] : __('staff.leave_unavailability')),
                 TextColumn::make('status')->label(__('school.status'))->badge()
                     ->formatStateUsing(fn (string $state) => __('staff.unavailability_states.'.$state))
                     ->color(fn (string $state) => match ($state) { 'approved' => 'success', 'pending' => 'warning', 'rejected' => 'danger', default => 'gray' })
@@ -73,7 +75,7 @@ final class StaffUnavailability extends StaffMemberPage
                     ->action(fn (array $record, array $data) => $this->change($record, 'staff.availability.approve', 'reject', $data)),
                 Action::make('cancel')->label(__('staff.cancel_unavailability'))->color('warning')->requiresConfirmation()
                     ->modalDescription(__('staff.cancel_unavailability_help'))
-                    ->visible(fn (array $record) => $record['status'] === 'approved' && $record['date_to'] >= now()->toDateString()
+                    ->visible(fn (array $record) => $record['status'] === 'approved' && $record['leave_id'] === null && $record['date_to'] >= now()->toDateString()
                         && $this->changeable() && $this->inForceAtOnce())
                     ->action(fn (array $record) => $this->change($record, 'staff.availability.manage', 'cancel', [])),
                 Action::make('withdraw')->label(__('staff.withdraw'))->color('gray')->requiresConfirmation()->modalDescription(__('staff.withdraw_help'))

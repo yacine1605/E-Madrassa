@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\Refusal;
 use App\Support\AcademicRecords;
 use App\Support\CurrentSchool;
 use App\Support\Paging;
@@ -11,11 +12,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * FR-STF-03: the days a teacher may not teach, from one day until another, with the reason; they
  * prevail over the weekly availability. In force at once or waiting for an approver, as a
- * declaration; one in force is cancelled until its last day, never deleted (SQL 034).
+ * declaration; one in force is cancelled until its last day, never deleted (SQL 034). A leave's
+ * (`leave_id`, FR-STF-04) has no reason of its own and follows its leave only (SQL 035).
  */
 final class UnavailabilityController
 {
-    private const COLUMNS = "id, staff_id, date_from, date_to, reason, status, decided_at, decided_by, decision_reason, cancelled_at, version,
+    private const COLUMNS = "id, staff_id, leave_id, date_from, date_to, reason, status, decided_at, decided_by, decision_reason, cancelled_at, version,
         created_at, created_by, updated_at, updated_by,
         (SELECT u.name FROM public.users u WHERE u.id = unavailability.created_by) AS declared_by_name,
         (SELECT u.name FROM public.users u WHERE u.id = unavailability.decided_by) AS decided_by_name";
@@ -65,7 +67,7 @@ final class UnavailabilityController
     /** A pending one withdrawn; the journal keeps its values. */
     public function destroy(Request $request, string $unavailability)
     {
-        $row = $this->find($unavailability, true);
+        $row = $this->changeable($unavailability);
         DB::select('SELECT school.require_staff(?, ?)', ['staff.availability.manage', $row->staff_id]);
         $data = $request->validate(['version' => 'required|integer|min:1']);
         $this->records->version($row, (int) $data['version']);
@@ -75,7 +77,7 @@ final class UnavailabilityController
 
     private function change(Request $request, string $unavailability, string $permission, string $status, string $reason): array
     {
-        $row = $this->find($unavailability, true);
+        $row = $this->changeable($unavailability);
         DB::select('SELECT school.require_staff(?, ?)', [$permission, $row->staff_id]);
         $data = $request->validate(['version' => 'required|integer|min:1',
             'decision_reason' => $reason === 'prohibited' ? 'prohibited' : $reason.'|string|min:3|max:500']);
@@ -84,6 +86,14 @@ final class UnavailabilityController
         if ($reason !== 'prohibited') $change['decision_reason'] = $data['decision_reason'] ?? null;
         DB::table('school.unavailability')->where('tenant_id', $this->school->id())->where('id', $row->id)->update($change);
         return ['data' => (array) $this->find($row->id)];
+    }
+
+    /** One declared here: a leave's is cancelled with its leave. */
+    private function changeable(string $id): object
+    {
+        $row = $this->find($id, true);
+        if ($row->leave_id !== null) throw Refusal::of('unavailability_from_leave');
+        return $row;
     }
 
     private function find(string $id, bool $lock = false): object { return $this->records->find('unavailability', $id, $lock, self::COLUMNS); }

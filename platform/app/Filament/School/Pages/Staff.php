@@ -5,6 +5,7 @@ namespace App\Filament\School\Pages;
 use App\Http\Controllers\StaffController;
 use App\Support\CurrentSchool;
 use App\Support\Formats;
+use App\Support\Permissions;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -90,6 +91,11 @@ final class Staff extends SchoolingPage
                 Action::make('availability')->label(__('staff.availability'))
                     ->visible(fn (array $record) => in_array($record['staff_type'], ['teacher_internal', 'teacher_external'], true))
                     ->url(fn (array $record) => StaffAvailability::getUrl(['staff' => $record['id']])),
+                // FR-STF-04: read with their own permission, for any member.
+                Action::make('contracts')->label(__('staff.contracts'))->visible(fn () => app(Permissions::class)->can('staff.contract.read'))
+                    ->url(fn (array $record) => StaffContracts::getUrl(['staff' => $record['id']])),
+                Action::make('leaves')->label(__('staff.leaves'))->visible(fn () => app(Permissions::class)->can('staff.leave.read'))
+                    ->url(fn (array $record) => StaffLeaves::getUrl(['staff' => $record['id']])),
                 Action::make('edit')->label(__('school.edit'))->visible(fn (array $record) => $this->changeable($record))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->staffFields(),

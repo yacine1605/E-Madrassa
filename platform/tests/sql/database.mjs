@@ -2409,6 +2409,111 @@ await check('a site\'s grant keeps the availability of its site\'s teachers; a t
   await rejects(DECLARE, [a, theirs.id, tomorrow, '[]', null, null, null], '42501');
   await as('school_runtime', a, 1);
 });
+// A member's contracts and leave (SQL 035, FR-STF-04): dated versions without any amount, planned absences that make a teacher unavailable.
+const CONTRACT = 'INSERT INTO school.staff_contract (tenant_id, staff_id, contract_type, valid_from, valid_to, weekly_hours, observation) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, valid_from::text, valid_to::text';
+const LEAVE = 'INSERT INTO school.staff_leave (tenant_id, staff_id, leave_type, date_from, date_to, observation) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, status';
+await check('a contract is versioned with its dates and carries no amount; its end only comes earlier (FR-STF-04 AC1)', async () => {
+  // AC1: nothing of a contract is an amount, whoever reads it.
+  const columns = (await sql("SELECT column_name FROM information_schema.columns WHERE table_schema = 'school' AND table_name = 'staff_contract'")).rows.map(r => r.column_name);
+  assert.deepEqual(columns.filter(c => /amount|salary|rate|pay|wage|price|minor/.test(c)), []);
+  const teacher = await newStaff('Contrat', 'Yanis');
+  const [started, renewal, later] = [await dayAfter(today, -30), await dayAfter(today, 10), await dayAfter(today, 300)];
+  const trial = await first(CONTRACT, [a, teacher.id, 'fixed_term', started, later, 18, null]);
+  assert.deepEqual([trial.valid_from, trial.valid_to], [started, later]);
+  await rejects(CONTRACT, [a, teacher.id, 'permanent', today, null, null, null], '23514', 'contract_overlap');
+  await rejects(CONTRACT, [a, (await newStaff('Contrat', 'Ines')).id, 'fixed_term', today, null, null, null], '23514', 'contract_end_required');
+  await rejects(CONTRACT, [a, teacher.id, 'permanent', later, started, null, null], '23514', 'contract_end_before_start');
+  await rejects(CONTRACT, [a, teacher.id, 'permanent', await dayAfter(later, 1), null, 0, null], '23514');
+  // An amendment: the version in force ends the day before the next one's first day, which follows it.
+  await sql('UPDATE school.staff_contract SET valid_to = $2 WHERE id = $1', [trial.id, await dayAfter(renewal, -1)]);
+  const next = await first(CONTRACT, [a, teacher.id, 'permanent', renewal, null, 20, 'Avenant n°1']);
+  await rejects('UPDATE school.staff_contract SET valid_to = $2 WHERE id = $1', [trial.id, later], '23514', 'contract_end_later');
+  await rejects('UPDATE school.staff_contract SET valid_to = NULL WHERE id = $1', [trial.id], '23514', 'contract_end_later');
+  await rejects('UPDATE school.staff_contract SET valid_to = $2 WHERE id = $1', [trial.id, await dayAfter(started, -1)], '23514', 'contract_end_before_start');
+  await rejects("UPDATE school.staff_contract SET end_reason = 'Erreur' WHERE id = $1", [trial.id], '23514', 'identity_immutable');
+  await rejects('UPDATE school.staff_contract SET weekly_hours = 30 WHERE id = $1', [trial.id], '42501');
+  // Ended earlier with its reason; a version begun is never deleted, one to come is, the journal keeping it masked.
+  await sql("UPDATE school.staff_contract SET valid_to = $2, end_reason = 'Fin de période d''essai' WHERE id = $1", [trial.id, today]);
+  await rejects('DELETE FROM school.staff_contract WHERE id = $1', [trial.id], '23514', 'contract_started');
+  await sql('DELETE FROM school.staff_contract WHERE id = $1', [next.id]);
+  const entry = await first("SELECT before FROM school.audit_log WHERE object_type = 'staff_contract' AND object_id = $1 AND action = 'DELETE'", [next.id]);
+  assert.deepEqual([entry.before.observation, entry.before.weekly_hours, entry.before.contract_type], ['[masqué]', 20, 'permanent']);
+  // Any member still with the school; an archived record's no longer change.
+  assert.ok((await first(CONTRACT, [a, (await newStaff('Bureau', 'Amel', 'administrative')).id, 'permanent', today, null, 40, null])).id);
+  const gone = await newStaff('Parti', 'Contrat');
+  const kept = await first(CONTRACT, [a, gone.id, 'hourly', started, null, null, null]);
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [gone.id]);
+  await rejects(CONTRACT, [a, gone.id, 'hourly', later, null, null, null], '23514', 'staff_left');
+  await sql('UPDATE school.staff_contract SET valid_to = $2 WHERE id = $1', [kept.id, today]);
+  await sql('UPDATE school.staff SET archived_at = now() WHERE id = $1', [gone.id]);
+  await rejects('UPDATE school.staff_contract SET valid_to = $2 WHERE id = $1', [kept.id, yesterday], '23514', 'staff_archived');
+});
+await check('a teacher\'s leave makes them unavailable, never saying why to the record\'s readers, and is cancelled with it (FR-STF-04, FR-STF-03)', async () => {
+  const teacher = await newStaff('Conge', 'Salima');
+  const leave = await first(LEAVE, [a, teacher.id, 'sick', yesterday, await dayAfter(today, 2), 'Certificat médical']);
+  assert.equal(leave.status, 'planned');
+  const off = await first('SELECT status, reason, date_from::text AS since FROM school.unavailability WHERE leave_id = $1', [leave.id]);
+  assert.deepEqual(off, { status: 'approved', reason: null, since: yesterday });
+  assert.equal((await first(AVAILABLE, [teacher.id, today, '08:00', '09:00'])).ok, false);
+  await rejects(LEAVE, [a, teacher.id, 'annual', await dayAfter(today, 2), await dayAfter(today, 5), null], '23514', 'leave_overlap');
+  await rejects(LEAVE, [a, teacher.id, 'annual', await dayAfter(today, 5), await dayAfter(today, 4), null], '23514', 'leave_end_before_start');
+  // Days the teacher declared may meet a leave's.
+  assert.equal((await first(DAY_OFF, [a, teacher.id, tomorrow, tomorrow, 'Rendez-vous'])).status, 'approved');
+  // A leave's unavailability follows its leave only, and never is forged.
+  await rejects("UPDATE school.unavailability SET status = 'cancelled' WHERE leave_id = $1", [leave.id], '23514', 'unavailability_from_leave');
+  await rejects('DELETE FROM school.unavailability WHERE leave_id = $1', [leave.id], '23514', 'availability_decided');
+  await rejects('INSERT INTO school.unavailability (tenant_id, staff_id, date_from, date_to, leave_id) VALUES ($1, $2, $3, $3, $4)',
+    [a, teacher.id, today, leave.id], '23514', 'unavailability_from_leave');
+  await rejects('UPDATE school.staff_leave SET date_to = $2 WHERE id = $1', [leave.id, today], '42501');
+  await rejects('DELETE FROM school.staff_leave WHERE id = $1', [leave.id], '42501');
+  await sql("UPDATE school.staff_leave SET status = 'cancelled' WHERE id = $1", [leave.id]);
+  assert.equal((await first('SELECT status FROM school.unavailability WHERE leave_id = $1', [leave.id])).status, 'cancelled');
+  assert.equal((await first(AVAILABLE, [teacher.id, today, '08:00', '09:00'])).ok, true);
+  await rejects("UPDATE school.staff_leave SET status = 'planned' WHERE id = $1", [leave.id], '23514', 'status_transition_refused');
+  // Once its days are gone, a leave stays as it is; a member who does not teach has no timetable to free.
+  const past = await first(LEAVE, [a, teacher.id, 'training', await dayAfter(today, -10), await dayAfter(today, -8), null]);
+  await rejects("UPDATE school.staff_leave SET status = 'cancelled' WHERE id = $1", [past.id], '23514', 'leave_ended');
+  const clerk = await newStaff('Conge', 'Bureau', 'administrative');
+  assert.equal((await first(LEAVE, [a, clerk.id, 'annual', tomorrow, await dayAfter(today, 10), null])).status, 'planned');
+  assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE staff_id = $1', [clerk.id]), 0);
+  const gone = await newStaff('Parti', 'Conge');
+  await sql("UPDATE school.staff SET status = 'left' WHERE id = $1", [gone.id]);
+  await rejects(LEAVE, [a, gone.id, 'annual', tomorrow, tomorrow, null], '23514', 'staff_left');
+});
+await check('contracts and leave are read with their own permission; a site\'s grant keeps its site\'s, a teacher reads their own (FR-IAM-04, section 3.3)', async () => {
+  const elsewhere = await newStaff('Siege', 'Terms');
+  const office = await scopedAccount('internal', 'site', [staffSiteB], ['staff.profile.read', 'staff.profile.create', 'staff.contract.read',
+    'staff.contract.manage', 'staff.leave.read', 'staff.leave.manage']);
+  await as('school_runtime', a, office.user);
+  const theirs = await newStaff('Annexe', 'Terms');
+  const contract = (await first(CONTRACT, [a, theirs.id, 'permanent', today, null, 12, null])).id;
+  // Their leave makes the teacher unavailable, though the grant declares no availability.
+  const leave = (await first(LEAVE, [a, theirs.id, 'annual', tomorrow, tomorrow, null])).id;
+  assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE leave_id = $1', [leave]), 1);
+  await rejects(CONTRACT, [a, elsewhere.id, 'permanent', today, null, null, null], '42501');
+  await rejects(LEAVE, [a, elsewhere.id, 'annual', tomorrow, tomorrow, null], '42501');
+  assert.deepEqual((await sql('SELECT id FROM school.staff_contract')).rows.map(r => r.id), [contract]);
+  // Whoever reads the records only reads that the teacher is away, not the leave nor the contract.
+  const reader = await scopedAccount('internal', 'tenant', null, ['staff.profile.read']);
+  await as('school_runtime', a, reader.user);
+  assert.equal(await count('SELECT count(*) n FROM school.staff_contract'), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.staff_leave'), 0);
+  assert.deepEqual(await first('SELECT reason, status FROM school.unavailability WHERE leave_id = $1', [leave]), { reason: null, status: 'approved' });
+  // A teacher with their own scope reads their contract and leave and their journal; changes none.
+  const self = await scopedAccount('internal', 'personal', null, ['staff.profile.read', 'staff.contract.read', 'staff.leave.read', 'audit.log.read']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [theirs.id, self.user]);
+  await as('school_runtime', a, self.user);
+  assert.deepEqual((await sql('SELECT id FROM school.staff_contract')).rows.map(r => r.id), [contract]);
+  assert.deepEqual((await sql('SELECT id FROM school.staff_leave')).rows.map(r => r.id), [leave]);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE object_type IN ('staff_contract', 'staff_leave')"), 2);
+  await rejects(CONTRACT, [a, theirs.id, 'permanent', await dayAfter(today, 400), null, null, null], '42501');
+  assert.equal((await sql("UPDATE school.staff_leave SET status = 'cancelled' WHERE id = $1", [leave])).rowCount ?? 0, 0);
+  await as('school_runtime', a, 1);
+  // Section 3.3: the school's teacher role reads them, as its template does.
+  assert.equal(await count(`SELECT count(*) n FROM school.role_permission p JOIN school.role r ON r.tenant_id = p.tenant_id AND r.id = p.role_id
+    WHERE r.tenant_id = $1 AND r.template_code = 'teacher' AND p.permission_code IN ('staff.contract.read', 'staff.leave.read')`, [a]), 2);
+});
 // The last-site concurrency test below expects the school's two sites of before.
 await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);
@@ -2896,6 +3001,28 @@ if (PgClient) {
     }
     assert.equal(await count('SELECT count(*) n FROM school.availability WHERE staff_id = $1', [teacher.id]), 1);
     assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE staff_id = $1', [teacher.id]), 1);
+  });
+  await check('two overlapping contracts, or two overlapping leaves, recorded at once are recorded once (FR-STF-04)', async () => {
+    await as('school_runtime', a, 1);
+    const member = await newStaff('Course', 'Contrat');
+    for (const [statement, values, rule] of [[CONTRACT, [a, member.id, 'permanent', tomorrow, null, null, null], 'contract_overlap'],
+      [LEAVE, [a, member.id, 'annual', tomorrow, tomorrow, null], 'leave_overlap']]) {
+      const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+      const results = await Promise.allSettled(clients.map(async c => {
+        await c.query('BEGIN');
+        try {
+          await c.query(statement, values);
+          await c.query('SELECT pg_sleep(0.15)');
+          await c.query('COMMIT');
+        } catch (e) { await c.query('ROLLBACK'); throw e; }
+      }));
+      await Promise.all(clients.map(c => c.end()));
+      assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+      assert.equal(results.find(r => r.status === 'rejected').reason.message, rule);
+    }
+    assert.equal(await count('SELECT count(*) n FROM school.staff_contract WHERE staff_id = $1', [member.id]), 1);
+    assert.equal(await count('SELECT count(*) n FROM school.staff_leave WHERE staff_id = $1', [member.id]), 1);
+    assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE staff_id = $1', [member.id]), 1);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

@@ -4,13 +4,15 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\StaffController;
 use App\Support\Formats;
+use App\Support\Permissions;
 use App\Support\SchoolScreen;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 
 /**
  * A screen about one member of staff, opened from their row of the staff list (`?staff=`): their
- * qualifications, their availability, their days off. Read with their record (FR-STF-01).
+ * qualifications, their availability, their days off, their contracts and leave. Read with their
+ * record (FR-STF-01), and with its own permission where a screen declares one (FR-STF-04).
  */
 abstract class StaffMemberPage extends SchoolingPage
 {
@@ -63,6 +65,17 @@ abstract class StaffMemberPage extends SchoolingPage
     {
         return !$this->member()['archived_at'] && $this->writableFor($permission, 'staff', $this->staff);
     }
+
+    /** « 4,5 h »: hours a day or a week, without decimals when whole. */
+    protected function hours(int|float|string|null $hours): string
+    {
+        if ($hours === null) return '';
+        $value = (float) $hours;
+        return __('staff.hours', ['hours' => Formats::number($value, floor($value) == $value ? 0 : 2)]);
+    }
+
+    /** Whether the reader may open another of the member's screens, read with this permission. */
+    protected function reads(string $permission): bool { return app(Permissions::class)->can($permission); }
 
     /** Who declared a pending one; who decided the others, when, and why if said. */
     protected function decision(array $record): string

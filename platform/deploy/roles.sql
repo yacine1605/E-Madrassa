@@ -176,6 +176,15 @@ GRANT INSERT (tenant_id, staff_id, date_from, date_to, reason) ON school.unavail
 GRANT UPDATE (status, decision_reason, version) ON school.availability, school.unavailability TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.is_own_staff(uuid), school.availability_in_force(uuid), school.availability_slots(jsonb),
   school.availability_hours(jsonb), school.availability_on(uuid, date), school.available(uuid, date, time, time) TO school_runtime;
+-- Contracts and leave (035): a contract's version keeps what it says, its end only comes earlier, one not begun is deleted;
+-- a leave is cancelled, never deleted. A teacher's leave writes and cancels its unavailability (leave_id).
+GRANT SELECT, DELETE ON school.staff_contract TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, contract_type, reference, valid_from, valid_to, weekly_hours, observation) ON school.staff_contract TO school_runtime;
+GRANT UPDATE (valid_to, end_reason, version) ON school.staff_contract TO school_runtime;
+GRANT SELECT ON school.staff_leave TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, leave_type, date_from, date_to, observation) ON school.staff_leave TO school_runtime;
+GRANT UPDATE (status, version) ON school.staff_leave TO school_runtime;
+GRANT INSERT (leave_id) ON school.unavailability TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -298,6 +307,9 @@ ALTER FUNCTION school.check_lead_teacher() OWNER TO platform_provisioner;
 GRANT SELECT ON school.availability, school.unavailability TO platform_provisioner;
 ALTER FUNCTION school.is_own_staff(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.check_availability() OWNER TO platform_provisioner;
+-- Contracts and leave (035): the member's state and the terms already there, whatever the writer may read.
+GRANT SELECT ON school.staff_contract, school.staff_leave TO platform_provisioner;
+ALTER FUNCTION school.check_staff_terms() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

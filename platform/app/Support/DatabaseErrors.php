@@ -36,6 +36,8 @@ final class DatabaseErrors
         'availability_not_teacher', 'availability_past', 'availability_slots_invalid', 'availability_slots_overlap',
         'availability_below_minimum', 'availability_same_day', 'availability_decided', 'unavailability_overlap', 'unavailability_ended',
         'self_approval', 'approval_required',
+        'contract_overlap', 'contract_end_required', 'contract_end_before_start', 'contract_end_later', 'contract_started',
+        'leave_overlap', 'leave_end_before_start', 'leave_ended', 'leave_kept', 'unavailability_from_leave',
     ];
 
     public static function message(string $rule): string
