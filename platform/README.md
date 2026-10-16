@@ -1245,7 +1245,7 @@ Routes: `GET|POST /api/expense-categories`, `POST /api/expense-categories/defaul
 | FR-DEP-02 AC3 | `ExpenseTest`, tests/sql: a teacher and a payments' reader see no document, by the expense's route or the files' one |
 | BR-05, BR-15 | `ExpenseTest`, tests/sql: one expense per key; none dated to come or in a closed month |
 
-VALIDATION_69
+Validation on 16 October 2026: **277 PHP integration tests (12,320 assertions), 245 embedded SQL checks and 269 native PostgreSQL 16 checks including concurrency**; migration 055 rolled back alone on the database the suite had filled (its first rollback failed: the checks of an expense depended on its table, now dropped first), then applied again; local browser acceptance in Chromium: 220 screens without a problem, Expenses and Expense categories included. The CI could not start (the GitHub account's billing).
 
 ## Next increments of lot 3
 
