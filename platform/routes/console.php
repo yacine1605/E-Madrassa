@@ -198,6 +198,14 @@ Artisan::command('platform:lead-reminders {--limit=500}', function () {
 
 Schedule::command('platform:lead-reminders')->everyMinute()->withoutOverlapping();
 
+// FR-FIN-06: the finance hears each morning of the instalments falling on the school's offsets (J-3, J, J+7 by default).
+Artisan::command('platform:finance-reminders {--day=}', function () {
+    $sent = DB::selectOne('SELECT platform.notify_installments(?::date) AS n', [$this->option('day') ?: now()->timezone('Africa/Algiers')->toDateString()])->n;
+    $this->info("Finance reminders notified: $sent.");
+})->purpose('Notify the finance of the instalments falling due, once a day per school (as school_runtime)');
+
+Schedule::command('platform:finance-reminders')->dailyAt('06:00')->timezone('Africa/Algiers')->withoutOverlapping();
+
 // FR-IMP-02: temporary files (exports) leave storage once expired.
 Artisan::command('platform:purge-files {--limit=500}', function () {
     $purged = 0;

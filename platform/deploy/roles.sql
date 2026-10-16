@@ -188,6 +188,8 @@ GRANT EXECUTE ON FUNCTION school.request_refund(uuid, text, uuid, numeric, text,
 -- Receipts (051): issued once by their function, read with their payment or refund, never changed.
 GRANT SELECT ON school.receipt TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.issue_receipt(uuid, uuid) TO school_runtime;
+-- Arrears (052): read as the reader's scope allows; the finance's daily reminder run by the scheduler.
+GRANT EXECUTE ON FUNCTION school.arrears(date, uuid), platform.notify_installments(date) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -453,6 +455,12 @@ GRANT SELECT, INSERT ON school.receipt TO platform_provisioner;
 GRANT SELECT, INSERT, UPDATE (last) ON school.receipt_counter TO platform_provisioner;
 ALTER FUNCTION platform.balance_at(uuid, uuid, timestamptz) OWNER TO platform_provisioner;
 ALTER FUNCTION school.issue_receipt(uuid, uuid) OWNER TO platform_provisioner;
+-- Arrears (052): the schedules, payments and members of every school for the daily reminder, once a day.
+GRANT SELECT, INSERT ON school.finance_reminder_run TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION platform.reminder_days(text) TO platform_provisioner;
+ALTER FUNCTION platform.arrears_of(uuid, uuid[], date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.arrears(date, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.notify_installments(date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

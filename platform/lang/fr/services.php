@@ -72,7 +72,7 @@ return [
     'exports' => 'Exports',
     'new_export' => 'Nouvel export',
     'export_kind' => 'Données',
-    'export_kinds' => ['accounts' => 'Comptes', 'referential' => 'Référentiel'],
+    'export_kinds' => ['accounts' => 'Comptes', 'referential' => 'Référentiel', 'arrears' => 'Impayés'],
     'language' => 'Langue du fichier',
     'author' => 'Auteur',
     'rows' => 'Lignes',

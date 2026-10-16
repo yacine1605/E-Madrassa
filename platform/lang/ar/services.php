@@ -72,7 +72,7 @@ return [
     'exports' => 'التصدير',
     'new_export' => 'تصدير جديد',
     'export_kind' => 'البيانات',
-    'export_kinds' => ['accounts' => 'الحسابات', 'referential' => 'المرجع'],
+    'export_kinds' => ['accounts' => 'الحسابات', 'referential' => 'المرجع', 'arrears' => 'المستحقات غير المدفوعة'],
     'language' => 'لغة الملف',
     'author' => 'المنفّذ',
     'rows' => 'الأسطر',

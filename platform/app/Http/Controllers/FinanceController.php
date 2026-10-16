@@ -49,6 +49,8 @@ final class FinanceController
             'paid' => $balance->paid, 'payments_pending' => $balance->pending, 'balance' => $balance->balance, 'state' => $balance->state,
             // FR-FIN-04: what was refunded or carried over, what waits to be, and the credit to decide on.
             'refunded' => $balance->refunded, 'refunds_pending' => $balance->refunds_pending, 'credit' => $balance->credit,
+            // FR-INS-02, FR-FIN-06: overdue, an indicator computed from the schedule and today, for whoever reads the payments.
+            ...$this->overdue($row->id),
             'schedule' => $schedule ? [...(array) $schedule, 'installments' => array_map(fn ($line) => (array) $line, DB::select(
                 'SELECT seq, due_date, amount::text AS amount FROM school.installment WHERE tenant_id = ? AND schedule_id = ? ORDER BY seq', [$this->school->id(), $schedule->id]))] : null,
             // A schedule no longer matching what is owed (an adjustment since) waits for its next version.
@@ -142,6 +144,14 @@ final class FinanceController
             [$status, $data['reason'] ?? null, $data['version'], $this->school->id(), $current['id']]);
         if (!$changed) throw Refusal::permissionDenied();
         return ['data' => $this->adjustment($current['id'])];
+    }
+
+    /** @return array{overdue: ?string, overdue_since: ?string, next_due_date: ?string} */
+    private function overdue(string $enrollment): array
+    {
+        if (!app(\App\Support\Permissions::class)->can('finance.payment.read')) return ['overdue' => null, 'overdue_since' => null, 'next_due_date' => null];
+        $row = DB::selectOne('SELECT overdue::text AS overdue, overdue_since::text AS overdue_since, next_due_date::text AS next_due_date FROM school.arrears(current_date, ?)', [$enrollment]);
+        return ['overdue' => $row?->overdue, 'overdue_since' => $row?->overdue_since, 'next_due_date' => $row?->next_due_date];
     }
 
     private function enrollment(string $id): object

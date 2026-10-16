@@ -3,6 +3,7 @@
 return [
     'accounts' => 'Comptes',
     'referential' => 'Référentiel',
+    'arrears' => 'Impayés',
     'yes' => 'oui',
     'no' => 'non',
     'columns' => [
@@ -18,6 +19,16 @@ return [
         'label_ar' => 'Libellé (arabe)',
         'parent' => 'Parent',
         'archived' => 'Archivé',
+        'matricule' => 'Matricule',
+        'pupil' => 'Élève',
+        'program' => 'Programme',
+        'group' => 'Groupe',
+        'due' => 'Dû',
+        'paid' => 'Payé',
+        'balance' => 'Reste à payer',
+        'overdue' => 'En retard',
+        'overdue_since' => 'En retard depuis',
+        'next_due_date' => 'Prochaine échéance',
     ],
     'status' => [
         'invited' => 'invité',

@@ -1163,11 +1163,32 @@ Routes: `GET /api/payments/{payment}/receipt`, `GET /api/refunds/{refund}/receip
 
 Validation on 16 October 2026: **273 PHP integration tests (11,619 assertions), 241 embedded SQL checks and 264 native PostgreSQL 16 checks including concurrency**; migration 051 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 204 screens without a problem. The CI could not start (the GitHub account's billing).
 
+## Increment 66 (lot 3): arrears
+
+**FR-FIN-06** (SQL 052).
+
+- **Open balances and overdue instalments**, as at a date (today by default), for the enrolments whose payments the reader reads (`finance.payment.read` for the whole school or the pupil's site), the cancelled ones left out (`school.arrears`): what is owed, paid and left; the instalments of the schedule in force whose date has passed and that what is paid does not cover (`overdue`, `overdue_since`); the next one to come. Computed, never stored; an enrolment without a schedule has nothing overdue. On an enrolment's Finance screen, the overdue amount and its date (FR-INS-02's `overdue` indicator).
+- **AC1**: the list's totals are what the listed enrolments owe less what they paid, whatever the page. Filters: date, programme, group, overdue only, pupil.
+- **AC2**: a teacher, or whoever reads no payment, reads none of it (`permission_denied`).
+- **Controlled export**: the Arrears screen exports what it lists (CSV, Excel, PDF), for whoever reads the payments and exports, logged as any export (FR-IMP-02); also on the Exports screen.
+- **Reminders**: each morning (`platform:finance-reminders`, 06:00 in Algiers), the instalments not yet covered that fall on the school's offsets (new setting `finance.reminder.offsets`: J-3, J and J+7 by default, among J-7 to J+30) are counted, and each member who reads the whole school's payments receives one notification, which opens the arrears; once a day per school. **No sanction is automatic**: nobody is suspended or blocked by it. Reminders to the payers themselves wait for their accounts (the parents' portal).
+
+Route: `GET /api/arrears`. Screen: **Arrears** in the Finance section.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-06 AC1 | `ArrearsTest`, tests/sql: totals of the open balances equal to what is owed less what is paid |
+| FR-FIN-06 AC2 | `ArrearsTest`, tests/sql: a teacher refused by the API, the screen and the base; a site's reader limited to its site |
+| Overdue | `ArrearsTest`, tests/sql: two instalments fallen due, one covered, the rest late since the second; due today not late yet |
+| Reminders | `ArrearsTest`, tests/sql: the late instalment counted seven days after, notified once |
+| Export | `ArrearsTest`: the screen's export, logged with its rows |
+
+Validation on 16 October 2026: **274 PHP integration tests (11,756 assertions), 242 embedded SQL checks and 265 native PostgreSQL 16 checks including concurrency**; migration 052 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 208 screens without a problem, Arrears included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Arrears (FR-FIN-06): open balances and overdue instalments, controlled export, reminders without automatic sanction.
-2. The period's close (FR-FIN-07): refuses a payment, a validation or a refund dated in a closed period; reopening motivated and approved; reconciliation report.
-3. A payment's optional supporting document (FR-FIN-02), on the files' service.
+1. The period's close (FR-FIN-07): refuses a payment, a validation or a refund dated in a closed period; reopening motivated and approved; reconciliation report.
+2. A payment's optional supporting document (FR-FIN-02), on the files' service.
 
 ## Next increments of lot 2
 

@@ -3,6 +3,7 @@
 return [
     'accounts' => 'الحسابات',
     'referential' => 'المرجع',
+    'arrears' => 'المستحقات غير المدفوعة',
     'yes' => 'نعم',
     'no' => 'لا',
     'columns' => [
@@ -18,6 +19,16 @@ return [
         'label_ar' => 'التسمية (بالعربية)',
         'parent' => 'الأصل',
         'archived' => 'مؤرشف',
+        'matricule' => 'رقم التسجيل',
+        'pupil' => 'التلميذ',
+        'program' => 'البرنامج',
+        'group' => 'الفوج',
+        'due' => 'المستحق',
+        'paid' => 'المدفوع',
+        'balance' => 'الباقي للدفع',
+        'overdue' => 'متأخر',
+        'overdue_since' => 'متأخر منذ',
+        'next_due_date' => 'القسط القادم',
     ],
     'status' => [
         'invited' => 'مدعو',

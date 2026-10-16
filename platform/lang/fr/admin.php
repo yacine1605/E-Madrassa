@@ -33,6 +33,8 @@ return [
         'finance' => [
             'payment' => ['methods' => ['cash' => 'Espèces', 'cheque' => 'Chèque', 'transfer' => 'Virement', 'ccp' => 'CCP', 'card' => 'Carte', 'other' => 'Autre']],
             'receipt' => ['locale' => ['fr' => 'Français', 'ar' => 'Arabe']],
+            'reminder' => ['offsets' => ['before_7' => 'J-7', 'before_3' => 'J-3', 'before_1' => 'J-1', 'due' => 'Jour J',
+                'after_1' => 'J+1', 'after_7' => 'J+7', 'after_15' => 'J+15', 'after_30' => 'J+30']],
         ],
     ],
 

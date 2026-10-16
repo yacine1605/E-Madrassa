@@ -105,6 +105,8 @@ final class EnrollmentFinance extends SchoolingPage
                 TextEntry::make('due')->label(__('finance.due'))->state($this->money($finance['due']))->weight('bold'),
                 TextEntry::make('paid')->label(__('finance.paid'))->state($this->money($finance['paid'])),
                 TextEntry::make('balance')->label(__('finance.balance'))->state($this->money($finance['balance']))->weight('bold'),
+                TextEntry::make('overdue')->label(__('finance.overdue'))->visible((float) $finance['overdue'] > 0)->color('danger')
+                    ->state(fn () => $this->money($finance['overdue']).' · '.__('finance.overdue_since', ['date' => Formats::date($finance['overdue_since'])])),
                 TextEntry::make('refunded')->label(__('finance.refunded'))->state($this->money($finance['refunded'])),
                 // FR-FIN-04: paid beyond what is owed, waiting for its decision (refund, carry-over, kept).
                 TextEntry::make('credit')->label(__('finance.credit'))->state($this->money($finance['credit']))

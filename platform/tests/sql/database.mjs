@@ -3292,6 +3292,45 @@ await check('a validated payment and an executed refund each get one receipt, nu
   assert.equal(await count('SELECT count(*) n FROM school.receipt WHERE id = $1', [issued.id]), 0);
   await as('school_runtime', a, 1);
 });
+// Arrears (SQL 052, FR-FIN-06): open balances and overdue instalments as at a date, for the reader's enrolments; the finance's daily reminder.
+await check('the arrears add up to what is owed less what is paid; the overdue instalments come from the schedule; a teacher reads none (FR-FIN-06 AC1, AC2)', async () => {
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'finance.schedule.manage', 'enrollment.enrollment.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'enrollment.enrollment.read']);
+  const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['finance.payment.read', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  const scheduled = await enroll((await newAdult('Retard', 'Amel')).id, await programme('RETARD-A', 90000));
+  const unscheduled = await enroll((await newAdult('Retard', 'Bilal')).id, await programme('RETARD-B', 50000));
+  await as('school_runtime', a, accountant.user);
+  await sql('SELECT school.set_schedule($1, $2::jsonb, NULL, $3)', [scheduled, JSON.stringify([{ due_date: '2026-01-15', amount: '30000' },
+    { due_date: '2026-02-15', amount: '30000' }, { due_date: '2099-01-15', amount: '30000' }]), uuid()]);
+  const paid = (await first(RECORD, [scheduled, '40000', 'today', 'cash', null, false, uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [paid]);
+  await as('school_runtime', a, accountant.user);
+  const ARREARS = `SELECT enrollment_id, due::text AS due, paid::text AS paid, balance::text AS balance, overdue::text AS overdue,
+    overdue_since::text AS since, next_due_date::text AS next FROM school.arrears($1::date, $2)`;
+  assert.deepEqual(await first(ARREARS, ['2026-03-01', scheduled]),
+    { enrollment_id: scheduled, due: '90000.00', paid: '40000.00', balance: '50000.00', overdue: '20000.00', since: '2026-02-15', next: '2099-01-15' });
+  assert.deepEqual(await first(ARREARS, ['2026-02-15', scheduled]).then(r => [r.overdue, r.since, r.next]), ['0.00', null, '2026-02-15'], 'due today is not late yet');
+  assert.deepEqual(await first(ARREARS, ['2026-03-01', unscheduled]).then(r => [r.balance, r.overdue, r.since]), ['50000.00', '0.00', null]);
+  // AC1: the open balances listed add up to what they owe less what they paid.
+  const totals = await first(`SELECT sum(balance)::text AS open, (sum(due) - sum(paid))::text AS owed, count(*) AS n FROM school.arrears('2026-03-01'::date)`);
+  assert.equal(totals.open, totals.owed);
+  assert.ok(Number(totals.n) >= 2);
+  // A reader of one site's payments reads that site's enrolments only; AC2: a teacher reads none.
+  await as('school_runtime', a, elsewhere.user);
+  assert.equal(await count(`SELECT count(*) n FROM school.arrears('2026-03-01'::date) WHERE enrollment_id = ANY ($1::uuid[])`, [[scheduled, unscheduled]]), 0);
+  await as('school_runtime', a, 4);
+  await rejects(`SELECT * FROM school.arrears('2026-03-01'::date)`, [], '42501', 'permission_denied');
+  // The daily reminder: the instalment of 15 February, still not covered, seven days after; once a day.
+  await as('school_runtime', a, 1);
+  await sql("SELECT platform.notify_installments('2026-02-22'::date)");
+  assert.equal((await first("SELECT platform.notify_installments('2026-02-22'::date) AS n")).n, 0, 'once a day');
+  await as('school_runtime', a, accountant.user);
+  const notice = await first("SELECT data FROM school.notification WHERE event = 'finance.installments_due' ORDER BY created_at DESC LIMIT 1");
+  assert.deepEqual([notice.data.day, notice.data.counts], ['2026-02-22', { after_7: 1 }]);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
