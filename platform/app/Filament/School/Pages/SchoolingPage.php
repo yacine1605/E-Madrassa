@@ -21,6 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -152,6 +153,14 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
     protected function codeField(): TextInput
     {
         return TextInput::make('code')->label(__('school.code'))->required()->regex('/^[A-Z0-9_-]{1,30}$/')->helperText(__('schooling.code_help'));
+    }
+
+    /** « mars 2025 », « مارس 2025 »: the month of a day. */
+    protected function month(?string $day): string
+    {
+        if ($day === null) return '';
+        $date = Carbon::parse($day);
+        return __('finance.months.'.$date->month).' '.Formats::digits($date->format('Y'));
     }
 
     /** A person's name in the reader's alphabet first, then in the other (BR-18): « Benali Amine · بن علي أمين ». */

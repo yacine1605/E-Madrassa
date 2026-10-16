@@ -50,6 +50,8 @@ final class StaffContracts extends StaffMemberPage
             ])->headerActions([
                 Action::make('leaves')->label(__('staff.leaves'))->color('gray')->visible(fn () => $this->reads('staff.leave.read'))
                     ->url(fn () => StaffLeaves::getUrl(['staff' => $this->staff])),
+                Action::make('pay_rules')->label(__('payroll.rules'))->color('gray')->visible(fn () => StaffPayRules::canAccess())
+                    ->url(fn () => StaffPayRules::getUrl(['staff' => $this->staff])),
                 Action::make('add')->label(__('staff.add_contract'))->visible(fn () => $this->changeable() && $this->member()['status'] !== 'left')
                     ->schema([
                         ...$this->terms(),

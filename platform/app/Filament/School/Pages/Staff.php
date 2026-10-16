@@ -96,6 +96,9 @@ final class Staff extends SchoolingPage
                     ->url(fn (array $record) => StaffContracts::getUrl(['staff' => $record['id']])),
                 Action::make('leaves')->label(__('staff.leaves'))->visible(fn () => app(Permissions::class)->can('staff.leave.read'))
                     ->url(fn (array $record) => StaffLeaves::getUrl(['staff' => $record['id']])),
+                // FR-REM-01: how they are paid, with the payroll module.
+                Action::make('pay_rules')->label(__('payroll.rules'))->visible(fn () => StaffPayRules::canAccess())
+                    ->url(fn (array $record) => StaffPayRules::getUrl(['staff' => $record['id']])),
                 Action::make('edit')->label(__('school.edit'))->visible(fn (array $record) => $this->changeable($record))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->staffFields(),

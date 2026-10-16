@@ -245,7 +245,7 @@ async function run(browser) {
   for (const locale of ['fr', 'ar']) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
       `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
-      `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`,
+      `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`, `staff-pay-rules?staff=${records.teacher}`,
       `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`, `lead-sheet?lead=${records.lead}`,
       `enrollment-finance?enrollment=${records.enrollment}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });

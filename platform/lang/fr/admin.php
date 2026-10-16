@@ -143,6 +143,9 @@ return [
         'expense' => 'Dépense',
         'expense_payment' => 'Paiement d’une dépense',
         'expense_correction' => 'Correction d’une dépense',
+        'pay_rule' => 'Règle de rémunération',
+        'pay_rule_rate' => 'Tarif d’une règle de rémunération',
+        'pay_rule_bonus' => 'Prime d’une règle de rémunération',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

@@ -28,6 +28,7 @@ use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PayRuleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
@@ -365,6 +366,18 @@ Route::prefix('api')->group(function () {
                 Route::get('finance-periods/reconciliation', [FinancePeriodController::class, 'reconciliation'])->middleware('permission:finance.payment.read,finance.period.close');
                 Route::post('finance-periods', [FinancePeriodController::class, 'store'])->middleware('permission:finance.period.close');
                 Route::post('finance-periods/{period}/reopen', [FinancePeriodController::class, 'reopen'])->middleware('permission:finance.period.reopen');
+            });
+
+            // FR-REM-01: how each member of staff is paid, in versions from the first day of a month; never read by academic_hr.
+            Route::middleware('module:payroll')->group(function () {
+                $readers = 'permission:payroll.rule.manage,payroll.amount.read';
+                Route::get('staff/{staff}/pay-rules', [PayRuleController::class, 'index'])->middleware($readers);
+                Route::get('pay-rules/{rule}/rate', [PayRuleController::class, 'rate'])->middleware($readers);
+                Route::middleware('permission:payroll.rule.manage')->group(function () {
+                    Route::post('staff/{staff}/pay-rules', [PayRuleController::class, 'store']);
+                    Route::post('pay-rules/{rule}/end', [PayRuleController::class, 'end']);
+                    Route::delete('pay-rules/{rule}', [PayRuleController::class, 'destroy']);
+                });
             });
 
             // FR-DEP-01, FR-DEP-02: the school's expense categories and expenses, decided by someone else than their author.

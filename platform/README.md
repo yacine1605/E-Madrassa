@@ -1294,9 +1294,33 @@ Routes: `GET|POST /api/expenses/{expense}/corrections`, `GET /api/expense-correc
 
 Validation on 16 October 2026: **279 PHP integration tests (12,719 assertions), 249 embedded SQL checks and 275 native PostgreSQL 16 checks including concurrency**; migration 057 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 228 screens without a problem, Expense corrections included. The CI could not start (the GitHub account's billing).
 
+## Increment 72 (lot 3): the remuneration rules
+
+SQL 058 (`database/schema/058_pay_rules.sql`, migration `2026_10_16_000058`) says how each member of staff is paid (FR-REM-01), with the `payroll` module:
+
+- **A version** from the first day of a month until the last day of one (none for an open one): `fixed_monthly` (its monthly amount), `hourly` or `per_session` (a default rate at least), `mixed` (a fixed part, a variable basis in hours or sessions, a default rate, what it includes, 0 by default) (AC6, AC7). Written with its rates and recurring bonuses all or nothing, once per key (BR-05), even sent five times at once. A member's versions never overlap, even two written at once.
+- **The member's type** (AC3): the administrative staff and `other` on a fixed salary only; a member who left or an archived record receives none.
+- **Rates** by default and by node of the school's referential (a level, a stream, a speciality, BR-13), one per node (AC8); `school.pay_rate` gives a node's own rate, else its nearest ancestor's, else the default, none when nothing resolves (AC5, BR-16).
+- **Versions** (BR-10, AC1, AC4): begun, a version keeps its amounts, rates and bonuses; a change is a new version from the first day of this month or one to come, which ends the one in force the day before; never before (no retroactive change). A version ends earlier at the end of a month not gone by, with its reason; one not begun is deleted, the one it ended in force again.
+- **Readers** (AC2): written by `payroll.rule.manage` for the whole school (the accountant), read with `payroll.amount.read` too (the direction); academic_hr, who manages the contracts, reads none.
+- Screen: **Remuneration** of a member of staff, from the staff list and their contracts (versions, rates, bonuses; a new version, an end, a deletion).
+
+Routes: `GET|POST /api/staff/{staff}/pay-rules`, `GET /api/pay-rules/{rule}/rate?node=`, `POST /api/pay-rules/{rule}/end`, `DELETE /api/pay-rules/{rule}`. The browser acceptance's school is now on the `complete` plan, so that the payroll's screens are checked.
+
+| Requirement | Evidence |
+|---|---|
+| FR-REM-01 AC1, AC4 | `PayRuleTest`, tests/sql: a change is a new version from this month or one to come, the months before kept; a version begun never changes |
+| FR-REM-01 AC2 | `PayRuleTest`, tests/sql: academic_hr refused on the API, the screen and the table; the direction reads, never writes |
+| FR-REM-01 AC3, AC6, AC7, AC8 | `PayRuleTest`, tests/sql: an hourly administrative refused; an incomplete mix, a fixed salary with a rate, two rates for a node, a node outside the referential refused |
+| FR-REM-01 AC5 | `PayRuleTest`, tests/sql: with a Secondary rate and a default, 2AS takes the Secondary rate, 4AM the default |
+| BR-05, BR-10 | tests/sql natifs: two versions from the same month at once leave one; five sendings of one write it once |
+
+Validation on 16 October 2026: **280 PHP integration tests (12,989 assertions), 250 embedded SQL checks and 277 native PostgreSQL 16 checks including concurrency**; migration 058 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium on the `complete` plan: 232 screens without a problem, Remuneration included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Remunerations (FR-REM-01 to 05): versioned rules, rates by level, monthly runs from hours and sessions entered by hand, bonuses and adjustments, payouts as expenses of the system `salaries` category, personal view (TST-12, TST-13, TST-19).
+1. Monthly runs (FR-REM-02, FR-REM-03): a draft per member and month from hours and sessions entered by hand, the four kinds computed to the cent (TST-19), a missing rate blocking the validation, validated by someone else and frozen, adjustments traced (TST-12).
+2. Payouts (FR-REM-04, FR-REM-05): paid in parts, each one the linked expense of the `salaries` category in the same transaction (TST-13); the personal view.
 
 ## Next increments of lot 2
 

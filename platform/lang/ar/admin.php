@@ -142,6 +142,9 @@ return [
         'expense' => 'نفقة',
         'expense_payment' => 'دفع نفقة',
         'expense_correction' => 'تصحيح نفقة',
+        'pay_rule' => 'قاعدة أجر',
+        'pay_rule_rate' => 'تعريفة قاعدة أجر',
+        'pay_rule_bonus' => 'منحة قاعدة أجر',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

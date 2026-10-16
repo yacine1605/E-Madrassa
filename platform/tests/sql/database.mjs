@@ -3770,6 +3770,87 @@ await check('a correction waiting holds its month\'s closure; validated, it is r
   assert.equal(after.expenses_committed, (Number(before.expenses_committed) - 500).toFixed(2));
   await as('school_runtime', a, 1);
 });
+// The remuneration rules (SQL 058, FR-REM-01): versions from the first day of a month, rates by node, the most specific winning.
+const SAVE_PAY_RULE = 'SELECT school.save_pay_rule($1, $2, $3::numeric, $4, $5::numeric, $6::date, $7::jsonb, $8::jsonb, $9) AS id';
+const payMonth = async k => (await first("SELECT (date_trunc('month', current_date) + $1 * interval '1 month')::date::text AS d", [k])).d;
+await check('a remuneration rule is a version from the first day of a month, of a kind the member\'s type allows, its rates by node; a change is a new version, never retroactive (FR-REM-01 AC1 to AC8)', async () => {
+  await as(null);
+  await sql("SELECT platform.enable_module($1, 'payroll')", [a]);
+  const payroll =await scopedAccount('internal', 'tenant', null, ['payroll.rule.manage', 'staff.profile.read']);
+  const director = await scopedAccount('internal', 'tenant', null, ['payroll.amount.read']);
+  const hr = await scopedAccount('internal', 'tenant', null, ['staff.profile.read', 'staff.contract.manage', 'staff.contract.read']);
+  await as('school_runtime', a, 1);
+  const teacher = (await first(STAFF, [a, 'Mansouri', 'Nadia', 'teacher_internal'])).id;
+  const clerk = (await first(STAFF, [a, 'Belkacem', 'Omar', 'administrative'])).id;
+  const [m3, m2, m1, m0, n1, n2, n3] = await Promise.all([-3, -2, -1, 0, 1, 2, 3].map(payMonth));
+  const day = async (k, d) => (await first('SELECT ($1::date + $2::int)::text AS d', [k, d])).d;
+  const [g2as, g4am] = await Promise.all(['2AS', '4AM'].map(nodeOf));
+  const rates = list => JSON.stringify(list.map(([node_id, unit_amount]) => ({ node_id, unit_amount })));
+  await as('school_runtime', a, payroll.user);
+  // AC3: the administrative staff on a fixed monthly salary only, with its recurring bonuses.
+  await rejects(SAVE_PAY_RULE, [clerk, 'hourly', null, null, null, m2, rates([[null, '1500']]), '[]', uuid()], '23514', 'pay_rule_kind_refused');
+  const salary = (await first(SAVE_PAY_RULE, [clerk, 'fixed_monthly', '45000', null, null, m2, '[]', JSON.stringify([{ label: ' Prime de transport ', amount: '3000' }]), uuid()])).id;
+  assert.deepEqual((await sql('SELECT label, amount::text AS amount FROM school.pay_rule_bonus WHERE pay_rule_id = $1', [salary])).rows, [{ label: 'Prime de transport', amount: '3000.00' }]);
+  // AC6, AC7: what each kind asks; AC8: one rate per node of the school's referential; from the first day of a month.
+  await rejects(SAVE_PAY_RULE, [teacher, 'mixed', '40000', null, '20', m3, rates([[null, '1500']]), '[]', uuid()], '23514', 'pay_rule_incomplete');
+  await rejects(SAVE_PAY_RULE, [teacher, 'mixed', null, 'hourly', '20', m3, rates([[null, '1500']]), '[]', uuid()], '23514', 'pay_rule_incomplete');
+  await rejects(SAVE_PAY_RULE, [teacher, 'fixed_monthly', '60000', null, null, m3, rates([[null, '1500']]), '[]', uuid()], '23514', 'pay_rule_rate_refused');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[secondaire, '2000']]), '[]', uuid()], '23514', 'pay_rule_default_rate_required');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[null, '1500'], [secondaire, '2000'], [secondaire, '2100']]), '[]', uuid()], '23514', 'pay_rule_rate_duplicate');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[null, '1500'], [uuid(), '2000']]), '[]', uuid()], '23514', 'pay_rule_node_unknown');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, await day(m3, 4), rates([[null, '1500']]), '[]', uuid()], '23514', 'pay_rule_month');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[null, '0']]), '[]', uuid()], '23514');
+  const key = uuid();
+  const hourly = (await first(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[null, '1500'], [secondaire, '2000']]), '[]', key])).id;
+  assert.equal((await first(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m3, rates([[null, '1500'], [secondaire, '2000']]), '[]', key])).id, hourly, 'BR-05');
+  await rejects(SAVE_PAY_RULE, [teacher, 'per_session', null, null, null, m3, rates([[null, '3000']]), '[]', key], '23514', 'idempotency_key_reused');
+  // AC5: a session of 2AS takes the Secondary rate, one of 4AM the default.
+  const rate = async (rule, nodeId) => (await first('SELECT school.pay_rate($1, $2, $3)::text AS r', [a, rule, nodeId])).r;
+  assert.deepEqual([await rate(hourly, g2as), await rate(hourly, g4am), await rate(hourly, secondaire)], ['2000.00', '1500.00', '2000.00']);
+  // AC1: a version in force keeps its rates; a change is a new version, from this month or one to come, never before.
+  await rejects('UPDATE school.pay_rule_rate SET unit_amount = 1600 WHERE pay_rule_id = $1 AND node_id IS NULL', [hourly], '23514', 'pay_rule_immutable');
+  await rejects('INSERT INTO school.pay_rule_rate (tenant_id, pay_rule_id, node_id, unit_amount) VALUES ($1, $2, $3, 1800)', [a, hourly, g4am], '23514', 'pay_rule_immutable');
+  await rejects('DELETE FROM school.pay_rule WHERE id = $1', [hourly], '23514', 'pay_rule_started');
+  await rejects(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, m1, rates([[null, '1600']]), '[]', uuid()], '23514', 'pay_rule_retroactive');
+  const june = (await first(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, n1, rates([[null, '1600'], [secondaire, '2200']]), '[]', uuid()])).id;
+  const ruleOn = async d => (await first('SELECT school.pay_rule_on($1, $2, $3::date) AS id', [a, teacher, d])).id;
+  assert.deepEqual([await ruleOn(m3), await ruleOn(m0), await ruleOn(n1), await ruleOn(n3)], [hourly, hourly, june, june]);
+  assert.equal((await first('SELECT valid_to::text AS d FROM school.pay_rule WHERE id = $1', [hourly])).d, await day(n1, -1));
+  assert.equal(await rate(await ruleOn(m0), g2as), '2000.00', 'AC1: the rate of the month before unchanged');
+  // Not begun, its rates still change; one version from a month at a time.
+  await sql('UPDATE school.pay_rule_rate SET unit_amount = 2300 WHERE pay_rule_id = $1 AND node_id = $2', [june, secondaire]);
+  await rejects(SAVE_PAY_RULE, [teacher, 'per_session', null, null, null, n1, rates([[null, '3000']]), '[]', uuid()], '23514', 'pay_rule_overlap');
+  // AC4: from hourly to a fixed salary from the first day of a month to come, the months before kept.
+  const fixed = (await first(SAVE_PAY_RULE, [teacher, 'fixed_monthly', '60000', null, null, n2, '[]', '[]', uuid()])).id;
+  assert.deepEqual([await ruleOn(m0), await ruleOn(n1), await ruleOn(n2)], [hourly, june, fixed]);
+  // Deleted before it begins, the version it ended is in force again.
+  await sql('DELETE FROM school.pay_rule WHERE id = $1', [fixed]);
+  assert.equal((await first('SELECT valid_to FROM school.pay_rule WHERE id = $1', [june])).valid_to, null);
+  assert.equal(await count('SELECT count(*) n FROM school.pay_rule_rate WHERE pay_rule_id = $1', [fixed]), 0);
+  // Ended earlier, at the end of a month not gone by, with its reason; never later, never in the past.
+  await rejects('UPDATE school.pay_rule SET valid_to = $2::date WHERE id = $1', [june, await day(n3, 4)], '23514', 'pay_rule_month');
+  await sql("UPDATE school.pay_rule SET valid_to = $2::date, end_reason = ' Fin de contrat ' WHERE id = $1", [june, await day(n3, -1)]);
+  await rejects('UPDATE school.pay_rule SET valid_to = NULL WHERE id = $1', [june], '23514', 'pay_rule_end_later');
+  await rejects('UPDATE school.pay_rule SET valid_to = $2::date WHERE id = $1', [hourly, await day(m1, -1)], '23514', 'pay_rule_retroactive');
+  await rejects('UPDATE school.pay_rule SET monthly_amount = 1 WHERE id = $1', [salary], '42501');
+  // A mix: its fixed part, its basis, what it includes (none by default).
+  await as('school_runtime', a, 1);
+  const other = (await first(STAFF, [a, 'Saidi', 'Yacine', 'teacher_external'])).id;
+  await as('school_runtime', a, payroll.user);
+  const mixed = (await first(SAVE_PAY_RULE, [other, 'mixed', '40000', 'hourly', null, m0, rates([[null, '1500']]), '[]', uuid()])).id;
+  assert.equal((await first('SELECT included_quantity::text AS q FROM school.pay_rule WHERE id = $1', [mixed])).q, '0.00');
+  // AC2: read with `payroll.amount.read`, written by `payroll.rule.manage` only; academic_hr sees none.
+  await as('school_runtime', a, director.user);
+  assert.equal(await count('SELECT count(*) n FROM school.pay_rule WHERE staff_id = $1', [teacher]), 2);
+  await rejects(SAVE_PAY_RULE, [clerk, 'fixed_monthly', '50000', null, null, n1, '[]', '[]', uuid()], '42501');
+  await as('school_runtime', a, hr.user);
+  assert.equal(await count('SELECT count(*) n FROM school.pay_rule WHERE staff_id = ANY ($1::uuid[])', [[teacher, clerk, other]]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.pay_rule_rate WHERE pay_rule_id = $1', [hourly]), 0);
+  await rejects(SAVE_PAY_RULE, [clerk, 'fixed_monthly', '50000', null, null, n1, '[]', '[]', uuid()], '42501');
+  await as(null);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'pay_rule' AND object_id = $1", [hourly]) >= 2);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -4530,6 +4611,35 @@ if (PgClient) {
     await as('school_runtime', a, validator.user);
     const after = await first('SELECT school.expense_committed($1, $2) AS committed, school.expense_paid($1, $2) AS paid', [a, chairs]);
     assert.ok(Number(after.committed) >= Number(after.paid));
+    await as('school_runtime', a, 1);
+  });
+  await check('two versions of a member\'s rule from the same month at once: one; five sendings of one: once (FR-REM-01, BR-05, BR-10)', async () => {
+    const payroll = await scopedAccount('internal', 'tenant', null, ['payroll.rule.manage', 'staff.profile.read']);
+    await as('school_runtime', a, 1);
+    const teacher = (await first(STAFF, [a, 'Ziani', 'Rym', 'teacher_internal'])).id;
+    const from = await payMonth(1);
+    const later = await payMonth(2);
+    const clients = await Promise.all([0, 1, 2, 3, 4].map(() => connect('school_runtime', a, payroll.user)));
+    const at = (c, s, p, pause = 0.1) => (async () => {
+      await c.query('BEGIN');
+      try {
+        const row = (await c.query(s, p)).rows[0];
+        await c.query(`SELECT pg_sleep(${pause})`);
+        await c.query('COMMIT');
+        return row?.id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    })();
+    const rates = JSON.stringify([{ node_id: null, unit_amount: '1500' }]);
+    const two = await Promise.allSettled(clients.slice(0, 2).map(c => at(c, SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, from, rates, '[]', uuid()], 0.15)));
+    assert.equal(two.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(two.find(r => r.status === 'rejected').reason.message, 'pay_rule_overlap');
+    const key = uuid();
+    const five = await Promise.allSettled(clients.map(c => at(c, SAVE_PAY_RULE, [teacher, 'fixed_monthly', '50000', null, null, later, '[]', '[]', key])));
+    await Promise.all(clients.map(c => c.end()));
+    assert.deepEqual(five.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+    assert.equal(new Set(five.map(r => r.value)).size, 1);
+    await as('school_runtime', a, payroll.user);
+    assert.equal(await count('SELECT count(*) n FROM school.pay_rule WHERE staff_id = $1', [teacher]), 2);
     await as('school_runtime', a, 1);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {

@@ -103,13 +103,6 @@ final class FinancePeriods extends SchoolingPage
         return $this->categoryNames[$code] ?? $code;
     }
 
-    /** « mars 2025 », « مارس 2025 ». */
-    private function month(string $day): string
-    {
-        $date = Carbon::parse($day);
-        return __('finance.months.'.$date->month).' '.Formats::digits($date->format('Y'));
-    }
-
     /** @return list<string> a reconciliation read line by line: payments by means, reversals, refunds, net; and before closing, what waits */
     private function reconciliationLines(array $report): array
     {

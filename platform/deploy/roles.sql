@@ -219,6 +219,18 @@ GRANT SELECT ON school.expense_correction TO school_runtime;
 GRANT INSERT (tenant_id, expense_id, kind, amount, corrected_on, reason, idempotency_key) ON school.expense_correction TO school_runtime;
 GRANT UPDATE (status, decision_reason, version) ON school.expense_correction TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.expense_committed(uuid, uuid), school.correct_expense(uuid, text, numeric, text, uuid) TO school_runtime;
+-- Remuneration rules (058): versions from the first day of a month, their rates and bonuses, by `payroll.rule.manage`;
+-- a version begun keeps them, one not begun is deleted.
+GRANT SELECT, DELETE ON school.pay_rule, school.pay_rule_rate, school.pay_rule_bonus TO school_runtime;
+GRANT INSERT (tenant_id, staff_id, kind, monthly_amount, variable_basis, included_quantity, valid_from, valid_to, idempotency_key) ON school.pay_rule TO school_runtime;
+GRANT UPDATE (valid_to, end_reason, version) ON school.pay_rule TO school_runtime;
+GRANT INSERT (tenant_id, pay_rule_id, node_id, unit_amount) ON school.pay_rule_rate TO school_runtime;
+GRANT UPDATE (unit_amount, version) ON school.pay_rule_rate TO school_runtime;
+GRANT INSERT (tenant_id, pay_rule_id, label, amount) ON school.pay_rule_bonus TO school_runtime;
+GRANT UPDATE (label, amount, version) ON school.pay_rule_bonus TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.pay_month_start(), school.pay_staff(uuid, uuid), school.check_pay_rule(uuid, uuid),
+  school.save_pay_rule(uuid, text, numeric, text, numeric, date, jsonb, jsonb, uuid), school.pay_rule_on(uuid, uuid, date),
+  school.pay_rate(uuid, uuid, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -507,6 +519,8 @@ ALTER FUNCTION school.guard_expense_file() OWNER TO platform_provisioner;
 GRANT SELECT ON school.expense_payment TO platform_provisioner;
 -- An expense's corrections (057): read by a month's reconciliation and closure.
 GRANT SELECT ON school.expense_correction TO platform_provisioner;
+-- Remuneration rules (058): a version reads its member's type and whether they left.
+ALTER FUNCTION school.pay_staff(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
