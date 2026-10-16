@@ -4,6 +4,7 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\PaymentController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\Permissions;
@@ -15,6 +16,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Callout;
@@ -23,26 +25,36 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 
 /**
  * FR-FIN-01: what one enrolment owes and when. Its agreed price, adjustments and what is owed;
  * its schedule in force, whose sum is what is owed; a new adjustment or a new version of the
- * schedule; the direction's decision on an adjustment beyond the threshold.
+ * schedule; the direction's decision on an adjustment beyond the threshold. FR-FIN-02/03: what
+ * it has paid, its payments and reversals; a payment recorded, validated by someone else,
+ * withdrawn by its author while it waits, or reversed once validated.
  */
 final class EnrollmentFinance extends SchoolingPage
 {
     protected static bool $isDiscovered = true;
     protected static bool $shouldRegisterNavigation = false;
-    protected static array $permissions = ['finance.payment.read', 'finance.discount.grant', 'finance.schedule.manage', 'finance.discount.approve'];
+    protected static array $permissions = ['finance.payment.read', 'finance.payment.create', 'finance.payment.create.delegated', 'finance.payment.validate',
+        'finance.payment.reverse', 'finance.discount.grant', 'finance.schedule.manage', 'finance.discount.approve'];
     protected static ?string $module = 'student_finance';
-    protected static string|array $routeMiddleware = ['module:student_finance',
-        'permission:finance.payment.read,finance.discount.grant,finance.schedule.manage,finance.discount.approve'];
+    protected static string|array $routeMiddleware = ['module:student_finance', 'permission:finance.payment.read,finance.payment.create,'
+        .'finance.payment.create.delegated,finance.payment.validate,finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve'];
     protected string $view = 'filament.school.enrollment-finance';
     #[Locked] public string $enrollment = '';
     private ?array $financeRow = null;
     private ?array $enrollmentRow = null;
+
+    /** @return list<string> the permissions that open an enrolment's finance */
+    public static function readers(): array
+    {
+        return static::$permissions;
+    }
 
     public function mount(): void
     {
@@ -83,12 +95,19 @@ final class EnrollmentFinance extends SchoolingPage
         $finance = $this->finance();
         return $schema->components([
             Callout::make(__('finance.schedule_mismatch'))->warning()->description(__('finance.schedule_mismatch_help'))->visible($finance['schedule_matches'] === false),
-            Section::make(__('finance.owed'))->columns(['default' => 2, 'sm' => 5])->schema([
+            Section::make(__('finance.owed'))->columns(['default' => 2, 'sm' => 4])->schema([
                 TextEntry::make('agreed')->label(__('finance.agreed_price'))->state($this->money($finance['agreed_price'])),
                 TextEntry::make('reductions')->label(__('finance.reductions'))->state($this->money($finance['reductions'])),
                 TextEntry::make('penalties')->label(__('finance.penalties'))->state($this->money($finance['penalties'])),
                 TextEntry::make('due')->label(__('finance.due'))->state($this->money($finance['due']))->weight('bold'),
-                TextEntry::make('pending')->label(__('finance.pending'))->state($this->money($finance['pending'])),
+                TextEntry::make('paid')->label(__('finance.paid'))->state($this->money($finance['paid'])),
+                TextEntry::make('balance')->label(__('finance.balance'))->state($this->money($finance['balance']))->weight('bold'),
+                // FR-INS-02: computed from the validated payments, beside the pedagogical state.
+                TextEntry::make('state')->label(__('finance.state'))->badge()->state(__('finance.states.'.$finance['state']))
+                    ->color(match ($finance['state']) { 'paid' => 'success', 'partially_paid' => 'warning', default => 'gray' }),
+                TextEntry::make('waiting')->label(__('finance.waiting'))->state(Formats::list(array_filter([
+                    (float) $finance['payments_pending'] > 0 ? __('finance.waiting_payments', ['amount' => $this->money($finance['payments_pending'])]) : null,
+                    (float) $finance['pending'] > 0 ? __('finance.waiting_adjustments', ['amount' => $this->money($finance['pending'])]) : null])) ?: __('finance.nothing_waiting')),
             ]),
         ]);
     }
@@ -103,6 +122,26 @@ final class EnrollmentFinance extends SchoolingPage
                 'by' => Formats::isolated($row['author']).($row['decider'] ? ' · '.Formats::isolated($row['decider']) : '')], $this->finance()['adjustments']))
             ->schema([TextEntry::make('kind')->label(__('finance.kind')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status')),
+                TextEntry::make('by')->label(__('finance.by'))])])]);
+    }
+
+    /** The payments and reversals, newest first, with their state and who recorded and validated them. */
+    public function paymentsInfolist(Schema $schema): Schema
+    {
+        return $schema->components([Section::make(__('finance.payments'))->description(__('finance.payments_help'))->schema([RepeatableEntry::make('payments')->hiddenLabel()
+            ->columns(['default' => 2, 'sm' => 5])->placeholder(__('finance.no_payment'))
+            ->state(array_map(fn (array $row) => [
+                'reference' => $row['reference'].($row['kind'] === 'reversal' ? ' · '.__('finance.reversal_of', ['reference' => $row['reverses_reference']]) : ''),
+                'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
+                'paid' => Formats::list(array_filter([Formats::date($row['paid_on']), $row['method_code'] ? __('finance.methods.'.$row['method_code']) : null,
+                    $row['external_ref'] ? Formats::isolated($row['external_ref']) : null])),
+                'status' => Formats::list(array_filter([__('finance.payment_states.'.$row['status']), $row['overpayment'] ? __('finance.overpayment') : null,
+                    $row['self_validated'] ? __('finance.self_validated') : null, $row['reason'] ? Formats::isolated($row['reason']) : null,
+                    $row['cancel_reason'] ? Formats::isolated($row['cancel_reason']) : null])),
+                'by' => Formats::list(array_filter([Formats::isolated($row['author']).($row['delegated'] ? ' ('.__('finance.delegated').')' : ''),
+                    $row['validator'] ? Formats::isolated($row['validator']) : null]))], $this->finance()['payments']))
+            ->schema([TextEntry::make('reference')->label(__('finance.reference')), TextEntry::make('amount')->label(__('finance.amount')),
+                TextEntry::make('paid')->label(__('finance.paid_on')), TextEntry::make('status')->label(__('school.status')),
                 TextEntry::make('by')->label(__('finance.by'))])])]);
     }
 
@@ -126,6 +165,37 @@ final class EnrollmentFinance extends SchoolingPage
         return [
             Action::make('enrollments')->label(__('schooling.enrollments'))->color('gray')->visible(fn () => app(Permissions::class)->can('enrollment.enrollment.read'))
                 ->url(fn () => Enrollments::getUrl()),
+            // FR-FIN-02: a payment, waiting for its validation by the finance; the form's key makes it once.
+            Action::make('pay')->label(__('finance.record_payment'))->visible(fn () => $this->finance()['status'] !== 'cancelled'
+                    && ($this->writable('finance.payment.create') || $this->writable('finance.payment.create.delegated')))
+                ->modalDescription(fn () => __('finance.record_payment_help', ['balance' => $this->money($this->finance()['balance'])]))
+                ->fillForm(fn () => ['paid_on' => now()->toDateString(), 'overpayment' => false, 'idempotency_key' => (string) Str::uuid()])
+                ->schema(fn () => [$this->amountField('amount'), DatePicker::make('paid_on')->label(__('finance.paid_on'))->required()->maxDate(now()),
+                    Select::make('method_code')->label(__('finance.method'))->required()->options($this->methods()),
+                    TextInput::make('external_ref')->label(__('finance.external_ref'))->maxLength(100)->helperText(__('finance.external_ref_help')),
+                    Toggle::make('overpayment')->label(__('finance.overpayment'))->helperText(__('finance.overpayment_help')),
+                    Hidden::make('idempotency_key')])
+                ->action(fn (array $data) => $this->changed(SchoolScreen::change(null, fn () => SchoolScreen::call(['finance.payment.create', 'finance.payment.create.delegated'],
+                    PaymentController::class, 'store', ['amount' => $this->sentAmount($data['amount']), 'paid_on' => substr((string) $data['paid_on'], 0, 10),
+                        'method_code' => $data['method_code'], 'external_ref' => $data['external_ref'] ?: null, 'overpayment' => (bool) $data['overpayment'],
+                        'idempotency_key' => $data['idempotency_key']], ['enrollment' => $this->enrollment])))),
+            // FR-FIN-03 AC3: validated by someone else than its author, unless the school allows it.
+            Action::make('validate_payment')->label(__('finance.validate_payment'))->visible(fn () => $this->writable('finance.payment.validate') && $this->validatable() !== [])
+                ->schema(fn () => [Select::make('payment')->label(__('finance.payment'))->required()->options($this->validatable())])
+                ->action(fn (array $data) => $this->onPayment($data['payment'], 'finance.payment.validate', 'validatePayment', [])),
+            // Its author withdraws a waiting payment, saying why.
+            Action::make('withdraw_payment')->label(__('finance.withdraw_payment'))->color('gray')->visible(fn () => $this->ownWaiting() !== [])
+                ->schema(fn () => [Select::make('payment')->label(__('finance.payment'))->required()->options($this->ownWaiting()),
+                    Textarea::make('reason')->label(__('schooling.history_reason'))->required()->minLength(3)->maxLength(500)])
+                ->action(fn (array $data) => $this->onPayment($data['payment'], ['finance.payment.create', 'finance.payment.create.delegated'], 'cancel', ['reason' => $data['reason']])),
+            // AC2: a linked reversal, with its reason, validated in its turn; the payment stays.
+            Action::make('reverse_payment')->label(__('finance.reverse_payment'))->color('danger')->visible(fn () => $this->writable('finance.payment.reverse') && $this->reversible() !== [])
+                ->modalDescription(__('finance.reverse_payment_help'))
+                ->fillForm(fn () => ['idempotency_key' => (string) Str::uuid()])
+                ->schema(fn () => [Select::make('payment')->label(__('finance.payment'))->required()->options($this->reversible()),
+                    Textarea::make('reason')->label(__('schooling.history_reason'))->required()->minLength(3)->maxLength(500), Hidden::make('idempotency_key')])
+                ->action(fn (array $data) => $this->changed(SchoolScreen::change('finance.payment.reverse', fn () => SchoolScreen::call('finance.payment.reverse',
+                    PaymentController::class, 'reverse', ['reason' => $data['reason'], 'idempotency_key' => $data['idempotency_key']], ['payment' => $data['payment']])))),
             // AC2: an adjustment with its reason; beyond the threshold, the direction decides.
             Action::make('adjust')->label(__('finance.add_adjustment'))->visible(fn () => $this->writable('finance.discount.grant'))
                 ->modalDescription(__('finance.add_adjustment_help'))
@@ -172,6 +242,48 @@ final class EnrollmentFinance extends SchoolingPage
             ->mapWithKeys(fn (array $row) => [$row['id'] => __('finance.kinds.'.$row['kind']).' · '.$this->money($row['amount']).' · '.Str::limit($row['reason'], 40)])->all();
     }
 
+    /** @return array<string, string> the school's means of payment */
+    private function methods(): array
+    {
+        $codes = json_decode((string) DB::selectOne("SELECT school.setting_value('finance.payment.methods')::text AS v")->v, true) ?: [];
+        return collect($codes)->mapWithKeys(fn (string $code) => [$code => __('finance.methods.'.$code)])->all();
+    }
+
+    /** @return array<string, string> the waiting payments the reader may validate: someone else's, or their own payment if the school allows it */
+    private function validatable(): array
+    {
+        $self = (bool) json_decode((string) DB::selectOne("SELECT school.setting_value('finance.allow_self_validation')::text AS v")->v);
+        return $this->paymentOptions(fn (array $row) => $row['status'] === 'pending_validation'
+            && ((int) $row['created_by'] !== (int) auth()->id() || ($self && $row['kind'] === 'payment')));
+    }
+
+    /** @return array<string, string> the reader's own waiting payments */
+    private function ownWaiting(): array
+    {
+        return $this->paymentOptions(fn (array $row) => $row['status'] === 'pending_validation' && (int) $row['created_by'] === (int) auth()->id());
+    }
+
+    /** @return array<string, string> the validated payments without a reversal under way */
+    private function reversible(): array
+    {
+        return $this->paymentOptions(fn (array $row) => $row['kind'] === 'payment' && $row['status'] === 'validated' && $row['reversal_id'] === null);
+    }
+
+    private function paymentOptions(callable $filter): array
+    {
+        return collect($this->finance()['payments'])->filter($filter)->mapWithKeys(fn (array $row) => [$row['id'] => Formats::list([$row['reference'],
+            $row['kind'] === 'reversal' ? __('finance.reversal_of', ['reference' => $row['reverses_reference']]) : $this->money($row['amount']),
+            Formats::date($row['paid_on'])])])->all();
+    }
+
+    private function onPayment(string $id, string|array $permission, string $method, array $data): array
+    {
+        $row = collect($this->finance()['payments'])->firstWhere('id', $id);
+        abort_unless($row, 404);
+        return $this->changed(SchoolScreen::change(null, fn () => SchoolScreen::call($permission, PaymentController::class, $method,
+            ['version' => $row['version'], ...$data], ['payment' => $row['id']])));
+    }
+
     /** An amount in dinars, two decimals at most, as the school writes it (« 12 500,50 »). */
     private function amountField(string $name): TextInput
     {
@@ -190,6 +302,7 @@ final class EnrollmentFinance extends SchoolingPage
         $this->financeRow = null;
         $this->cacheSchema('summaryInfolist', null);
         $this->cacheSchema('adjustmentsInfolist', null);
+        $this->cacheSchema('paymentsInfolist', null);
         return $result;
     }
 }

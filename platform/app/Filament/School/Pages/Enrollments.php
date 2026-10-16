@@ -83,8 +83,8 @@ final class Enrollments extends SchoolingPage
                 $this->transferAction(),
                 // FR-FIN-01: what it owes and when.
                 Action::make('finance')->label(__('finance.open_finance'))
-                    ->visible(fn () => DB::selectOne('SELECT school.module_enabled(?) AS on', ['student_finance'])->on && collect(['finance.payment.read', 'finance.discount.grant',
-                        'finance.schedule.manage', 'finance.discount.approve'])->contains(fn (string $p) => app(\App\Support\Permissions::class)->can($p)))
+                    ->visible(fn () => DB::selectOne('SELECT school.module_enabled(?) AS on', ['student_finance'])->on
+                        && collect(EnrollmentFinance::readers())->contains(fn (string $p) => app(\App\Support\Permissions::class)->can($p)))
                     ->url(fn (array $record) => EnrollmentFinance::getUrl(['enrollment' => $record['id']])),
                 Action::make('history')->label(__('schooling.history'))->modalHeading(__('schooling.history'))->modalSubmitAction(false)
                     ->schema(fn (array $record) => $this->history($record)),

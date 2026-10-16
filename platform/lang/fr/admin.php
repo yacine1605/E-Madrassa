@@ -30,6 +30,9 @@ return [
         'enrollment' => [
             'access' => ['require_payment' => ['none' => 'Aucun : l’inscription validée suffit', 'first_installment' => 'La première échéance', 'full' => 'La totalité']],
         ],
+        'finance' => [
+            'payment' => ['methods' => ['cash' => 'Espèces', 'cheque' => 'Chèque', 'transfer' => 'Virement', 'ccp' => 'CCP', 'card' => 'Carte', 'other' => 'Autre']],
+        ],
     ],
 
     // FR-REF-04.
@@ -129,6 +132,7 @@ return [
         'progression' => 'Décision de passage annuel',
         'adjustment' => 'Ajustement d’une inscription',
         'payment_schedule' => 'Échéancier d’une inscription',
+        'payment' => 'Paiement d’une inscription',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

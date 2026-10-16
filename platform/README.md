@@ -1092,10 +1092,37 @@ Routes, all behind the `student_finance` module: `GET /api/enrollments/{enrollme
 
 Validation on 16 October 2026: **268 PHP integration tests (10,983 assertions), 237 embedded SQL checks and 258 native PostgreSQL 16 checks including concurrency**; migration 048 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 196 screens without a problem, an enrolment's Finance and Adjustments to approve included. The CI could not start (the GitHub account's billing).
 
+## Increment 63 (lot 3): payments, their validation and reversals
+
+**FR-FIN-02** and **FR-FIN-03** (SQL 049). A payment always belongs to an enrolment; amounts stay `NUMERIC(14,2)` and two-decimal strings (BR-04).
+
+- **Recording** (`school.record_payment`): amount, date (never to come), means among the school's (new setting `finance.payment.methods`: cash, cheque, transfer, CCP, other by default; card can be added), external reference. Each payment gets a reference `PAY-{year}-{six digits}`, unique in the school and never given again (AC3). The same key answers the first payment, **even sent five times at the same moment** (AC1, TST-10, native check); a key given again for another payment is refused. Never beyond what is left to pay, waiting payments counted, unless entered as an **overpayment** (its credit's decision comes with refunds, FR-FIN-04). A cancelled enrolment takes no new payment; a suspended one does and stays suspended (FR-INS-02 AC2).
+- **The cash desk**: `finance.payment.create.delegated` records a payment marked `delegated`; like any payment, it waits (`pending_validation`) for the finance.
+- **Validation** (AC3, BR-08): by `finance.payment.validate`, never by the payment's author, unless the school sets `finance.allow_self_validation` (off by default), which marks the payment `self_validated`; the message names the rule. Only a validated payment counts in what is paid (AC2).
+- **Immutability** (TST-11): a validated, reversed or withdrawn payment never changes, in the API and in the base (`payment_immutable`); nothing is deleted. While it waits, its author corrects it or withdraws it with a reason (`payment_not_author` for anyone else).
+- **Reversal** (AC2, `school.reverse_payment`): `finance.payment.reverse` asks for the reversal of a validated payment, its whole amount, with its reason, one at a time; someone else than its author validates it (no exception), and the payment becomes `reversed`, both kept. What is paid is the validated payments less their validated reversals.
+- **Financial state** (FR-INS-02, TST-09): `unpaid`, `partially_paid` or `paid`, computed by `school.payment_balance` (what is owed, paid, waiting, left), never entered; payments never touch the pedagogical state. **Access to courses** (FR-INS-04): `full` needs what is owed paid; `first_installment`, the first instalment of the schedule in force (without a schedule, a payment).
+- **Screens**: the enrolment's **Finance** shows what is paid, what is left, the financial state and the payments with their references, authors and validators; it records a payment, validates one, withdraws one's own, or reverses a validated one. **Payments to validate** lists the waiting payments and reversals, the cash desk's included, with their means and reference. The Enrolments screen opens the finance for whoever records or validates payments.
+
+Routes, behind the `student_finance` module: `GET /api/payments`, `POST /api/enrollments/{enrollment}/payments`, `PATCH /api/payments/{payment}`, `POST /api/payments/{payment}/cancel`, `/validate` and `/reverse`; `GET /api/enrollments/{enrollment}/finance` now answers the cash desk and the validators too.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-02 AC1, TST-10 | tests/sql (native): five sendings of one key at once make one payment; two payments at once never pass what is left; `PaymentTest`: the same key again, the same payment |
+| FR-FIN-02 AC2 | `PaymentTest`, tests/sql: what is paid and left after each validation and reversal |
+| FR-FIN-02 AC3 | tests/sql: a cancelled payment's reference is not given again; references unique |
+| FR-FIN-03 AC1, TST-11 | `PaymentTest` (API), tests/sql (base): a validated payment's amount refused |
+| FR-FIN-03 AC2 | `PaymentTest`, tests/sql: the reversal validated by someone else, the payment `reversed` and kept |
+| FR-FIN-03 AC3, BR-08 | `PaymentTest`, tests/sql: the author refused with `segregation_of_duties`; the school's self-validation marked |
+| TST-09, FR-INS-02 AC2 | tests/sql, `PaymentTest`: the enrolment stays pending, then suspended, when paid |
+| Screens | `PaymentTest`: the cash desk records from the Finance screen, the finance validates from Payments to validate, reverses and validates the reversal from the Finance screen |
+
+Validation on 16 October 2026: **270 PHP integration tests (11,291 assertions), 239 embedded SQL checks and 261 native PostgreSQL 16 checks including concurrency**; migration 049 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 200 screens without a problem, Payments to validate and the payments on an enrolment's Finance included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Payments (FR-FIN-02/03): methods, validation and its separation, immutability, reversals, idempotency (TST-09–11); `school.enrollment_paid` reads them.
-2. Refunds and overpayments (FR-FIN-04), receipts (FR-FIN-05), arrears (FR-FIN-06), the period's close (FR-FIN-07).
+1. Refunds and the decision on an overpayment's credit (FR-FIN-04).
+2. Receipts (FR-FIN-05), arrears (FR-FIN-06), the period's close (FR-FIN-07, which will refuse a payment dated in a closed period). A payment's optional supporting document comes with the receipts.
 
 ## Next increments of lot 2
 

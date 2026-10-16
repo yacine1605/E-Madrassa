@@ -21,6 +21,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
@@ -317,13 +318,23 @@ Route::prefix('api')->group(function () {
             // FR-FIN-01: what an enrolment owes and when; its adjustments, decided by the direction beyond the threshold.
             Route::middleware('module:student_finance')->group(function () {
                 Route::get('enrollments/{enrollment}/finance', [FinanceController::class, 'show'])
-                    ->middleware('permission:finance.payment.read,finance.discount.grant,finance.schedule.manage,finance.discount.approve');
+                    ->middleware('permission:finance.payment.read,finance.payment.create,finance.payment.create.delegated,finance.payment.validate,'
+                        .'finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve');
                 Route::get('adjustments', [FinanceController::class, 'adjustments'])->middleware('permission:finance.payment.read,finance.discount.approve');
                 Route::post('enrollments/{enrollment}/adjustments', [FinanceController::class, 'adjust'])->middleware('permission:finance.discount.grant');
                 Route::post('adjustments/{adjustment}/approve', [FinanceController::class, 'approve'])->middleware('permission:finance.discount.approve');
                 Route::post('adjustments/{adjustment}/reject', [FinanceController::class, 'reject'])->middleware('permission:finance.discount.approve');
                 Route::get('enrollments/{enrollment}/schedule/proposal', [FinanceController::class, 'proposal'])->middleware('permission:finance.schedule.manage');
                 Route::post('enrollments/{enrollment}/schedule', [FinanceController::class, 'schedule'])->middleware('permission:finance.schedule.manage');
+                // FR-FIN-02, FR-FIN-03: payments, validated by someone else, reversed by a linked reversal.
+                Route::get('payments', [PaymentController::class, 'index'])
+                    ->middleware('permission:finance.payment.read,finance.payment.validate,finance.payment.reverse,finance.payment.create,finance.payment.create.delegated');
+                Route::post('enrollments/{enrollment}/payments', [PaymentController::class, 'store'])
+                    ->middleware('permission:finance.payment.create,finance.payment.create.delegated');
+                Route::patch('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:finance.payment.create,finance.payment.create.delegated');
+                Route::post('payments/{payment}/cancel', [PaymentController::class, 'cancel'])->middleware('permission:finance.payment.create,finance.payment.create.delegated');
+                Route::post('payments/{payment}/validate', [PaymentController::class, 'validatePayment'])->middleware('permission:finance.payment.validate');
+                Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->middleware('permission:finance.payment.reverse');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

@@ -30,6 +30,9 @@ return [
         'enrollment' => [
             'access' => ['require_payment' => ['none' => 'لا شيء: يكفي التسجيل المصادق عليه', 'first_installment' => 'القسط الأول', 'full' => 'كامل المبلغ']],
         ],
+        'finance' => [
+            'payment' => ['methods' => ['cash' => 'نقدًا', 'cheque' => 'صك', 'transfer' => 'تحويل', 'ccp' => 'الحساب البريدي الجاري', 'card' => 'بطاقة', 'other' => 'أخرى']],
+        ],
     ],
 
     // FR-REF-04.
@@ -128,6 +131,7 @@ return [
         'progression' => 'قرار الانتقال السنوي',
         'adjustment' => 'تعديل تسجيل',
         'payment_schedule' => 'جدول أقساط تسجيل',
+        'payment' => 'دفعة تسجيل',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

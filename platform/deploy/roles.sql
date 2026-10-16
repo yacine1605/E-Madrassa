@@ -172,6 +172,13 @@ GRANT INSERT (tenant_id, enrollment_id, version, total, reason, idempotency_key)
 GRANT INSERT (tenant_id, schedule_id, seq, due_date, amount) ON school.installment TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.finance_in_scope(text, uuid), school.enrollment_due(uuid), school.current_schedule(uuid),
   school.set_schedule(uuid, jsonb, text, uuid) TO school_runtime;
+-- Payments (049): recorded and corrected while they wait, validated or withdrawn once; reversed by a linked reversal.
+GRANT SELECT ON school.payment TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, kind, reverses_payment_id, amount, paid_on, method_code, external_ref, overpayment, reason, idempotency_key)
+  ON school.payment TO school_runtime;
+GRANT UPDATE (amount, paid_on, method_code, external_ref, overpayment, reason, status, cancel_reason, version) ON school.payment TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.payment_balance(uuid, uuid), school.next_payment_reference(uuid), school.check_payment(school.payment),
+  school.record_payment(uuid, numeric, date, text, text, boolean, uuid), school.reverse_payment(uuid, text, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -422,6 +429,12 @@ ALTER FUNCTION school.finance_in_scope(text, uuid) OWNER TO platform_provisioner
 ALTER FUNCTION platform.enrollment_due_of(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.enrollment_due(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.enrollment_paid(uuid, text) OWNER TO platform_provisioner;
+-- Payments (049): what is paid and waits, whatever the reader may see; the schedule's first instalment for the access; the references' counter.
+GRANT SELECT ON school.payment, school.payment_schedule, school.installment TO platform_provisioner;
+GRANT SELECT, INSERT, UPDATE (last) ON school.payment_counter TO platform_provisioner;
+ALTER FUNCTION platform.enrollment_paid_of(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.payment_balance(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.next_payment_reference(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

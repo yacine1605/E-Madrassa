@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * FR-FIN-01: what an enrolment owes and when. Its adjustments (discounts, debt waivers,
  * penalties), each with its reason, approved by the direction beyond the school's threshold, by
  * someone else than their author (BR-08); its schedule, versioned, whose sum is what is owed
- * (AC1). Amounts are strings with two decimals, never floats (BR-04). The rules are SQL 048's.
+ * (AC1); what is paid (SQL 049). Amounts are strings with two decimals, never floats (BR-04). The rules are SQL 048's.
  */
 final class FinanceController
 {
@@ -32,7 +32,9 @@ final class FinanceController
     public function show(string $enrollment)
     {
         $row = $this->enrollment($enrollment);
-        $due = DB::selectOne('SELECT school.enrollment_due(?)::text AS due', [$row->id])->due;
+        // FR-FIN-02 step 1: what is owed, paid and waiting, for whoever reads the finance or records its payments.
+        $balance = DB::selectOne('SELECT due::text AS due, paid::text AS paid, pending::text AS pending, balance::text AS balance, state FROM school.payment_balance(?)', [$row->id]);
+        $due = $balance->due;
         $sums = DB::selectOne("SELECT coalesce(sum(amount) FILTER (WHERE kind <> 'penalty' AND status = 'approved'), 0)::text AS reductions,
             coalesce(sum(amount) FILTER (WHERE kind = 'penalty' AND status = 'approved'), 0)::text AS penalties,
             coalesce(sum(amount) FILTER (WHERE status = 'pending'), 0)::text AS pending FROM school.adjustment WHERE tenant_id = ? AND enrollment_id = ?",
@@ -42,12 +44,15 @@ final class FinanceController
         return ['data' => [
             'enrollment_id' => $row->id, 'status' => $row->status, 'agreed_price' => $row->agreed_price, 'reductions' => $sums->reductions,
             'penalties' => $sums->penalties, 'pending' => $sums->pending, 'due' => $due,
+            // FR-INS-02: the financial state, computed from the validated payments net of their reversals (TST-09).
+            'paid' => $balance->paid, 'payments_pending' => $balance->pending, 'balance' => $balance->balance, 'state' => $balance->state,
             'schedule' => $schedule ? [...(array) $schedule, 'installments' => array_map(fn ($line) => (array) $line, DB::select(
                 'SELECT seq, due_date, amount::text AS amount FROM school.installment WHERE tenant_id = ? AND schedule_id = ? ORDER BY seq', [$this->school->id(), $schedule->id]))] : null,
             // A schedule no longer matching what is owed (an adjustment since) waits for its next version.
             'schedule_matches' => $schedule ? $schedule->total === $due : null,
             'adjustments' => array_map(fn ($row) => $this->present($row), DB::select(self::ADJUSTMENTS.' WHERE a.tenant_id = ? AND a.enrollment_id = ? ORDER BY a.created_at DESC, a.id',
                 [$this->school->id(), $row->id])),
+            'payments' => PaymentController::of($this->school->id(), $row->id),
         ]];
     }
 

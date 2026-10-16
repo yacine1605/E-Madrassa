@@ -23,7 +23,7 @@ const screens = name => ({
 let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
-  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals'];
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -229,6 +229,9 @@ async function seed(browser, session) {
     const proposal = await (await fetch(`/api/enrollments/${enrollment.id}/schedule/proposal`, { headers: { Accept: 'application/json' } })).json();
     await call(`enrollments/${enrollment.id}/schedule`, { installments: proposal.data.installments, idempotency_key: crypto.randomUUID() });
     await call(`enrollments/${enrollment.id}/adjustments`, { kind: 'discount', amount: '15000', reason: 'Bourse au mérite', idempotency_key: crypto.randomUUID() });
+    // A payment by cheque waiting for its validation (FR-FIN-02).
+    await call(`enrollments/${enrollment.id}/payments`, { amount: '40000', paid_on: day(0), method_code: 'cheque', external_ref: 'CHQ 0012345',
+      idempotency_key: crypto.randomUUID() });
     return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id, enrollment: enrollment.id };
   });
   await context.close();
