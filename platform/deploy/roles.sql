@@ -366,6 +366,8 @@ ALTER FUNCTION school.lead_assignees(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.lead_assignee_valid(bigint, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.close_lead_reminders() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.notify_due_reminders(integer) OWNER TO platform_provisioner;
+-- A group's composition (041): its lead teacher's account and roles, whatever the writer may read, notified.
+ALTER FUNCTION school.notify_composition() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

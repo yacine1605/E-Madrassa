@@ -2740,6 +2740,29 @@ await check('a promotion enrols in a later year\'s class at the next level, a re
   assert.equal(await count('SELECT count(*) n FROM school.progression WHERE enrollment_id = ANY ($1)', [[x, y]]), 0);
   assert.equal(await count('SELECT count(*) n FROM school.group_membership WHERE group_id = $1', [small]), 0);
 });
+// A group's composition (SQL 041, FR-GRP-02): a pupil joining or leaving notifies the group's lead teacher.
+await check('a pupil joining or leaving a group notifies its lead teacher, by the group only; nobody for their own change (FR-GRP-02)', async () => {
+  const program = await programme('COMPO-041');
+  const [led, unled] = [await group('COMPO-A', program, 10), await group('COMPO-B', program, 10)];
+  const record = await newStaff('Compo', 'Titulaire');
+  const teacher = await scopedAccount('internal', 'tenant', null, ['group.group.read', 'group.membership.manage', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [record.id, teacher.user]);
+  await sql(LEAD, [led, record.id]);
+  const notes = async () => { await as(null); const rows = (await sql("SELECT data FROM school.notification WHERE user_id = $1 AND event = 'group.membership_changed' ORDER BY created_at, id", [teacher.user])).rows.map(r => r.data); await as('school_runtime', a, 1); return rows; };
+  const place = await joinGroup(await enroll((await newAdult('Compo', 'Ines')).id, program), led);
+  await joinGroup(await enroll((await newAdult('Compo', 'Samir')).id, program), unled);
+  assert.deepEqual(await notes(), [{ group_id: led, change: 'joined' }]);
+  await sql("SELECT set_config('app.reason', 'Changement de classe', false)");
+  await sql('SELECT school.move_to_group($1, $2)', [place, unled]);
+  await sql("SELECT set_config('app.reason', '', false)");
+  assert.deepEqual(await notes(), [{ group_id: led, change: 'joined' }, { group_id: led, change: 'left' }]);
+  // The lead teacher's own change tells them nothing.
+  const enrolment = await enroll((await newAdult('Compo', 'Lina')).id, program);
+  await as('school_runtime', a, teacher.user);
+  await sql(JOIN_GROUP, [a, enrolment, led]);
+  assert.equal((await notes()).length, 2);
+});
 // Admissions (SQL 038, FR-CRM-01, FR-CRM-02): prospects on a site, their children, interactions and reminders; the conversion, once.
 const PROSPECT = 'INSERT INTO school.lead (tenant_id, site_id, last_name, first_name, phone, source, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status';
 const prospect = async (site = siteA, last = 'Prospect', source = 'word_of_mouth', assigned = null) =>

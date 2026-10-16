@@ -947,9 +947,24 @@ Routes: `POST /api/progressions` (`decisions`: each `enrollment_id`, `decision`,
 
 Validation on 16 October 2026: **258 PHP integration tests (10,340 assertions), 229 embedded SQL checks and 250 native PostgreSQL 16 checks including concurrency**; migration 040 rolled back alone with 4 decisions, their 4 enrolments and their journal in place (the enrolments kept, the journal's policy as 038 wrote it), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a column and an action on a class's members.
 
+## Increment 54 (lot 2): a group's composition notified
+
+`041_composition_notices.sql`:
+
+- **FR-GRP-02, step 4** (annex B, `group.membership.changed`): a pupil **joining** a group (an assignment, the target of a transfer, a promotion's class) or **leaving** it (an end, the source of a transfer) notifies the group's **lead teacher**: through their account, if they have one, are still with the school, still read the groups, and did not make the change themselves. The notification (`group.membership_changed`, no e-mail by default) names the group and the change only, no pupil (BR-19); it opens the group's members, which the teacher reads with their own rights (033).
+- The waiting list of a full group (FR-GRP-02's SHOULD) waits for its decision (OD-14).
+
+No new route. On screen, a composition's notification opens **the group**.
+
+| Requirement | Evidence |
+|---|---|
+| FR-GRP-02, BR-19 | `tests/sql/database.mjs`: an assignment and a transfer notify the lead teacher of the group joined and left, by the group and the change only; a group without a lead teacher notifies nobody; the teacher's own change tells them nothing. `CompositionNoticeTest`: through the API, an assignment and its end in the teacher's bell, none in the author's, the notification opening the group |
+
+Validation on 16 October 2026: **259 PHP integration tests (10,360 assertions), 230 embedded SQL checks and 251 native PostgreSQL 16 checks including concurrency**; migration 041 rolled back alone with 2 of its notifications and 541 memberships in place (the memberships kept), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, an action on a notification.
+
 ## Next increments of lot 2
 
-1. Notifications of a group's composition, and the teachers' pedagogical access. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
+1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The prospects' import (section 3.3, « élèves, CRM ») and their retention (NFR-DATA-03: a lost prospect's data are kept until then); the dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

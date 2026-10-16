@@ -29,6 +29,7 @@ return [
     'mark_read' => 'Marquer comme lue',
     'mark_all_read' => 'Tout marquer comme lu',
     'see_task' => 'Voir la tâche',
+    'see_group' => 'Voir le groupe',
     'email_preferences' => 'Recevoir par e-mail',
     'email_help' => 'Chaque notification reste ici ; cochez celles qui doivent aussi arriver par e-mail.',
     'deliveries' => 'E-mails non envoyés',

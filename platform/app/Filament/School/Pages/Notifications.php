@@ -58,6 +58,9 @@ final class Notifications extends SchoolPage implements HasTable
                 // FR-CRM-01 AC1: a due reminder opens its prospect, which the reader reads with their own rights.
                 Action::make('lead')->label(__('admission.see_lead'))->visible(fn (array $record) => isset($record['data']['lead_id']))
                     ->url(fn (array $record) => LeadSheet::getUrl(['lead' => $record['data']['lead_id']])),
+                // FR-GRP-02: a group's composition changed; its lead teacher opens it.
+                Action::make('group')->label(__('services.see_group'))->visible(fn (array $record) => isset($record['data']['group_id']))
+                    ->url(fn (array $record) => GroupMembers::getUrl(['group' => $record['data']['group_id']])),
                 Action::make('read')->label(__('services.mark_read'))->visible(fn (array $record) => !$record['read_at'] && SchoolScreen::writable(null))
                     ->action(fn (array $record) => SchoolScreen::change(null,
                         fn () => SchoolScreen::call([], NotificationController::class, 'read', parameters: ['notification' => $record['id']]))),
