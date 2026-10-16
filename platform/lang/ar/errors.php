@@ -265,6 +265,7 @@ return [
     'import_program_unknown' => 'برنامج غير معروف لهذه السنة: :code.',
     'import_group_unknown' => 'فوج غير معروف لهذه السنة: :code.',
     'import_enrollment_exists' => 'التلميذ مسجل مسبقًا في هذا البرنامج ضمن فوج آخر: تُجرى تغييراته من الشاشة.',
+    'import_lead_duplicate' => 'هذا الهاتف معروف مسبقًا: :names. استعمل مرجعه، أو اكتب سببًا في العمود duplicate_reason لتسجيل مترشح آخر.',
 
     // The framework's own refusals.
     'not_found' => 'غير موجود.',

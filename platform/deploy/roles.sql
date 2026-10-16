@@ -153,6 +153,9 @@ GRANT EXECUTE ON FUNCTION school.site_scope_ids(text, text) TO school_runtime;
 -- Retention (030): what the next run will do, for whoever manages the settings; the daily run, by the scheduler.
 GRANT EXECUTE ON FUNCTION school.retention_run(), school.retention_due(), platform.apply_retention(integer) TO school_runtime;
 GRANT EXECUTE ON FUNCTION platform.apply_lead_retention(integer) TO school_runtime;
+-- The prospects' import (043): a prospect keeps the reference of its file; one an import created is undone by its function.
+GRANT INSERT (external_ref) ON school.lead TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.discard_lead(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -376,6 +379,11 @@ GRANT SELECT, UPDATE (body) ON school.lead_interaction TO platform_provisioner;
 GRANT UPDATE (body) ON school.lead_reminder TO platform_provisioner;
 ALTER FUNCTION platform.lead_retention_candidates(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.apply_lead_retention(integer) OWNER TO platform_provisioner;
+-- The prospects' import (043): a prospect an import created, deleted with its children by this function alone; its reference
+-- cleared by the retention run.
+GRANT UPDATE (external_ref), DELETE ON school.lead TO platform_provisioner;
+GRANT DELETE ON school.lead_child TO platform_provisioner;
+ALTER FUNCTION school.discard_lead(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

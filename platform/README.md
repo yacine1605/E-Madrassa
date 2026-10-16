@@ -977,9 +977,25 @@ No new route.
 
 Validation on 16 October 2026: **260 PHP integration tests (10,387 assertions), 231 embedded SQL checks and 252 native PostgreSQL 16 checks including concurrency**; migration 042 rolled back alone with 7 prospects, one of them anonymised, in place (the anonymised one kept as it is), applied again, rolled back and applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a row in Settings and in its retention summary.
 
+## Increment 56 (lot 2): the prospects' import, and imported records anonymised
+
+`043_lead_imports.sql`, `app/Imports/LeadsImporter.php`:
+
+- **FR-IMP-01, FR-CRM-01** (section 3.3: the front office imports « élèves, CRM »): **Prospects** is a new kind of import, by `crm.lead.create` for the whole school. A row is a prospect by the reference of the school's file (`external_ref`, never changed): its contact (`last_name`, `first_name`, `phone`, `email`, `relationship`), its `source` (the school's code, in any case), its `site` by code (else the default site), and its first child (`child_first_name`, `child_last_name`, `child_birth_date`, `child_level` by the referential's code) and the school's own fields (`custom_<key>`). Created at the first step, or updated column by column; the same file again changes nothing (BR-05); a closed prospect is changed on screen only. A phone already known among prospects, pupils and guardians is refused unless the row gives a reason (`duplicate_reason`), kept in the journal. An import is undone, last first, while nothing has been built on its prospects (no interaction, reminder, conversion, closure: `school.discard_lead`).
+- **A fix of the retention run (030, NFR-DATA-03)**: it clears an imported pupil's or guardian's file reference when it anonymises them, which the references' frozen code refused; the refusal counted as a rule keeping the record, and **imported pupils and guardians were never anonymised**. The run alone (its flag) now passes the frozen codes; nobody else does. The prospects' run clears their reference too.
+
+No new route: `GET /api/imports/templates/leads` and `POST /api/imports` (`kind` `leads`) are the engine's.
+
+| Requirement | Evidence |
+|---|---|
+| FR-IMP-01, FR-CRM-01, BR-05 | `LeadImportTest`: the template's columns; a file previewed, then imported: the annex and the source by their codes in any case, the child with its birth date and level, the e-mail as the screen stores it; the same phone as a pupil's without a reason, an unknown source, a row without phone nor e-mail refused with their line; the same file again unchanged, a changed cell updated; undone last first, an interaction since keeping its prospect |
+| NFR-DATA-03, BR-17 | `tests/sql/database.mjs`: an imported pupil archived long enough anonymised, their file's reference cleared; outside the run, a reference still never changes. Prospects: their reference cleared with the rest |
+
+Validation on 16 October 2026: **261 PHP integration tests (10,428 assertions), 232 embedded SQL checks and 253 native PostgreSQL 16 checks including concurrency**; migration 043 rolled back alone with 9 prospects, 2 of them imported, and 3 imports in place (the prospects kept without their reference, the frozen codes as 001 wrote them), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a kind more on Imports.
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
-2. The prospects' import (section 3.3, « élèves, CRM »); the dashboard's conversion rate comes with lot 5's dashboards.
+2. The dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

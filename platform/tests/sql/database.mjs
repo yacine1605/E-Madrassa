@@ -2917,6 +2917,22 @@ await check('a prospect lost for longer than the school\'s duration is anonymise
   await rejects("UPDATE school.lead SET status = 'contacted' WHERE id = $1", [lost.id], '23514', 'lead_anonymised');
   await reason('');
 });
+await check('an imported pupil and guardian are anonymised in their turn, their file\'s reference with them (NFR-DATA-03, SQL 043)', async () => {
+  await as('school_runtime', a, 1);
+  const pupil = (await first(STUDENT_REF, [a, 'Importe', 'Retenu', null, null, '1990-01-01', pupilFields, 'RET-IMPORT-1'])).id;
+  await sql("UPDATE school.student SET status = 'former' WHERE id = $1", [pupil]);
+  await sql('UPDATE school.student SET archived_at = now() WHERE id = $1', [pupil]);
+  await backdate('student', pupil, { archived_at: new Date(Date.now() - 30 * 365.25 * 864e5).toISOString() });
+  await as('school_runtime', null, null);
+  await sql(RETAIN, [a]);
+  await as(null);
+  assert.deepEqual(await first('SELECT external_ref, last_name_lat, anonymised_at IS NOT NULL AS done FROM school.student WHERE id = $1', [pupil]),
+    { external_ref: null, last_name_lat: 'ANONYME', done: true });
+  // Outside the run, a reference still never changes.
+  await as('school_runtime', a, 1);
+  const kept = (await first(STUDENT_REF, [a, 'Importe', 'Garde', null, null, '1990-01-01', pupilFields, 'RET-IMPORT-2'])).id;
+  await rejects("UPDATE school.student SET external_ref = 'AUTRE' WHERE id = $1", [kept]);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

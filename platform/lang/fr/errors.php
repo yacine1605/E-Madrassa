@@ -265,6 +265,7 @@ return [
     'import_program_unknown' => 'Programme inconnu pour cette année : :code.',
     'import_group_unknown' => 'Groupe inconnu pour cette année : :code.',
     'import_enrollment_exists' => 'Élève déjà inscrit à ce programme, dans un autre groupe : ses changements se font à l’écran.',
+    'import_lead_duplicate' => 'Ce téléphone est déjà connu : :names. Reprenez sa référence, ou indiquez un motif dans la colonne duplicate_reason pour enregistrer un autre prospect.',
 
     // The framework's own refusals.
     'not_found' => 'Introuvable.',

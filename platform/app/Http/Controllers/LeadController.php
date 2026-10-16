@@ -65,7 +65,7 @@ final class LeadController
     public function duplicates(Request $request)
     {
         $data = $request->validate(['phone' => 'required|string|max:40']);
-        return ['data' => $this->samePhone($data['phone'])];
+        return ['data' => $this->phoneMatches($data['phone'])];
     }
 
     public function store(Request $request)
@@ -76,7 +76,7 @@ final class LeadController
         $this->records->site($data);
         // The warning and the write together, as for pupils: two calls of the same family at once see each other.
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 38))', [$this->school->id()]);
-        $matches = isset($data['phone']) ? $this->samePhone($data['phone']) : [];
+        $matches = isset($data['phone']) ? $this->phoneMatches($data['phone']) : [];
         if ($matches && empty($data['duplicate_reason'])) throw Refusal::of('lead_duplicate', extra: ['duplicates' => $matches]);
         if ($matches) DB::select("SELECT set_config('app.reason', ?, true)", [$data['duplicate_reason']]);
         $children = $data['children'] ?? [];
@@ -271,8 +271,8 @@ final class LeadController
             ...array_intersect_key($child, array_flip(['first_name', 'last_name', 'birth_date', 'level_id']))], 'id');
     }
 
-    /** Pupils, guardians and prospects of this phone, as the reader may see them, at most ten. */
-    private function samePhone(string $phone): array
+    /** Pupils, guardians and prospects of this phone, as the reader may see them, at most ten (the screen and the import's warning). */
+    public function phoneMatches(string $phone): array
     {
         $digits = "regexp_replace(school.search_key(%s), '[^0-9+]', '', 'g')";
         $key = DB::selectOne('SELECT nullif('.sprintf($digits, '?').", '') AS k", [$phone])->k;

@@ -55,6 +55,8 @@ return [
         // The staff, then their qualifications.
         'staff' => App\Imports\StaffImporter::class,
         'qualifications' => App\Imports\QualificationsImporter::class,
+        // The prospects (section 3.3: the front office imports « élèves, CRM »).
+        'leads' => App\Imports\LeadsImporter::class,
     ],
 
     // FR-IMP-02: what can be exported, and from how many rows an export runs in the background.
