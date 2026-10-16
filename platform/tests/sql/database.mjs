@@ -2979,6 +2979,24 @@ await check('a member of staff archived for longer than the school\'s duration i
   assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND action = 'RETENTION' AND after ? 'staff'", [a]), 1);
   await as('school_runtime', a, 1);
 });
+// A pupil's history (SQL 047, FR-ELV-01): their record's own journal entries, for whoever reads the pupil, without values.
+await check('a pupil\'s history gives their record\'s changes, states and reasons to whoever reads the pupil, never the values (FR-ELV-01, BR-17)', async () => {
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Historique', 'Amel')).id;
+  await sql("UPDATE school.student SET phone = '0550 77 88 99' WHERE id = $1", [pupil]);
+  await sql("SELECT set_config('app.reason', 'Impayés répétés', false)");
+  await sql("UPDATE school.student SET status = 'blocked', status_reason = 'Impayés répétés' WHERE id = $1", [pupil]);
+  await sql("SELECT set_config('app.reason', '', false)");
+  const history = (await sql('SELECT action, fields, status, reason, actor_id::int AS actor FROM school.student_history($1)', [pupil])).rows;
+  assert.deepEqual(history.map(h => [h.action, h.status, h.reason]), [['UPDATE', 'blocked', 'Impayés répétés'], ['UPDATE', null, null], ['INSERT', 'active', null]]);
+  assert.deepEqual(history[1].fields, ['phone']);
+  assert.ok(!JSON.stringify(history).includes('0550 77 88 99'), 'no value');
+  // A reader of another site's pupils only, or without the pupils, reads nothing of it.
+  const elsewhere = await scopedAccount('internal', 'site', [staffSiteB], ['student.record.read']);
+  await as('school_runtime', a, elsewhere.user);
+  await rejects('SELECT * FROM school.student_history($1)', [pupil], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

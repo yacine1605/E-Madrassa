@@ -258,6 +258,7 @@ Route::prefix('api')->group(function () {
                     Route::get('students/{student}', [StudentController::class, 'show']);
                     Route::post('students/duplicates', [StudentController::class, 'duplicates']);
                     Route::get('students/{student}/photo', [StudentPhotoController::class, 'show']);
+                    Route::get('students/{student}/history', [StudentController::class, 'history']);
                 });
                 Route::post('students', [StudentController::class, 'store'])->middleware('permission:student.record.create');
                 Route::put('students/{student}', [StudentController::class, 'update'])->middleware('permission:student.record.update');

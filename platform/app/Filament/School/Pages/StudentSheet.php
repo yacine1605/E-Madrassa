@@ -35,6 +35,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 
@@ -87,6 +88,7 @@ final class StudentSheet extends SchoolingPage
         $rows = $this->identity();
         $enrollments = $this->enrollments();
         $origin = $this->origin();
+        $history = $this->history();
         return $schema->components([Section::make(__('schooling.identity'))->columns(['default' => 1, 'sm' => 2])
             ->schema([
                 // FR-ELV-01: the photo's thumbnail, or the initials of a pupil without one.
@@ -104,6 +106,13 @@ final class StudentSheet extends SchoolingPage
                 ->schema([TextEntry::make('program')->label(__('schooling.program')), TextEntry::make('year')->label(__('reference.year')),
                     TextEntry::make('status')->label(__('school.status')), TextEntry::make('group')->label(__('schooling.main_group')),
                     TextEntry::make('access')->label(__('schooling.access_granted'))])]),
+            // FR-ELV-01: what happened to the pupil, newest first, as far as the reader may see it.
+            Section::make(__('schooling.history'))->description(__('schooling.history_help'))->collapsible()->schema([RepeatableEntry::make('history')->hiddenLabel()
+                ->columns(['default' => 1, 'sm' => 4])->placeholder(__('schooling.no_history'))
+                ->state(array_map(fn (array $event) => ['at' => Formats::dateTime($event['at']), 'event' => $this->eventText($event),
+                    'reason' => Formats::isolated($event['reason'] ?? null), 'actor' => Formats::isolated($event['actor'])], $history))
+                ->schema([TextEntry::make('at')->label(__('schooling.history_when')), TextEntry::make('event')->label(__('schooling.history_what')),
+                    TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('actor')->label(__('admission.author'))])]),
             // FR-CRM-02 AC2: the prospect the pupil came from, its interactions with the family, for whoever reads prospects.
             Section::make(__('admission.origin'))->description(__('admission.origin_help'))->visible($origin !== null)
                 ->headerActions([Action::make('lead')->label(__('admission.see_lead'))->link()
@@ -114,6 +123,31 @@ final class StudentSheet extends SchoolingPage
                     ->schema([TextEntry::make('occurred_at')->label(__('admission.occurred_at')), TextEntry::make('kind')->label(__('admission.interaction_kind')),
                         TextEntry::make('author')->label(__('admission.author')), TextEntry::make('body')->label(__('admission.body'))])]),
         ]);
+    }
+
+    /** @return list<array> the pupil's history (FR-ELV-01) */
+    private function history(): array
+    {
+        return SchoolScreen::call('student.record.read', StudentController::class, 'history', parameters: ['student' => $this->student])['data'];
+    }
+
+    /** One event of the history, as a sentence of the reader's language. */
+    private function eventText(array $event): string
+    {
+        // A field by the name the screens give it: the journal's, else the pupil's form's (`site_id` as « Site »).
+        $field = fn (string $key) => collect(['admin.fields.'.$key, 'schooling.'.$key, 'schooling.'.preg_replace('/_id$/', '', $key)])
+            ->first(fn (string $name) => Lang::has($name) && is_string(__($name)), $key);
+        $field = fn (string $key) => ($name = $field($key)) === $key ? $key : __($name);
+        return match ($event['kind']) {
+            'updated' => __('schooling.history_events.updated', ['fields' => Formats::list(array_map($field, $event['fields']))]),
+            'status' => __('schooling.history_events.status', ['status' => __('schooling.student_states.'.$event['status'])]),
+            'enrollment' => __('schooling.history_events.enrollment', ['program' => $event['program'], 'status' => __('schooling.enrollment_states.'.$event['status'])]),
+            'joined', 'left' => __('schooling.history_events.'.$event['kind'], ['group' => $event['group']]),
+            'guardian_linked', 'guardian_unlinked' => __('schooling.history_events.'.$event['kind'], ['name' => $this->personName($event['guardian']),
+                'relationship' => __('schooling.relationships.'.$event['relationship'])]),
+            'decision' => __('schooling.history_events.decision', ['program' => $event['program'], 'decision' => __('schooling.decisions.'.$event['decision'])]),
+            default => __('schooling.history_events.'.$event['kind']),
+        };
     }
 
     /** @return ?array the prospect the pupil came from and its interactions, or null (none, or a reader without prospects) */

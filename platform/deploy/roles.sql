@@ -162,6 +162,8 @@ GRANT INSERT (copied_from) ON school.program TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.copy_program(uuid, uuid) TO school_runtime;
 -- Programmes and groups from files (045): one an import created is undone by its function.
 GRANT EXECUTE ON FUNCTION school.discard_program(uuid), school.discard_group(uuid) TO school_runtime;
+-- A pupil's history (047): their record's own journal entries, for whoever reads the pupil, without the values.
+GRANT EXECUTE ON FUNCTION school.student_history(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -404,6 +406,8 @@ GRANT UPDATE (reason, decision_reason) ON school.unavailability TO platform_prov
 GRANT UPDATE (decision_reason) ON school.availability TO platform_provisioner;
 ALTER FUNCTION platform.staff_retention_candidates(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.apply_staff_retention(integer) OWNER TO platform_provisioner;
+-- A pupil's history (047): the journal's entries of the pupil's record (read already), whoever may read the journal.
+ALTER FUNCTION school.student_history(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

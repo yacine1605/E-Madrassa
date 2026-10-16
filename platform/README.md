@@ -1040,6 +1040,20 @@ No new route.
 
 Validation on 16 October 2026: **264 PHP integration tests (10,575 assertions), 234 embedded SQL checks and 255 native PostgreSQL 16 checks including concurrency**; migration 046 rolled back alone with 45 members of staff, one of them anonymised, in place (kept as it is, the guards as 031, 034 and 035 wrote them), applied again, then rolled back with all the others and applied again. Browser acceptance not run: no new screen, a row in Settings and in its retention summary (the CI could not start, the GitHub account's billing).
 
+## Increment 60 (lot 2): a pupil's history on their sheet
+
+`047_student_history.sql`:
+
+- **FR-ELV-01** (« consulter la fiche d'un élève avec son historique »): the pupil's sheet shows **what happened to the pupil**, newest first: their record's creation, its changes (the fields changed, never their values, BR-17), its states with their reasons, its archiving and anonymisation, by whom; their enrolments' states with their programme and reason; the groups they joined and left; the guardians linked and unlinked; their year-end decisions. Each part as the reader may see it: the record's own entries through `school.student_history`, which gives them to whoever reads the pupil (the journal itself stays its readers', FR-AUD-01); the rest through the enrolments', groups' and guardians' own policies.
+
+Route: `GET /api/students/{student}/history` (`student.record.read`), at most 200 events.
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-01, BR-17, FR-IAM-04 | `tests/sql/database.mjs`: a pupil's creation, a change of phone (its field, not its value) and a block with its reason, newest first; refused to a reader of another site's pupils. `StudentHistoryTest`: the same through the API with the enrolment, its group and the guardian; a reader of the pupils without their enrolments reads the record's history only; the sheet showing it |
+
+Validation on 16 October 2026: **265 PHP integration tests (10,653 assertions), 235 embedded SQL checks and 256 native PostgreSQL 16 checks including concurrency**; migration 047 rolled back alone with 611 pupils and their 659 journal entries in place, applied again, then rolled back with all the others and applied again. Local browser acceptance in Chromium: 188 screens without a problem, the pupil's sheet with its history included (the CI could not start, the GitHub account's billing).
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.

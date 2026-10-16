@@ -31,6 +31,66 @@ final class StudentController
             'matricule' => $create ? ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/'] : 'prohibited'];
     }
 
+    /**
+     * FR-ELV-01: the pupil's history, newest first: their record's own entries (SQL 047), and their
+     * enrolments' states, groups, guardians and year-end decisions as the reader may see them.
+     */
+    public function history(string $student)
+    {
+        $pupil = $this->find($student);
+        $t = $this->school->id();
+        $events = [];
+        foreach (DB::select('SELECT occurred_at, action, to_json(fields) AS fields, status, reason, actor_id FROM school.student_history(?)', [$pupil->id]) as $row) {
+            $fields = json_decode($row->fields, true);
+            $kind = match (true) {
+                $row->action === 'INSERT' => 'created',
+                $row->action === 'DELETE' => 'deleted',
+                in_array('anonymised_at', $fields, true) => 'anonymised',
+                in_array('archived_at', $fields, true) => 'archived',
+                // A photo added, replaced or removed (FR-ELV-01): its files, never shown as such.
+                $fields !== [] && array_diff($fields, ['photo_file_id', 'photo_thumb_file_id']) === [] => 'photo',
+                $row->status !== null => 'status',
+                default => 'updated',
+            };
+            $events[] = ['at' => $row->occurred_at, 'kind' => $kind, 'status' => $row->status,
+                'fields' => $kind === 'updated' ? array_values(array_diff($fields, ['photo_file_id', 'photo_thumb_file_id'])) : [],
+                'reason' => $row->reason, 'actor_id' => $row->actor_id];
+        }
+        // Each enrolment's states, with its programme, as the reader may see it.
+        foreach (DB::select("SELECT h.changed_at, h.from_status, h.to_status, h.reason, h.changed_by, e.terms_snapshot ->> 'code' AS program
+            FROM school.enrollment_status_history h JOIN school.enrollment e ON e.tenant_id = h.tenant_id AND e.id = h.enrollment_id
+            WHERE h.tenant_id = ? AND e.student_id = ?", [$t, $pupil->id]) as $row) {
+            $events[] = ['at' => $row->changed_at, 'kind' => 'enrollment', 'status' => $row->to_status, 'program' => $row->program,
+                'reason' => $row->reason, 'actor_id' => $row->changed_by];
+        }
+        // The groups joined and left, when it was recorded (a class of next year joined today, from its first day).
+        foreach (DB::select('SELECT m.created_at, m.updated_at, m.valid_to, m.created_by, m.updated_by, g.code FROM school.group_membership m
+            JOIN school.enrollment e ON e.tenant_id = m.tenant_id AND e.id = m.enrollment_id
+            JOIN school.study_group g ON g.tenant_id = m.tenant_id AND g.id = m.group_id WHERE m.tenant_id = ? AND e.student_id = ?', [$t, $pupil->id]) as $row) {
+            $events[] = ['at' => $row->created_at, 'kind' => 'joined', 'group' => $row->code, 'actor_id' => $row->created_by];
+            if ($row->valid_to !== null) $events[] = ['at' => $row->updated_at, 'kind' => 'left', 'group' => $row->code, 'actor_id' => $row->updated_by];
+        }
+        // The guardians linked, and unlinked.
+        foreach (DB::select('SELECT l.created_at, l.archived_at, l.relationship, l.created_by, g.last_name_ar, g.first_name_ar, g.last_name_lat, g.first_name_lat
+            FROM school.student_guardian l JOIN school.guardian g ON g.tenant_id = l.tenant_id AND g.id = l.guardian_id WHERE l.tenant_id = ? AND l.student_id = ?',
+            [$t, $pupil->id]) as $row) {
+            $person = array_intersect_key((array) $row, array_flip(PupilRecords::NAMES));
+            $events[] = ['at' => $row->created_at, 'kind' => 'guardian_linked', 'guardian' => $person, 'relationship' => $row->relationship, 'actor_id' => $row->created_by];
+            if ($row->archived_at !== null) $events[] = ['at' => $row->archived_at, 'kind' => 'guardian_unlinked', 'guardian' => $person, 'relationship' => $row->relationship, 'actor_id' => null];
+        }
+        // The year-end decisions (FR-INS-05).
+        foreach (DB::select("SELECT p.created_at, p.decision, p.reason, p.created_by, e.terms_snapshot ->> 'code' AS program FROM school.progression p
+            JOIN school.enrollment e ON e.tenant_id = p.tenant_id AND e.id = p.enrollment_id WHERE p.tenant_id = ? AND e.student_id = ?", [$t, $pupil->id]) as $row) {
+            $events[] = ['at' => $row->created_at, 'kind' => 'decision', 'decision' => $row->decision, 'program' => $row->program, 'reason' => $row->reason,
+                'actor_id' => $row->created_by];
+        }
+        usort($events, fn (array $a, array $b) => strcmp((string) $b['at'], (string) $a['at']));
+        $events = array_slice($events, 0, 200);
+        $names = collect(DB::select('SELECT id, name FROM public.users WHERE id = ANY (?::bigint[])',
+            ['{'.implode(',', array_unique(array_filter(array_column($events, 'actor_id')))).'}']))->pluck('name', 'id');
+        return ['data' => array_map(fn (array $event) => [...$event, 'actor' => $event['actor_id'] === null ? null : ($names[$event['actor_id']] ?? null)], $events)];
+    }
+
     public function duplicates(Request $request)
     {
         $data = $request->validate($this->rules(true));
