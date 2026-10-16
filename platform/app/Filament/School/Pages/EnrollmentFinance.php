@@ -5,6 +5,7 @@ namespace App\Filament\School\Pages;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\RefundController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\Permissions;
@@ -34,17 +35,19 @@ use Livewire\Attributes\Locked;
  * its schedule in force, whose sum is what is owed; a new adjustment or a new version of the
  * schedule; the direction's decision on an adjustment beyond the threshold. FR-FIN-02/03: what
  * it has paid, its payments and reversals; a payment recorded, validated by someone else,
- * withdrawn by its author while it waits, or reversed once validated.
+ * withdrawn by its author while it waits, or reversed once validated. FR-FIN-04: its refunds and
+ * carry-overs, asked, decided by the direction, executed; its credit refunded, carried or kept.
  */
 final class EnrollmentFinance extends SchoolingPage
 {
     protected static bool $isDiscovered = true;
     protected static bool $shouldRegisterNavigation = false;
     protected static array $permissions = ['finance.payment.read', 'finance.payment.create', 'finance.payment.create.delegated', 'finance.payment.validate',
-        'finance.payment.reverse', 'finance.discount.grant', 'finance.schedule.manage', 'finance.discount.approve'];
+        'finance.payment.reverse', 'finance.discount.grant', 'finance.schedule.manage', 'finance.discount.approve', 'finance.refund.request', 'finance.refund.approve'];
     protected static ?string $module = 'student_finance';
     protected static string|array $routeMiddleware = ['module:student_finance', 'permission:finance.payment.read,finance.payment.create,'
-        .'finance.payment.create.delegated,finance.payment.validate,finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve'];
+        .'finance.payment.create.delegated,finance.payment.validate,finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve,'
+        .'finance.refund.request,finance.refund.approve'];
     protected string $view = 'filament.school.enrollment-finance';
     #[Locked] public string $enrollment = '';
     private ?array $financeRow = null;
@@ -102,12 +105,17 @@ final class EnrollmentFinance extends SchoolingPage
                 TextEntry::make('due')->label(__('finance.due'))->state($this->money($finance['due']))->weight('bold'),
                 TextEntry::make('paid')->label(__('finance.paid'))->state($this->money($finance['paid'])),
                 TextEntry::make('balance')->label(__('finance.balance'))->state($this->money($finance['balance']))->weight('bold'),
+                TextEntry::make('refunded')->label(__('finance.refunded'))->state($this->money($finance['refunded'])),
+                // FR-FIN-04: paid beyond what is owed, waiting for its decision (refund, carry-over, kept).
+                TextEntry::make('credit')->label(__('finance.credit'))->state($this->money($finance['credit']))
+                    ->color((float) $finance['credit'] > 0 ? 'warning' : null)->helperText((float) $finance['credit'] > 0 ? __('finance.credit_help') : null),
                 // FR-INS-02: computed from the validated payments, beside the pedagogical state.
                 TextEntry::make('state')->label(__('finance.state'))->badge()->state(__('finance.states.'.$finance['state']))
                     ->color(match ($finance['state']) { 'paid' => 'success', 'partially_paid' => 'warning', default => 'gray' }),
                 TextEntry::make('waiting')->label(__('finance.waiting'))->state(Formats::list(array_filter([
                     (float) $finance['payments_pending'] > 0 ? __('finance.waiting_payments', ['amount' => $this->money($finance['payments_pending'])]) : null,
-                    (float) $finance['pending'] > 0 ? __('finance.waiting_adjustments', ['amount' => $this->money($finance['pending'])]) : null])) ?: __('finance.nothing_waiting')),
+                    (float) $finance['pending'] > 0 ? __('finance.waiting_adjustments', ['amount' => $this->money($finance['pending'])]) : null,
+                    (float) $finance['refunds_pending'] > 0 ? __('finance.waiting_refunds', ['amount' => $this->money($finance['refunds_pending'])]) : null])) ?: __('finance.nothing_waiting')),
             ]),
         ]);
     }
@@ -142,6 +150,25 @@ final class EnrollmentFinance extends SchoolingPage
                     $row['validator'] ? Formats::isolated($row['validator']) : null]))], $this->finance()['payments']))
             ->schema([TextEntry::make('reference')->label(__('finance.reference')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('paid')->label(__('finance.paid_on')), TextEntry::make('status')->label(__('school.status')),
+                TextEntry::make('by')->label(__('finance.by'))])])]);
+    }
+
+    /** The refunds and carry-overs, newest first, with their decision and execution. */
+    public function refundsInfolist(Schema $schema): Schema
+    {
+        return $schema->components([Section::make(__('finance.refunds'))->description(__('finance.refunds_help'))->schema([RepeatableEntry::make('refunds')->hiddenLabel()
+            ->columns(['default' => 2, 'sm' => 5])->placeholder(__('finance.no_refund'))
+            ->state(array_map(fn (array $row) => [
+                'kind' => __('finance.refund_kinds.'.$row['kind']).($row['target_program'] ? ' · '.$row['target_program'] : ''),
+                'amount' => $this->money($row['amount']),
+                'reason' => Formats::isolated($row['reason']),
+                'status' => Formats::list(array_filter([__('finance.refund_states.'.$row['status']), $row['reference'],
+                    $row['method_code'] ? __('finance.methods.'.$row['method_code']) : null, $row['paid_on'] ? Formats::date($row['paid_on']) : null,
+                    $row['decision_reason'] ? Formats::isolated($row['decision_reason']) : null])),
+                'by' => Formats::list(array_filter([Formats::isolated($row['author']), $row['decider'] ? Formats::isolated($row['decider']) : null,
+                    $row['executor'] ? Formats::isolated($row['executor']) : null]))], $this->finance()['refunds']))
+            ->schema([TextEntry::make('kind')->label(__('finance.kind')), TextEntry::make('amount')->label(__('finance.amount')),
+                TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status')),
                 TextEntry::make('by')->label(__('finance.by'))])])]);
     }
 
@@ -196,6 +223,37 @@ final class EnrollmentFinance extends SchoolingPage
                     Textarea::make('reason')->label(__('schooling.history_reason'))->required()->minLength(3)->maxLength(500), Hidden::make('idempotency_key')])
                 ->action(fn (array $data) => $this->changed(SchoolScreen::change('finance.payment.reverse', fn () => SchoolScreen::call('finance.payment.reverse',
                     PaymentController::class, 'reverse', ['reason' => $data['reason'], 'idempotency_key' => $data['idempotency_key']], ['payment' => $data['payment']])))),
+            // FR-FIN-04: a refund or a carry-over to the pupil's other enrolment, asked with its reason.
+            Action::make('refund')->label(__('finance.ask_refund'))->color('gray')->visible(fn () => $this->writable('finance.refund.request') && (float) $this->finance()['paid'] > 0)
+                ->modalDescription(fn () => __('finance.ask_refund_help', ['paid' => $this->money($this->finance()['paid']), 'credit' => $this->money($this->finance()['credit'])]))
+                ->fillForm(fn () => ['kind' => 'refund', 'amount' => (float) $this->finance()['credit'] > 0 ? number_format((float) $this->finance()['credit'], 2, ',', ' ') : null,
+                    'idempotency_key' => (string) Str::uuid()])
+                ->schema(fn () => [Select::make('kind')->label(__('finance.kind'))->required()->live()
+                        ->options(collect(__('finance.refund_kinds'))->only($this->finance()['siblings'] === [] ? ['refund'] : ['refund', 'carry_over'])->all()),
+                    Select::make('target_enrollment_id')->label(__('finance.target'))->visible(fn (Get $get) => $get('kind') === 'carry_over')->required()
+                        ->options(collect($this->finance()['siblings'])->mapWithKeys(fn (array $other) => [$other['id'] => $other['program'].' · '.__('schooling.enrollment_states.'.$other['status'])])->all()),
+                    $this->amountField('amount'), Textarea::make('reason')->label(__('schooling.history_reason'))->required()->minLength(3)->maxLength(500),
+                    Hidden::make('idempotency_key')])
+                ->action(fn (array $data) => $this->changed(SchoolScreen::change('finance.refund.request', fn () => SchoolScreen::call('finance.refund.request',
+                    RefundController::class, 'store', ['kind' => $data['kind'], 'target_enrollment_id' => $data['target_enrollment_id'] ?? null,
+                        'amount' => $this->sentAmount($data['amount']), 'reason' => $data['reason'], 'idempotency_key' => $data['idempotency_key']], ['enrollment' => $this->enrollment])))),
+            // The direction approves or rejects it, never the one who asked (BR-08).
+            Action::make('decide_refund')->label(__('finance.decide_refund'))->visible(fn () => $this->writable('finance.refund.approve') && $this->refundOptions('requested', true) !== [])
+                ->schema(fn () => [Select::make('refund')->label(__('finance.refund'))->required()->options($this->refundOptions('requested', true)),
+                    Select::make('decision')->label(__('finance.decision'))->required()->live()->options(__('finance.decisions')),
+                    Textarea::make('reason')->label(__('schooling.history_reason'))->minLength(3)->maxLength(500)->required(fn (Get $get) => $get('decision') === 'reject')])
+                ->action(fn (array $data) => $this->onRefund($data['refund'], 'finance.refund.approve', $data['decision'], ['reason' => $data['reason'] ?: null])),
+            // AC2: executed once approved: a refund with its means and date; a carry-over pays the other enrolment.
+            Action::make('execute_refund')->label(__('finance.execute_refund'))->visible(fn () => $this->writable('finance.refund.request') && $this->refundOptions('approved') !== [])
+                ->modalDescription(__('finance.execute_refund_help'))
+                ->fillForm(fn () => ['paid_on' => now()->toDateString()])
+                ->schema(fn () => [Select::make('refund')->label(__('finance.refund'))->required()->live()->options($this->refundOptions('approved')),
+                    Select::make('method_code')->label(__('finance.method'))->options($this->methods())->visible(fn (Get $get) => $this->refundKind($get('refund')) !== 'carry_over')
+                        ->required(),
+                    DatePicker::make('paid_on')->label(__('finance.paid_on'))->maxDate(now())->visible(fn (Get $get) => $this->refundKind($get('refund')) !== 'carry_over')->required(),
+                    TextInput::make('external_ref')->label(__('finance.external_ref'))->maxLength(100)->visible(fn (Get $get) => $this->refundKind($get('refund')) !== 'carry_over')])
+                ->action(fn (array $data) => $this->onRefund($data['refund'], 'finance.refund.request', 'execute', ['method_code' => $data['method_code'] ?? null,
+                    'paid_on' => isset($data['paid_on']) ? substr((string) $data['paid_on'], 0, 10) : null, 'external_ref' => ($data['external_ref'] ?? null) ?: null])),
             // AC2: an adjustment with its reason; beyond the threshold, the direction decides.
             Action::make('adjust')->label(__('finance.add_adjustment'))->visible(fn () => $this->writable('finance.discount.grant'))
                 ->modalDescription(__('finance.add_adjustment_help'))
@@ -276,6 +334,26 @@ final class EnrollmentFinance extends SchoolingPage
             Formats::date($row['paid_on'])])])->all();
     }
 
+    /** @return array<string, string> the refunds in this state, those of others only when deciding (BR-08) */
+    private function refundOptions(string $status, bool $others = false): array
+    {
+        return collect($this->finance()['refunds'])->where('status', $status)->filter(fn (array $row) => !$others || (int) $row['created_by'] !== (int) auth()->id())
+            ->mapWithKeys(fn (array $row) => [$row['id'] => Formats::list([__('finance.refund_kinds.'.$row['kind']), $this->money($row['amount']), Str::limit($row['reason'], 40)])])->all();
+    }
+
+    private function refundKind(?string $id): ?string
+    {
+        return $id ? collect($this->finance()['refunds'])->firstWhere('id', $id)['kind'] ?? null : null;
+    }
+
+    private function onRefund(string $id, string $permission, string $method, array $data): array
+    {
+        $row = collect($this->finance()['refunds'])->firstWhere('id', $id);
+        abort_unless($row, 404);
+        return $this->changed(SchoolScreen::change($permission, fn () => SchoolScreen::call($permission, RefundController::class, $method,
+            ['version' => $row['version'], ...$data], ['refund' => $row['id']])));
+    }
+
     private function onPayment(string $id, string|array $permission, string $method, array $data): array
     {
         $row = collect($this->finance()['payments'])->firstWhere('id', $id);
@@ -303,6 +381,7 @@ final class EnrollmentFinance extends SchoolingPage
         $this->cacheSchema('summaryInfolist', null);
         $this->cacheSchema('adjustmentsInfolist', null);
         $this->cacheSchema('paymentsInfolist', null);
+        $this->cacheSchema('refundsInfolist', null);
         return $result;
     }
 }

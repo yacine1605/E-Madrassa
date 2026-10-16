@@ -29,6 +29,7 @@ use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReferentialController;
+use App\Http\Controllers\RefundController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
@@ -319,7 +320,7 @@ Route::prefix('api')->group(function () {
             Route::middleware('module:student_finance')->group(function () {
                 Route::get('enrollments/{enrollment}/finance', [FinanceController::class, 'show'])
                     ->middleware('permission:finance.payment.read,finance.payment.create,finance.payment.create.delegated,finance.payment.validate,'
-                        .'finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve');
+                        .'finance.payment.reverse,finance.discount.grant,finance.schedule.manage,finance.discount.approve,finance.refund.request,finance.refund.approve');
                 Route::get('adjustments', [FinanceController::class, 'adjustments'])->middleware('permission:finance.payment.read,finance.discount.approve');
                 Route::post('enrollments/{enrollment}/adjustments', [FinanceController::class, 'adjust'])->middleware('permission:finance.discount.grant');
                 Route::post('adjustments/{adjustment}/approve', [FinanceController::class, 'approve'])->middleware('permission:finance.discount.approve');
@@ -335,6 +336,12 @@ Route::prefix('api')->group(function () {
                 Route::post('payments/{payment}/cancel', [PaymentController::class, 'cancel'])->middleware('permission:finance.payment.create,finance.payment.create.delegated');
                 Route::post('payments/{payment}/validate', [PaymentController::class, 'validatePayment'])->middleware('permission:finance.payment.validate');
                 Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->middleware('permission:finance.payment.reverse');
+                // FR-FIN-04: refunds and carry-overs, asked by the finance, approved by the direction, then executed.
+                Route::get('refunds', [RefundController::class, 'index'])->middleware('permission:finance.payment.read,finance.refund.request,finance.refund.approve');
+                Route::post('enrollments/{enrollment}/refunds', [RefundController::class, 'store'])->middleware('permission:finance.refund.request');
+                Route::post('refunds/{refund}/approve', [RefundController::class, 'approve'])->middleware('permission:finance.refund.approve');
+                Route::post('refunds/{refund}/reject', [RefundController::class, 'reject'])->middleware('permission:finance.refund.approve');
+                Route::post('refunds/{refund}/execute', [RefundController::class, 'execute'])->middleware('permission:finance.refund.request');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

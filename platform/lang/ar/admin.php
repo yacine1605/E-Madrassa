@@ -132,6 +132,7 @@ return [
         'adjustment' => 'تعديل تسجيل',
         'payment_schedule' => 'جدول أقساط تسجيل',
         'payment' => 'دفعة تسجيل',
+        'refund' => 'استرداد تسجيل',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

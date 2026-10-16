@@ -133,6 +133,7 @@ return [
         'adjustment' => 'Ajustement d’une inscription',
         'payment_schedule' => 'Échéancier d’une inscription',
         'payment' => 'Paiement d’une inscription',
+        'refund' => 'Remboursement d’une inscription',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

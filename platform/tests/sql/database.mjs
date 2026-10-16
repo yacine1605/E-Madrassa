@@ -3168,6 +3168,83 @@ await check('a waiting payment is corrected by its author within what is left; i
   assert.equal(await count('SELECT count(*) n FROM school.payment WHERE reference = $1', [reference]), 1);
   await as('school_runtime', a, 1);
 });
+// Refunds and overpayments (SQL 050, FR-FIN-04): asked with their reason, approved by someone else, executed once approved; a credit decided explicitly.
+await check('a refund is asked, approved by someone else, then executed within what is paid; a credit is refunded, carried over or kept (FR-FIN-04 AC1, AC2, BR-08)', async () => {
+  const finance = ['finance.payment.read', 'finance.payment.create', 'finance.refund.request', 'finance.discount.grant', 'enrollment.enrollment.read'];
+  const accountant = await scopedAccount('internal', 'tenant', null, finance);
+  const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'enrollment.enrollment.read']);
+  const director = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.refund.approve', 'enrollment.enrollment.read']);
+  const both = await scopedAccount('internal', 'tenant', null, [...finance, 'finance.refund.approve']);
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Rembourse', 'Walid')).id;
+  const e = await enroll(pupil, await programme('REMB-A', 50000));
+  const other = await enroll(pupil, await programme('REMB-B', 30000));
+  const stranger = await enroll((await newAdult('Autre', 'Eleve')).id, await programme('REMB-C', 30000));
+  const validate = async id => { await as('school_runtime', a, validator.user); await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [id]); };
+  await as('school_runtime', a, accountant.user);
+  await validate((await first(RECORD, [e, '60000', 'today', 'cash', null, true, uuid()])).id);
+  await as('school_runtime', a, accountant.user);
+  const BAL = 'SELECT paid::text AS paid, refunded::text AS refunded, refunds_pending::text AS asked, credit::text AS credit, state FROM school.payment_balance($1)';
+  assert.deepEqual(await first(BAL, [e]), { paid: '60000.00', refunded: '0.00', asked: '0.00', credit: '10000.00', state: 'paid' });
+  const REQUEST = 'SELECT school.request_refund($1, $2, $3, $4, $5, $6) AS id';
+  await rejects(REQUEST, [e, 'refund', null, '60000.01', 'Trop', uuid()], '23514', 'refund_exceeds_paid');
+  await rejects(REQUEST, [e, 'refund', null, '100', '  ', uuid()], '23514', 'reason_required');
+  const key = uuid();
+  const refund = (await first(REQUEST, [e, 'refund', null, '4000', 'Trop-perçu', key])).id;
+  assert.equal((await first(REQUEST, [e, 'refund', null, '4000', 'Trop-perçu', key])).id, refund, 'the same key, the same refund');
+  await rejects(REQUEST, [e, 'refund', null, '56000.01', 'Au-delà', uuid()], '23514', 'refund_exceeds_paid');
+  // AC2: never executed without its approval; approved by the direction only, never by the one who asked.
+  const EXECUTE = "UPDATE school.refund SET status = 'executed', method_code = 'cash', paid_on = current_date WHERE id = $1";
+  await rejects(EXECUTE, [refund], '23514', 'refund_not_approved');
+  await rejects("UPDATE school.refund SET status = 'approved' WHERE id = $1", [refund], '42501', 'permission_denied');
+  await as('school_runtime', a, both.user);
+  const own = (await first(REQUEST, [e, 'refund', null, '100', 'Le sien', uuid()])).id;
+  await rejects("UPDATE school.refund SET status = 'approved' WHERE id = $1", [own], '23514', 'segregation_of_duties');
+  await as('school_runtime', a, director.user);
+  await rejects("UPDATE school.refund SET status = 'rejected' WHERE id = $1", [own], '23514', 'reason_required');
+  await sql("UPDATE school.refund SET status = 'rejected', decision_reason = 'Pas justifié' WHERE id = $1", [own]);
+  await sql("UPDATE school.refund SET status = 'approved' WHERE id = $1", [refund]);
+  await rejects(EXECUTE, [own], '23514', 'refund_not_approved');
+  await as('school_runtime', a, accountant.user);
+  await sql(EXECUTE, [refund]);
+  const executed = await first('SELECT reference, executed_at IS NOT NULL AS done FROM school.refund WHERE id = $1', [refund]);
+  assert.match(executed.reference, /^RMB-\d{4}-\d{6}$/);
+  assert.deepEqual(await first(BAL, [e]), { paid: '56000.00', refunded: '4000.00', asked: '0.00', credit: '6000.00', state: 'paid' });
+  await rejects("UPDATE school.refund SET external_ref = 'Plus tard' WHERE id = $1", [refund], '23514', 'refund_decided');
+  await rejects('DELETE FROM school.refund WHERE id = $1', [refund], '42501');
+  // A carry-over, to another enrolment of the same pupil only, pays it there once validated by the finance.
+  await rejects(REQUEST, [e, 'carry_over', stranger, '1000', 'Report', uuid()], '23514', 'refund_target_invalid');
+  const carry = (await first(REQUEST, [e, 'carry_over', other, '3000', 'Report sur la seconde inscription', uuid()])).id;
+  await as('school_runtime', a, director.user);
+  await sql("UPDATE school.refund SET status = 'approved' WHERE id = $1", [carry]);
+  await as('school_runtime', a, accountant.user);
+  await sql("UPDATE school.refund SET status = 'executed' WHERE id = $1", [carry]);
+  const carried = await first("SELECT id, status, method_code, amount::text AS amount FROM school.payment WHERE carried_from_refund_id = $1", [carry]);
+  assert.deepEqual([carried.status, carried.method_code, carried.amount], ['pending_validation', 'carry_over', '3000.00']);
+  await rejects("UPDATE school.payment SET status = 'cancelled', cancel_reason = 'Non' WHERE id = $1", [carried.id], '23514', 'payment_carried');
+  await rejects(RECORD, [other, '10', 'today', 'carry_over', null, false, uuid()], '23514', 'payment_method_unknown');
+  await validate(carried.id);
+  await as('school_runtime', a, accountant.user);
+  await rejects('SELECT school.reverse_payment($1, $2, $3)', [carried.id, 'Annuler le report', uuid()], '23514', 'payment_carried');
+  assert.equal((await first(BAL, [other])).paid, '3000.00');
+  assert.deepEqual(await first(BAL, [e]), { paid: '53000.00', refunded: '7000.00', asked: '0.00', credit: '3000.00', state: 'paid' });
+  // The rest kept by the school, with its reason, within the credit.
+  await rejects(ADJUST, [a, e, 'credit_retained', 3000.01, 'Conservé', uuid()], '23514', 'credit_exceeded');
+  assert.equal((await first(ADJUST, [a, e, 'credit_retained', 3000, 'Frais de dossier conservés', uuid()])).status, 'approved');
+  assert.deepEqual(await first(BAL, [e]), { paid: '53000.00', refunded: '7000.00', asked: '0.00', credit: '0.00', state: 'paid' });
+  // AC1: cancelling a paid enrolment moves no money.
+  const moves = 'SELECT (SELECT count(*) FROM school.payment WHERE enrollment_id = $1) + (SELECT count(*) FROM school.refund WHERE enrollment_id = $1) AS n';
+  const before = (await first(moves, [other])).n;
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'cancelled', status_reason = 'Abandon' WHERE id = $1", [other]);
+  await as('school_runtime', a, accountant.user);
+  assert.equal((await first(moves, [other])).n, before);
+  assert.equal((await first(BAL, [other])).paid, '3000.00');
+  // Whoever reads no finance reads no refund.
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.refund WHERE enrollment_id = $1', [e]), 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

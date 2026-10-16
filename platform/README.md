@@ -1119,10 +1119,33 @@ Routes, behind the `student_finance` module: `GET /api/payments`, `POST /api/enr
 
 Validation on 16 October 2026: **270 PHP integration tests (11,291 assertions), 239 embedded SQL checks and 261 native PostgreSQL 16 checks including concurrency**; migration 049 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 200 screens without a problem, Payments to validate and the payments on an enrolment's Finance included. The CI could not start (the GitHub account's billing).
 
+## Increment 64 (lot 3): refunds and overpayments
+
+**FR-FIN-04** (SQL 050): a circuit distinct from payments.
+
+- **Asked** by the finance (`finance.refund.request`) with its reason, once per key (BR-05), never beyond what is paid, the refunds already asked for counted (`refund_exceeds_paid`).
+- **Decided** by the direction (`finance.refund.approve`): approved, or rejected with its reason; never by the one who asked (BR-08, sod rule `refund`).
+- **Executed** by the finance once approved only (AC2, `refund_not_approved`): a refund with its means, date and outside reference, and its own reference `RMB-{year}-{six digits}`. What was refunded comes out of what is paid. Decided or executed, it never changes; none is deleted.
+- **A credit** (paid beyond what is owed) is decided explicitly: refunded; **carried over** to another open enrolment of the same pupil (`refund_target_invalid` otherwise), whose execution records a linked payment there (means `carry_over`), validated by the finance as any other and never corrected, withdrawn or reversed (`payment_carried`); or **kept** by the school with its reason, as an adjustment `credit_retained` within the credit (`credit_exceeded`). The same circuit carries an enrolment's payments to the one it was transferred to (FR-INS-03).
+- **AC1**: cancelling an enrolment moves no money; its payments stay, and the finance decides.
+- **Screens**: the enrolment's **Finance** shows what was refunded and the credit, the refunds and carry-overs with their decision; it asks for a refund or a carry-over, decides one, executes one, or keeps a credit (Adjustment, « crédit conservé »). **Refunds to approve** lists the requests for the direction.
+
+Routes, behind the `student_finance` module: `GET /api/refunds`, `POST /api/enrollments/{enrollment}/refunds`, `POST /api/refunds/{refund}/approve`, `/reject` and `/execute`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-04 AC1 | tests/sql: a paid enrolment cancelled, no payment nor refund added, what it paid unchanged |
+| FR-FIN-04 AC2 | `RefundTest`, tests/sql: executing before the approval refused; a rejected refund never executed |
+| BR-08 | `RefundTest`, tests/sql: the accountant cannot approve; an account with both rights cannot approve its own request |
+| Credit | `RefundTest`, tests/sql: a refund, a carry-over validated on the other enrolment, the rest kept, the credit at nothing |
+| Screens | `RefundTest`: the credit proposed as the amount, asked from the Finance screen, approved from Refunds to approve, executed from the Finance screen |
+
+Validation on 16 October 2026: **272 PHP integration tests (11,517 assertions), 240 embedded SQL checks and 262 native PostgreSQL 16 checks including concurrency**; migration 050 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 204 screens without a problem, Refunds to approve and the refunds on an enrolment's Finance included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Refunds and the decision on an overpayment's credit (FR-FIN-04).
-2. Receipts (FR-FIN-05), arrears (FR-FIN-06), the period's close (FR-FIN-07, which will refuse a payment dated in a closed period). A payment's optional supporting document comes with the receipts.
+1. Receipts of payments and refunds (FR-FIN-05), with a payment's optional supporting document.
+2. Arrears (FR-FIN-06), the period's close (FR-FIN-07, which will refuse a payment or a refund dated in a closed period).
 
 ## Next increments of lot 2
 

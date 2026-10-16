@@ -179,6 +179,12 @@ GRANT INSERT (tenant_id, enrollment_id, kind, reverses_payment_id, amount, paid_
 GRANT UPDATE (amount, paid_on, method_code, external_ref, overpayment, reason, status, cancel_reason, version) ON school.payment TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.payment_balance(uuid, uuid), school.next_payment_reference(uuid), school.check_payment(school.payment),
   school.record_payment(uuid, numeric, date, text, text, boolean, uuid), school.reverse_payment(uuid, text, uuid) TO school_runtime;
+-- Refunds (050): asked with their reason, decided by someone else, executed once approved; a carry-over pays the pupil's other enrolment.
+GRANT SELECT ON school.refund TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, kind, target_enrollment_id, amount, reason, idempotency_key) ON school.refund TO school_runtime;
+GRANT UPDATE (status, decision_reason, method_code, paid_on, external_ref, version) ON school.refund TO school_runtime;
+GRANT INSERT (carried_from_refund_id) ON school.payment TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.request_refund(uuid, text, uuid, numeric, text, uuid), school.next_refund_reference(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -435,6 +441,10 @@ GRANT SELECT, INSERT, UPDATE (last) ON school.payment_counter TO platform_provis
 ALTER FUNCTION platform.enrollment_paid_of(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.payment_balance(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.next_payment_reference(uuid) OWNER TO platform_provisioner;
+-- Refunds (050): what was refunded comes out of what is paid; the refunds' counter.
+GRANT SELECT ON school.refund TO platform_provisioner;
+GRANT SELECT, INSERT, UPDATE (last) ON school.refund_counter TO platform_provisioner;
+ALTER FUNCTION school.next_refund_reference(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;
