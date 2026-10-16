@@ -85,6 +85,7 @@ return [
     'block_reason' => 'Motif du blocage',
     'block_enrollments' => 'Inscriptions en cours',
     'block_enrollments_help' => 'Inscriptions non annulées : :count. Le blocage ne les modifie pas ; elles ne pourront plus être validées tant qu’il dure.',
+    'block_enrollments_hidden' => 'Et :count que vous ne consultez pas.',
     'archive_help' => 'Le dossier d’un ancien élève archivé quitte les listes ; il reste consultable avec les dossiers archivés.',
     'guardians' => 'Responsables légaux',
     'guardian' => 'Responsable',

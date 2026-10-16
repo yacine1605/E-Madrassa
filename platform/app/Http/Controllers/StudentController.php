@@ -148,8 +148,9 @@ final class StudentController
         if ((int) $data['version'] !== (int) $current->version) throw Refusal::of('stale_version');
         if ($data['status'] === 'blocked' && $current->status !== 'blocked') {
             $count = DB::selectOne('SELECT school.student_enrollment_count(?) AS n', [$current->id])->n;
+            // FR-ELV-03 AC1: which ones, as far as the reader may see them; the others counted only.
             if ($count > 0 && !$request->boolean('confirm_enrollments'))
-                throw Refusal::of('student_active_enrollments', extra: ['active_enrollments' => $count]);
+                throw Refusal::of('student_active_enrollments', extra: ['active_enrollments' => $count, 'enrollments' => $this->activeEnrollments($current->id)]);
         }
         DB::select("SELECT set_config('app.reason', ?, true)", [$data['reason']]);
         DB::table('school.student')->where('tenant_id', $this->school->id())->where('id', $current->id)->update([
@@ -167,6 +168,15 @@ final class StudentController
         DB::table('school.student')->where('tenant_id', $this->school->id())->where('id', $current->id)
             ->update(['archived_at' => now(), 'version' => $data['version']]);
         return $this->show($current->id);
+    }
+
+    /** @return list<array> the pupil's enrolments not cancelled that the reader may see: programme, year, state */
+    public function activeEnrollments(string $student): array
+    {
+        return array_map(fn ($row) => [...(array) $row, 'labels' => json_decode($row->labels, true)], DB::select("SELECT e.id, e.status,
+            e.terms_snapshot ->> 'code' AS program, e.terms_snapshot -> 'labels' AS labels, y.code AS year FROM school.enrollment e
+            JOIN school.academic_year y ON y.tenant_id = e.tenant_id AND y.id = e.year_id
+            WHERE e.tenant_id = ? AND e.student_id = ? AND e.status <> 'cancelled' ORDER BY y.start_date DESC, e.created_at", [$this->school->id(), $student]));
     }
 
     private function find(string $id, bool $lock = false): object

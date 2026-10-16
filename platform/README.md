@@ -1054,6 +1054,22 @@ Route: `GET /api/students/{student}/history` (`student.record.read`), at most 20
 
 Validation on 16 October 2026: **265 PHP integration tests (10,653 assertions), 235 embedded SQL checks and 256 native PostgreSQL 16 checks including concurrency**; migration 047 rolled back alone with 611 pupils and their 659 journal entries in place, applied again, then rolled back with all the others and applied again. Local browser acceptance in Chromium: 188 screens without a problem, the pupil's sheet with its history included (the CI could not start, the GitHub account's billing).
 
+## Increment 61 (lot 2): a block names its enrolments; two screens' choices fixed
+
+- **FR-ELV-03 AC1** (« bloquer un élève avec inscriptions actives avertit des inscriptions concernées et ne les modifie pas »): the block's refusal (`student_active_enrollments`) and the sheet's warning now **name** the enrolments concerned that the reader may see (programme, year, state), and count the others; still none is changed.
+- **BR-07, FR-GRP-02**: a full class refuses the next pupil on its members' screen with the reason (`group_full`), now tested through the screen.
+- **Two fixes**: on a group's members screen, **Add a member** failed when sent, since its search list could not name the chosen enrolment again (Filament refuses such a choice); converting a prospect with **a guardian already recorded** failed the same way (increment 51). Both now name their choice.
+
+No new route, no migration.
+
+| Requirement | Evidence |
+|---|---|
+| FR-ELV-03 AC1 | `BlockAndCapacityTest`: the refusal lists both enrolments, the pupil left active; the sheet's warning names them |
+| BR-07, FR-GRP-02 | `BlockAndCapacityTest`: a class of one place, full, refuses the next pupil from its screen, one member kept |
+| FR-CRM-02 | `LeadTest`: a child converted from the prospect's sheet with a guardian already recorded |
+
+Validation on 16 October 2026: **266 PHP integration tests (10,701 assertions), 235 embedded SQL checks and 256 native PostgreSQL 16 checks including concurrency**. Browser acceptance not run again: no new screen; the CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.

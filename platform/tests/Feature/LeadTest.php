@@ -211,7 +211,10 @@ final class LeadTest extends TestCase
         [$school, $desk, $site] = $this->setting();
         $this->get('/school/leads')->assertOk()->assertSee(__('admission.create_lead'));
         $this->get('/school/lead-options')->assertOk()->assertSee('word_of_mouth');
-        $this->within($school, $desk, function () use ($site) {
+        // A programme to convert into, made by the head of studies; the front office signed in again.
+        $program = $this->program($school);
+        $this->signIn($desk)->assertOk();
+        $this->within($school, $desk, function () use ($site, $program) {
             Livewire::test(Leads::class)->callTableAction('create', data: ['site_id' => $site, 'last_name' => 'Kaci', 'first_name' => 'Nadia',
                 'phone' => '0550 44 55 66', 'relationship' => 'mother', 'source' => 'poster', 'children' => [['first_name' => 'Rayan', 'birth_date' => '2015-03-04']]])
                 ->assertHasNoTableActionErrors()->assertNotified(__('school.saved'));
@@ -224,6 +227,16 @@ final class LeadTest extends TestCase
             $sheet()->assertSee('Visite de l’école')->callAction('status', data: ['status' => 'lost', 'lost_reason' => 'Trop loin'])->assertNotified(__('school.saved'));
             $this->assertSame(['lost', 'Trop loin'], [DB::table('school.lead')->where('id', $lead->id)->value('status'),
                 DB::table('school.lead')->where('id', $lead->id)->value('lost_reason')]);
+            // A child converted from the sheet, with a guardian already recorded (the search's choice named again on sending).
+            $other = DB::table('school.lead')->insertGetId(['tenant_id' => $lead->tenant_id, 'site_id' => $lead->site_id, 'last_name' => 'Kaci', 'phone' => '0550 44 55 67',
+                'source' => 'poster'], 'id');
+            $child = DB::table('school.lead_child')->insertGetId(['tenant_id' => $lead->tenant_id, 'lead_id' => $other, 'first_name' => 'Lina', 'birth_date' => '1995-03-04'], 'id');
+            $guardian = DB::table('school.guardian')->insertGetId(['tenant_id' => $lead->tenant_id, 'last_name_lat' => 'Kaci', 'first_name_lat' => 'Omar',
+                'phone' => '0550 44 55 68'], 'id');
+            Livewire::withQueryParams(['lead' => $other])->test(LeadSheet::class)->callTableAction('convert', $child, data: [
+                'student' => ['last_name_lat' => 'Kaci', 'first_name_lat' => 'Lina', 'birth_date' => '1995-03-04'], 'guardian_mode' => 'existing',
+                'guardian_id' => $guardian, 'relationship' => 'father', 'program_id' => $program])->assertHasNoTableActionErrors();
+            $this->assertNotNull(DB::table('school.lead_child')->where('id', $child)->value('student_id'));
             Livewire::test(LeadOptions::class)->callTableAction('create', data: ['kind' => 'source', 'code' => 'salon',
                 'labels' => ['fr' => 'Salon de l’étudiant', 'ar' => 'صالون الطالب'], 'sort_order' => '5'])->assertNotified(__('school.saved'));
             $this->assertTrue(DB::table('school.lead_option')->where('code', 'salon')->exists());

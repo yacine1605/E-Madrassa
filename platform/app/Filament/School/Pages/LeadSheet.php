@@ -240,7 +240,9 @@ final class LeadSheet extends SchoolingPage
                 Select::make('guardian_id')->label(__('admission.existing_guardian'))->searchable()
                     ->visible(fn (Get $get) => $get('guardian_mode') === 'existing')->required(fn (Get $get) => $get('guardian_mode') === 'existing')
                     ->getSearchResultsUsing(fn (string $search) => collect(SchoolScreen::call('guardian.record.read', GuardianController::class, 'index', ['q' => $search, 'per_page' => 50])['data'])
-                        ->mapWithKeys(fn ($guardian) => [$guardian['id'] => $this->personName($guardian).($guardian['phone'] ? ' · '.Formats::isolated($guardian['phone']) : '')])->all()),
+                        ->mapWithKeys(fn ($guardian) => [$guardian['id'] => $this->personName($guardian).($guardian['phone'] ? ' · '.Formats::isolated($guardian['phone']) : '')])->all())
+                    ->getOptionLabelUsing(fn ($value) => $value ? $this->personName(SchoolScreen::call('guardian.record.read', GuardianController::class, 'show',
+                        parameters: ['guardian' => $value])['data']) : null),
                 Select::make('relationship')->label(__('schooling.relationship'))->options(__('schooling.relationships'))
                     ->visible(fn (Get $get) => in_array($get('guardian_mode'), ['contact', 'existing'], true))->required(fn (Get $get) => in_array($get('guardian_mode'), ['contact', 'existing'], true)),
                 Toggle::make('is_primary_contact')->label(__('schooling.primary_contact'))->default(true)->visible(fn (Get $get) => in_array($get('guardian_mode'), ['contact', 'existing'], true)),

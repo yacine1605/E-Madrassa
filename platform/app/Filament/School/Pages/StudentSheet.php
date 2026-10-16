@@ -221,7 +221,7 @@ final class StudentSheet extends SchoolingPage
                         ->options(collect(__('schooling.student_states'))->only($this->pupil()['status'] === 'active' ? ['former', 'blocked'] : ['active'])->all()),
                     Callout::make(__('schooling.block_enrollments'))->warning()
                         ->visible(fn (Get $get) => $get('status') === 'blocked' && $this->enrollmentCount() > 0)
-                        ->description(fn () => __('schooling.block_enrollments_help', ['count' => Formats::number($this->enrollmentCount())])),
+                        ->description(fn () => $this->blockWarning()),
                     $this->reason(),
                 ])
                 ->action(fn (array $data) => $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student,
@@ -362,6 +362,19 @@ final class StudentSheet extends SchoolingPage
         if (!$guardian) return null;
         $row = SchoolScreen::call('guardian.record.read', GuardianController::class, 'show', parameters: ['guardian' => $guardian])['data'];
         return $this->personName($row).($row['phone'] ? ' · '.Formats::isolated($row['phone']) : '');
+    }
+
+    /** FR-ELV-03 AC1: the enrolments a block concerns, those the reader may see by name, the others counted. */
+    private function blockWarning(): string
+    {
+        $count = $this->enrollmentCount();
+        $visible = app(Permissions::class)->can('enrollment.enrollment.read')
+            ? SchoolScreen::call('student.record.read', StudentController::class, 'activeEnrollments', parameters: ['student' => $this->student]) : [];
+        $lines = array_map(fn (array $enrollment) => $enrollment['program'].' · '.Locales::label($enrollment['labels']).' · '.$enrollment['year']
+            .' ('.__('schooling.enrollment_states.'.$enrollment['status']).')', $visible);
+        $hidden = $count - count($visible);
+        return implode(' ', array_filter([__('schooling.block_enrollments_help', ['count' => Formats::number($count)]), $lines === [] ? null : Formats::list($lines).'.',
+            $hidden > 0 ? __('schooling.block_enrollments_hidden', ['count' => Formats::number($hidden)]) : null]));
     }
 
     /** The enrolments a block leaves as they are, counted whatever the reader may see of them (FR-ELV-03 AC1). */

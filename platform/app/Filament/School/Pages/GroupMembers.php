@@ -93,7 +93,9 @@ final class GroupMembers extends SchoolingPage
                 Action::make('add')->label(__('schooling.add_member'))
                     ->visible(fn () => $this->studyGroup()['status'] === 'active' && $this->creatable('group.membership.manage', $this->studyGroup()['site_id']))
                     ->schema([Select::make('enrollment_id')->label(__('schooling.enrollment'))->required()->searchable()->helperText(__('schooling.add_member_help'))
-                        ->getSearchResultsUsing(fn (string $search) => $this->assignable($search))])
+                        ->getSearchResultsUsing(fn (string $search) => $this->assignable($search))
+                        // The chosen enrolment, named again when the form is sent (without it, Filament refuses the choice).
+                        ->getOptionLabelUsing(fn ($value) => $this->enrollmentLabel($value))])
                     ->action(fn (array $data) => $this->changed(SchoolScreen::changeAt('group.membership.manage', $this->studyGroup()['site_id'],
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'store', $data, ['group' => $this->group])))),
                 // FR-INS-05: the year's end for the class's validated pupils without a decision, at once (all or nothing).
@@ -130,6 +132,13 @@ final class GroupMembers extends SchoolingPage
                     ->action(fn (array $record, array $data) => $this->changed(SchoolScreen::changeFor('group.membership.manage', 'group_membership', $record['id'],
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'end', [...$data, 'version' => $record['version']], ['membership' => $record['id']])))),
             ])]);
+    }
+
+    private function enrollmentLabel(?string $enrollment): ?string
+    {
+        if (!$enrollment) return null;
+        $row = SchoolScreen::call('enrollment.enrollment.read', EnrollmentController::class, 'show', parameters: ['enrollment' => $enrollment])['data'];
+        return ($row['student']['matricule'] ?? '').' · '.($row['student'] ? $this->personName($row['student']) : '').' · '.$row['terms_snapshot']['code'];
     }
 
     /** @return array<string, string> the year's enrolments that may join: pending or validated, of the programme for a class or a session */
