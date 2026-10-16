@@ -7,7 +7,7 @@ use App\Support\CurrentSchool;
 use App\Support\Locales;
 use Illuminate\Support\Facades\DB;
 
-/** FR-DEP-02: the expenses as their screen lists them, by period, category, beneficiary, state, for whoever reads them (« filtres et exports »). */
+/** FR-DEP-02, FR-DEP-03: the expenses as their screen lists them, what is committed of them once corrected, by period, category, beneficiary, state, for whoever reads them (« filtres et exports »). */
 final class ExpensesExport implements Dataset
 {
     public function __construct(private CurrentSchool $school) {}
@@ -19,7 +19,7 @@ final class ExpensesExport implements Dataset
     public function columns(string $locale): array
     {
         return array_map(fn ($key) => ['key' => $key, 'label' => __("exports.columns.$key", [], $locale)],
-            ['expense_date', 'category', 'label', 'beneficiary', 'reason', 'program', 'amount', 'expense_status', 'paid', 'left_to_pay', 'payment_state', 'author', 'decider']);
+            ['expense_date', 'category', 'label', 'beneficiary', 'reason', 'program', 'amount', 'committed', 'expense_status', 'paid', 'left_to_pay', 'payment_state', 'author', 'decider']);
     }
 
     public function filters(): array
@@ -41,6 +41,7 @@ final class ExpensesExport implements Dataset
             // Amounts as the base gives them: exact, two decimals (BR-04).
             yield ['expense_date' => $row->expense_date, 'category' => $labels[$locale] ?? Locales::label($labels), 'label' => $row->label,
                 'beneficiary' => $row->beneficiary, 'reason' => $row->reason, 'program' => $row->program, 'amount' => $row->amount,
+                'committed' => $row->status === 'validated' ? $row->committed : null,
                 'expense_status' => __('expenses.states.'.$row->status, [], $locale), 'paid' => $row->status === 'validated' ? $row->paid : null,
                 'left_to_pay' => $row->status === 'validated' ? $row->left_to_pay : null,
                 'payment_state' => $row->payment_state ? __('expenses.payment_states.'.$row->payment_state, [], $locale) : null,

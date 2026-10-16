@@ -141,6 +141,7 @@ return [
         'expense_category' => 'فئة النفقات',
         'expense' => 'نفقة',
         'expense_payment' => 'دفع نفقة',
+        'expense_correction' => 'تصحيح نفقة',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

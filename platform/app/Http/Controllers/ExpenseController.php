@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
  * author while a draft, submitted, then validated or rejected with its reason by someone else
  * (AC1), by the direction beyond the school's threshold; never changed once decided (AC2). Its
  * documents are added by its author while a draft and read only with `expense.attachment.read`
- * (AC3). Amounts are strings with two decimals (BR-04). The rules are SQL 055's.
+ * (AC3). Validated, it is corrected or cancelled by its linked negative entry, decided by someone
+ * else (FR-DEP-03). Amounts are strings with two decimals (BR-04). The rules are SQL 055 to 057's.
  */
 final class ExpenseController
 {
@@ -23,15 +24,20 @@ final class ExpenseController
         x.label, x.beneficiary, x.reason, x.program_id, (SELECT p.code FROM school.program p WHERE p.tenant_id = x.tenant_id AND p.id = x.program_id) AS program,
         x.status, x.needs_approval, x.submitted_at, x.decided_at, x.decision_reason, x.version, x.created_by, x.created_at,
         (SELECT u.name FROM public.users u WHERE u.id = x.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = x.decided_by) AS decider,
-        y.paid::text AS paid, (x.amount - y.paid)::numeric(14, 2)::text AS left_to_pay, school.expense_payment_state(x.status, x.amount, y.paid) AS payment_state
+        y.committed::text AS committed, y.paid::text AS paid, (y.committed - y.paid)::numeric(14, 2)::text AS left_to_pay,
+        school.expense_payment_state(x.status, y.committed, y.paid) AS payment_state
         FROM school.expense x JOIN school.expense_category c ON c.tenant_id = x.tenant_id AND c.id = x.category_id
-        CROSS JOIN LATERAL (SELECT school.expense_paid(x.tenant_id, x.id) AS paid) y";
-    public const RULES = ['status' => 'nullable|in:draft,submitted,validated,rejected', 'payment' => 'nullable|in:unpaid,partially_paid,paid', 'category' => 'nullable|uuid',
+        CROSS JOIN LATERAL (SELECT school.expense_paid(x.tenant_id, x.id) AS paid, school.expense_committed(x.tenant_id, x.id) AS committed) y";
+    public const RULES = ['status' => 'nullable|in:draft,submitted,validated,rejected', 'payment' => 'nullable|in:unpaid,partially_paid,paid,cancelled', 'category' => 'nullable|uuid',
         'program' => 'nullable|uuid', 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'search' => 'nullable|string|max:100'];
     public const PAYMENTS = "SELECT y.id, y.expense_id, y.kind, y.reverses_payment_id, y.amount::text AS amount, y.paid_on::text AS paid_on, y.method_code, y.external_ref,
         y.reason, y.status, y.decided_at, y.decision_reason, y.version, y.created_by, y.created_at, x.beneficiary, x.expense_date::text AS expense_date,
         (SELECT u.name FROM public.users u WHERE u.id = y.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = y.decided_by) AS decider
         FROM school.expense_payment y JOIN school.expense x ON x.tenant_id = y.tenant_id AND x.id = y.expense_id";
+    public const CORRECTIONS = "SELECT k.id, k.expense_id, k.kind, k.amount::text AS amount, k.corrected_on::text AS corrected_on, k.reason, k.status, k.decided_at,
+        k.decision_reason, k.version, k.created_by, k.created_at, x.beneficiary, x.expense_date::text AS expense_date, x.amount::text AS expense_amount,
+        (SELECT u.name FROM public.users u WHERE u.id = k.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = k.decided_by) AS decider
+        FROM school.expense_correction k JOIN school.expense x ON x.tenant_id = k.tenant_id AND x.id = k.expense_id";
     // Positive, two decimals at most.
     private const AMOUNT = ['required', 'string', 'regex:/^(?!0+(\.0+)?$)(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$/'];
     private const FIELDS = ['expense_date' => 'required|date_format:Y-m-d|before_or_equal:today', 'category_id' => 'required|uuid', 'label' => 'nullable|string|max:200',
@@ -55,7 +61,7 @@ final class ExpenseController
     {
         $sql = self::EXPENSES.' WHERE x.tenant_id = ?';
         $bindings = [$tenant];
-        foreach (['status' => 'x.status = ?', 'payment' => 'school.expense_payment_state(x.status, x.amount, y.paid) = ?', 'category' => 'x.category_id = ?',
+        foreach (['status' => 'x.status = ?', 'payment' => 'school.expense_payment_state(x.status, y.committed, y.paid) = ?', 'category' => 'x.category_id = ?',
             'program' => 'x.program_id = ?', 'from' => 'x.expense_date >= ?::date', 'to' => 'x.expense_date <= ?::date'] as $key => $clause) {
             if (isset($filters[$key])) { $sql .= ' AND '.$clause; $bindings[] = $filters[$key]; }
         }
@@ -83,6 +89,26 @@ final class ExpenseController
         $id = DB::selectOne('SELECT school.record_expense_payment(?, ?::numeric, ?::date, ?, ?, ?) AS id', [$current['id'], $data['amount'], $data['paid_on'],
             $data['method_code'], $data['external_ref'] ?? null, $data['idempotency_key']])->id;
         return response()->json(['data' => (array) DB::selectOne(self::PAYMENTS.' WHERE y.tenant_id = ? AND y.id = ?', [$this->school->id(), $id]),
+            'expense' => $this->expense($current['id'])], 201);
+    }
+
+    /** An expense's corrections, the latest first. */
+    public function corrections(string $expense)
+    {
+        $current = $this->expense($expense);
+        return ['data' => array_map(fn ($row) => (array) $row, DB::select(self::CORRECTIONS.' WHERE k.tenant_id = ? AND k.expense_id = ? ORDER BY k.created_at DESC, k.id',
+            [$this->school->id(), $current['id']]))];
+    }
+
+    /** FR-DEP-03: part of a validated expense taken off (`correction`) or all that is committed of it (`cancellation`), with its reason; once per key. */
+    public function correct(Request $request, string $expense)
+    {
+        $current = $this->expense($expense);
+        $data = $request->validate(['kind' => 'required|in:correction,cancellation', 'amount' => array_merge(['required_if:kind,correction', 'nullable', 'prohibited_if:kind,cancellation'],
+            array_slice(self::AMOUNT, 1)), 'reason' => 'required|string|min:3|max:500', 'idempotency_key' => 'required|uuid']);
+        $id = DB::selectOne('SELECT school.correct_expense(?, ?, ?::numeric, ?, ?) AS id', [$current['id'], $data['kind'], $data['amount'] ?? null, $data['reason'],
+            $data['idempotency_key']])->id;
+        return response()->json(['data' => (array) DB::selectOne(self::CORRECTIONS.' WHERE k.tenant_id = ? AND k.id = ?', [$this->school->id(), $id]),
             'expense' => $this->expense($current['id'])], 201);
     }
 

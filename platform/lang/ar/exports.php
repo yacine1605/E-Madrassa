@@ -38,6 +38,7 @@ return [
         'amount' => 'المبلغ',
         'expense_status' => 'المصادقة',
         'left_to_pay' => 'الباقي للدفع',
+        'committed' => 'الملتزم به بعد التصحيحات',
         'payment_state' => 'الدفع',
         'author' => 'أدخلها',
         'decider' => 'قرّرها',

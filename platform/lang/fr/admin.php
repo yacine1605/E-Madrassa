@@ -142,6 +142,7 @@ return [
         'expense_category' => 'Catégorie de dépenses',
         'expense' => 'Dépense',
         'expense_payment' => 'Paiement d’une dépense',
+        'expense_correction' => 'Correction d’une dépense',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

@@ -38,6 +38,7 @@ return [
         'amount' => 'Montant',
         'expense_status' => 'Validation',
         'left_to_pay' => 'Reste à payer',
+        'committed' => 'Engagé après corrections',
         'payment_state' => 'Paiement',
         'author' => 'Saisie par',
         'decider' => 'Décidée par',

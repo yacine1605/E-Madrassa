@@ -21,6 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -33,7 +34,8 @@ use Illuminate\Support\Str;
  * draft is corrected, documented and submitted by its author; then validated or rejected by
  * someone else (AC1), by the direction beyond the school's threshold; decided, it never changes
  * (AC2). Its documents only for `expense.attachment.read` (AC3). A validated expense is paid at once
- * or in parts, its payment state apart from its commitment; filtered, it is exported.
+ * or in parts, its payment state apart from its commitment; filtered, it is exported. Validated, it
+ * is corrected or cancelled by its linked negative entry, decided by someone else (FR-DEP-03).
  */
 final class Expenses extends SchoolingPage
 {
@@ -59,7 +61,9 @@ final class Expenses extends SchoolingPage
                     ->description(fn (array $record) => Locales::label($record['category_labels'])),
                 TextColumn::make('beneficiary')->label(__('expenses.beneficiary'))->searchable()->formatStateUsing(fn ($state) => Formats::isolated($state))
                     ->description(fn (array $record) => Formats::isolated(Formats::list(array_filter([$record['label'], $record['reason'], $record['program']])))),
-                TextColumn::make('amount')->label(__('expenses.amount'))->formatStateUsing(fn ($state) => $this->money($state)),
+                // Corrected, what is committed of it now; its original amount kept.
+                TextColumn::make('amount')->label(__('expenses.amount'))->formatStateUsing(fn ($state) => $this->money($state))
+                    ->description(fn (array $record) => $record['committed'] !== $record['amount'] ? __('expenses.committed_now', ['amount' => $this->money($record['committed'])]) : null),
                 TextColumn::make('status')->label(__('expenses.status'))->badge()->formatStateUsing(fn (string $state) => __('expenses.states.'.$state))
                     ->color(fn (string $state) => match ($state) { 'validated' => 'success', 'rejected' => 'danger', 'submitted' => 'warning', default => 'gray' })
                     ->description(fn (array $record) => Formats::list(array_filter([$record['needs_approval'] ? __('expenses.needs_approval') : null,
@@ -67,7 +71,7 @@ final class Expenses extends SchoolingPage
                 // Committed is not paid: what is paid of it, once validated.
                 TextColumn::make('payment_state')->label(__('expenses.payment'))->badge()
                     ->formatStateUsing(fn (?string $state) => $state ? __('expenses.payment_states.'.$state) : null)
-                    ->color(fn (?string $state) => match ($state) { 'paid' => 'success', 'partially_paid' => 'warning', default => 'gray' })
+                    ->color(fn (?string $state) => match ($state) { 'paid' => 'success', 'partially_paid' => 'warning', 'cancelled' => 'danger', default => 'gray' })
                     ->description(fn (array $record) => $record['payment_state'] === 'partially_paid'
                         ? __('expenses.paid_of', ['paid' => $this->money($record['paid']), 'left' => $this->money($record['left_to_pay'])]) : null),
                 TextColumn::make('author')->label(__('expenses.by'))->formatStateUsing(fn ($state) => Formats::isolated((string) $state))
@@ -81,6 +85,7 @@ final class Expenses extends SchoolingPage
             ])->headerActions([
                 Action::make('categories')->label(__('expenses.categories'))->color('gray')->url(fn () => ExpenseCategories::getUrl()),
                 Action::make('expense_payments')->label(__('expenses.expense_payments'))->color('gray')->url(fn () => ExpensePayments::getUrl()),
+                Action::make('expense_corrections')->label(__('expenses.expense_corrections'))->color('gray')->url(fn () => ExpenseCorrections::getUrl()),
                 // « Filtres et exports »: the listed expenses, for whoever reads them and exports, logged like any export (FR-IMP-02).
                 Action::make('export')->label(__('expenses.export'))->color('gray')
                     ->visible(fn () => $this->writable('export.job.create') && app(Permissions::class)->can('expense.expense.read'))
@@ -139,6 +144,23 @@ final class Expenses extends SchoolingPage
                             'when' => Formats::list(array_filter([Formats::date($row['paid_on']), __('finance.methods.'.$row['method_code']),
                                 $row['external_ref'] ? Formats::isolated($row['external_ref']) : null, Formats::isolated((string) $row['author'])]))],
                             SchoolScreen::call(static::$permissions, ExpenseController::class, 'payments', parameters: ['expense' => $record['id']])['data']))
+                        ->columns(3)->schema([TextEntry::make('what')->hiddenLabel(), TextEntry::make('amount')->hiddenLabel(), TextEntry::make('when')->hiddenLabel()])]),
+                // FR-DEP-03: part of it taken off, or all that is committed of it, by its linked negative entry with its reason; decided by someone else.
+                Action::make('correct')->label(__('expenses.correct'))->color('danger')->modalDescription(__('expenses.correct_help'))
+                    ->visible(fn (array $record) => $record['status'] === 'validated' && $record['payment_state'] !== 'cancelled' && $this->writable('expense.expense.reverse'))
+                    ->fillForm(fn () => ['kind' => 'correction', 'idempotency_key' => (string) Str::uuid()])
+                    ->schema(fn () => [Radio::make('kind')->label(__('expenses.kind'))->required()->live()->options(__('expenses.correction_kinds')),
+                        $this->amountField('amount')->label(__('expenses.correction_amount'))->visible(fn (Get $get) => $get('kind') === 'correction'),
+                        Textarea::make('reason')->label(__('expenses.reason'))->required()->minLength(3)->maxLength(500), Hidden::make('idempotency_key')])
+                    ->action(fn (array $record, array $data) => SchoolScreen::change('expense.expense.reverse', fn () => SchoolScreen::call('expense.expense.reverse',
+                        ExpenseController::class, 'correct', ['kind' => $data['kind'], 'amount' => $data['kind'] === 'correction' ? $this->sentAmount((string) $data['amount']) : null,
+                            'reason' => $data['reason'], 'idempotency_key' => $data['idempotency_key']], ['expense' => $record['id']]))),
+                Action::make('corrections')->label(__('expenses.corrections'))->modalSubmitAction(false)->visible(fn (array $record) => $record['status'] === 'validated')
+                    ->schema(fn (array $record) => [RepeatableEntry::make('corrections')->hiddenLabel()->placeholder(__('expenses.no_correction'))
+                        ->state(array_map(fn (array $row) => ['what' => Formats::list([__('expenses.correction_kinds.'.$row['kind']), __('expenses.correction_statuses.'.$row['status'])]),
+                            'amount' => '− '.$this->money(ltrim($row['amount'], '-')),
+                            'when' => Formats::list([Formats::date($row['corrected_on']), Formats::isolated($row['reason']), Formats::isolated((string) $row['author'])])],
+                            SchoolScreen::call(static::$permissions, ExpenseController::class, 'corrections', parameters: ['expense' => $record['id']])['data']))
                         ->columns(3)->schema([TextEntry::make('what')->hiddenLabel(), TextEntry::make('amount')->hiddenLabel(), TextEntry::make('when')->hiddenLabel()])]),
                 // AC3: its documents, for `expense.attachment.read` only.
                 Action::make('documents')->label(__('expenses.documents'))->modalSubmitAction(false)

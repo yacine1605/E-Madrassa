@@ -1271,10 +1271,32 @@ Routes: `GET|POST /api/expenses/{expense}/payments`, `GET /api/expense-payments`
 
 Validation on 16 October 2026: **278 PHP integration tests (12,551 assertions), 247 embedded SQL checks and 272 native PostgreSQL 16 checks including concurrency**; migration 056 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 224 screens without a problem, Expense payments included. The CI could not start (the GitHub account's billing).
 
+## Increment 71 (lot 3): an expense's corrections
+
+SQL 057 (`database/schema/057_expense_corrections.sql`, migration `2026_10_16_000057`) corrects a validated expense without changing nor erasing it (FR-DEP-03):
+
+- **A correction** (`expense.expense.reverse`, for the whole school): a negative entry linked to a validated expense, with its reason, dated the day it is asked for: part of what is committed (`correction`, never all of it) or all of it (`cancellation`, its amount set by the base). Asked for once per key (BR-05), even five times at once; one waits at a time of an expense, even two asked for at once.
+- **Its decision**: validated by `expense.expense.validate`, never by whoever asked for it (BR-08, new sod rule `expense_correction`), or rejected with a reason. Decided, it never changes nor goes (TST-11); the expense keeps its amount, and what is committed of it (its amount and its validated corrections) is computed, `cancelled` once nothing is (AC1).
+- **Never below what is paid**: checked when it is asked for and again when it is validated, under the expense's payments' lock, so a cancellation validated while the expense is paid never leaves more paid than committed; a paid expense is cancelled once its payments are taken back. A payment is now limited by what is committed after the corrections.
+- **Closed months** (BR-15, FR-FIN-07): a correction is dated the day it is asked for, never in a closed month; a month's closure waits for the corrections dated in it, and its reconciliation adds them and what is committed once they are counted.
+- **Readers**: whoever reads, validates, pays or corrects the expenses reads their corrections; a payments' reader or a teacher sees none. The expenses' export adds what is committed after corrections.
+- Screens: **Expenses** (what is committed now under the amount, *Correct or cancel*, *Corrections*, the `cancelled` payment state), **Expense corrections** (validation, rejection), **Closures** (the corrections of a reconciliation).
+
+Routes: `GET|POST /api/expenses/{expense}/corrections`, `GET /api/expense-corrections`, `POST /api/expense-corrections/{correction}/validate`, `/reject`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-DEP-03 AC1 | `ExpenseCorrectionTest`, tests/sql: cancelling a validated expense creates a linked negative entry and keeps the original; what is committed computed, `cancelled` |
+| BR-08, TST-11 | `ExpenseCorrectionTest`, tests/sql: never validated by whoever asked for it, on the API and the screen; decided, never changed nor deleted |
+| BR-05, BR-06 | tests/sql natifs: five sendings of a cancellation ask once; two corrections at once leave one waiting; a cancellation validated while the expense is paid: never both |
+| FR-DEP-02 (paid) | `ExpenseCorrectionTest`, tests/sql: never corrected below what is paid; a payment limited by what is committed after the corrections |
+| FR-FIN-07, BR-15 | tests/sql: a correction waiting counts in its month; validated, the reconciliation reports it and what is committed |
+
+Validation on 16 October 2026: **279 PHP integration tests (12,719 assertions), 249 embedded SQL checks and 275 native PostgreSQL 16 checks including concurrency**; migration 057 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 228 screens without a problem, Expense corrections included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Expenses' corrections (FR-DEP-03): a validated expense corrected or cancelled by a linked negative entry with its reason, the original kept, never below what is paid; closed months applied.
-2. Remunerations (FR-REM): rules, rates by level, monthly runs and payouts (TST-12, TST-13, TST-19).
+1. Remunerations (FR-REM-01 to 05): versioned rules, rates by level, monthly runs from hours and sessions entered by hand, bonuses and adjustments, payouts as expenses of the system `salaries` category, personal view (TST-12, TST-13, TST-19).
 
 ## Next increments of lot 2
 

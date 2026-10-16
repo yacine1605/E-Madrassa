@@ -12,6 +12,7 @@ use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpenseCorrectionController;
 use App\Http\Controllers\ExpensePaymentController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FinancePeriodController;
@@ -395,6 +396,12 @@ Route::prefix('api')->group(function () {
                 Route::post('expense-payments/{payment}/reverse', [ExpensePaymentController::class, 'reverse'])->middleware('permission:expense.expense.reverse');
                 Route::post('expense-payments/{payment}/validate', [ExpensePaymentController::class, 'validateReversal'])->middleware('permission:expense.expense.validate');
                 Route::post('expense-payments/{payment}/reject', [ExpensePaymentController::class, 'reject'])->middleware('permission:expense.expense.validate');
+                // FR-DEP-03: a validated expense corrected or cancelled by its linked negative entry, decided by someone else.
+                Route::get('expenses/{expense}/corrections', [ExpenseController::class, 'corrections'])->middleware($readers);
+                Route::post('expenses/{expense}/corrections', [ExpenseController::class, 'correct'])->middleware('permission:expense.expense.reverse');
+                Route::get('expense-corrections', [ExpenseCorrectionController::class, 'index'])->middleware($readers);
+                Route::post('expense-corrections/{correction}/validate', [ExpenseCorrectionController::class, 'validateCorrection'])->middleware('permission:expense.expense.validate');
+                Route::post('expense-corrections/{correction}/reject', [ExpenseCorrectionController::class, 'reject'])->middleware('permission:expense.expense.validate');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

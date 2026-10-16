@@ -3658,6 +3658,118 @@ await check('a month closes once the expenses dated in it are decided; its recon
   assert.equal((await first('SELECT status FROM school.expense_payment WHERE id = $1', [cash])).status, 'reversed', 'the payment of the closed month reversed, its date kept');
   await as('school_runtime', a, 1);
 });
+// An expense's corrections (SQL 057, FR-DEP-03): a linked negative entry, decided by someone else, never below what is paid, the original kept.
+const CORRECT_EXPENSE = 'SELECT school.correct_expense($1, $2, $3::numeric, $4, $5) AS id';
+await check('a validated expense is corrected or cancelled by its linked negative entry, validated by someone else, never below what is paid, the original kept (FR-DEP-03, BR-08, TST-11)', async () => {
+  const clerk = await scopedAccount('internal', 'tenant', null, ['expense.expense.create', 'expense.expense.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['expense.expense.validate', 'expense.expense.read', 'finance.payment.read']);
+  const corrector = await scopedAccount('internal', 'tenant', null, ['expense.expense.reverse', 'expense.expense.pay', 'expense.expense.validate']);
+  const cashier = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create']);
+  await as('school_runtime', a, clerk.user);
+  const equipment = (await first("SELECT id FROM school.expense_category WHERE tenant_id = $1 AND code = 'equipment'", [a])).id;
+  const boards = (await first(EXPENSE, ['today', '10000', equipment, null, 'Bureau Pro', 'Tableaux blancs', null, uuid()])).id;
+  const state = async () => (await first(`SELECT x.amount::text AS amount, x.status, school.expense_committed($1, $2)::text AS committed,
+    school.expense_payment_state(x.status, school.expense_committed($1, $2), school.expense_paid($1, $2)) AS payment FROM school.expense x WHERE x.id = $2`, [a, boards]));
+  // Not before its validation, by `expense.expense.reverse` alone.
+  await as('school_runtime', a, corrector.user);
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '1000', 'Remise', uuid()], '23514', 'expense_not_correctable');
+  await as('school_runtime', a, clerk.user);
+  await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [boards]);
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.expense SET status = 'validated' WHERE id = $1", [boards]);
+  for (const who of [clerk.user, validator.user, cashier.user]) {
+    await as('school_runtime', a, who);
+    await rejects(CORRECT_EXPENSE, [boards, 'correction', '1000', 'Remise', uuid()], '42501');
+  }
+  // With its reason, part of it, once per key, one waiting at a time.
+  await as('school_runtime', a, corrector.user);
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '1000', '  ', uuid()], '23514', 'reason_required');
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '10000', 'Tout', uuid()], '23514', 'correction_exceeds_amount');
+  const key = uuid();
+  const discount = (await first(CORRECT_EXPENSE, [boards, 'correction', '2500', '  Remise obtenue ', key])).id;
+  assert.equal((await first(CORRECT_EXPENSE, [boards, 'correction', '2500', 'Remise obtenue', key])).id, discount, 'BR-05: the same key answers the first correction');
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '3000', 'Remise obtenue', key], '23514', 'idempotency_key_reused');
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '500', 'Autre remise', uuid()], '23514', 'expense_correction_pending');
+  const asked = await first('SELECT amount::text AS amount, reason, status, corrected_on::text AS day FROM school.expense_correction WHERE id = $1', [discount]);
+  assert.deepEqual(Object.values(asked), ['-2500.00', 'Remise obtenue', 'pending_validation', today]);
+  assert.deepEqual(Object.values(await state()), ['10000.00', 'validated', '10000.00', 'unpaid'], 'a correction waiting changes nothing');
+  // BR-08: never validated by whoever asked for it; validated by someone else, the original kept.
+  await rejects("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [discount], '23514', 'segregation_of_duties');
+  await as('school_runtime', a, clerk.user);
+  assert.equal((await sql("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [discount])).rowCount ?? 0, 0);
+  await as('school_runtime', a, validator.user);
+  await rejects("UPDATE school.expense_correction SET status = 'rejected' WHERE id = $1", [discount], '23514', 'reason_required');
+  await sql("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [discount]);
+  assert.deepEqual(Object.values(await state()), ['10000.00', 'validated', '7500.00', 'unpaid']);
+  // TST-11: decided, it never changes nor goes.
+  await rejects("UPDATE school.expense_correction SET status = 'rejected', decision_reason = 'Erreur' WHERE id = $1", [discount], '23514', 'expense_correction_immutable');
+  await rejects('UPDATE school.expense_correction SET amount = -1 WHERE id = $1', [discount], '42501');
+  await rejects('DELETE FROM school.expense_correction WHERE id = $1', [discount], '42501');
+  // Paid against what is committed; never corrected below what is paid.
+  await as('school_runtime', a, corrector.user);
+  const cash = (await first(PAY_EXPENSE, [boards, '5000', 'today', 'cash', null, uuid()])).id;
+  await rejects(PAY_EXPENSE, [boards, '2500.01', 'today', 'cash', null, uuid()], '23514', 'payment_exceeds_balance');
+  await rejects(CORRECT_EXPENSE, [boards, 'correction', '3000', 'Seconde remise', uuid()], '23514', 'correction_below_paid');
+  await rejects(CORRECT_EXPENSE, [boards, 'cancellation', null, 'Commande annulée', uuid()], '23514', 'correction_below_paid');
+  // Paid, it is cancelled once its payments are taken back: the cancellation of all that is committed.
+  const back = (await first(REVERSE_EXPENSE_PAYMENT, [cash, 'Commande annulée', uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.expense_payment SET status = 'validated' WHERE id = $1", [back]);
+  await as('school_runtime', a, corrector.user);
+  const cancelled = (await first(CORRECT_EXPENSE, [boards, 'cancellation', null, 'Commande annulée', uuid()])).id;
+  assert.equal((await first('SELECT amount::text AS amount FROM school.expense_correction WHERE id = $1', [cancelled])).amount, '-7500.00');
+  // A payment while the cancellation waits keeps it from being validated.
+  const late = (await first(PAY_EXPENSE, [boards, '100', 'today', 'cash', null, uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await rejects("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [cancelled], '23514', 'correction_below_paid');
+  await as('school_runtime', a, corrector.user);
+  const lateBack = (await first(REVERSE_EXPENSE_PAYMENT, [late, 'Payé par erreur', uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.expense_payment SET status = 'validated' WHERE id = $1", [lateBack]);
+  await sql("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [cancelled]);
+  assert.deepEqual(Object.values(await state()), ['10000.00', 'validated', '0.00', 'cancelled'], 'the original kept, nothing committed');
+  await as('school_runtime', a, corrector.user);
+  await rejects(PAY_EXPENSE, [boards, '0.01', 'today', 'cash', null, uuid()], '23514', 'payment_exceeds_balance');
+  await rejects(CORRECT_EXPENSE, [boards, 'cancellation', null, 'Encore', uuid()], '23514', 'expense_not_correctable');
+  // FR-FIN-07: the month's reconciliation tells its corrections and what is committed once they are counted.
+  await as('school_runtime', a, validator.user);
+  const month = (await first("SELECT school.reconciliation(current_date) AS r")).r;
+  assert.ok(month.expense_corrections.count >= 2 && Number(month.expense_corrections.amount) <= -10000);
+  assert.equal(month.expenses_committed, (Number(month.expenses_total) + Number(month.expense_corrections.amount)).toFixed(2));
+  // Whoever reads no expense reads none of its corrections; the journal keeps them.
+  await as('school_runtime', a, cashier.user);
+  assert.equal(await count('SELECT count(*) n FROM school.expense_correction WHERE expense_id = $1', [boards]), 0);
+  await as(null);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'expense_correction' AND object_id = $1", [discount]) >= 2);
+  await as('school_runtime', a, 1);
+});
+await check('a correction waiting holds its month\'s closure; validated, it is reported (FR-FIN-07, BR-15)', async () => {
+  const clerk = await scopedAccount('internal', 'tenant', null, ['expense.expense.create', 'expense.expense.read']);
+  const accountant = await scopedAccount('internal', 'tenant', null, ['expense.expense.validate', 'expense.expense.reverse', 'expense.expense.read',
+    'finance.payment.read', 'finance.period.close']);
+  const other = await scopedAccount('internal', 'tenant', null, ['expense.expense.validate', 'expense.expense.read']);
+  await as('school_runtime', a, clerk.user);
+  const missions = (await first("SELECT id FROM school.expense_category WHERE tenant_id = $1 AND code = 'missions'", [a])).id;
+  const trip = (await first(EXPENSE, ['today', '3000', missions, null, 'Agence Sahara', 'Sortie pédagogique', null, uuid()])).id;
+  await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [trip]);
+  await as('school_runtime', a, other.user);
+  await sql("UPDATE school.expense SET status = 'validated' WHERE id = $1", [trip]);
+  await as('school_runtime', a, accountant.user);
+  const before = (await first("SELECT school.reconciliation(current_date) AS r")).r;
+  const asked = (await first(CORRECT_EXPENSE, [trip, 'correction', '500', 'Un car de moins', uuid()])).id;
+  const waiting = (await first("SELECT school.reconciliation(current_date) AS r")).r;
+  assert.equal(waiting.pending, before.pending + 1, 'a correction waiting counts in its month');
+  assert.deepEqual(waiting.expense_corrections, before.expense_corrections);
+  await as('school_runtime', a, other.user);
+  await sql("UPDATE school.expense_correction SET status = 'validated' WHERE id = $1", [asked]);
+  await as('school_runtime', a, accountant.user);
+  const after = (await first("SELECT school.reconciliation(current_date) AS r")).r;
+  assert.equal(after.pending, before.pending);
+  assert.deepEqual([after.expense_corrections.count, after.expense_corrections.amount],
+    [before.expense_corrections.count + 1, (Number(before.expense_corrections.amount) - 500).toFixed(2)]);
+  assert.equal(after.expenses_committed, (Number(before.expenses_committed) - 500).toFixed(2));
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -4376,6 +4488,48 @@ if (PgClient) {
       assert.deepEqual(report.expense_payments, {});
     } else assert.deepEqual(report.expense_payments, { cash: { count: 1, amount: '10000.00' } });
     assert.equal(report.expenses_total, '50000.00');
+    await as('school_runtime', a, 1);
+  });
+  await check('two corrections of an expense at once leave one waiting; five sendings of one ask once; a cancellation validated while the expense is paid: never committed below paid (FR-DEP-03, BR-05, BR-06)', async () => {
+    const clerk = await scopedAccount('internal', 'tenant', null, ['expense.expense.create', 'expense.expense.read']);
+    const corrector = await scopedAccount('internal', 'tenant', null, ['expense.expense.reverse', 'expense.expense.pay', 'expense.expense.read']);
+    const validator = await scopedAccount('internal', 'tenant', null, ['expense.expense.validate', 'expense.expense.read']);
+    await as('school_runtime', a, clerk.user);
+    const equipment = (await first("SELECT id FROM school.expense_category WHERE tenant_id = $1 AND code = 'equipment'", [a])).id;
+    const chairs = (await first(EXPENSE, ['today', '8000', equipment, null, 'Mobilier Plus', 'Chaises', null, uuid()])).id;
+    await sql("UPDATE school.expense SET status = 'submitted' WHERE id = $1", [chairs]);
+    await as('school_runtime', a, validator.user);
+    await sql("UPDATE school.expense SET status = 'validated' WHERE id = $1", [chairs]);
+    const clients = await Promise.all([0, 1, 2, 3, 4].map(() => connect('school_runtime', a, corrector.user)));
+    const checker = await connect('school_runtime', a, validator.user);
+    const at = (c, s, p, pause = 0.1) => (async () => {
+      await c.query('BEGIN');
+      try {
+        const row = (await c.query(s, p)).rows[0];
+        await c.query(`SELECT pg_sleep(${pause})`);
+        await c.query('COMMIT');
+        return row?.id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    })();
+    const two = await Promise.allSettled(clients.slice(0, 2).map((c, i) => at(c, CORRECT_EXPENSE, [chairs, 'correction', String(1000 + i), 'Remise', uuid()], 0.15)));
+    assert.equal(two.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(two.find(r => r.status === 'rejected').reason.message, 'expense_correction_pending');
+    await as('school_runtime', a, validator.user);
+    await sql("UPDATE school.expense_correction SET status = 'rejected', decision_reason = 'Remise refusée' WHERE expense_id = $1", [chairs]);
+    const key = uuid();
+    const five = await Promise.allSettled(clients.map(c => at(c, CORRECT_EXPENSE, [chairs, 'cancellation', null, 'Commande annulée', key])));
+    assert.deepEqual(five.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+    assert.equal(new Set(five.map(r => r.value)).size, 1);
+    // Validated while what is committed is paid: one of them only.
+    const race = await Promise.allSettled([
+      at(checker, "UPDATE school.expense_correction SET status = 'validated' WHERE id = $1 RETURNING id", [five[0].value], 0.15),
+      at(clients[0], PAY_EXPENSE, [chairs, '8000', 'today', 'cash', null, uuid()], 0.15)]);
+    await Promise.all([...clients, checker].map(c => c.end()));
+    assert.equal(race.filter(r => r.status === 'fulfilled').length, 1);
+    assert.ok(['correction_below_paid', 'payment_exceeds_balance'].includes(race.find(r => r.status === 'rejected').reason.message));
+    await as('school_runtime', a, validator.user);
+    const after = await first('SELECT school.expense_committed($1, $2) AS committed, school.expense_paid($1, $2) AS paid', [a, chairs]);
+    assert.ok(Number(after.committed) >= Number(after.paid));
     await as('school_runtime', a, 1);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {

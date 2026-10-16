@@ -129,6 +129,9 @@ final class FinancePeriods extends SchoolingPage
                 ...array_map(fn (string $code, array $row) => $line(__('finance.reconciliation_expenses', ['category' => $this->category($code)]), $row),
                     array_keys($report['expenses']), $report['expenses']),
                 __('finance.reconciliation_total', ['label' => __('finance.expenses_total'), 'amount' => $this->money($report['expenses_total'])]),
+                // SQL 057: the corrections validated with a day in the month, what is committed once they are counted.
+                ...(($report['expense_corrections']['count'] ?? 0) > 0 ? [$line(__('finance.reconciliation_expense_corrections'), $report['expense_corrections']),
+                    __('finance.reconciliation_total', ['label' => __('finance.expenses_committed'), 'amount' => $this->money($report['expenses_committed'])])] : []),
                 ...array_map(fn (string $code, array $row) => $line(__('finance.reconciliation_expense_payments', ['method' => $means($code)]), $row),
                     array_keys($report['expense_payments']), $report['expense_payments']),
                 (int) $report['expense_reversals']['count'] > 0 ? $line(__('finance.reconciliation_expense_reversals'), $report['expense_reversals']) : null,
