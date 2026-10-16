@@ -5,16 +5,21 @@ namespace App\Filament\School\Pages;
 use App\Filament\School\Pages\Concerns\EnrolsPupils;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\GroupMembershipController;
+use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\StudyGroupController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
@@ -36,6 +41,7 @@ final class GroupMembers extends SchoolingPage
     #[Locked] public string $group = '';
     private ?array $groupRow = null;
     private ?array $targetRows = null;
+    private ?array $laterRows = null;
 
     public function mount(): void
     {
@@ -78,6 +84,8 @@ final class GroupMembers extends SchoolingPage
                 TextColumn::make('enrollment.status')->label(__('schooling.enrollment'))
                     ->state(fn (array $record) => isset($record['enrollment']['status']) ? __('schooling.enrollment_states.'.$record['enrollment']['status']) : ''),
                 IconColumn::make('is_main')->label(__('schooling.main_group'))->boolean(),
+                TextColumn::make('enrollment.decision')->label(__('schooling.progression'))
+                    ->state(fn (array $record) => isset($record['enrollment']['decision']) ? __('schooling.decisions.'.$record['enrollment']['decision']) : ''),
                 TextColumn::make('valid_from')->label(__('schooling.member_from'))->formatStateUsing(fn ($state) => Formats::date($state)),
                 TextColumn::make('valid_to')->label(__('schooling.member_until'))->formatStateUsing(fn ($state) => Formats::date($state)),
             ])->filters([Filter::make('history')->label(__('schooling.include_history'))->toggle()])
@@ -88,6 +96,28 @@ final class GroupMembers extends SchoolingPage
                         ->getSearchResultsUsing(fn (string $search) => $this->assignable($search))])
                     ->action(fn (array $data) => $this->changed(SchoolScreen::changeAt('group.membership.manage', $this->studyGroup()['site_id'],
                         fn () => SchoolScreen::call('group.membership.manage', GroupMembershipController::class, 'store', $data, ['group' => $this->group])))),
+                // FR-INS-05: the year's end for the class's validated pupils without a decision, at once (all or nothing).
+                Action::make('progression')->label(__('schooling.progression_action'))->modalDescription(__('schooling.progression_help'))
+                    ->visible(fn () => in_array($this->studyGroup()['group_type'], ['class', 'session'], true) && SchoolScreen::writable(null)
+                        && app(\App\Support\Permissions::class)->can('enrollment.progression.decide') && $this->undecided() !== [])
+                    ->schema(fn () => [
+                        CheckboxList::make('enrollments')->label(__('schooling.students'))->required()->options($this->undecided())->bulkToggleable()->columns(2),
+                        Radio::make('decision')->label(__('schooling.progression'))->required()->live()->options(__('schooling.decisions')),
+                        Select::make('target_group_id')->label(__('schooling.target_class'))->helperText(__('schooling.target_class_help'))
+                            ->visible(fn (Get $get) => in_array($get('decision'), ['promoted', 'repeated'], true))
+                            ->required(fn (Get $get) => in_array($get('decision'), ['promoted', 'repeated'], true))->options(fn () => $this->laterClasses()),
+                        DatePicker::make('due_date')->label(__('schooling.first_due_date'))->helperText(__('schooling.first_due_date_help'))
+                            ->visible(fn (Get $get) => in_array($get('decision'), ['promoted', 'repeated'], true))
+                            ->required(fn (Get $get) => in_array($get('decision'), ['promoted', 'repeated'], true)),
+                        $this->reason(),
+                    ])
+                    ->action(function (array $data) {
+                        $target = in_array($data['decision'], ['promoted', 'repeated'], true);
+                        $this->changed(SchoolScreen::change(null, fn () => SchoolScreen::call('enrollment.progression.decide', ProgressionController::class, 'store',
+                            ['decisions' => array_map(fn (string $enrollment) => ['enrollment_id' => $enrollment, 'decision' => $data['decision'], 'reason' => $data['reason'],
+                                'target_group_id' => $target ? $data['target_group_id'] : null, 'due_date' => $target ? substr((string) $data['due_date'], 0, 10) : null],
+                                array_values($data['enrollments']))])));
+                    }),
             ])->recordActions([ActionGroup::make([
                 Action::make('transfer')->label(__('schooling.transfer'))->modalDescription(__('schooling.transfer_help'))
                     ->visible(fn (array $record) => $record['valid_to'] === null && $this->targets() !== [])
@@ -137,6 +167,26 @@ final class GroupMembers extends SchoolingPage
     private function targetSite(string $group): ?string
     {
         return collect($this->targetGroups())->firstWhere('id', $group)['site_id'] ?? null;
+    }
+
+    /** @return array<string, string> the class's current members with a validated enrolment and no decision yet */
+    private function undecided(): array
+    {
+        return collect(SchoolScreen::call('group.group.read', GroupMembershipController::class, 'index', ['per_page' => 100], ['group' => $this->group])['data'])
+            ->filter(fn (array $member) => $member['is_main'] && ($member['enrollment']['status'] ?? null) === 'validated' && ($member['enrollment']['decision'] ?? null) === null
+                && isset($member['enrollment']['matricule']))
+            ->mapWithKeys(fn (array $member) => [$member['enrollment_id'] => $member['enrollment']['matricule'].' · '.$this->personName($member['enrollment'])])->all();
+    }
+
+    /** @return array<string, string> the classes and sessions of later years, open or in preparation, with their places */
+    private function laterClasses(): array
+    {
+        $start = $this->years()[$this->studyGroup()['year_id']]['start_date'] ?? null;
+        $later = collect($this->years())->filter(fn (array $year) => $start !== null && $year['start_date'] > $start)->keys()->all();
+        return collect($this->laterRows ??= collect(['active', 'draft'])->flatMap(fn (string $status) => SchoolScreen::call('group.group.read', StudyGroupController::class, 'index',
+                ['status' => $status, 'per_page' => 100])['data'])->all())
+            ->filter(fn (array $group) => in_array($group['year_id'], $later, true) && in_array($group['group_type'], ['class', 'session'], true))
+            ->mapWithKeys(fn (array $group) => [$group['id'] => ($this->years()[$group['year_id']]['code'] ?? '').' · '.$this->groupName($group)])->all();
     }
 
     /** After a change, the group's places are read again. */

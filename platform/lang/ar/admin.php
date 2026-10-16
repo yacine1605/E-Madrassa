@@ -124,6 +124,7 @@ return [
         'lead_interaction' => 'تواصل مع مترشح',
         'lead_reminder' => 'تذكير خاص بمترشح',
         'lead_option' => 'مصدر أو مرحلة المترشحين',
+        'progression' => 'قرار الانتقال السنوي',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

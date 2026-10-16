@@ -219,6 +219,10 @@ GRANT EXECUTE ON FUNCTION school.lead_status_reserved(text), school.lead_status_
   school.lead_assignee_valid(bigint, uuid), school.lead_in_scope(text, uuid), platform.notify_due_reminders(integer) TO school_runtime;
 -- Access to courses (039): computed when asked, from the enrolment's state, its payments and the school's setting.
 GRANT EXECUTE ON FUNCTION school.enrollment_paid(uuid, text), school.access_open(text, uuid), school.access_granted(uuid) TO school_runtime;
+-- The annual progression (040): one decision per enrolment, written by its function and never changed.
+GRANT SELECT ON school.progression TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, decision, reason, target_group_id, due_date, target_enrollment_id) ON school.progression TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.progression_refusal(uuid, text, uuid), school.decide_progression(uuid, text, text, uuid, date) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.

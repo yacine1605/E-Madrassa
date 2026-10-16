@@ -43,6 +43,8 @@ final class DatabaseErrors
         'lead_option_unknown', 'lead_option_archived', 'lead_status_reserved', 'lead_closed', 'lead_not_converted', 'reopen_reason_required',
         'lost_reason_required', 'lead_assignee_invalid', 'lead_already_converted', 'lead_conversion_mismatch', 'lead_child_archived',
         'interaction_future', 'interaction_body_required', 'reminder_past',
+        'progression_decided', 'progression_not_validated', 'progression_target_required', 'progression_target_invalid', 'progression_same_year',
+        'progression_level_changed', 'progression_level_same', 'progression_target_enrolled',
     ];
 
     public static function message(string $rule): string

@@ -18,6 +18,8 @@ final class EnrollmentController
         price_version, terms_snapshot || jsonb_build_object('base_price', agreed_price::text) AS terms_snapshot,
         validated_by, validated_at, transferred_from, version, archived_at, created_at, updated_at,
         school.access_open(status, id) AS access_granted,
+        (SELECT jsonb_build_object('id', p.id, 'decision', p.decision, 'target_enrollment_id', p.target_enrollment_id) FROM school.progression p
+         WHERE p.tenant_id = enrollment.tenant_id AND p.enrollment_id = enrollment.id) AS progression,
         (SELECT jsonb_build_object('matricule', s.matricule, 'last_name_ar', s.last_name_ar, 'first_name_ar', s.first_name_ar,
            'last_name_lat', s.last_name_lat, 'first_name_lat', s.first_name_lat)
          FROM school.student s WHERE s.tenant_id = enrollment.tenant_id AND s.id = enrollment.student_id) AS student,
@@ -119,5 +121,5 @@ final class EnrollmentController
     }
 
     private function find(string $id, bool $lock = false): object { return $this->records->find('enrollment', $id, $lock, self::COLUMNS); }
-    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot', 'student', 'main_group', 'transfer_source', 'transfer_target']); }
+    private function present(object $row): array { return $this->decoded($row, ['terms_snapshot', 'student', 'main_group', 'transfer_source', 'transfer_target', 'progression']); }
 }

@@ -927,9 +927,29 @@ The enrolments' replies (`GET /api/enrollments`, `GET /api/enrollments/{enrollme
 
 Validation on 16 October 2026: **256 PHP integration tests (10,185 assertions)**, **228 embedded SQL checks and 248 native PostgreSQL 16 checks including concurrency**; migration 039 rolled back alone with 2 schools' values of the setting and 538 enrolments in place (the settings' guard as 011 wrote it), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a column on Enrolments and on the pupil's sheet, a row in Settings.
 
+## Increment 53 (lot 2): the annual progression
+
+`040_progression.sql`:
+
+- **FR-INS-05**: at the end of a year, for a validated enrolment (`progression_not_validated`), one **decision**: promoted, repeated, left or completed, with its reason, by `enrollment.progression.decide` within a scope that reaches the enrolment. A promotion or a repetition names a **class or session of a later year** (`progression_same_year`, `progression_target_invalid`) and the day the new enrolment's first instalment falls due (lot 3's invoice): the pupil is enrolled there, **pending**, at the programme's price of the day, and assigned to the class from its first day (FR-INS-01); a repetition keeps the level, a promotion changes it (`progression_level_changed`, `progression_level_same`, AC4); a pupil already enrolled in the target programme is not enrolled again (`progression_target_enrolled`). Leaving or completing a cycle enrols nobody.
+- A decision is written once by `school.decide_progression` and never changes: the same decision again answers the first one, even sent twice at once, and makes nothing (AC2); another one is refused (`progression_decided`). The source enrolment, its groups and history stay as they were (AC3, BR-03).
+- A **batch** of decisions is the request's: if one target fails (a full class, a pupil already enrolled), none is made (AC1).
+- A promotion or a repetition enrols and assigns with the decider's own rights (`enrollment.enrollment.create`, `group.membership.manage`), as a transfer does (027): the head of studies has them; the direction, which also decides (annex A), records departures and completions, and a promotion only with a role that enrols.
+
+Routes: `POST /api/progressions` (`decisions`: each `enrollment_id`, `decision`, `reason`, and for a promotion or a repetition `target_group_id`, `due_date`; 200 at most), `GET /api/progressions` (`year_id`, `decision`, `target_group_id`); an enrolment's reply carries its `progression`. On screen, a class's **members** show each one's decision, and **Decide the progression** takes the class's validated pupils without one, at once.
+
+| Requirement | Evidence |
+|---|---|
+| FR-INS-05 AC1 | `tests/sql/database.mjs`: two decisions into a class of one place, in one transaction: refused, no decision, no assignment. `ProgressionTest`: the same batch through the API, no enrolment created |
+| FR-INS-05 AC2 | `tests/sql/database.mjs`: the same decision again answers the first, the pupil enrolled once; another refused; the same decision sent twice at once makes one enrolment (native). `ProgressionTest`: the same batch again, the same decisions, no new enrolment |
+| FR-INS-05 AC3, BR-03 | `tests/sql/database.mjs`, `ProgressionTest`: the source enrolment's state, version and class unchanged; a decision never changed |
+| FR-INS-05 AC4 | `tests/sql/database.mjs`: a repetition at another level, a promotion at the same level, a target in the same year, a promotion without its class or due date, a departure with a class, a blank reason, a pending enrolment, a pupil already enrolled in the target programme: refused. `ProgressionTest`: the same through the API, and the class's screen deciding for two pupils at once |
+
+Validation on 16 October 2026: **258 PHP integration tests (10,340 assertions), 229 embedded SQL checks and 250 native PostgreSQL 16 checks including concurrency**; migration 040 rolled back alone with 4 decisions, their 4 enrolments and their journal in place (the enrolments kept, the journal's policy as 038 wrote it), applied again, then rolled back with all the others and applied again. Browser acceptance left to the CI: no new screen, a column and an action on a class's members.
+
 ## Next increments of lot 2
 
-1. Annual progression (FR-INS-05); notifications of a group's composition. Payments themselves, which `access_granted` will read, come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
+1. Notifications of a group's composition, and the teachers' pedagogical access. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The prospects' import (section 3.3, « élèves, CRM ») and their retention (NFR-DATA-03: a lost prospect's data are kept until then); the dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

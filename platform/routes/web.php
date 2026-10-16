@@ -23,6 +23,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReferentialController;
@@ -245,6 +246,9 @@ Route::prefix('api')->group(function () {
                 Route::post('enrollments/{enrollment}/suspend', [EnrollmentController::class, 'suspend'])->middleware('permission:enrollment.enrollment.suspend');
                 Route::post('enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->middleware('permission:enrollment.enrollment.cancel');
                 Route::post('enrollments/{enrollment}/transfer', [EnrollmentController::class, 'transfer'])->middleware('permission:enrollment.enrollment.cancel');
+                // FR-INS-05: the annual progression, a batch of decisions at once.
+                Route::get('progressions', [ProgressionController::class, 'index'])->middleware('permission:enrollment.enrollment.read');
+                Route::post('progressions', [ProgressionController::class, 'store'])->middleware('permission:enrollment.progression.decide');
             });
 
             Route::middleware('module:students_crm')->group(function () {

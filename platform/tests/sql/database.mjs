@@ -2675,6 +2675,71 @@ await check('a validated enrolment opens its courses; with a payment required, o
   assert.equal(await access(e), false, 'out of the reader\'s reach');
   await as('school_runtime', a, 1);
 });
+// The annual progression (SQL 040, FR-INS-05): one decision per validated enrolment; a promotion or a repetition enrols in a later year's class.
+await check('a promotion enrols in a later year\'s class at the next level, a repetition at the same level, once; the source stays as it was (FR-INS-05 AC2 to AC4)', async () => {
+  await as(null);
+  const later = (await first("INSERT INTO school.academic_year (tenant_id, code, start_date, end_date, status) VALUES ($1, 'PASSAGE-N1', '2028-09-01', '2029-06-30', 'planned') RETURNING id", [a])).id;
+  const nextGrade = (await first("SELECT id FROM school.ref_node WHERE tenant_id = $1 AND type_code = 'grade' AND archived_at IS NULL AND id <> $2 ORDER BY code LIMIT 1", [a, grade])).id;
+  await as('school_runtime', a, 1);
+  const source = await programme('PASSAGE-A');
+  const sourceClass = await group('PASSAGE-A1', source, 10);
+  const program = async (code, node) => (await first(PROGRAM, [a, later, node, code, JSON.stringify({ fr: 'Programme ' + code }), 100000, 'active'])).id;
+  const laterClass = async (code, programId, capacity = 10) => (await first(GROUP, [a, later, code, JSON.stringify({ fr: 'Classe ' + code }), 'class', programId, siteA, capacity])).id;
+  const up = await laterClass('PASSAGE-B1', await program('PASSAGE-B', nextGrade));
+  const again = await laterClass('PASSAGE-R1', await program('PASSAGE-R', grade));
+  const sameYear = await group('PASSAGE-A2', await programme('PASSAGE-A-BIS'), 10);
+  const validated = async given => {
+    const e = await enroll((await newAdult('Passage', given)).id, source);
+    await joinGroup(e, sourceClass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+    return e;
+  };
+  const DECIDE = 'SELECT school.decide_progression($1, $2, $3, $4, $5::date) AS id';
+  const e = await validated('Amine');
+  const pending = await enroll((await newAdult('Passage', 'Attente')).id, source);
+  await rejects(DECIDE, [pending, 'promoted', 'Admis', up, '2028-09-15'], '23514', 'progression_not_validated');
+  // AC4: a repetition that changes the level, a promotion that keeps it or stays in the same year, refused.
+  await rejects(DECIDE, [e, 'repeated', 'Résultats insuffisants', up, '2028-09-15'], '23514', 'progression_level_changed');
+  await rejects(DECIDE, [e, 'promoted', 'Admis', again, '2028-09-15'], '23514', 'progression_level_same');
+  await rejects(DECIDE, [e, 'promoted', 'Admis', sameYear, '2028-09-15'], '23514', 'progression_same_year');
+  await rejects(DECIDE, [e, 'promoted', 'Admis', null, null], '23514', 'progression_target_required');
+  await rejects(DECIDE, [e, 'promoted', 'Admis', up, null], '23514', 'progression_target_required');
+  await rejects(DECIDE, [e, 'left', 'Déménagement', up, '2028-09-15'], '23514', 'progression_target_invalid');
+  await rejects(DECIDE, [e, 'promoted', '  ', up, '2028-09-15'], '23514', 'reason_required');
+  const before = await first('SELECT status, version, updated_at::text AS at FROM school.enrollment WHERE id = $1', [e]);
+  const decided = (await first(DECIDE, [e, 'promoted', 'Admis en classe supérieure', up, '2028-09-15'])).id;
+  const made = await first('SELECT p.target_enrollment_id AS t, t.status, t.year_id, m.group_id, m.is_main FROM school.progression p JOIN school.enrollment t ON t.id = p.target_enrollment_id JOIN school.group_membership m ON m.enrollment_id = t.id WHERE p.id = $1', [decided]);
+  assert.deepEqual([made.status, made.year_id, made.group_id, made.is_main], ['pending', later, up, true]);
+  // AC2: the same decision again makes nothing; another one is refused.
+  assert.equal((await first(DECIDE, [e, 'promoted', 'Admis en classe supérieure', up, '2028-09-15'])).id, decided);
+  await rejects(DECIDE, [e, 'repeated', 'Finalement non', again, '2028-09-15'], '23514', 'progression_decided');
+  assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE student_id = (SELECT student_id FROM school.enrollment WHERE id = $1)', [e]), 2);
+  // AC3: the source enrolment, its groups and history unchanged.
+  assert.deepEqual(await first('SELECT status, version, updated_at::text AS at FROM school.enrollment WHERE id = $1', [e]), before);
+  assert.equal(await count('SELECT count(*) n FROM school.group_membership WHERE enrollment_id = $1 AND valid_to IS NULL', [e]), 1);
+  await rejects("UPDATE school.progression SET reason = 'Autre' WHERE id = $1", [decided], '42501');
+  // A repetition at the same level; a departure without a target.
+  assert.ok((await first(DECIDE, [await validated('Lina'), 'repeated', 'Moyenne insuffisante', again, '2028-09-15'])).id);
+  const gone = (await first(DECIDE, [await validated('Yanis'), 'left', 'Déménagement de la famille', null, null])).id;
+  assert.equal((await first('SELECT target_enrollment_id FROM school.progression WHERE id = $1', [gone])).target_enrollment_id, null);
+  // A pupil already enrolled in the target programme is not enrolled again.
+  const twice = await validated('Sami');
+  await enroll((await first('SELECT student_id FROM school.enrollment WHERE id = $1', [twice])).student_id, (await first('SELECT program_id FROM school.study_group WHERE id = $1', [up])).program_id);
+  await rejects(DECIDE, [twice, 'promoted', 'Admis', up, '2028-09-15'], '23514', 'progression_target_enrolled');
+
+  // AC1: a batch whose target is full creates nothing.
+  const small = await laterClass('PASSAGE-B2', (await first('SELECT program_id FROM school.study_group WHERE id = $1', [up])).program_id, 1);
+  const [x, y] = [await validated('Rania'), await validated('Karim')];
+  await sql('BEGIN');
+  let refused = null;
+  try {
+    for (const one of [x, y]) await sql(DECIDE, [one, 'promoted', 'Admis', small, '2028-09-15']);
+    await sql('COMMIT');
+  } catch (err) { refused = err.message; await sql('ROLLBACK'); }
+  assert.equal(refused, 'group_full');
+  assert.equal(await count('SELECT count(*) n FROM school.progression WHERE enrollment_id = ANY ($1)', [[x, y]]), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.group_membership WHERE group_id = $1', [small]), 0);
+});
 // Admissions (SQL 038, FR-CRM-01, FR-CRM-02): prospects on a site, their children, interactions and reminders; the conversion, once.
 const PROSPECT = 'INSERT INTO school.lead (tenant_id, site_id, last_name, first_name, phone, source, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status';
 const prospect = async (site = siteA, last = 'Prospect', source = 'word_of_mouth', assigned = null) =>
@@ -3346,6 +3411,33 @@ if (PgClient) {
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'lead_already_converted');
     assert.equal(await count("SELECT count(*) n FROM school.student WHERE last_name_lat = 'Clic'"), 1);
+  });
+  await check('the same annual decision sent twice at once enrols the pupil once (FR-INS-05 AC2)', async () => {
+    await as(null);
+    const later = (await first("INSERT INTO school.academic_year (tenant_id, code, start_date, end_date, status) VALUES ($1, 'COURSE-N1', '2029-09-01', '2030-06-30', 'planned') RETURNING id", [a])).id;
+    const nextGrade = (await first("SELECT id FROM school.ref_node WHERE tenant_id = $1 AND type_code = 'grade' AND archived_at IS NULL AND id <> $2 ORDER BY code LIMIT 1", [a, grade])).id;
+    await as('school_runtime', a, 1);
+    const source = await programme('COURSE-PA');
+    const sourceClass = await group('COURSE-PA1', source, 5);
+    const target = (await first(PROGRAM, [a, later, nextGrade, 'COURSE-PB', '{"fr": "Suivant"}', 100000, 'active'])).id;
+    const up = (await first(GROUP, [a, later, 'COURSE-PB1', '{"fr": "Classe suivante"}', 'class', target, siteA, 5])).id;
+    const e = await enroll((await newAdult('Course', 'Passage')).id, source);
+    await joinGroup(e, sourceClass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async c => {
+      await c.query('BEGIN');
+      try {
+        const id = (await c.query('SELECT school.decide_progression($1, $2, $3, $4, $5::date) AS id', [e, 'promoted', 'Admis', up, '2029-09-15'])).rows[0].id;
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+        return id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.deepEqual(results.map(r => r.status), ['fulfilled', 'fulfilled']);
+    assert.equal(results[0].value, results[1].value);
+    assert.equal(await count('SELECT count(*) n FROM school.enrollment WHERE program_id = $1', [target]), 1);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

@@ -125,6 +125,7 @@ return [
         'lead_interaction' => 'Échange avec un prospect',
         'lead_reminder' => 'Rappel d’un prospect',
         'lead_option' => 'Source ou étape des prospects',
+        'progression' => 'Décision de passage annuel',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

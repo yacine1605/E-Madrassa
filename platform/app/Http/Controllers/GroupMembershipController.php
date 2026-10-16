@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 final class GroupMembershipController
 {
-    // With the enrolment's state and its pupil, as the reader may see them.
+    // With the enrolment's state, its annual decision and its pupil, as the reader may see them.
     private const COLUMNS = "id, enrollment_id, group_id, is_main, valid_from, valid_to, version, created_at, updated_at,
         (SELECT jsonb_build_object('status', e.status, 'student_id', e.student_id, 'matricule', s.matricule, 'last_name_ar', s.last_name_ar,
+           'decision', (SELECT p.decision FROM school.progression p WHERE p.tenant_id = e.tenant_id AND p.enrollment_id = e.id),
            'first_name_ar', s.first_name_ar, 'last_name_lat', s.last_name_lat, 'first_name_lat', s.first_name_lat)
          FROM school.enrollment e LEFT JOIN school.student s ON s.tenant_id = e.tenant_id AND s.id = e.student_id
          WHERE e.tenant_id = group_membership.tenant_id AND e.id = group_membership.enrollment_id) AS enrollment";
