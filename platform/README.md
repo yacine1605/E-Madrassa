@@ -732,7 +732,7 @@ Decision of 13 October 2026: each school defines how long it keeps each category
 | `retention.journal_years` | The journal's entries are deleted | 10 years | 5–50 |
 | `retention.finance_years` | Financial records, applied with lot 3 | 10 years | 10–50 |
 
-The defaults are proposals, to be validated by each school and a lawyer (OD-07).
+The defaults were accepted on 16 October 2026 (OD-07), the prospects' 24 months too (increment 55); each school changes them in its settings when its client asks.
 
 - A pupil's departure day (`left_on`) is set by the database when they become a former pupil; pupils who left before were given the day the journal recorded it.
 - `php artisan platform:retention` runs daily (scheduler) for every school, whatever its state: it archives the former pupils due, then anonymises the archived records due. An anonymised pupil keeps their matricule, birth year, gender, site, enrolments and groups; their names become `ANONYME` and their matricule, everything else personal goes (phone, e-mail, address, place of birth, school of origin, the school's own fields, import reference, account link, photo, whose files are then purged). A guardian is anonymised and archived once every pupil linked to them is: only their links remain. Journal entries older than the school's duration are deleted. At most `--limit` records per category and school (1,000 by default); the rest waits for the next night.
@@ -966,7 +966,7 @@ Validation on 16 October 2026: **259 PHP integration tests (10,360 assertions), 
 
 `042_lead_retention.sql`:
 
-- **NFR-DATA-03, BR-17**: a **lost** prospect is kept as long as the school says (**Anonymise a lost prospect after (months)**, `retention.lead_months`, 24 by default, a proposal to validate with OD-07), counted from its closure, then **anonymised** by the daily run (`platform:retention`, after the pupils'): the contact's names, phone, e-mail and the school's fields, the reason of its loss, its children's names and birth dates, what was said in its interactions and reminders. What stays: its site, source, step, dates, its children's levels, and the number of its interactions. The run's counts go to the school's journal; an anonymised prospect changes no more (`lead_anonymised`). An open prospect is not touched; a registered one stays with its pupil, whose own policy applies (030).
+- **NFR-DATA-03, BR-17**: a **lost** prospect is kept as long as the school says (**Anonymise a lost prospect after (months)**, `retention.lead_months`, 24 by default, accepted on 16 October 2026), counted from its closure, then **anonymised** by the daily run (`platform:retention`, after the pupils'): the contact's names, phone, e-mail and the school's fields, the reason of its loss, its children's names and birth dates, what was said in its interactions and reminders. What stays: its site, source, step, dates, its children's levels, and the number of its interactions. The run's counts go to the school's journal; an anonymised prospect changes no more (`lead_anonymised`). An open prospect is not touched; a registered one stays with its pupil, whose own policy applies (030).
 - The settings' retention summary counts the lost prospects the next run will anonymise.
 
 No new route.
@@ -998,4 +998,4 @@ Validation on 16 October 2026: **261 PHP integration tests (10,428 assertions), 
 1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The dashboard's conversion rate comes with lot 5's dashboards.
 
-Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.
+Lot 1's last exit item: the Arabic labels were confirmed by a native speaker on 16 October 2026; the choice of an Arabic font stays open.
