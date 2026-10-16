@@ -6,6 +6,7 @@ return [
         'personal' => 'فضائي',
         'schooling' => 'الشؤون الدراسية',
         'staff' => 'الموظفون',
+        'finance' => 'المالية',
         'data' => 'الاستيراد والتصدير',
         'people' => 'الأشخاص والصلاحيات',
         'referential' => 'المرجع',
@@ -125,6 +126,8 @@ return [
         'lead_reminder' => 'تذكير خاص بمترشح',
         'lead_option' => 'مصدر أو مرحلة المترشحين',
         'progression' => 'قرار الانتقال السنوي',
+        'adjustment' => 'تعديل تسجيل',
+        'payment_schedule' => 'جدول أقساط تسجيل',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

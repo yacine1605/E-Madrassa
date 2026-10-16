@@ -1070,9 +1070,36 @@ No new route, no migration.
 
 Validation on 16 October 2026: **266 PHP integration tests (10,701 assertions), 235 embedded SQL checks and 256 native PostgreSQL 16 checks including concurrency**. Browser acceptance not run again: no new screen; the CI could not start (the GitHub account's billing).
 
+## Increment 62 (lot 3): what an enrolment owes and when
+
+Lot 3 starts with **FR-FIN-01** (SQL 048): an enrolment's adjustments and its schedule. Amounts are `NUMERIC(14,2)` in the base and two-decimal strings in the API, never floats (BR-04).
+
+- **What is owed**: the agreed price copied with the enrolment (BR-11), less its approved discounts and debt waivers, plus its approved penalties (`platform.enrollment_due_of`, internal; `school.enrollment_due`, for whoever reads the enrolment's finance). An adjustment never takes it below nothing (`adjustment_exceeds_due`).
+- **Adjustments** (`school.adjustment`): a discount, a debt waiver or a penalty, **always with its reason** (AC2). Within the school's threshold (new setting `finance.discount.approval_percent`, 10 % of the agreed price for the enrolment's discounts and waivers together by default: the OD-09 proposal), approved at once; a penalty always. Beyond it, pending until a decision by the new permission **`finance.discount.approve`** (the `direction` template, added to the schools that have student finance), never by its author (BR-08, sod rule `adjustment`); a refusal says why. Decided, it never changes (`adjustment_decided`); none is deleted. The same key again answers the first one (BR-05).
+- **Schedule** (`school.payment_schedule`, `school.installment`): versioned, each version written whole and never changed; the one in force is the latest. Its lines **must add up to what is owed** (AC1, `schedule_sum_mismatch`); dates in order, amounts positive (`schedule_invalid`); a version after the first says why. The first one is proposed from the programme's payment terms copied with the enrolment (share and due date of each term, else equal monthly shares), each line rounded half up to the centime and the last taking the remainder. An adjustment since the version in force is flagged on screen: the schedule waits for its next version.
+- **Access to courses** (FR-INS-04): `school.enrollment_paid` now reads what is owed after adjustments; validated payments come with increment 63.
+- **Screens**: an enrolment's **Finance** (from the Enrolments screen: what is owed, adjustments with their decision, schedule in force; adjust, new version of the schedule, decide); **Adjustments to approve** in a new Finance section of the navigation.
+
+Routes, all behind the `student_finance` module: `GET /api/enrollments/{enrollment}/finance`, `GET /api/enrollments/{enrollment}/schedule/proposal`, `POST /api/enrollments/{enrollment}/schedule`, `POST /api/enrollments/{enrollment}/adjustments`, `GET /api/adjustments`, `POST /api/adjustments/{adjustment}/approve` and `/reject`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-01 AC1 | `FinanceScheduleTest`: a schedule of 100,000 refused for 120,000 owed; the proposal 36,000 + 84,000 from the terms 30 % / 70 %; a second version after the adjustments, with its reason; tests/sql: sum, order, version and immutability |
+| FR-FIN-01 AC2 | `FinanceScheduleTest`: an adjustment without its reason refused; 10 % approved at once, beyond it pending; tests/sql: a reason required by the base |
+| BR-08 | `FinanceScheduleTest`, tests/sql: the accountant cannot approve, the direction approves or refuses with its reason once; the author never decides |
+| BR-05 | `FinanceScheduleTest`: the same schedule key gives one version |
+| Screens | `FinanceScheduleTest`: an adjustment recorded and the first schedule set from the enrolment's Finance screen, approved from Adjustments to approve |
+
+Validation on 16 October 2026: **268 PHP integration tests (10,983 assertions), 237 embedded SQL checks and 258 native PostgreSQL 16 checks including concurrency**; migration 048 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 196 screens without a problem, an enrolment's Finance and Adjustments to approve included. The CI could not start (the GitHub account's billing).
+
+## Next increments of lot 3
+
+1. Payments (FR-FIN-02/03): methods, validation and its separation, immutability, reversals, idempotency (TST-09–11); `school.enrollment_paid` reads them.
+2. Refunds and overpayments (FR-FIN-04), receipts (FR-FIN-05), arrears (FR-FIN-06), the period's close (FR-FIN-07).
+
 ## Next increments of lot 2
 
-1. A full group's waiting list once OD-14 is decided. Payments themselves, which `access_granted` will read, and the progression's invoices come with lot 3. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
+1. A full group's waiting list once OD-14 is decided. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 2. The dashboard's conversion rate comes with lot 5's dashboards.
 
 Lot 1's last exit item is closed: the Arabic labels were confirmed by a native speaker on 16 October 2026, and Arabic keeps the system's font (decision of the same day).

@@ -6,6 +6,7 @@ return [
         'personal' => 'Mon espace',
         'schooling' => 'Scolarité',
         'staff' => 'Personnel',
+        'finance' => 'Finance',
         'data' => 'Imports et exports',
         'people' => 'Personnes et droits',
         'referential' => 'Référentiel',
@@ -126,6 +127,8 @@ return [
         'lead_reminder' => 'Rappel d’un prospect',
         'lead_option' => 'Source ou étape des prospects',
         'progression' => 'Décision de passage annuel',
+        'adjustment' => 'Ajustement d’une inscription',
+        'payment_schedule' => 'Échéancier d’une inscription',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

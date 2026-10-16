@@ -9,6 +9,7 @@ use App\Http\Controllers\ContractController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuardianController;
@@ -311,6 +312,18 @@ Route::prefix('api')->group(function () {
                     Route::post('lead-options/{option}/archive', [LeadOptionController::class, 'archive']);
                 });
                 Route::post('lead-children/{child}/convert', [LeadController::class, 'convert'])->middleware('permission:crm.lead.convert');
+            });
+
+            // FR-FIN-01: what an enrolment owes and when; its adjustments, decided by the direction beyond the threshold.
+            Route::middleware('module:student_finance')->group(function () {
+                Route::get('enrollments/{enrollment}/finance', [FinanceController::class, 'show'])
+                    ->middleware('permission:finance.payment.read,finance.discount.grant,finance.schedule.manage,finance.discount.approve');
+                Route::get('adjustments', [FinanceController::class, 'adjustments'])->middleware('permission:finance.payment.read,finance.discount.approve');
+                Route::post('enrollments/{enrollment}/adjustments', [FinanceController::class, 'adjust'])->middleware('permission:finance.discount.grant');
+                Route::post('adjustments/{adjustment}/approve', [FinanceController::class, 'approve'])->middleware('permission:finance.discount.approve');
+                Route::post('adjustments/{adjustment}/reject', [FinanceController::class, 'reject'])->middleware('permission:finance.discount.approve');
+                Route::get('enrollments/{enrollment}/schedule/proposal', [FinanceController::class, 'proposal'])->middleware('permission:finance.schedule.manage');
+                Route::post('enrollments/{enrollment}/schedule', [FinanceController::class, 'schedule'])->middleware('permission:finance.schedule.manage');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

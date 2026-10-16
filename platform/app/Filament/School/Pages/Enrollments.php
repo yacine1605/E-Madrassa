@@ -24,6 +24,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -80,6 +81,11 @@ final class Enrollments extends SchoolingPage
                 $this->stateAction('cancel', 'cancel', 'enrollment.enrollment.cancel', ['pending', 'validated', 'suspended'], 'danger')
                     ->modalDescription(__('schooling.cancel_help')),
                 $this->transferAction(),
+                // FR-FIN-01: what it owes and when.
+                Action::make('finance')->label(__('finance.open_finance'))
+                    ->visible(fn () => DB::selectOne('SELECT school.module_enabled(?) AS on', ['student_finance'])->on && collect(['finance.payment.read', 'finance.discount.grant',
+                        'finance.schedule.manage', 'finance.discount.approve'])->contains(fn (string $p) => app(\App\Support\Permissions::class)->can($p)))
+                    ->url(fn (array $record) => EnrollmentFinance::getUrl(['enrollment' => $record['id']])),
                 Action::make('history')->label(__('schooling.history'))->modalHeading(__('schooling.history'))->modalSubmitAction(false)
                     ->schema(fn (array $record) => $this->history($record)),
             ])]);

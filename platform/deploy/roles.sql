@@ -164,6 +164,14 @@ GRANT EXECUTE ON FUNCTION school.copy_program(uuid, uuid) TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.discard_program(uuid), school.discard_group(uuid) TO school_runtime;
 -- A pupil's history (047): their record's own journal entries, for whoever reads the pupil, without the values.
 GRANT EXECUTE ON FUNCTION school.student_history(uuid) TO school_runtime;
+-- What an enrolment owes (048): adjustments granted with their reason and decided once; schedules written whole, by version.
+GRANT SELECT ON school.adjustment, school.payment_schedule, school.installment TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, kind, amount, reason, idempotency_key) ON school.adjustment TO school_runtime;
+GRANT UPDATE (status, decision_reason, version) ON school.adjustment TO school_runtime;
+GRANT INSERT (tenant_id, enrollment_id, version, total, reason, idempotency_key) ON school.payment_schedule TO school_runtime;
+GRANT INSERT (tenant_id, schedule_id, seq, due_date, amount) ON school.installment TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.finance_in_scope(text, uuid), school.enrollment_due(uuid), school.current_schedule(uuid),
+  school.set_schedule(uuid, jsonb, text, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -408,6 +416,12 @@ ALTER FUNCTION platform.staff_retention_candidates(uuid) OWNER TO platform_provi
 ALTER FUNCTION platform.apply_staff_retention(integer) OWNER TO platform_provisioner;
 -- A pupil's history (047): the journal's entries of the pupil's record (read already), whoever may read the journal.
 ALTER FUNCTION school.student_history(uuid) OWNER TO platform_provisioner;
+-- What an enrolment owes (048): its adjustments and its pupil's site, whatever the reader may see; the amount for the finance only.
+GRANT SELECT ON school.adjustment TO platform_provisioner;
+ALTER FUNCTION school.finance_in_scope(text, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.enrollment_due_of(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.enrollment_due(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.enrollment_paid(uuid, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

@@ -23,11 +23,11 @@ const screens = name => ({
 let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
-  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
-const rawKey = /\b(?:school|admin|schooling|staff|services|reference|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
+const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
 
 const failures = [];
 const report = [];
@@ -225,7 +225,11 @@ async function seed(browser, session) {
     await call(`lead-children/${lead.children[0].id}/convert`, { idempotency_key: crypto.randomUUID(), program_id: program.id,
       student: { last_name_lat: 'Haddad', first_name_lat: 'Yanis', birth_date: '2014-02-10' },
       guardian: { last_name_lat: 'Haddad', first_name_lat: 'Samia', phone: '0661 22 33 44' }, relationship: 'mother' });
-    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id };
+    // What the enrolment owes and when (FR-FIN-01): its schedule as proposed, a discount waiting for the direction.
+    const proposal = await (await fetch(`/api/enrollments/${enrollment.id}/schedule/proposal`, { headers: { Accept: 'application/json' } })).json();
+    await call(`enrollments/${enrollment.id}/schedule`, { installments: proposal.data.installments, idempotency_key: crypto.randomUUID() });
+    await call(`enrollments/${enrollment.id}/adjustments`, { kind: 'discount', amount: '15000', reason: 'Bourse au mérite', idempotency_key: crypto.randomUUID() });
+    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id, enrollment: enrollment.id };
   });
   await context.close();
   return records;
@@ -239,7 +243,8 @@ async function run(browser) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
       `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
       `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`,
-      `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`, `lead-sheet?lead=${records.lead}`]], ['operator', 'console', consolePages]]) {
+      `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`, `lead-sheet?lead=${records.lead}`,
+      `enrollment-finance?enrollment=${records.enrollment}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

@@ -2997,6 +2997,67 @@ await check('a pupil\'s history gives their record\'s changes, states and reason
   await rejects('SELECT * FROM school.student_history($1)', [pupil], '42501', 'permission_denied');
   await as('school_runtime', a, 1);
 });
+// What an enrolment owes (SQL 048, FR-FIN-01): adjustments with their reason, approved beyond the threshold by someone else; schedules whose sum is what is owed.
+const ADJUST = 'INSERT INTO school.adjustment (tenant_id, enrollment_id, kind, amount, reason, idempotency_key) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, status';
+await check('an adjustment needs its reason; beyond the threshold the direction approves it, never its author (FR-FIN-01 AC2, BR-08)', async () => {
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.discount.grant', 'finance.schedule.manage', 'finance.payment.read', 'enrollment.enrollment.read']);
+  const director = await scopedAccount('internal', 'tenant', null, ['finance.discount.approve', 'finance.payment.read', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  const e = await enroll((await newAdult('Remise', 'Nadia')).id, await programme('REMISE', 120000));
+  await as('school_runtime', a, accountant.user);
+  const due = async () => (await first('SELECT school.enrollment_due($1)::text AS d', [e])).d;
+  assert.equal(await due(), '120000.00');
+  await rejects(ADJUST, [a, e, 'discount', 10000, '  ', uuid()], '23514', 'reason_required');
+  assert.equal((await first(ADJUST, [a, e, 'discount', 10000, 'Fratrie', uuid()])).status, 'approved', 'within 10 %');
+  assert.equal(await due(), '110000.00');
+  const beyond = await first(ADJUST, [a, e, 'discount', 5000, 'Situation sociale', uuid()]);
+  assert.equal(beyond.status, 'pending', 'the two together beyond 10 %');
+  assert.equal(await due(), '110000.00');
+  assert.equal((await sql("UPDATE school.adjustment SET status = 'approved' WHERE id = $1", [beyond.id])).affectedRows ?? 0, 0, 'not for the accountant to approve');
+  await rejects(ADJUST, [a, e, 'debt_waiver', 106000, 'Tout', uuid()], '23514', 'adjustment_exceeds_due');
+  assert.equal((await first(ADJUST, [a, e, 'penalty', 2000, 'Retard', uuid()])).status, 'approved');
+  // The direction decides; never the author, even with both permissions.
+  const both = await scopedAccount('internal', 'tenant', null, ['finance.discount.grant', 'finance.discount.approve', 'finance.payment.read', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, both.user);
+  const own = await first(ADJUST, [a, e, 'discount', 3000, 'Bourse', uuid()]);
+  await rejects("UPDATE school.adjustment SET status = 'approved' WHERE id = $1", [own.id], '23514', 'segregation_of_duties');
+  await as('school_runtime', a, director.user);
+  await sql("UPDATE school.adjustment SET status = 'approved' WHERE id = $1", [beyond.id]);
+  await rejects("UPDATE school.adjustment SET status = 'rejected' WHERE id = $1", [own.id], '23514', 'reason_required');
+  await sql("UPDATE school.adjustment SET status = 'rejected', decision_reason = 'Dossier incomplet' WHERE id = $1", [own.id]);
+  await rejects("UPDATE school.adjustment SET status = 'rejected', decision_reason = 'Finalement non' WHERE id = $1", [beyond.id], '23514', 'adjustment_decided');
+  await rejects(ADJUST, [a, e, 'discount', 100, 'Pas le droit', uuid()], '42501');
+  assert.equal(await due(), '107000.00', '120000 - 10000 - 5000 + 2000');
+  // Whoever reads no finance reads no amount.
+  await as('school_runtime', a, 4);
+  await rejects('SELECT school.enrollment_due($1)', [e], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+await check('a schedule\'s instalments add up to what is owed, in order; a new version says why; neither is ever changed (FR-FIN-01 AC1, BR-04, BR-05)', async () => {
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.discount.grant', 'finance.schedule.manage', 'finance.payment.read', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  const e = await enroll((await newAdult('Echeance', 'Rayan')).id, await programme('ECHEANCE', 100000.5));
+  await as('school_runtime', a, accountant.user);
+  const SET = 'SELECT school.set_schedule($1, $2::jsonb, $3, $4) AS id';
+  const lines = (...items) => JSON.stringify(items.map(([due_date, amount]) => ({ due_date, amount })));
+  await rejects(SET, [e, lines(['2026-09-15', '50000.00'], ['2026-12-15', '50000.00']), null, uuid()], '23514', 'schedule_sum_mismatch');
+  await rejects(SET, [e, lines(['2026-12-15', '50000.25'], ['2026-09-15', '50000.25']), null, uuid()], '23514', 'schedule_invalid');
+  await rejects(SET, [e, lines(['2026-09-15', '100000.505']), null, uuid()], '23514', 'schedule_invalid');
+  const key = uuid();
+  const first1 = (await first(SET, [e, lines(['2026-09-15', '50000.25'], ['2026-12-15', '50000.25']), null, key])).id;
+  assert.equal((await first(SET, [e, lines(['2026-09-15', '50000.25'], ['2026-12-15', '50000.25']), null, key])).id, first1, 'the same key, the same version');
+  await rejects(SET, [e, lines(['2026-09-15', '100000.50']), null, uuid()], '23514', 'reason_required');
+  // A discount changes what is owed: the schedule follows, in a new version.
+  await sql(ADJUST, [a, e, 'discount', 500.5, 'Parrainage', uuid()]);
+  await rejects(SET, [e, lines(['2026-09-15', '50000.25'], ['2026-12-15', '50000.25']), 'Remise', uuid()], '23514', 'schedule_sum_mismatch');
+  const second = (await first(SET, [e, lines(['2026-09-15', '33166.66'], ['2026-12-15', '33166.66'], ['2027-03-15', '33166.68']), 'Remise de parrainage', uuid()])).id;
+  assert.equal((await first('SELECT school.current_schedule($1) AS id', [e])).id, second);
+  assert.deepEqual((await sql('SELECT version, total::text AS t FROM school.payment_schedule WHERE enrollment_id = $1 ORDER BY version', [e])).rows,
+    [{ version: 1, t: '100000.50' }, { version: 2, t: '99500.00' }]);
+  await rejects('UPDATE school.installment SET amount = 1 WHERE schedule_id = $1', [second], '42501');
+  await rejects('DELETE FROM school.payment_schedule WHERE id = $1', [first1], '42501');
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

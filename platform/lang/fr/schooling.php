@@ -123,7 +123,6 @@ return [
     'target_class_help' => 'Au niveau suivant pour un passage, au même niveau pour un redoublement.',
     'first_due_date' => 'Première échéance',
     'first_due_date_help' => 'Le jour où la première échéance de la nouvelle inscription est due (facture du lot finance).',
-    'history' => 'Historique',
     'history_help' => 'Ce qui est arrivé à l’élève, du plus récent au plus ancien : son dossier, ses inscriptions, ses groupes, ses responsables et ses décisions de fin d’année, selon ce que vous pouvez consulter.',
     'no_history' => 'Aucun événement',
     'history_when' => 'Quand',
