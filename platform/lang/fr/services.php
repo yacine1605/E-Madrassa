@@ -43,7 +43,7 @@ return [
     'new_import' => 'Nouvel import',
     'import_kind' => 'Données',
     'import_kinds' => ['accounts' => 'Comptes', 'referential' => 'Référentiel', 'students' => 'Élèves', 'guardians' => 'Responsables légaux',
-        'enrollments' => 'Inscriptions'],
+        'enrollments' => 'Inscriptions', 'staff' => 'Personnel', 'qualifications' => 'Habilitations des enseignants'],
     'import_validation' => 'Validée à l’import',
     'import_states' => ['previewing' => 'aperçu en cours', 'previewed' => 'à confirmer', 'importing' => 'import en cours', 'imported' => 'importé',
         'failed' => 'en échec', 'rolled_back' => 'annulé', 'cancelled' => 'abandonné'],

@@ -2514,6 +2514,39 @@ await check('contracts and leave are read with their own permission; a site\'s g
   assert.equal(await count(`SELECT count(*) n FROM school.role_permission p JOIN school.role r ON r.tenant_id = p.tenant_id AND r.id = p.role_id
     WHERE r.tenant_id = $1 AND r.template_code = 'teacher' AND p.permission_code IN ('staff.contract.read', 'staff.leave.read')`, [a]), 2);
 });
+// The staff's import (SQL 036, FR-IMP-01): a member keeps the reference of their file; one an import created is undone while nothing depends on them.
+await check('a member of staff\'s reference from a file is theirs alone and never changes; an import undone removes them while nothing depends on them (FR-IMP-01, BR-05)', async () => {
+  const STAFF_REF = "INSERT INTO school.staff (tenant_id, last_name_lat, first_name_lat, staff_type, external_ref) VALUES ($1, $2, 'Import', 'teacher_internal', $3) RETURNING id";
+  const member = (await first(STAFF_REF, [a, 'Reference', 'PERS-1'])).id;
+  await rejects(STAFF_REF, [a, 'Double', 'PERS-1'], '23505');
+  await rejects("UPDATE school.staff SET external_ref = 'PERS-2' WHERE id = $1", [member], '42501');
+  await as(null);
+  await rejects("UPDATE school.staff SET external_ref = 'PERS-2' WHERE id = $1", [member], '23514', 'code_immutable');
+  await as('school_runtime', a, 1);
+  // Only what an import still in place created goes.
+  await rejects('SELECT school.discard_staff($1)', [member], '23514', 'dependent_operation');
+  const batch = await importBatch();
+  await reported(batch, 'staff', member);
+  // A qualification, a day off, a contract, a leave, a group they lead, an account: built on them since, the member stays.
+  const subject = (await first("INSERT INTO school.subject (tenant_id, code, kind, labels) VALUES ($1, 'IMP_STAFF', 'subject', '{\"fr\": \"Import\"}') RETURNING id", [a])).id;
+  const node = (await first("SELECT id FROM school.ref_node WHERE tenant_id = $1 AND archived_at IS NULL ORDER BY code LIMIT 1", [a])).id;
+  const line = (await first('INSERT INTO school.qualification (tenant_id, staff_id, subject_id, node_id) VALUES ($1, $2, $3, $4) RETURNING id', [a, member, subject, node])).id;
+  await rejects('SELECT school.discard_staff($1)', [member], '23514', 'dependent_operation');
+  await sql('DELETE FROM school.qualification WHERE id = $1', [line]);
+  const contract = (await first(CONTRACT, [a, member, 'permanent', await dayAfter(today, 5), null, null, null])).id;
+  await rejects('SELECT school.discard_staff($1)', [member], '23514', 'dependent_operation');
+  await sql('DELETE FROM school.staff_contract WHERE id = $1', [contract]);
+  await sql("UPDATE school.staff SET status = 'on_leave' WHERE id = $1", [member]);
+  await rejects('SELECT school.discard_staff($1)', [member], '23514', 'dependent_operation');
+  await sql("UPDATE school.staff SET status = 'active' WHERE id = $1", [member]);
+  // Whoever may not create staff for the whole school undoes nothing.
+  await as('school_runtime', a, roleless);
+  await rejects('SELECT school.discard_staff($1)', [member], '42501');
+  await as('school_runtime', a, 1);
+  await sql('SELECT school.discard_staff($1)', [member]);
+  assert.equal(await count('SELECT count(*) n FROM school.staff WHERE id = $1', [member]), 0);
+  assert.deepEqual((await first("SELECT reason FROM school.audit_log WHERE object_type = 'staff' AND object_id = $1 AND action = 'DELETE'", [member])).reason, 'import_rollback');
+});
 // The last-site concurrency test below expects the school's two sites of before.
 await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);

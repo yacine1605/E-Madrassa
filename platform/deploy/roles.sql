@@ -185,6 +185,9 @@ GRANT SELECT ON school.staff_leave TO school_runtime;
 GRANT INSERT (tenant_id, staff_id, leave_type, date_from, date_to, observation) ON school.staff_leave TO school_runtime;
 GRANT UPDATE (status, version) ON school.staff_leave TO school_runtime;
 GRANT INSERT (leave_id) ON school.unavailability TO school_runtime;
+-- The staff's import (036): a member keeps the reference of their file; one an import created is undone by its function.
+GRANT INSERT (external_ref) ON school.staff TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.discard_staff(uuid) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -310,6 +313,10 @@ ALTER FUNCTION school.check_availability() OWNER TO platform_provisioner;
 -- Contracts and leave (035): the member's state and the terms already there, whatever the writer may read.
 GRANT SELECT ON school.staff_contract, school.staff_leave TO platform_provisioner;
 ALTER FUNCTION school.check_staff_terms() OWNER TO platform_provisioner;
+-- The staff's import (036): a member an import still in place created, deleted by this function alone, the row locked
+-- first (a lock needs a column to update: the one the pupils' also grants, which nothing of the provisioner's writes here).
+GRANT UPDATE (archived_at), DELETE ON school.staff TO platform_provisioner;
+ALTER FUNCTION school.discard_staff(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

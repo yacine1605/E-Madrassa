@@ -52,6 +52,9 @@ return [
         'students' => App\Imports\StudentsImporter::class,
         'guardians' => App\Imports\GuardiansImporter::class,
         'enrollments' => App\Imports\EnrollmentsImporter::class,
+        // The staff, then their qualifications.
+        'staff' => App\Imports\StaffImporter::class,
+        'qualifications' => App\Imports\QualificationsImporter::class,
     ],
 
     // FR-IMP-02: what can be exported, and from how many rows an export runs in the background.

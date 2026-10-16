@@ -43,7 +43,7 @@ return [
     'new_import' => 'استيراد جديد',
     'import_kind' => 'البيانات',
     'import_kinds' => ['accounts' => 'الحسابات', 'referential' => 'المرجع', 'students' => 'التلاميذ', 'guardians' => 'الأولياء',
-        'enrollments' => 'التسجيلات'],
+        'enrollments' => 'التسجيلات', 'staff' => 'الموظفون', 'qualifications' => 'تأهيلات الأساتذة'],
     'import_validation' => 'مصادق عليه عند الاستيراد',
     'import_states' => ['previewing' => 'المعاينة جارية', 'previewed' => 'في انتظار التأكيد', 'importing' => 'الاستيراد جارٍ', 'imported' => 'مستورد',
         'failed' => 'فاشل', 'rolled_back' => 'ملغى', 'cancelled' => 'متروك'],

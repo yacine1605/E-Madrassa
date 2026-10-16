@@ -849,8 +849,25 @@ Validation on 16 October 2026: **241 PHP integration tests (8,952 assertions), 2
 
 AC2 (a leave lists the sessions it touches) comes with the sessions of lot 4, which will read the teacher's unavailability. A leave does not change the record's state (`on_leave`), which the manager sets for a long absence (FR-STF-01).
 
+## Increment 49 (lot 2): the staff's import
+
+`036_staff_imports.sql`, `app/Imports/StaffImporter.php`, `app/Imports/QualificationsImporter.php`:
+
+- **FR-IMP-01, FR-STF-01**: the **Imports** screen offers **Personnel** (`staff`) to whoever may create staff for the whole school. A row per member: `external_ref` (the school's stable reference, required), `staff_number` (kept when given, attributed otherwise, never changed: `code_immutable`; one already another member's refused), the names in Arabic or Latin letters, `staff_type` (`teacher_internal`, `teacher_external`, `administrative`, `other`), `phone`, `email`, `hire_date` (`2020-09-01` or `01/09/2020`), `site` (a site's code; the default site when empty) and the school's own fields as `custom_<key>` columns. The same file imported again updates what it changes, column by column, or leaves the member as they are, never duplicates them (BR-05); a column it leaves out keeps its value. A member is created active; a departure is recorded on screen. A sensitive field is written by whoever reads the staff's contracts (`staff.contract.read`), as on screen.
+- **FR-IMP-01, FR-STF-02**: **Habilitations des enseignants** (`qualifications`), for whoever manages qualifications for the whole school: `staff_ref` (the staff file's reference, or the member's number), `subject` and `node` (codes of the catalogue and of the referential, in any case), `valid_from` (today when empty) and `valid_to`. An unknown member, subject or node is refused, never created (AC2); the database's rules apply as on screen (`qualification_not_teacher`, `staff_left`, `qualification_overlap`…). A line already there is left as it is, whatever day the file comes again: without `valid_from`, the line in force or to come; a file giving it another end is refused (`qualification_differs`), an end being final and changed on screen.
+- **Undo** (FR-IMP-01): last import first, while nothing depends on it. A member an import created goes through `school.discard_staff` while they are active, without an account, a qualification, an availability, a day off, a contract, a leave or a group they lead; a member it updated gets their values back while they still hold the imported ones. A qualification it created is removed while its end is as imported. The reference never changes once given, and the journal masks it.
+
+| Requirement | Evidence |
+|---|---|
+| FR-IMP-01 AC1, AC3, BR-05 | `StaffImportTest`: three members previewed without anything written, created with a number kept and one attributed, on the site named or the default one; the same file again unchanged, a changed cell updating one member; qualifications by reference or number and by codes in any case, unchanged when imported again. `tests/sql/database.mjs`: a reference unique and never changed, even by the database's owner |
+| FR-IMP-01 AC2 | `StaffImportTest`: each refused line with its cause: a wrong function, an impossible date, no full name, an unknown site, a number taken or changed, a line twice; a member who left, an unknown member, subject or node, an administrative member, a line whose end the file changes |
+| FR-IMP-01 (undo), BR-02 | `tests/sql/database.mjs`: `school.discard_staff` refuses a member no import created, one with a qualification, a contract or not active, and anyone without the permission for the whole school; the journal keeps the removal with its reason. `StaffImportTest`: the staff's import kept while their qualifications, a contract or a correction on screen depend on it, undone once these are; imported again, the members come back once |
+| FR-REF-04, FR-IAM-04 | `StaffImportTest`: the school's own fields as columns, a sensitive one refused to a role that does not read the contracts; the qualifications' kind refused to that role, both kinds to a grant limited to a site |
+
+Validation on 16 October 2026: **245 PHP integration tests (9,113 assertions), 220 embedded SQL checks and 238 native PostgreSQL 16 checks including concurrency**; migration 036 rolled back alone with 42 members, 10 of them from files, and 15 staff and qualification imports in place (the members kept without their reference), then with all the others, and applied again. Browser acceptance left to the CI: no new screen, the Imports screen offers two more kinds.
+
 ## Next increments of lot 2
 
-1. The import of staff; rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05). Replacements' groups (the rest of TST-03) come with lot 4's sessions.
+1. Rooms (FR-SLL-02) and CRM/conversion (FR-CRM-01/02); payment-based access (FR-INS-04) and annual progression (FR-INS-05). Replacements' groups (the rest of TST-03) come with lot 4's sessions.
 
 Lot 1's last exit item stays open: a native speaker's review of the Arabic labels, with the choice of an Arabic font.

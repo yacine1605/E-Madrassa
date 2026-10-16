@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Support\PupilRecords;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +22,8 @@ trait Columns
 
     /** @var array<string, array<string, object>> */
     private array $fields = [];
-    private ?bool $sensitive = null;
+    /** @var array<string, bool> whether the person reads each entity's sensitive fields */
+    private array $sensitive = [];
 
     private function date(?string $value, string $column): ?string
     {
@@ -61,7 +63,8 @@ trait Columns
 
     /**
      * The school's own values the row brings, by key: null clears one. A sensitive field is
-     * written only by whoever may read it (FR-REF-04).
+     * written only by whoever may read it (FR-REF-04): a pupil's or a guardian's with
+     * `student.sensitive.read`, a member of staff's with `staff.contract.read`.
      *
      * @return array<string, mixed>
      */
@@ -70,8 +73,8 @@ trait Columns
         $values = [];
         foreach ($this->customFields($entity) as $column => $field) {
             if (!array_key_exists($column, $row)) continue;
-            $this->sensitive ??= (bool) DB::selectOne("SELECT school.can_everywhere('student.sensitive.read') AS granted")->granted;
-            if ($field->is_sensitive && !$this->sensitive) throw new RowRefused('permission_denied', __('errors.import_column_denied', ['column' => $column]));
+            $this->sensitive[$entity] ??= (bool) DB::selectOne('SELECT school.can_everywhere(?) AS granted', [PupilRecords::sensitivePermission($entity)])->granted;
+            if ($field->is_sensitive && !$this->sensitive[$entity]) throw new RowRefused('permission_denied', __('errors.import_column_denied', ['column' => $column]));
             $value = $this->text($row[$column]);
             $values[$field->key] = $value === null ? null : match ($field->field_type) {
                 'number' => is_numeric($value) ? $value + 0 : throw new RowRefused('custom_value_invalid', __('errors.import_value_invalid', ['column' => $column])),
