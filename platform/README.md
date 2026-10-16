@@ -731,6 +731,8 @@ Decision of 13 October 2026: each school defines how long it keeps each category
 | `retention.minor_years` | The same, for a pupil who left as a minor (the school's majority age) | 10 years | 1–50 |
 | `retention.journal_years` | The journal's entries are deleted | 10 years | 5–50 |
 | `retention.finance_years` | Financial records, applied with lot 3 | 10 years | 10–50 |
+| `retention.lead_months` | A lost prospect is anonymised (increment 55) | 24 months after its closure | 1–120 |
+| `retention.staff_years` | An archived member of staff is anonymised (increment 59) | 10 years after archiving | 1–50 |
 
 The defaults were accepted on 16 October 2026 (OD-07), the prospects' 24 months too (increment 55); each school changes them in its settings when its client asks.
 
@@ -1023,6 +1025,20 @@ No new route: the engine's `GET /api/imports/templates/{kind}` and `POST /api/im
 | FR-IMP-01, FR-GRP-01, FR-GRP-01 AC2 | `ProgramGroupImportTest`: a class with its programme, lead teacher by number and main room by code; a support group without programme; a class without programme, a room smaller than the class, an unknown programme refused with their line; the same file unchanged; the programmes not undone while their groups stand, then the groups, then the programmes and their prices |
 
 Validation on 16 October 2026: **263 PHP integration tests (10,548 assertions), 233 embedded SQL checks and 254 native PostgreSQL 16 checks including concurrency**; migration 045 rolled back alone with 82 programmes, 62 groups and 5 of their imports in place (the programmes and groups kept, their prices immutable again), applied again, then rolled back with all the others and applied again. Local browser acceptance in Chromium: 188 screens without a problem, the Programmes' copy and the import kinds included. The CI could not start its jobs (the GitHub account's billing), so the screens in Firefox and WebKit were not run for increments 57 and 58.
+
+## Increment 59 (lot 2): the staff's retention
+
+`046_staff_retention.sql`:
+
+- **FR-STF-01, NFR-DATA-03, BR-17**: a member of staff who **left and was archived** is kept as long as the school says (**Anonymise an archived member of staff after (years)**, `retention.staff_years`, 10 years by default, as a pupil's record; each school changes it in its settings), then **anonymised** by the daily run (`platform:retention`): the names (the number stands for the first name), phone, e-mail, the school's fields, the file's reference and the account's link; their contracts' reference, notes and end's reason, their leaves' notes, the reasons of their days off and of the decisions on their availability. What stays: their number, type, site, dates, qualifications, the types and hours of their contracts and leaves, so that lot 3 and 4's sessions, hours and pay keep pointing at the record (BR-02). The run's counts go to the school's journal; the settings' retention summary counts the members due.
+
+No new route.
+
+| Requirement | Evidence |
+|---|---|
+| FR-STF-01, NFR-DATA-03, BR-17 | `tests/sql/database.mjs`: a member archived 11 years ago counted, then anonymised with their contract and leave, once, outside any school; their number, type and hours kept; the run's counts in the journal. `StaffRetentionTest`: the same through the API (departure, archive), `platform:retention` and the retention summary |
+
+Validation on 16 October 2026: **264 PHP integration tests (10,575 assertions), 234 embedded SQL checks and 255 native PostgreSQL 16 checks including concurrency**; migration 046 rolled back alone with 45 members of staff, one of them anonymised, in place (kept as it is, the guards as 031, 034 and 035 wrote them), applied again, then rolled back with all the others and applied again. Browser acceptance not run: no new screen, a row in Settings and in its retention summary (the CI could not start, the GitHub account's billing).
 
 ## Next increments of lot 2
 

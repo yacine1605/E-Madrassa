@@ -153,6 +153,7 @@ GRANT EXECUTE ON FUNCTION school.site_scope_ids(text, text) TO school_runtime;
 -- Retention (030): what the next run will do, for whoever manages the settings; the daily run, by the scheduler.
 GRANT EXECUTE ON FUNCTION school.retention_run(), school.retention_due(), platform.apply_retention(integer) TO school_runtime;
 GRANT EXECUTE ON FUNCTION platform.apply_lead_retention(integer) TO school_runtime;
+GRANT EXECUTE ON FUNCTION platform.apply_staff_retention(integer) TO school_runtime;
 -- The prospects' import (043): a prospect keeps the reference of its file; one an import created is undone by its function.
 GRANT INSERT (external_ref) ON school.lead TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.discard_lead(uuid) TO school_runtime;
@@ -394,6 +395,15 @@ GRANT DELETE ON school.program, school.program_price, school.study_group TO plat
 GRANT SELECT ON school.progression TO platform_provisioner;
 ALTER FUNCTION school.discard_program(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.discard_group(uuid) OWNER TO platform_provisioner;
+-- The staff's retention (046): a member archived long enough anonymised with their contracts, leaves and days off, by the run alone (its flag).
+GRANT UPDATE (last_name_lat, first_name_lat, last_name_ar, first_name_ar, phone, email, custom, external_ref, user_id, anonymised_at)
+  ON school.staff TO platform_provisioner;
+GRANT UPDATE (reference, observation, end_reason) ON school.staff_contract TO platform_provisioner;
+GRANT UPDATE (observation) ON school.staff_leave TO platform_provisioner;
+GRANT UPDATE (reason, decision_reason) ON school.unavailability TO platform_provisioner;
+GRANT UPDATE (decision_reason) ON school.availability TO platform_provisioner;
+ALTER FUNCTION platform.staff_retention_candidates(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.apply_staff_retention(integer) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

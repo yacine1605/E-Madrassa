@@ -1941,7 +1941,7 @@ await check('the run archives who left, anonymises a pupil after their category\
   await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'retention.minor_years', '3')", [a]);
   assert.deepEqual((await sql('SELECT category, due FROM school.retention_due() ORDER BY 1')).rows,
     [{ category: 'archive', due: 0 }, { category: 'guardian', due: 0 }, { category: 'journal', due: 0 }, { category: 'lead', due: 0 },
-     { category: 'pupil', due: 0 }]);
+     { category: 'pupil', due: 0 }, { category: 'staff', due: 0 }]);
   for (const id of [adult, minor]) await backdate('student', id, { archived_at: new Date(Date.now() - 4 * 365.25 * 864e5).toISOString() });
   await as('school_runtime', a, 1);
   assert.equal((await first("SELECT due FROM school.retention_due() WHERE category = 'pupil'")).due, 1);
@@ -2956,6 +2956,28 @@ await check('an imported pupil and guardian are anonymised in their turn, their 
   await as('school_runtime', a, 1);
   const kept = (await first(STUDENT_REF, [a, 'Importe', 'Garde', null, null, '1990-01-01', pupilFields, 'RET-IMPORT-2'])).id;
   await rejects("UPDATE school.student SET external_ref = 'AUTRE' WHERE id = $1", [kept]);
+});
+await check('a member of staff archived for longer than the school\'s duration is anonymised with their contracts, leaves and days off (FR-STF-01, NFR-DATA-03)', async () => {
+  await as('school_runtime', a, 1);
+  const member = await newStaff('Retenu', 'Karim');
+  await sql(CONTRACT, [a, member.id, 'permanent', '2015-09-01', '2016-06-30', 18, 'Ancien enseignant de Blida']);
+  await sql(LEAVE, [a, member.id, 'sick', '2016-01-10', '2016-01-12', 'Opération du genou']);
+  await sql("UPDATE school.staff SET status = 'left', left_on = '2016-06-30' WHERE id = $1", [member.id]);
+  await sql('UPDATE school.staff SET archived_at = now() WHERE id = $1', [member.id]);
+  await backdate('staff', member.id, { archived_at: new Date(Date.now() - 11 * 365.25 * 864e5).toISOString() });
+  await as('school_runtime', a, 1);
+  assert.equal((await first("SELECT due FROM school.retention_due() WHERE category = 'staff'")).due, 1);
+  await as('school_runtime', null, null);
+  const runs = (await sql('SELECT tenant_id, staff FROM platform.apply_staff_retention(100)')).rows;
+  assert.deepEqual(runs.find(r => r.tenant_id === a), { tenant_id: a, staff: 1 });
+  assert.equal((await sql('SELECT * FROM platform.apply_staff_retention(100)')).rows.length, 0, 'once');
+  await as(null);
+  assert.deepEqual(await first('SELECT last_name_lat, first_name_lat = staff_number AS numbered, phone, email, user_id, anonymised_at IS NOT NULL AS done, status FROM school.staff WHERE id = $1', [member.id]),
+    { last_name_lat: 'ANONYME', numbered: true, phone: null, email: null, user_id: null, done: true, status: 'left' });
+  assert.deepEqual((await sql('SELECT observation, weekly_hours::text AS h FROM school.staff_contract WHERE staff_id = $1', [member.id])).rows, [{ observation: null, h: '18.00' }]);
+  assert.deepEqual((await sql('SELECT observation, leave_type FROM school.staff_leave WHERE staff_id = $1', [member.id])).rows, [{ observation: null, leave_type: 'sick' }]);
+  assert.equal(await count("SELECT count(*) n FROM school.audit_log WHERE tenant_id = $1 AND action = 'RETENTION' AND after ? 'staff'", [a]), 1);
+  await as('school_runtime', a, 1);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);

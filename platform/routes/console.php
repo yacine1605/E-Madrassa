@@ -219,6 +219,10 @@ Artisan::command('platform:retention {--limit=1000}', function () {
         $this->info("School $run->tenant_id: $run->archived archived, $run->anonymised pupils and $run->guardians guardians anonymised, "
             ."$run->journal journal entries purged, $run->kept kept by a rule.");
     }
+    // The staff archived long enough (SQL 046).
+    foreach (DB::select('SELECT * FROM platform.apply_staff_retention(?)', [(int) $this->option('limit')]) as $run) {
+        $this->info("School $run->tenant_id: $run->staff members of staff anonymised.");
+    }
     // The prospects lost long enough (SQL 042).
     foreach (DB::select('SELECT * FROM platform.apply_lead_retention(?)', [(int) $this->option('limit')]) as $run) {
         $this->info("School $run->tenant_id: $run->leads lost prospects anonymised.");
