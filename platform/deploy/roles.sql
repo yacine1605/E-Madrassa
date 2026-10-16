@@ -188,6 +188,17 @@ GRANT INSERT (leave_id) ON school.unavailability TO school_runtime;
 -- The staff's import (036): a member keeps the reference of their file; one an import created is undone by its function.
 GRANT INSERT (external_ref) ON school.staff TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.discard_staff(uuid) TO school_runtime;
+-- Rooms (037): a site's rooms, their closures and the school's lists of types and equipment, archived or cancelled,
+-- never deleted; a group's main room. A room keeps its site and code, a list's entry its kind and code.
+GRANT SELECT ON school.room, school.room_closure, school.room_option, platform.room_option_default TO school_runtime;
+GRANT INSERT (tenant_id, site_id, code, labels, capacity, room_type, equipment, status) ON school.room TO school_runtime;
+GRANT UPDATE (labels, capacity, room_type, equipment, status, version, archived_at) ON school.room TO school_runtime;
+GRANT INSERT (tenant_id, room_id, date_from, date_to, reason) ON school.room_closure TO school_runtime;
+GRANT UPDATE (status, version) ON school.room_closure TO school_runtime;
+GRANT INSERT (tenant_id, kind, code, labels, sort_order) ON school.room_option TO school_runtime;
+GRANT UPDATE (labels, sort_order, version, archived_at) ON school.room_option TO school_runtime;
+GRANT INSERT (main_room_id), UPDATE (main_room_id) ON school.study_group TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.room_available(uuid, date) TO school_runtime;
 
 -- Sign-in and the person's own password and MFA (018): the credentials, and nothing else. No
 -- schema of the platform's, no function, no other column of a person.
@@ -317,6 +328,8 @@ ALTER FUNCTION school.check_staff_terms() OWNER TO platform_provisioner;
 -- first (a lock needs a column to update: the one the pupils' also grants, which nothing of the provisioner's writes here).
 GRANT UPDATE (archived_at), DELETE ON school.staff TO platform_provisioner;
 ALTER FUNCTION school.discard_staff(uuid) OWNER TO platform_provisioner;
+-- Rooms (037): a school's lists of room types and equipment, given with the sites and rooms module (enable_module).
+GRANT SELECT, INSERT ON school.room_option TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

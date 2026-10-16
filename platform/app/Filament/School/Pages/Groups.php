@@ -3,6 +3,7 @@
 namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\RoomController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudyGroupController;
 use App\Support\Formats;
@@ -55,6 +56,8 @@ final class Groups extends SchoolingPage
                     ->state(fn (array $record) => $record['lead_teacher'] ? $this->personName($record['lead_teacher'])
                         : ($record['lead_teacher_id'] ? __('schooling.lead_teacher_hidden') : null)),
                 TextColumn::make('site_id')->label(__('schooling.site'))->formatStateUsing(fn (string $state) => $this->siteName($state) ?? ''),
+                TextColumn::make('main_room')->label(__('schooling.main_room'))->toggleable()
+                    ->state(fn (array $record) => $record['main_room'] ? $this->roomLabel($record['main_room']) : null),
                 TextColumn::make('year_id')->label(__('reference.year'))->formatStateUsing(fn (string $state) => $this->years()[$state]['code'] ?? ''),
                 TextColumn::make('members')->label(__('schooling.places'))
                     ->state(fn (array $record) => __('schooling.places_taken', ['members' => Formats::number($record['members']), 'capacity' => Formats::number($record['capacity'])])),
@@ -77,8 +80,9 @@ final class Groups extends SchoolingPage
                             ->required(fn (Get $get) => in_array($get('group_type'), ['class', 'session'], true))
                             ->getSearchResultsUsing(fn (string $search, Get $get) => $this->programOptions($get('year_id'), $search))
                             ->getOptionLabelUsing(fn ($value) => $this->programLabel($value)),
-                        $this->siteField('group.group.manage')->helperText(null), $this->leadTeacherField(),
+                        $this->siteField('group.group.manage')->helperText(null)->live(), $this->leadTeacherField(),
                         $this->codeField(), ...$this->labelFields(), $this->capacityField(),
+                        $this->mainRoomField(fn (Get $get) => $get('site_id')),
                         DatePicker::make('valid_from')->label(__('school.valid_from'))->required()->default(now()),
                         DatePicker::make('valid_to')->label(__('school.valid_until'))->afterOrEqual('valid_from'),
                         Select::make('status')->label(__('school.status'))->required()->default('draft')
@@ -95,7 +99,7 @@ final class Groups extends SchoolingPage
                         && $this->writableFor('group.group.manage', 'study_group', $record['id']))
                     ->fillForm(fn (array $record) => $record)
                     ->schema(fn (array $record) => [...$this->labelFields(), $this->capacityField()->helperText(__('schooling.capacity_help')),
-                        $this->leadTeacherField(),
+                        $this->leadTeacherField(), $this->mainRoomField(fn () => $record['site_id'], $record['main_room_id']),
                         DatePicker::make('valid_to')->label(__('school.valid_until'))->minDate($record['valid_from']),
                         Select::make('status')->label(__('school.status'))->required()
                             ->options(collect(__('schooling.group_states'))->only(self::NEXT[$record['status']])->all()),
@@ -117,6 +121,29 @@ final class Groups extends SchoolingPage
             ->visible(fn () => $this->readsStaff())
             ->getSearchResultsUsing(fn (string $search) => $this->teacherOptions($search))
             ->getOptionLabelUsing(fn ($value) => $this->teacherLabel($value));
+    }
+
+    /**
+     * FR-GRP-01, FR-SLL-02: optional, among the rooms of the group's site in use and available, with
+     * their places; the one it has stays offered. The database refuses one smaller than the group.
+     */
+    private function mainRoomField(callable $site, ?string $current = null): Select
+    {
+        return Select::make('main_room_id')->label(__('schooling.main_room'))->helperText(__('schooling.main_room_help'))
+            ->options(function (Get $get) use ($site, $current) {
+                $siteId = $site($get);
+                if (!$siteId) return [];
+                return collect(SchoolScreen::call('referential.node.read', RoomController::class, 'index', ['site_id' => $siteId, 'per_page' => 100,
+                    'include_archived' => $current !== null])['data'])
+                    ->filter(fn (array $room) => $room['id'] === $current || ($room['status'] === 'active' && !$room['archived_at']))
+                    ->mapWithKeys(fn (array $room) => [$room['id'] => $this->roomLabel($room)])->all();
+            });
+    }
+
+    /** « A101 · Salle 101 · 30 places » */
+    private function roomLabel(array $room): string
+    {
+        return implode(' · ', array_filter([$room['code'], Locales::label($room['labels']), __('schooling.room_places', ['places' => Formats::number($room['capacity'])])]));
     }
 
     private function readsStaff(): bool { return app(Permissions::class)->can('staff.profile.read'); }

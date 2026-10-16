@@ -113,6 +113,9 @@ return [
         'custom_field' => 'حقل مخصص',
         'file_object' => 'ملف',
         'support_grant' => 'وصول الدعم',
+        'room' => 'قاعة',
+        'room_closure' => 'غلق قاعة',
+        'room_option' => 'نوع قاعة أو تجهيز',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

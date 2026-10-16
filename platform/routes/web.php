@@ -27,6 +27,9 @@ use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RoomClosureController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\RoomOptionController;
 use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingController;
@@ -332,6 +335,24 @@ Route::prefix('api')->group(function () {
                     Route::post('sites', [SiteController::class, 'store']);
                     Route::put('sites/{site}', [SiteController::class, 'update']);
                     Route::post('sites/{site}/archive', [SiteController::class, 'archive']);
+                });
+                // FR-SLL-02: rooms, their closures, and the school's lists of room types and equipment.
+                Route::middleware('permission:referential.node.read')->group(function () {
+                    Route::get('rooms', [RoomController::class, 'index']);
+                    Route::get('rooms/{room}', [RoomController::class, 'show']);
+                    Route::get('rooms/{room}/closures', [RoomClosureController::class, 'index']);
+                    Route::get('room-options', [RoomOptionController::class, 'index']);
+                });
+                Route::middleware('permission:room.room.manage')->group(function () {
+                    Route::post('rooms', [RoomController::class, 'store']);
+                    Route::put('rooms/{room}', [RoomController::class, 'update']);
+                    Route::post('rooms/{room}/archive', [RoomController::class, 'archive']);
+                    Route::post('rooms/{room}/closures', [RoomClosureController::class, 'store']);
+                    Route::post('room-closures/{closure}/cancel', [RoomClosureController::class, 'cancel']);
+                    Route::post('room-options', [RoomOptionController::class, 'store']);
+                    Route::post('room-options/defaults', [RoomOptionController::class, 'defaults']);
+                    Route::put('room-options/{option}', [RoomOptionController::class, 'update']);
+                    Route::post('room-options/{option}/archive', [RoomOptionController::class, 'archive']);
                 });
             });
         });

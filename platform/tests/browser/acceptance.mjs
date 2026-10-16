@@ -23,7 +23,7 @@ const screens = name => ({
 let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
-  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -149,10 +149,11 @@ async function signInSteps(page, kind, account) {
 }
 
 // Lot 2's records of the acceptance school, made once through the API by its administrator: a
-// year, a programme with a subject, a qualified teacher with their week, a day off, a contract and
-// a leave, leading a class, a pupil with a guardian in it. The lists then have rows, and the pupil's
-// sheet, the class's members, the programme's subjects and the teacher's qualifications,
-// availability, days off, contracts and leave are screens too.
+// year, a programme with a subject, a room with a closure, a qualified teacher with their week, a
+// day off, a contract and a leave, leading a class in that room, a pupil with a guardian in it. The
+// lists then have rows, and the pupil's sheet, the class's members, the programme's subjects, the
+// room's closures and the teacher's qualifications, availability, days off, contracts and leave are
+// screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -185,9 +186,14 @@ async function seed(browser, session) {
     // Their contract and a leave (FR-STF-04).
     await call(`staff/${teacher.id}/contracts`, { contract_type: 'permanent', reference: 'CDI-2020-014', valid_from: '2020-09-01', weekly_hours: '18' });
     await call(`staff/${teacher.id}/leaves`, { leave_type: 'annual', date_from: day(20), date_to: day(24), observation: 'Congé de printemps' });
-    // The class they lead (FR-GRP-01).
+    // A room of the site, closed for a few days (FR-SLL-02).
+    const room = await call('rooms', { site_id: site.id, code: 'A101', labels: { fr: 'Salle 101', ar: 'القاعة 101' }, capacity: 30,
+      room_type: 'CLASSROOM', equipment: ['PROJECTOR', 'WHITEBOARD'] });
+    await call(`rooms/${room.id}/closures`, { date_from: day(10), date_to: day(12), reason: 'Travaux de peinture' });
+    // The class they lead, in that room (FR-GRP-01).
     const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
-      labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active', lead_teacher_id: teacher.id });
+      labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active', lead_teacher_id: teacher.id,
+      main_room_id: room.id });
     const pupil = await call('students', { last_name_lat: 'Benali', first_name_lat: 'Amine', last_name_ar: 'بن علي', first_name_ar: 'أمين',
       birth_date: '2012-05-01', birth_place: 'Alger', gender: 'm', phone: '0550 12 34 56', address: '12 rue des Oliviers, Alger' });
     const guardian = await call('guardians', { last_name_lat: 'Benali', first_name_lat: 'Karim', last_name_ar: 'بن علي', first_name_ar: 'كريم',
@@ -210,7 +216,7 @@ async function seed(browser, session) {
     if (!sent.ok) throw new Error(`photo: HTTP ${sent.status} ${await sent.text()}`);
     const enrollment = await call('enrollments', { student_id: pupil.id, program_id: program.id, idempotency_key: crypto.randomUUID() });
     await call(`groups/${group.id}/memberships`, { enrollment_id: enrollment.id });
-    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id };
+    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id };
   });
   await context.close();
   return records;
@@ -224,7 +230,7 @@ async function run(browser) {
     for (const [kind, prefix, pages] of [['admin', 'school', [...schoolPages, `student-sheet?student=${records.pupil}`, `group-members?group=${records.group}`,
       `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
       `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`,
-      `staff-leaves?staff=${records.teacher}`]], ['operator', 'console', consolePages]]) {
+      `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();

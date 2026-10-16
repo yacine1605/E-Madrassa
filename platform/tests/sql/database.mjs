@@ -2547,6 +2547,100 @@ await check('a member of staff\'s reference from a file is theirs alone and neve
   assert.equal(await count('SELECT count(*) n FROM school.staff WHERE id = $1', [member]), 0);
   assert.deepEqual((await first("SELECT reason FROM school.audit_log WHERE object_type = 'staff' AND object_id = $1 AND action = 'DELETE'", [member])).reason, 'import_rollback');
 });
+// Rooms (SQL 037, FR-SLL-02): a site's rooms with their type, equipment and state among the school's lists, dated closures, a group's main room.
+const ROOM = 'INSERT INTO school.room (tenant_id, site_id, code, labels, capacity, room_type, equipment) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, equipment';
+const room = async (site, code, capacity = 30, type = 'CLASSROOM', equipment = []) =>
+  first(ROOM, [a, site, code, JSON.stringify({ fr: 'Salle ' + code, ar: 'قاعة ' + code }), capacity, type, equipment]);
+const CLOSURE = 'INSERT INTO school.room_closure (tenant_id, room_id, date_from, date_to, reason) VALUES ($1, $2, $3, $4, $5) RETURNING id';
+await check('a room has its type and equipment among the school\'s lists, given with the module, and a code unique on its site (FR-SLL-02)', async () => {
+  // The publisher's lists, given to the school with its sites and rooms module.
+  assert.deepEqual((await sql("SELECT kind, count(*)::int AS n FROM school.room_option WHERE tenant_id = $1 GROUP BY kind ORDER BY kind", [a])).rows,
+    [{ kind: 'equipment', n: 6 }, { kind: 'room_type', n: 5 }]);
+  const lab = await room(siteA, 'LABO-1', 24, 'LAB', ['PROJECTOR', 'LAB_BENCHES', 'PROJECTOR']);
+  assert.deepEqual(lab.equipment, ['LAB_BENCHES', 'PROJECTOR']);
+  await rejects(ROOM, [a, siteA, 'LABO-1', '{"fr": "Autre"}', 10, 'LAB', []], '23505');
+  assert.ok((await room(staffSiteB, 'LABO-1')).id, 'the same code on another site');
+  await rejects(ROOM, [a, siteA, 'S-0', '{"fr": "Vide"}', 0, 'CLASSROOM', []], '23514');
+  await rejects(ROOM, [a, siteA, 'S-1', '{"fr": "Piscine"}', 10, 'POOL', []], '23514', 'room_option_unknown');
+  await rejects(ROOM, [a, siteA, 'S-1', '{"fr": "Salle"}', 10, 'CLASSROOM', ['TELESCOPE']], '23514', 'room_option_unknown');
+  await rejects("UPDATE school.room SET code = 'LABO-2' WHERE id = $1", [lab.id], '42501');
+  // The school adds to its lists and archives an entry: new rooms no longer take it, those that have it keep it.
+  const music = (await first("INSERT INTO school.room_option (tenant_id, kind, code, labels) VALUES ($1, 'room_type', 'MUSIC', '{\"fr\": \"Salle de musique\", \"ar\": \"قاعة موسيقى\"}') RETURNING id", [a])).id;
+  const studio = await room(siteA, 'MUS-1', 15, 'MUSIC');
+  await sql('UPDATE school.room_option SET archived_at = now() WHERE id = $1', [music]);
+  await rejects(ROOM, [a, siteA, 'MUS-2', '{"fr": "Musique"}', 15, 'MUSIC', []], '23514', 'room_option_unknown');
+  await sql('UPDATE school.room SET capacity = 18 WHERE id = $1', [studio.id]);
+  await rejects("UPDATE school.room_option SET labels = '{\"fr\": \"Musique\"}' WHERE id = $1", [music], '23514', 'room_option_archived');
+  await rejects("UPDATE school.room_option SET code = 'SONG' WHERE id = $1", [music], '42501');
+  // An archived room stays as it is; the lists are the whole school's to change.
+  await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [studio.id]);
+  await rejects('UPDATE school.room SET capacity = 20 WHERE id = $1', [studio.id], '23514', 'room_archived');
+  const local = await scopedAccount('internal', 'site', [staffSiteB], ['referential.node.read', 'room.room.manage']);
+  await as('school_runtime', a, local.user);
+  assert.ok((await room(staffSiteB, 'ANNEXE-1')).id);
+  await rejects(ROOM, [a, siteA, 'ANNEXE-1', '{"fr": "Ailleurs"}', 10, 'CLASSROOM', []], '42501');
+  assert.equal((await sql('UPDATE school.room SET capacity = 99 WHERE id = $1', [lab.id])).rowCount ?? 0, 0, 'another site\'s room');
+  await rejects("INSERT INTO school.room_option (tenant_id, kind, code, labels) VALUES ($1, 'equipment', 'PIANO', '{\"fr\": \"Piano\"}')", [a], '42501');
+  await as('school_runtime', a, 1);
+});
+await check('a room closed or unavailable takes no session on those days; a closure is cancelled until its last day (FR-SLL-02 AC2)', async () => {
+  const hall = (await room(siteA, 'AMPHI-1', 120, 'AMPHI')).id;
+  const [day, later] = [await dayAfter(today, 3), await dayAfter(today, 5)];
+  const available = async on => (await first('SELECT school.room_available($1, $2::date) AS ok', [hall, on])).ok;
+  assert.equal(await available(day), true);
+  const works = (await first(CLOSURE, [a, hall, day, later, 'Travaux de peinture'])).id;
+  assert.deepEqual([await available(day), await available(later), await available(await dayAfter(later, 1))], [false, false, true]);
+  await rejects(CLOSURE, [a, hall, later, await dayAfter(later, 2), 'Autres travaux'], '23514', 'room_closure_overlap');
+  await rejects(CLOSURE, [a, hall, yesterday, today, 'Hier'], '23514', 'room_closure_past');
+  await rejects(CLOSURE, [a, hall, later, day, 'A l\'envers'], '23514', 'room_closure_end_before_start');
+  await rejects("UPDATE school.room_closure SET date_to = date_to + 1 WHERE id = $1", [works], '42501');
+  await sql("UPDATE school.room_closure SET status = 'cancelled' WHERE id = $1", [works]);
+  assert.equal(await available(day), true);
+  // Unavailable for repairs: no new session, any day.
+  await sql("UPDATE school.room SET status = 'unavailable' WHERE id = $1", [hall]);
+  assert.equal(await available(day), false);
+  await sql("UPDATE school.room SET status = 'active' WHERE id = $1", [hall]);
+  // A closure whose days are gone stays as it is.
+  await as(null);
+  await sql('ALTER TABLE school.room_closure DISABLE TRIGGER USER');
+  const past = (await first("INSERT INTO school.room_closure (tenant_id, room_id, date_from, date_to, reason, created_at, updated_at) VALUES ($1, $2, current_date - 5, current_date - 3, 'Passée', now(), now()) RETURNING id", [a, hall])).id;
+  await sql('ALTER TABLE school.room_closure ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.room_closure SET status = 'cancelled' WHERE id = $1", [past], '23514', 'room_closure_ended');
+});
+await check('a group\'s main room is on its site, available when named and never smaller than the group; a site with rooms in use stays (FR-GRP-01, FR-SLL-02 AC1, FR-SLL-01)', async () => {
+  const program = await programme('SALLES');
+  const small = (await room(siteA, 'PETITE', 20)).id;
+  const big = (await room(siteA, 'GRANDE', 30)).id;
+  const elsewhere = (await room(staffSiteB, 'LOIN', 40)).id;
+  const twentyFive = await group('SALLE-25', program, 25);
+  const named = room => sql('UPDATE school.study_group SET main_room_id = $2 WHERE id = $1', [twentyFive, room]);
+  // AC1: a room of 20 places for a group of 25 is a capacity conflict.
+  await rejects('UPDATE school.study_group SET main_room_id = $2 WHERE id = $1', [twentyFive, small], '23514', 'room_too_small');
+  await rejects('UPDATE school.study_group SET main_room_id = $2 WHERE id = $1', [twentyFive, elsewhere], '23514', 'room_other_site');
+  await named(big);
+  // Whichever changes: the group grows past its room, the room shrinks below its group.
+  await rejects('UPDATE school.study_group SET capacity = 31 WHERE id = $1', [twentyFive], '23514', 'room_too_small');
+  await sql('UPDATE school.study_group SET capacity = 30 WHERE id = $1', [twentyFive]);
+  await rejects('UPDATE school.room SET capacity = 29 WHERE id = $1', [big], '23514', 'room_too_small');
+  await rejects('UPDATE school.room SET archived_at = now() WHERE id = $1', [big], '23514', 'room_in_use');
+  // An unavailable room is named no more; the group that has it keeps it.
+  await sql("UPDATE school.room SET status = 'unavailable' WHERE id = $1", [big]);
+  const other = await group('SALLE-10', program, 10);
+  await rejects('UPDATE school.study_group SET main_room_id = $2 WHERE id = $1', [other, big], '23514', 'room_unavailable');
+  await sql('UPDATE school.study_group SET labels = $2 WHERE id = $1', [twentyFive, JSON.stringify({ fr: 'Groupe renommé' })]);
+  await sql("UPDATE school.room SET status = 'active' WHERE id = $1", [big]);
+  // FR-SLL-01: a site with a room in use is not archived.
+  const annex = (await first("INSERT INTO school.site (tenant_id, code, labels) VALUES ($1, 'ROOMS-C', '{\"fr\": \"Annexe des salles\"}') RETURNING id", [a])).id;
+  const last = (await room(annex, 'C-1')).id;
+  await rejects('UPDATE school.site SET archived_at = now() WHERE id = $1', [annex], '23514', 'site_has_rooms');
+  await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [last]);
+  await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [annex]);
+  await rejects(ROOM, [a, annex, 'C-2', '{"fr": "Salle"}', 10, 'CLASSROOM', []], '23514', 'site_archived');
+});
+// The rooms above leave the school's sites free to be archived (FR-SLL-01).
+await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
+await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
 // The last-site concurrency test below expects the school's two sites of before.
 await as(null);
 await sql('UPDATE school.site SET archived_at = now() WHERE id = $1', [staffSiteB]);
@@ -3056,6 +3150,25 @@ if (PgClient) {
     assert.equal(await count('SELECT count(*) n FROM school.staff_contract WHERE staff_id = $1', [member.id]), 1);
     assert.equal(await count('SELECT count(*) n FROM school.staff_leave WHERE staff_id = $1', [member.id]), 1);
     assert.equal(await count('SELECT count(*) n FROM school.unavailability WHERE staff_id = $1', [member.id]), 1);
+  });
+  await check('two overlapping closures of a room made at once are recorded once (FR-SLL-02)', async () => {
+    await as('school_runtime', a, 1);
+    const hall = (await first(ROOM, [a, siteA, 'COURSE-1', '{"fr": "Course"}', 30, 'CLASSROOM', []])).id;
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async c => {
+      await c.query('BEGIN');
+      try {
+        await c.query(CLOSURE, [a, hall, tomorrow, tomorrow, 'Travaux']);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'room_closure_overlap');
+    assert.equal(await count('SELECT count(*) n FROM school.room_closure WHERE room_id = $1', [hall]), 1);
+    // Its site free to be archived again (FR-SLL-01).
+    await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [hall]);
   });
   await check('two uploads at once never pass the storage quota together (FR-PLT-02)', async () => {
     await as(null);

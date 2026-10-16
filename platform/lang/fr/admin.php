@@ -114,6 +114,9 @@ return [
         'custom_field' => 'Champ personnalisé',
         'file_object' => 'Fichier',
         'support_grant' => 'Accès du support',
+        'room' => 'Salle',
+        'room_closure' => 'Fermeture d’une salle',
+        'room_option' => 'Type de salle ou équipement',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

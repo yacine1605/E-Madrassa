@@ -38,6 +38,8 @@ final class DatabaseErrors
         'self_approval', 'approval_required',
         'contract_overlap', 'contract_end_required', 'contract_end_before_start', 'contract_end_later', 'contract_started',
         'leave_overlap', 'leave_end_before_start', 'leave_ended', 'leave_kept', 'unavailability_from_leave',
+        'room_option_unknown', 'room_option_archived', 'room_archived', 'room_in_use', 'room_too_small', 'room_other_site', 'room_unavailable',
+        'room_closure_past', 'room_closure_end_before_start', 'room_closure_overlap', 'room_closure_ended', 'site_has_rooms',
     ];
 
     public static function message(string $rule): string
