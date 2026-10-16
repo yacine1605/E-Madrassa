@@ -185,6 +185,9 @@ GRANT INSERT (tenant_id, enrollment_id, kind, target_enrollment_id, amount, reas
 GRANT UPDATE (status, decision_reason, method_code, paid_on, external_ref, version) ON school.refund TO school_runtime;
 GRANT INSERT (carried_from_refund_id) ON school.payment TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.request_refund(uuid, text, uuid, numeric, text, uuid), school.next_refund_reference(uuid) TO school_runtime;
+-- Receipts (051): issued once by their function, read with their payment or refund, never changed.
+GRANT SELECT ON school.receipt TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.issue_receipt(uuid, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -445,6 +448,11 @@ ALTER FUNCTION school.next_payment_reference(uuid) OWNER TO platform_provisioner
 GRANT SELECT ON school.refund TO platform_provisioner;
 GRANT SELECT, INSERT, UPDATE (last) ON school.refund_counter TO platform_provisioner;
 ALTER FUNCTION school.next_refund_reference(uuid) OWNER TO platform_provisioner;
+-- Receipts (051): numbered from their counter, their content read from the payment, the refund, the pupil and the school.
+GRANT SELECT, INSERT ON school.receipt TO platform_provisioner;
+GRANT SELECT, INSERT, UPDATE (last) ON school.receipt_counter TO platform_provisioner;
+ALTER FUNCTION platform.balance_at(uuid, uuid, timestamptz) OWNER TO platform_provisioner;
+ALTER FUNCTION school.issue_receipt(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.enable_module(uuid, text) OWNER TO platform_provisioner;

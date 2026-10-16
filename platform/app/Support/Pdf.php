@@ -18,21 +18,27 @@ final class Pdf
     /**
      * @param string $view a view under resources/views/pdf
      * @param string $reference the document's number, fixed by the caller when it is issued
+     * @param array{identity?: array, generated?: \DateTimeInterface, watermark?: string} $options a document frozen when issued (a receipt) prints
+     *        the school's identity and the time of then; a copy of it, its watermark (« duplicata »)
      * @return string the PDF itself
      */
-    public function render(string $view, array $data, string $locale, string $reference, string $title, string $format = 'A4'): string
+    public function render(string $view, array $data, string $locale, string $reference, string $title, string $format = 'A4', array $options = []): string
     {
         $rtl = $locale === 'ar';
         if (!is_dir(storage_path('app/mpdf'))) mkdir(storage_path('app/mpdf'), 0700, true);
         $mpdf = new Mpdf(['mode' => 'utf-8', 'format' => $format, 'default_font' => 'dejavusans', 'tempDir' => storage_path('app/mpdf'),
             'autoScriptToLang' => true, 'autoLangToFont' => true, 'margin_top' => 30, 'margin_bottom' => 18, 'margin_header' => 8, 'margin_footer' => 8]);
         $mpdf->SetDirectionality($rtl ? 'rtl' : 'ltr');
-        $identity = $this->identity();
-        $generated = now()->timezone('Africa/Algiers');
+        $identity = [...$this->identity(), ...($options['identity'] ?? [])];
+        $generated = \Illuminate\Support\Carbon::instance($options['generated'] ?? now())->timezone('Africa/Algiers');
         $mpdf->SetTitle($title.' '.$reference);
         $mpdf->SetAuthor($identity['name']);
         $mpdf->SetCreator('Madrassa');
         $mpdf->SetSubject($reference);
+        if (isset($options['watermark'])) {
+            $mpdf->SetWatermarkText($options['watermark'], 0.08);
+            $mpdf->showWatermarkText = true;
+        }
         $mpdf->SetHTMLHeader(view('pdf.header', ['identity' => $identity, 'rtl' => $rtl])->render());
         $digits = $identity['arabic_digits'];
         $mpdf->SetHTMLFooter(view('pdf.footer', ['reference' => $reference, 'generated' => Formats::dateTime($generated, $locale, $digits),

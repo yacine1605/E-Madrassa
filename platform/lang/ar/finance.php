@@ -93,4 +93,6 @@ return [
     'refund_approvals' => 'استردادات للموافقة',
     'refund_approvals_help' => 'الاستردادات والترحيلات التي طلبتها المالية. لا يمكن لطالبها الموافقة عليها.',
     'no_refund_approval' => 'لا شيء للموافقة',
+    'receipt' => 'الوصل',
+    'open_receipt' => 'فتح الوصل',
 ];

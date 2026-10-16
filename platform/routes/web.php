@@ -28,6 +28,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\QualificationController;
+use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RefundController;
 use App\Http\Controllers\RetentionController;
@@ -336,6 +337,10 @@ Route::prefix('api')->group(function () {
                 Route::post('payments/{payment}/cancel', [PaymentController::class, 'cancel'])->middleware('permission:finance.payment.create,finance.payment.create.delegated');
                 Route::post('payments/{payment}/validate', [PaymentController::class, 'validatePayment'])->middleware('permission:finance.payment.validate');
                 Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->middleware('permission:finance.payment.reverse');
+                // FR-FIN-05: a receipt, issued by its first download, a duplicate afterwards.
+                Route::get('payments/{payment}/receipt', [ReceiptController::class, 'payment'])
+                    ->middleware('permission:finance.payment.read,finance.payment.validate,finance.payment.create,finance.payment.create.delegated');
+                Route::get('refunds/{refund}/receipt', [ReceiptController::class, 'refund'])->middleware('permission:finance.payment.read,finance.refund.request');
                 // FR-FIN-04: refunds and carry-overs, asked by the finance, approved by the direction, then executed.
                 Route::get('refunds', [RefundController::class, 'index'])->middleware('permission:finance.payment.read,finance.refund.request,finance.refund.approve');
                 Route::post('enrollments/{enrollment}/refunds', [RefundController::class, 'store'])->middleware('permission:finance.refund.request');

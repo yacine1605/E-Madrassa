@@ -32,6 +32,7 @@ return [
         ],
         'finance' => [
             'payment' => ['methods' => ['cash' => 'Espèces', 'cheque' => 'Chèque', 'transfer' => 'Virement', 'ccp' => 'CCP', 'card' => 'Carte', 'other' => 'Autre']],
+            'receipt' => ['locale' => ['fr' => 'Français', 'ar' => 'Arabe']],
         ],
     ],
 
@@ -134,6 +135,7 @@ return [
         'payment_schedule' => 'Échéancier d’une inscription',
         'payment' => 'Paiement d’une inscription',
         'refund' => 'Remboursement d’une inscription',
+        'receipt' => 'Reçu',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

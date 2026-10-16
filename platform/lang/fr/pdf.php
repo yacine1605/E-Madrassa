@@ -11,4 +11,13 @@ return [
     'amount' => 'Montant',
     'total' => 'Total',
     'rows' => ':count ligne(s)',
+    'payment_receipt' => 'Reçu de paiement',
+    'refund_receipt' => 'Reçu de remboursement',
+    'duplicate' => 'DUPLICATA',
+    'pupil' => 'Élève',
+    'program' => 'Programme',
+    'payment_line' => 'Paiement',
+    'refund_line' => 'Remboursement',
+    'balance_after' => 'Reste à payer après cette opération',
+    'credit_after' => 'Crédit après cette opération',
 ];

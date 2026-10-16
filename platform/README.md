@@ -1142,10 +1142,32 @@ Routes, behind the `student_finance` module: `GET /api/refunds`, `POST /api/enro
 
 Validation on 16 October 2026: **272 PHP integration tests (11,517 assertions), 240 embedded SQL checks and 262 native PostgreSQL 16 checks including concurrency**; migration 050 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 204 screens without a problem, Refunds to approve and the refunds on an enrolment's Finance included. The CI could not start (the GitHub account's billing).
 
+## Increment 65 (lot 3): receipts
+
+**FR-FIN-05** (SQL 051) on the common PDF service (FR-PDF-01).
+
+- **One receipt** per validated payment and per executed refund (`school.issue_receipt`), issued by its first download: numbered `REC-{year}-{six digits}` from a locked counter, so that receipts issued at the same moment never share a number (AC1, native check), and one payment printed twice at once has one receipt.
+- **Frozen content**, written by the base when it is issued: the school's identity, the pupil and their matricule, the programme, the payment's or refund's reference, amount, means, outside reference and date, a refund's reason, and **what is left to pay just after it** (or the credit), computed at the moment the payment was validated or the refund executed (`platform.balance_at`). A later payment changes nothing in it; nothing changes it, nothing deletes it.
+- **Printed again**: the same receipt, its content and time of then, marked « DUPLICATA » and watermarked. `App\Support\Pdf::render` takes, for a document frozen when issued, the identity and the time to print and a watermark.
+- **Language**: the school's setting `finance.receipt.locale` (French by default, or Arabic), fixed on the receipt when it is issued. In Arabic, letters joined and amounts left to right (AC2, TST-17).
+- Whoever reads the payment or the refund reads its receipt; the cash desk prints the receipt of a payment it recorded once validated. The enrolment's **Finance** screen links each validated payment's and executed refund's receipt.
+
+Routes: `GET /api/payments/{payment}/receipt`, `GET /api/refunds/{refund}/receipt`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-05 AC1 | tests/sql (native): four printings of two payments at once, two receipts with two numbers |
+| FR-FIN-05 AC2, TST-17 | `ReceiptTest`: an Arabic receipt read back by pdftotext, letters in their joined forms, amounts in order |
+| Frozen, duplicate | `ReceiptTest`, tests/sql: the balance after the payment kept after a later payment; the second printing marked DUPLICATA with the same number |
+| Validated only | `ReceiptTest`, tests/sql: a waiting payment's or an unexecuted refund's receipt refused (`receipt_not_validated`) |
+
+Validation on 16 October 2026: **273 PHP integration tests (11,619 assertions), 241 embedded SQL checks and 264 native PostgreSQL 16 checks including concurrency**; migration 051 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 204 screens without a problem. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Receipts of payments and refunds (FR-FIN-05), with a payment's optional supporting document.
-2. Arrears (FR-FIN-06), the period's close (FR-FIN-07, which will refuse a payment or a refund dated in a closed period).
+1. Arrears (FR-FIN-06): open balances and overdue instalments, controlled export, reminders without automatic sanction.
+2. The period's close (FR-FIN-07): refuses a payment, a validation or a refund dated in a closed period; reopening motivated and approved; reconciliation report.
+3. A payment's optional supporting document (FR-FIN-02), on the files' service.
 
 ## Next increments of lot 2
 

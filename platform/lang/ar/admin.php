@@ -32,6 +32,7 @@ return [
         ],
         'finance' => [
             'payment' => ['methods' => ['cash' => 'نقدًا', 'cheque' => 'صك', 'transfer' => 'تحويل', 'ccp' => 'الحساب البريدي الجاري', 'card' => 'بطاقة', 'other' => 'أخرى']],
+            'receipt' => ['locale' => ['fr' => 'الفرنسية', 'ar' => 'العربية']],
         ],
     ],
 
@@ -133,6 +134,7 @@ return [
         'payment_schedule' => 'جدول أقساط تسجيل',
         'payment' => 'دفعة تسجيل',
         'refund' => 'استرداد تسجيل',
+        'receipt' => 'وصل',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

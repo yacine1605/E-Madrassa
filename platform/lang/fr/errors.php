@@ -133,6 +133,7 @@ return [
     'refund_target_invalid' => 'Le report se fait vers une autre inscription ouverte du même élève.',
     'refund_execution_incomplete' => 'Indiquez le moyen et la date du remboursement.',
     'credit_exceeded' => 'On ne conserve pas plus que le crédit de l’inscription (ce qui est payé au-delà du dû).',
+    'receipt_not_validated' => 'Un reçu s’établit pour un paiement validé ou un remboursement exécuté.',
     'photo_invalid' => 'Choisissez une photo au format JPEG, PNG ou WebP.',
     'photo_too_large' => 'La photo dépasse 2 Mo. Choisissez une image plus légère.',
     'photo_dimensions' => 'Cette image a trop de pixels (16 millions au plus). Réduisez-la avant de l’envoyer.',

@@ -137,7 +137,7 @@ final class EnrollmentFinance extends SchoolingPage
     public function paymentsInfolist(Schema $schema): Schema
     {
         return $schema->components([Section::make(__('finance.payments'))->description(__('finance.payments_help'))->schema([RepeatableEntry::make('payments')->hiddenLabel()
-            ->columns(['default' => 2, 'sm' => 5])->placeholder(__('finance.no_payment'))
+            ->columns(['default' => 2, 'sm' => 6])->placeholder(__('finance.no_payment'))
             ->state(array_map(fn (array $row) => [
                 'reference' => $row['reference'].($row['kind'] === 'reversal' ? ' · '.__('finance.reversal_of', ['reference' => $row['reverses_reference']]) : ''),
                 'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
@@ -147,17 +147,19 @@ final class EnrollmentFinance extends SchoolingPage
                     $row['self_validated'] ? __('finance.self_validated') : null, $row['reason'] ? Formats::isolated($row['reason']) : null,
                     $row['cancel_reason'] ? Formats::isolated($row['cancel_reason']) : null])),
                 'by' => Formats::list(array_filter([Formats::isolated($row['author']).($row['delegated'] ? ' ('.__('finance.delegated').')' : ''),
-                    $row['validator'] ? Formats::isolated($row['validator']) : null]))], $this->finance()['payments']))
+                    $row['validator'] ? Formats::isolated($row['validator']) : null])),
+                // FR-FIN-05: a validated payment's receipt, issued by its first download.
+                'receipt' => $row['kind'] === 'payment' && $row['validated_at'] ? url('/api/payments/'.$row['id'].'/receipt') : null], $this->finance()['payments']))
             ->schema([TextEntry::make('reference')->label(__('finance.reference')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('paid')->label(__('finance.paid_on')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by'))])])]);
+                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry()])])]);
     }
 
     /** The refunds and carry-overs, newest first, with their decision and execution. */
     public function refundsInfolist(Schema $schema): Schema
     {
         return $schema->components([Section::make(__('finance.refunds'))->description(__('finance.refunds_help'))->schema([RepeatableEntry::make('refunds')->hiddenLabel()
-            ->columns(['default' => 2, 'sm' => 5])->placeholder(__('finance.no_refund'))
+            ->columns(['default' => 2, 'sm' => 6])->placeholder(__('finance.no_refund'))
             ->state(array_map(fn (array $row) => [
                 'kind' => __('finance.refund_kinds.'.$row['kind']).($row['target_program'] ? ' · '.$row['target_program'] : ''),
                 'amount' => $this->money($row['amount']),
@@ -166,10 +168,18 @@ final class EnrollmentFinance extends SchoolingPage
                     $row['method_code'] ? __('finance.methods.'.$row['method_code']) : null, $row['paid_on'] ? Formats::date($row['paid_on']) : null,
                     $row['decision_reason'] ? Formats::isolated($row['decision_reason']) : null])),
                 'by' => Formats::list(array_filter([Formats::isolated($row['author']), $row['decider'] ? Formats::isolated($row['decider']) : null,
-                    $row['executor'] ? Formats::isolated($row['executor']) : null]))], $this->finance()['refunds']))
+                    $row['executor'] ? Formats::isolated($row['executor']) : null])),
+                'receipt' => $row['kind'] === 'refund' && $row['status'] === 'executed' ? url('/api/refunds/'.$row['id'].'/receipt') : null], $this->finance()['refunds']))
             ->schema([TextEntry::make('kind')->label(__('finance.kind')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by'))])])]);
+                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry()])])]);
+    }
+
+    /** The receipt's link of a payment or a refund: the first opening issues it, the next ones print a duplicate. */
+    private function receiptEntry(): TextEntry
+    {
+        return TextEntry::make('receipt')->label(__('finance.receipt'))->formatStateUsing(fn () => __('finance.open_receipt'))
+            ->url(fn (?string $state) => $state, shouldOpenInNewTab: true)->color('primary');
     }
 
     /** The schedule in force, line by line. */

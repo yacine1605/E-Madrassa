@@ -93,4 +93,6 @@ return [
     'refund_approvals' => 'Remboursements à approuver',
     'refund_approvals_help' => 'Les remboursements et reports demandés par la finance. Leur demandeur ne peut pas les approuver.',
     'no_refund_approval' => 'Rien à approuver',
+    'receipt' => 'Reçu',
+    'open_receipt' => 'Ouvrir le reçu',
 ];

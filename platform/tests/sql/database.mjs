@@ -3245,6 +3245,53 @@ await check('a refund is asked, approved by someone else, then executed within w
   assert.equal(await count('SELECT count(*) n FROM school.refund WHERE enrollment_id = $1', [e]), 0);
   await as('school_runtime', a, 1);
 });
+// Receipts (SQL 051, FR-FIN-05): one per validated payment or executed refund, numbered once, content frozen.
+const ISSUE = 'SELECT id, issued FROM school.issue_receipt($1, $2)';
+await check('a validated payment and an executed refund each get one receipt, numbered once, its content frozen (FR-FIN-05)', async () => {
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'finance.refund.request', 'enrollment.enrollment.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'finance.refund.approve', 'enrollment.enrollment.read']);
+  await as('school_runtime', a, 1);
+  const e = await enroll((await newAdult('Recu', 'Nour')).id, await programme('RECU', 80000));
+  await as('school_runtime', a, accountant.user);
+  const id = (await first(RECORD, [e, '30000', 'today', 'cheque', 'CHQ 77', false, uuid()])).id;
+  await rejects(ISSUE, [id, null], '23514', 'receipt_not_validated');
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [id]);
+  await as('school_runtime', a, accountant.user);
+  const issued = await first(ISSUE, [id, null]);
+  assert.equal(issued.issued, true);
+  const again = await first(ISSUE, [id, null]);
+  assert.deepEqual([again.id, again.issued], [issued.id, false], 'printed again, the same receipt');
+  const receipt = await first('SELECT number, locale, content FROM school.receipt WHERE id = $1', [issued.id]);
+  assert.match(receipt.number, /^REC-\d{4}-\d{6}$/);
+  assert.equal(receipt.locale, 'fr');
+  assert.deepEqual([receipt.content.amount, receipt.content.balance_after, receipt.content.method_code, receipt.content.external_ref, receipt.content.program.code],
+    ['30000.00', '50000.00', 'cheque', 'CHQ 77', 'RECU']);
+  // Frozen: a later payment changes nothing in it; nothing changes it.
+  const later = (await first(RECORD, [e, '10000', 'today', 'cash', null, false, uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [later]);
+  await as('school_runtime', a, accountant.user);
+  const second = await first(ISSUE, [later, null]);
+  assert.notEqual((await first('SELECT number FROM school.receipt WHERE id = $1', [second.id])).number, receipt.number);
+  assert.equal((await first('SELECT content FROM school.receipt WHERE id = $1', [second.id])).content.balance_after, '40000.00');
+  assert.equal((await first('SELECT content FROM school.receipt WHERE id = $1', [issued.id])).content.balance_after, '50000.00');
+  await rejects("UPDATE school.receipt SET locale = 'ar' WHERE id = $1", [issued.id], '42501');
+  // A refund's receipt, once executed.
+  const refund = (await first('SELECT school.request_refund($1, $2, $3, $4, $5, $6) AS id', [e, 'refund', null, '5000', 'Désistement partiel', uuid()])).id;
+  await rejects(ISSUE, [null, refund], '23514', 'receipt_not_validated');
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.refund SET status = 'approved' WHERE id = $1", [refund]);
+  await as('school_runtime', a, accountant.user);
+  await sql("UPDATE school.refund SET status = 'executed', method_code = 'cash', paid_on = current_date WHERE id = $1", [refund]);
+  const refundReceipt = await first(ISSUE, [null, refund]);
+  assert.equal((await first('SELECT content FROM school.receipt WHERE id = $1', [refundReceipt.id])).content.kind, 'refund');
+  // Whoever reads no payment issues and reads no receipt.
+  await as('school_runtime', a, 4);
+  await rejects(ISSUE, [id, null], '42501', 'permission_denied');
+  assert.equal(await count('SELECT count(*) n FROM school.receipt WHERE id = $1', [issued.id]), 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -3873,6 +3920,37 @@ if (PgClient) {
     await as('school_runtime', a, cashier.user);
     assert.equal(await count('SELECT count(*) n FROM school.payment WHERE enrollment_id = $1', [e]), 2);
     assert.equal(await count('SELECT count(DISTINCT reference) n FROM school.payment WHERE enrollment_id = $1', [e]), 2);
+    await as('school_runtime', a, 1);
+  });
+  await check('receipts issued at the same moment never share a number; one payment printed twice at once has one receipt (FR-FIN-05 AC1)', async () => {
+    const accountant = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'finance.payment.validate', 'enrollment.enrollment.read']);
+    const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'enrollment.enrollment.read']);
+    await as('school_runtime', a, 1);
+    const e = await enroll((await newAdult('Course', 'Recu')).id, await programme('COURSE-REC', 100000));
+    const ids = [];
+    for (const amount of ['10000', '20000']) {
+      await as('school_runtime', a, accountant.user);
+      const id = (await first(RECORD, [e, amount, 'today', 'cash', null, false, uuid()])).id;
+      await as('school_runtime', a, validator.user);
+      await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [id]);
+      ids.push(id);
+    }
+    const clients = await Promise.all([0, 1, 2, 3].map(() => connect('school_runtime', a, accountant.user)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        const row = (await c.query(ISSUE, [ids[i % 2], null])).rows[0];
+        await c.query('SELECT pg_sleep(0.1)');
+        await c.query('COMMIT');
+        return row.id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.deepEqual(results.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+    assert.equal(results[0].value, results[2].value);
+    assert.equal(results[1].value, results[3].value);
+    await as('school_runtime', a, accountant.user);
+    assert.equal(await count('SELECT count(DISTINCT number) n FROM school.receipt WHERE payment_id = ANY ($1::uuid[])', [ids]), 2);
     await as('school_runtime', a, 1);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {

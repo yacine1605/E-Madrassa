@@ -49,7 +49,7 @@ final class DatabaseErrors
         'adjustment_exceeds_due', 'adjustment_decided', 'schedule_invalid', 'schedule_sum_mismatch',
         'payment_exceeds_balance', 'payment_future_date', 'payment_method_unknown', 'payment_immutable', 'payment_not_author',
         'payment_not_reversible', 'payment_reference_exhausted', 'payment_carried', 'refund_exceeds_paid', 'refund_not_approved', 'refund_decided',
-        'refund_target_invalid', 'refund_execution_incomplete', 'credit_exceeded',
+        'refund_target_invalid', 'refund_execution_incomplete', 'credit_exceeded', 'receipt_not_validated',
     ];
 
     public static function message(string $rule): string
