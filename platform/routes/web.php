@@ -11,6 +11,7 @@ use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\FinancePeriodController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuardianController;
@@ -350,6 +351,11 @@ Route::prefix('api')->group(function () {
                 Route::post('refunds/{refund}/approve', [RefundController::class, 'approve'])->middleware('permission:finance.refund.approve');
                 Route::post('refunds/{refund}/reject', [RefundController::class, 'reject'])->middleware('permission:finance.refund.approve');
                 Route::post('refunds/{refund}/execute', [RefundController::class, 'execute'])->middleware('permission:finance.refund.request');
+                // FR-FIN-07: a past month closed with its reconciliation; reopened with a reason by someone else.
+                Route::get('finance-periods', [FinancePeriodController::class, 'index'])->middleware('permission:finance.payment.read,finance.period.close,finance.period.reopen');
+                Route::get('finance-periods/reconciliation', [FinancePeriodController::class, 'reconciliation'])->middleware('permission:finance.payment.read,finance.period.close');
+                Route::post('finance-periods', [FinancePeriodController::class, 'store'])->middleware('permission:finance.period.close');
+                Route::post('finance-periods/{period}/reopen', [FinancePeriodController::class, 'reopen'])->middleware('permission:finance.period.reopen');
             });
 
             // FR-STF-01: the staff's records, with or without an account (P7).

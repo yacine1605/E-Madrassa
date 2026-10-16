@@ -150,7 +150,7 @@ final class PseudoLocalizationTest extends TestCase
         }
         foreach (['home', 'accounts', 'roles', 'assignments', 'choose-school', 'credentials', 'reference-types', 'reference-nodes', 'subjects', 'years', 'periods',
             'custom-fields', 'settings', 'support-access', 'journal', 'tasks', 'notifications', 'deliveries', 'imports', 'exports', 'sites', 'activation', 'recovery',
-            'programs', 'groups', 'students', 'guardians', 'enrollments', 'leads', 'lead-options', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears'] as $page) {
+            'programs', 'groups', 'students', 'guardians', 'enrollments', 'leads', 'lead-options', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods'] as $page) {
             $data = array_map(fn ($text) => trim((string) $text, self::PUNCTUATION), $data);
             $unmarked = array_values(array_diff($this->visibleTexts($this->get('/school/'.$page)->assertOk()->getContent()), $data));
             $this->assertSame([], $unmarked, "Text outside the catalogs on /school/$page.");

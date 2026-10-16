@@ -3331,6 +3331,92 @@ await check('the arrears add up to what is owed less what is paid; the overdue i
   assert.deepEqual([notice.data.day, notice.data.counts], ['2026-02-22', { after_7: 1 }]);
   await as('school_runtime', a, 1);
 });
+// The financial period's close (SQL 053, FR-FIN-07, BR-15): a past month closed with its reconciliation; nothing dated in it afterwards; reopened by someone else, with a reason.
+const CLOSE = 'SELECT school.close_period($1::date) AS id';
+await check('a closed month refuses what is dated in it, keeps its reconciliation and is reopened by someone else with a reason (FR-FIN-07 AC1, AC2)', async () => {
+  const accountant = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'finance.payment.reverse',
+    'finance.refund.request', 'finance.period.close', 'enrollment.enrollment.read']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.validate', 'finance.refund.approve', 'enrollment.enrollment.read']);
+  const director = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.period.close', 'finance.period.reopen']);
+  const sited = await scopedAccount('internal', 'site', [scopeSiteB], ['finance.payment.read', 'finance.period.close', 'finance.period.reopen']);
+  await as('school_runtime', a, 1);
+  const e = await enroll((await newAdult('Cloture', 'Imane')).id, await programme('CLOTURE', 100000));
+  await as('school_runtime', a, accountant.user);
+  const cash = (await first(RECORD, [e, '30000', '2025-03-10', 'cash', null, false, uuid()])).id;
+  const cheque = (await first(RECORD, [e, '20000', '2025-03-20', 'cheque', 'CHQ 9', false, uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [cash]);
+  await as('school_runtime', a, accountant.user);
+  const refund = (await first('SELECT school.request_refund($1, $2, $3, $4, $5, $6) AS id', [e, 'refund', null, '5000', 'Désistement partiel', uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.refund SET status = 'approved' WHERE id = $1", [refund]);
+  await as('school_runtime', a, accountant.user);
+  await sql("UPDATE school.refund SET status = 'executed', method_code = 'cash', paid_on = '2025-03-25' WHERE id = $1", [refund]);
+  // Read before its closure: what it holds and what still waits in it.
+  const preview = (await first("SELECT school.reconciliation('2025-03-05') AS r")).r;
+  assert.deepEqual([preview.payments_total, preview.refunds_total, preview.net, preview.pending, preview.closed], ['30000.00', '5000.00', '25000.00', 1, false]);
+  // Closed once ended, for the whole school, once nothing dated in it waits for its validation.
+  await rejects(CLOSE, ['today'], '23514', 'period_not_ended');
+  await rejects(CLOSE, ['2025-03-01'], '23514', 'period_has_pending');
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [cheque]);
+  await rejects(CLOSE, ['2025-03-01'], '42501', 'permission_denied');
+  await as('school_runtime', a, sited.user);
+  await rejects(CLOSE, ['2025-03-01'], '42501', 'permission_denied');
+  await as('school_runtime', a, accountant.user);
+  const closed = (await first(CLOSE, ['2025-03-17'])).id;
+  await rejects(CLOSE, ['2025-03-01'], '23514', 'period_closed');
+  const period = await first('SELECT period_start::text AS start, period_end::text AS end, status, report FROM school.finance_period WHERE id = $1', [closed]);
+  assert.deepEqual([period.start, period.end, period.status], ['2025-03-01', '2025-03-31', 'closed']);
+  // The reconciliation: the month's validated payments by means, its refunds, what came in net.
+  assert.deepEqual([period.report.payments, period.report.payments_total, period.report.refunds, period.report.refunds_total, period.report.net],
+    [{ cash: { count: 1, amount: '30000.00' }, cheque: { count: 1, amount: '20000.00' } }, '50000.00', { cash: { count: 1, amount: '5000.00' } }, '5000.00', '45000.00']);
+  // AC1: nothing recorded, moved or validated with a date in it; a correction goes through a reversal dated today.
+  await rejects(RECORD, [e, '1000', '2025-03-15', 'cash', null, false, uuid()], '23514', 'period_closed');
+  const pending = (await first(RECORD, [e, '1000', 'today', 'cash', null, false, uuid()])).id;
+  await rejects("UPDATE school.payment SET paid_on = '2025-03-15' WHERE id = $1", [pending], '23514', 'period_closed');
+  await sql("UPDATE school.payment SET paid_on = '2025-04-15' WHERE id = $1", [pending]);
+  const second = (await first('SELECT school.request_refund($1, $2, $3, $4, $5, $6) AS id', [e, 'refund', null, '1000', 'Erreur de caisse', uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.refund SET status = 'approved' WHERE id = $1", [second]);
+  await as('school_runtime', a, accountant.user);
+  await rejects("UPDATE school.refund SET status = 'executed', method_code = 'cash', paid_on = '2025-03-31' WHERE id = $1", [second], '23514', 'period_closed');
+  const reversal = (await first('SELECT school.reverse_payment($1, $2, $3) AS id', [cheque, 'Chèque rejeté', uuid()])).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payment SET status = 'validated' WHERE id = $1", [reversal]);
+  assert.equal((await first('SELECT status FROM school.payment WHERE id = $1', [cheque])).status, 'reversed', 'the payment of the closed month reversed, its date kept');
+  // A closure never changes, nor goes; whoever reads no payment reads none.
+  await as('school_runtime', a, director.user);
+  await rejects("UPDATE school.finance_period SET report = '{}' WHERE id = $1", [closed], '42501');
+  await rejects('DELETE FROM school.finance_period WHERE id = $1', [closed], '42501');
+  await as('school_runtime', a, 4);
+  assert.equal(await count('SELECT count(*) n FROM school.finance_period WHERE id = $1', [closed]), 0);
+  await rejects("SELECT school.reconciliation('2025-03-01')", [], '42501', 'permission_denied');
+  // AC2: reopened by `finance.period.reopen` only, with its reason, journalled; never by whoever closed it.
+  await as('school_runtime', a, accountant.user);
+  assert.equal((await sql("UPDATE school.finance_period SET status = 'reopened', reopen_reason = 'Erreur' WHERE id = $1", [closed])).rowCount ?? 0, 0);
+  await as('school_runtime', a, director.user);
+  assert.equal((await first('SELECT status FROM school.finance_period WHERE id = $1', [closed])).status, 'closed');
+  await as('school_runtime', a, director.user);
+  await rejects("UPDATE school.finance_period SET status = 'reopened', reopen_reason = '   ' WHERE id = $1", [closed], '23514', 'reason_required');
+  await sql("UPDATE school.finance_period SET status = 'reopened', reopen_reason = 'Chèque du 20 mars mal daté' WHERE id = $1", [closed]);
+  const reopened = await first('SELECT status, reopened_by::int AS by, reopened_at IS NOT NULL AS dated FROM school.finance_period WHERE id = $1', [closed]);
+  assert.deepEqual([reopened.status, reopened.by, reopened.dated], ['reopened', Number(director.user), true]);
+  await as(null);
+  const entry = await first("SELECT actor_id::int AS actor, after FROM school.audit_log WHERE object_type = 'finance_period' AND object_id = $1 AND action = 'UPDATE'", [closed]);
+  assert.deepEqual([entry.actor, entry.after.status, entry.after.reopen_reason], [Number(director.user), 'reopened', 'Chèque du 20 mars mal daté']);
+  await as('school_runtime', a, director.user);
+  await rejects("UPDATE school.finance_period SET status = 'closed' WHERE id = $1", [closed], '23514', 'immutable_record');
+  // Reopened, the month takes its dates again; closed again, the former closure kept.
+  await as('school_runtime', a, accountant.user);
+  const late = (await first(RECORD, [e, '1000', '2025-03-28', 'cash', null, false, uuid()])).id;
+  await sql("UPDATE school.payment SET status = 'cancelled', cancel_reason = 'Doublon' WHERE id = $1", [late]);
+  await as('school_runtime', a, director.user);
+  const again = (await first(CLOSE, ['2025-03-01'])).id;
+  assert.equal(await count("SELECT count(*) n FROM school.finance_period WHERE tenant_id = $1 AND period_start = '2025-03-01'", [a]), 2);
+  await rejects("UPDATE school.finance_period SET status = 'reopened', reopen_reason = 'Encore' WHERE id = $1", [again], '23514', 'segregation_of_duties');
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -3990,6 +4076,25 @@ if (PgClient) {
     assert.equal(results[1].value, results[3].value);
     await as('school_runtime', a, accountant.user);
     assert.equal(await count('SELECT count(DISTINCT number) n FROM school.receipt WHERE payment_id = ANY ($1::uuid[])', [ids]), 2);
+    await as('school_runtime', a, 1);
+  });
+  await check('a month closed while a payment dated in it is recorded: never both (FR-FIN-07 AC1)', async () => {
+    const closer = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.period.close']);
+    const cashier = await scopedAccount('internal', 'tenant', null, ['finance.payment.read', 'finance.payment.create', 'enrollment.enrollment.read']);
+    await as('school_runtime', a, 1);
+    const e = await enroll((await newAdult('Course', 'Cloture')).id, await programme('COURSE-CLO', 100000));
+    const clients = [await connect('school_runtime', a, closer.user), await connect('school_runtime', a, cashier.user)];
+    const results = await Promise.allSettled([[CLOSE, ['2025-05-01']], [RECORD, [e, '1000', '2025-05-10', 'cash', null, false, uuid()]]].map(async ([s, p], i) => {
+      await clients[i].query('BEGIN');
+      try {
+        await clients[i].query(s, p);
+        await clients[i].query('SELECT pg_sleep(0.15)');
+        await clients[i].query('COMMIT');
+      } catch (err) { await clients[i].query('ROLLBACK'); throw err; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.ok(['period_closed', 'period_has_pending'].includes(results.find(r => r.status === 'rejected').reason.message));
     await as('school_runtime', a, 1);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {

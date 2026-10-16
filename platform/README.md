@@ -1185,10 +1185,30 @@ Route: `GET /api/arrears`. Screen: **Arrears** in the Finance section.
 
 Validation on 16 October 2026: **274 PHP integration tests (11,756 assertions), 242 embedded SQL checks and 265 native PostgreSQL 16 checks including concurrency**; migration 052 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 208 screens without a problem, Arrears included. The CI could not start (the GitHub account's billing).
 
+## Increment 67 (lot 3): the financial period's close
+
+**FR-FIN-07**, **BR-15** (SQL 053).
+
+- **Closure**: a past month, for the whole school, by `finance.period.close` held for the whole school (`school.close_period`), once no payment or reversal dated in it waits for its validation (`period_has_pending`); never the month in progress (`period_not_ended`), once at a time (`period_closed`). Its **reconciliation** is written with it and never changes: the validated payments dated in it by means (the carried-over ones apart), the reversals and the executed refunds dated in it, the carry-overs between enrolments, and what came in net (payments − reversals − refunds). Read before closing (`school.reconciliation`), with what still waits in the month.
+- **AC1**: afterwards nothing is recorded, moved, validated or executed with a date in it (`period_closed`): a payment dated in it, a waiting payment moved into it, a validation, a refund executed on a day of it. A correction goes through a linked operation in the open period: a reversal is dated the day it is asked for, and the payment it reverses keeps its date. The check sits in the payments' and refunds' triggers, behind a lock the closure takes: a month closed while a payment dated in it is recorded never takes both.
+- **AC2**: reopened by `finance.period.reopen` (the direction) for the whole school, with its reason (`reason_required`), never by whoever closed it (`segregation_of_duties`, sod rule `finance_period`); who and when are recorded, and the journal keeps the change. Reopened, the month takes its dates again until it is closed again; the former closure stays beside the new one. A closure is never deleted.
+
+Routes: `GET /api/finance-periods`, `GET /api/finance-periods/reconciliation?month=`, `POST /api/finance-periods`, `POST /api/finance-periods/{period}/reopen`. Screen: **Closures** in the Finance section: the closed months, their net and reconciliation; *Close a month* shows the month's reconciliation before closing; *Reopen* for the direction.
+
+| Requirement | Evidence |
+|---|---|
+| FR-FIN-07 AC1 | `FinancePeriodTest`, tests/sql: a payment dated in a closed month refused; a waiting payment moved into it, a refund executed on a day of it refused; a reversal of today accepted, its payment reversed |
+| FR-FIN-07 AC1, concurrency | tests/sql native: a closure and a payment dated in the month at the same moment, never both |
+| FR-FIN-07 AC2 | `FinancePeriodTest`, tests/sql: reopened by the direction with its reason, journalled; refused without reason, to the accountant, to whoever closed it |
+| Reconciliation | `FinancePeriodTest`, tests/sql: payments by means, refunds, net, written with the closure and read before it |
+| Conditions | `FinancePeriodTest`, tests/sql: refused while a payment waits, for the month in progress, twice, for a reader of one site |
+
+Validation on 16 October 2026: **275 PHP integration tests (11,959 assertions), 243 embedded SQL checks and 267 native PostgreSQL 16 checks including concurrency**; migration 053 rolled back alone, then with all the others, and applied again; local browser acceptance in Chromium: 212 screens without a problem, Closures included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. The period's close (FR-FIN-07): refuses a payment, a validation or a refund dated in a closed period; reopening motivated and approved; reconciliation report.
-2. A payment's optional supporting document (FR-FIN-02), on the files' service.
+1. A payment's optional supporting document (FR-FIN-02), on the files' service.
+2. Expenses (FR-DEP-01 to 03): categories, entry and validation, linked corrections; the closed months apply to them.
 
 ## Next increments of lot 2
 
