@@ -55,4 +55,15 @@ return [
     'roll_statuses' => ['present' => 'Présent', 'absent' => 'Absent', 'late' => 'En retard', 'excused' => 'Excusé'],
     'roll_history' => 'Historique',
     'no_roll_change' => 'Aucune modification.',
+    // FR-PRE-01: the absence alerts (SQL 073).
+    'absence_alerts' => 'Alertes d’absence',
+    'absence_alerts_help' => 'Un élève absent sans justification :threshold fois au cours des :days derniers jours déclenche une alerte quand l’absence qui atteint le seuil est enregistrée ; les retards et les absences excusées ne comptent pas. Il n’est de nouveau signalé qu’après une nouvelle période entière. Seuil et période se règlent dans les paramètres de l’école.',
+    'no_absence_threshold' => 'Aucun seuil d’absences : l’école l’a mis à 0 dans ses paramètres.',
+    'no_absence_alert' => 'Aucune alerte d’absence',
+    'alert_day' => 'Atteint le',
+    'alert_window' => 'du :from au :to',
+    'pupil' => 'Élève',
+    'absences' => 'Absences',
+    'alert_absences' => ':absences absences (seuil :threshold)',
+    'see_absence_alerts' => 'Voir les alertes d’absence',
 ];

@@ -24,11 +24,11 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes', 'timetable-versions', 'teacher-attendance', 'delivered-hours', 'roll-call', 'finance-dashboard', 'operations-dashboard'];
+  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes', 'timetable-versions', 'teacher-attendance', 'delivered-hours', 'roll-call', 'absence-alerts', 'finance-dashboard', 'operations-dashboard'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
-const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|account|console|errors|validation|messages|formats|exports|pdf|mail|payroll)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
+const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|account|console|errors|validation|messages|formats|exports|pdf|mail|payroll|planning|attendance|dashboard)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
 
 const failures = [];
 const report = [];

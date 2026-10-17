@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AbsenceAlertController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountLinkController;
 use App\Http\Controllers\ArrearsController;
@@ -594,6 +595,11 @@ Route::prefix('api')->group(function () {
                     Route::get('class-sessions/{session}/roll-call', [RollCallController::class, 'show']);
                     Route::post('class-sessions/{session}/roll-call', [RollCallController::class, 'store']);
                     Route::get('class-sessions/{session}/roll-call/history', [RollCallController::class, 'history']);
+                });
+                // FR-PRE-01: the absence alerts (SQL 073), for whoever corrects the group's rolls or leads it.
+                Route::middleware('permission:attendance.student.entry.update')->group(function () {
+                    Route::get('absence-alerts', [AbsenceAlertController::class, 'index']);
+                    Route::get('absence-alerts/rule', [AbsenceAlertController::class, 'rule']);
                 });
                 // FR-PTG-03: the hours delivered by the validated attendance.
                 Route::get('delivered-hours', [DeliveredHoursController::class, 'index'])->middleware('permission:hours.validated.read,payroll.run.generate');

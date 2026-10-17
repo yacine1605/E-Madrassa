@@ -4782,6 +4782,83 @@ await check('a roll calls the pupils the group had that day, by its own teacher 
   assert.equal(await count('SELECT count(*) n FROM school.student_attendance WHERE session_id = $1', [session]), 0);
   await as('school_runtime', a, 1);
 });
+// Absence thresholds (SQL 073, FR-PRE-01): absences without excuse over the last days; one alert at the threshold, told to the group's followers.
+await check('a pupil absent without excuse as often as the threshold over the window raises one alert, told to the group\'s followers (FR-PRE-01)', async () => {
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read', 'group.group.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
+  const supervisor = await scopedAccount('internal', 'tenant', null, ['student.record.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
+  const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['attendance.student.entry.update']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Seuil', 'Rania')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const taught = await programme('ALERT', 90000, 'active', planned.year);
+  await line(taught, maths, { weekly: 10, from: await dayAfter(today, -30) });
+  const followed = await planGroup('PLAN-AL', taught, 10);
+  const days = (await sql(`SELECT d::date::text AS d FROM generate_series(current_date - 1, current_date - 20, interval '-1 day') d
+    WHERE school.day_open(d::date, $1) ORDER BY d LIMIT 4`, [siteA])).rows.map(r => r.d);
+  assert.equal(days.length, 4);
+  const pupils = [];
+  for (const name of ['Amine', 'Lina']) {
+    const pupil = (await newAdult('Seuil', name)).id;
+    await joinGroup(await enroll(pupil, taught), followed);
+    pupils.push(pupil);
+  }
+  // In the group since before the sessions, which its teacher leads.
+  await as(null);
+  await sql('ALTER TABLE school.group_membership DISABLE TRIGGER USER');
+  await sql('UPDATE school.group_membership SET valid_from = $2::date WHERE group_id = $1', [followed, await dayAfter(days[0], -7)]);
+  await sql('ALTER TABLE school.group_membership ENABLE TRIGGER USER');
+  await sql('ALTER TABLE school.study_group DISABLE TRIGGER USER');
+  await sql('UPDATE school.study_group SET lead_teacher_id = $2 WHERE id = $1', [followed, teacher]);
+  await sql('ALTER TABLE school.study_group ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  const sessions = [];
+  for (const day of days) sessions.push((await first(SESSION, [a, followed, maths, teacher, null, day, '08:00', '08:50'])).id);
+  const MARK = 'INSERT INTO school.student_attendance (tenant_id, session_id, student_id, status) VALUES ($1, $2, $3, $4) RETURNING id';
+  const alerts = () => count('SELECT count(*) n FROM school.absence_alert WHERE group_id = $1', [followed]);
+  // Two absences, a late arrival, an excused absence: below the threshold (3 in 30 days by default).
+  await as('school_runtime', a, teacherAccount.user);
+  for (const [session, amine, lina] of [[0, 'absent', 'late'], [1, 'absent', 'excused']]) {
+    await first(MARK, [a, sessions[session], pupils[0], amine]);
+    await first(MARK, [a, sessions[session], pupils[1], lina]);
+  }
+  await as(null);
+  assert.equal(await alerts(), 0);
+  // The third: one alert, over the last 30 days, today's included.
+  await as('school_runtime', a, teacherAccount.user);
+  const third = await first(MARK, [a, sessions[2], pupils[0], 'absent']);
+  await first(MARK, [a, sessions[2], pupils[1], 'absent']);
+  await as(null);
+  const local = (await first('SELECT school.local_day(now())::text AS d')).d;
+  const alert = await first('SELECT id, student_id, attendance_id, absences, threshold, from_day::text AS from_day, to_day::text AS to_day FROM school.absence_alert WHERE group_id = $1', [followed]);
+  assert.deepEqual(alert, { id: alert.id, student_id: pupils[0], attendance_id: third.id, absences: 3, threshold: 3,
+    from_day: await dayAfter(local, -29), to_day: local });
+  // Told to the group's followers, the supervisor and its lead teacher; not to whoever corrects another site's rolls.
+  const told = user => count("SELECT count(*) n FROM school.notification WHERE user_id = $1 AND event = 'attendance.absence_threshold' AND data ->> 'alert' = $2", [user, alert.id]);
+  assert.deepEqual([await told(supervisor.user), await told(teacherAccount.user), await told(elsewhere.user)], [1, 1, 0]);
+  // A fourth absence within the window: no second alert. A late arrival corrected to an absence counts: Lina's third.
+  await as('school_runtime', a, teacherAccount.user);
+  await first(MARK, [a, sessions[3], pupils[0], 'absent']);
+  await first(MARK, [a, sessions[3], pupils[1], 'absent']);
+  await as(null);
+  assert.equal(await alerts(), 1);
+  await as('school_runtime', a, teacherAccount.user);
+  await sql("UPDATE school.student_attendance SET status = 'absent' WHERE session_id = $1 AND student_id = $2", [sessions[0], pupils[1]]);
+  await as(null);
+  assert.deepEqual((await sql('SELECT student_id, absences FROM school.absence_alert WHERE group_id = $1 ORDER BY created_at', [followed])).rows,
+    [{ student_id: pupils[0], absences: 3 }, { student_id: pupils[1], absences: 3 }]);
+  // Never changed; written by the database alone.
+  await as('school_runtime', a, 1);
+  await rejects('UPDATE school.absence_alert SET absences = 1 WHERE id = $1', [alert.id], '42501');
+  await rejects('INSERT INTO school.absence_alert (tenant_id, student_id, group_id, attendance_id, absences, threshold, from_day, to_day) VALUES ($1, $2, $3, $4, 1, 1, $5, $5)',
+    [a, pupils[0], followed, third.id, local], '42501');
+  // Read by the group's followers: the lead teacher and the supervisor; not by another site's reader.
+  for (const [user, n] of [[teacherAccount.user, 2], [supervisor.user, 2], [elsewhere.user, 0]]) {
+    await as('school_runtime', a, user);
+    assert.equal(await count('SELECT count(*) n FROM school.absence_alert WHERE group_id = $1', [followed]), n);
+  }
+  await as('school_runtime', a, 1);
+});
 // The finance dashboard (SQL 069, FR-TDB-01, TST-16): each figure the sum of its operations; a salary payout never counted twice.
 await check('the finance dashboard\'s figures equal their source operations, month by month; a payout is never counted twice (FR-TDB-01 AC1, AC2, TST-16)', async () => {
   await as('platform_admin', null, 6);
@@ -5475,8 +5552,9 @@ if (PgClient) {
     })();
     const five = await Promise.allSettled(clients.map((c, i) => at(c, [a, groups[i], maths, planned.teacher, rooms[i], day, '16:00', '17:00'])));
     assert.equal(five.filter(r => r.status === 'fulfilled').length, 1);
-    // The others refused by the check, or by the exclusion constraint when they ran side by side.
-    assert.ok(five.filter(r => r.status === 'rejected').every(r => r.reason.code === '23P01' || r.reason.message === 'session_teacher_busy'),
+    // The others refused by the check, or by the exclusion constraint when they ran side by side; under
+    // load, two waiting on each other's row end in a deadlock, refused as a conflict to retry (DatabaseErrors).
+    assert.ok(five.filter(r => r.status === 'rejected').every(r => ['23P01', '40P01'].includes(r.reason.code) || r.reason.message === 'session_teacher_busy'),
       five.map(r => r.reason?.message).join());
     // One pupil in two groups: two teachers, two rooms, the same hour.
     const two = await Promise.allSettled([at(clients[0], [a, planned.group, maths, planned.teacher, rooms[0], day, '17:00', '18:00']),

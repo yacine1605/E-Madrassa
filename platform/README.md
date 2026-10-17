@@ -1580,6 +1580,18 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 90 (lot 4): absence thresholds
+
+FR-PRE-01's thresholds, decided with the school on 17 October 2026:
+
+- **The rule**, two school settings (« Paramètres de l'école »): `attendance.absence_threshold` absences without excuse over the last `attendance.absence_window_days` days, 3 in 30 by default; 0 sets no threshold. Late arrivals and excused absences do not count, nor a session cancelled since.
+- **The alert**: the database raises it when the mark that reaches the threshold is saved, a mark corrected to an absence too (`school.check_absence_threshold`, SQL 073), with the absences counted, the window and the threshold then; one per pupil and window, never changed.
+- **Who is told**: a notification (`attendance.absence_threshold`, in the application, by email if they want it) to whoever corrects the group's rolls for the whole school or on its site, and to its lead teacher; the notification opens « Alertes d'absence », the alerts they may read, the latest first, a pupil whose record they do not read unnamed. `GET /api/absence-alerts`, `GET /api/absence-alerts/rule`.
+
+The guardians are told next, by email (increment 91) and WhatsApp (increment 92), each when the school turns it on.
+
+Validation on 17 October 2026: **306 PHP integration tests (16,055 assertions)**; **268 embedded SQL checks and 299 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 864 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 89 (lot 4): the planning by month
 
 FR-PLN-04's monthly view:
@@ -1628,8 +1640,9 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. Absence thresholds the school sets, and the pupils' guardians told by their contacts when one is crossed (FR-PRE-01).
-2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
+1. The guardians told of an absence alert by email, when the school turns it on (FR-PRE-01).
+2. And by WhatsApp, through the WhatsApp Business Platform, when the school turns it on and its account is set up (FR-PRE-01).
+3. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
 
 ## Next increments of lot 2
 

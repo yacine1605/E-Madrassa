@@ -305,6 +305,8 @@ GRANT SELECT ON school.student_attendance, school.student_attendance_change TO s
 GRANT INSERT (tenant_id, session_id, student_id, status, late_minutes, note) ON school.student_attendance TO school_runtime;
 GRANT UPDATE (status, late_minutes, note) ON school.student_attendance TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.roll_pupils(uuid) TO school_runtime;
+-- The absence alerts (073): read within the reader's rules, written by the database alone.
+GRANT SELECT ON school.absence_alert TO school_runtime;
 -- The finance dashboard (069): its figures summed from the operations by functions with their owner's rights, for `dashboard.finance.read`.
 GRANT EXECUTE ON FUNCTION school.finance_dashboard(date, date), school.program_profitability(date, date) TO school_runtime;
 -- A programme's expenses paid (071), for the result on the cash basis.
@@ -641,6 +643,10 @@ ALTER FUNCTION school.month_paid(uuid, date) OWNER TO platform_provisioner;
 GRANT SELECT, INSERT ON school.student_attendance_change TO platform_provisioner;
 ALTER FUNCTION school.record_student_attendance() OWNER TO platform_provisioner;
 ALTER FUNCTION school.roll_pupils(uuid) OWNER TO platform_provisioner;
+-- The absence alerts (073): counted over the pupil's marks, written and notified by the database.
+GRANT SELECT, INSERT ON school.absence_alert TO platform_provisioner;
+ALTER FUNCTION school.check_absence_threshold() OWNER TO platform_provisioner;
+ALTER FUNCTION school.absence_watchers(uuid, uuid) OWNER TO platform_provisioner;
 -- The finance dashboard (069): every operation of the school summed, whatever its reader may read of it.
 GRANT SELECT ON school.refund, school.payroll_run, school.payroll_payout TO platform_provisioner;
 ALTER FUNCTION school.finance_dashboard(date, date) OWNER TO platform_provisioner;

@@ -55,4 +55,15 @@ return [
     'roll_statuses' => ['present' => 'حاضر', 'absent' => 'غائب', 'late' => 'متأخر', 'excused' => 'غياب مبرَّر'],
     'roll_history' => 'السجل',
     'no_roll_change' => 'لا يوجد تعديل.',
+    // FR-PRE-01: the absence alerts (SQL 073).
+    'absence_alerts' => 'تنبيهات الغياب',
+    'absence_alerts_help' => 'التلميذ الغائب دون تبرير :threshold مرات خلال آخر :days يومًا يُطلق تنبيهًا عند تسجيل الغياب الذي يبلغ العتبة؛ ولا تُحتسب التأخرات ولا الغيابات المبرَّرة. ولا يُنبَّه إليه من جديد إلا بعد مدة كاملة أخرى. تُضبط العتبة والمدة في إعدادات المؤسسة.',
+    'no_absence_threshold' => 'لا توجد عتبة للغيابات: جعلتها المؤسسة 0 في إعداداتها.',
+    'no_absence_alert' => 'لا يوجد تنبيه غياب',
+    'alert_day' => 'بُلغت في',
+    'alert_window' => 'من :from إلى :to',
+    'pupil' => 'التلميذ',
+    'absences' => 'الغيابات',
+    'alert_absences' => ':absences غيابات (العتبة :threshold)',
+    'see_absence_alerts' => 'عرض تنبيهات الغياب',
 ];

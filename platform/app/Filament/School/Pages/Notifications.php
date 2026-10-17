@@ -62,6 +62,9 @@ final class Notifications extends SchoolPage implements HasTable
                 Action::make('group')->label(__('services.see_group'))->visible(fn (array $record) => isset($record['data']['group_id']))
                     ->url(fn (array $record) => GroupMembers::getUrl(['group' => $record['data']['group_id']])),
                 // FR-FIN-06: instalments falling due open the arrears.
+                // FR-PRE-01: a pupil reached the absence threshold; the alerts open.
+                Action::make('absences')->label(__('attendance.see_absence_alerts'))->visible(fn (array $record) => isset($record['data']['alert']))
+                    ->url(AbsenceAlerts::getUrl()),
                 Action::make('arrears')->label(__('finance.see_arrears'))->visible(fn (array $record) => isset($record['data']['arrears']))->url(Arrears::getUrl()),
                 Action::make('read')->label(__('services.mark_read'))->visible(fn (array $record) => !$record['read_at'] && SchoolScreen::writable(null))
                     ->action(fn (array $record) => SchoolScreen::change(null,
