@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // FR-PRE-01: the school's WhatsApp Business account, for the guardians' messages (DEPLOY.md).
+    'whatsapp' => [
+        'token' => env('WHATSAPP_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'template' => env('WHATSAPP_TEMPLATE', 'absence_alert'),
+        'version' => env('WHATSAPP_API_VERSION', 'v21.0'),
+    ],
+
 ];

@@ -1580,6 +1580,16 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 92 (lot 4): the guardians told by WhatsApp
+
+FR-PRE-01 is complete. Beside the email, as decided on 17 October 2026:
+
+- **When**: the school turns it on (`attendance.notify_guardians_whatsapp`, « Paramètres de l'école », off by default) and its WhatsApp Business account is set up (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, DEPLOY.md). A minor's absence alert then queues a message to each primary contact with a phone, on this channel, beside the email if that is on too (SQL 075).
+- **What**: the school's template approved by Meta (`absence_alert` by default, Utility category, in French and Arabic), sent in the school's language with six parameters: the pupil's first name, the absences, the window's first and last days, the school and its phone; the same words as the email (DEPLOY.md gives them).
+- **How**: `platform:guardian-messages` sends both channels, through Meta's Cloud API (`App\Support\WhatsApp`); a phone written nationally (0550 12 34 56) gets Algeria's code. A message that can never be sent fails at once with why (`guardian_phone_unusable` for a landline, `whatsapp_not_configured` without an account); one that the API refuses is tried again, five times at most. « Alertes d'absence » shows each message's state.
+
+Validation on 17 October 2026: **308 PHP integration tests (16,181 assertions)**; **268 embedded SQL checks and 299 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 864 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 91 (lot 4): the guardians told by email
 
 FR-PRE-01's notification to the guardians, as decided on 17 October 2026:
@@ -1650,8 +1660,7 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. The guardians told of an absence alert by WhatsApp, through the WhatsApp Business Platform, when the school turns it on and its account is set up (FR-PRE-01).
-2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
+1. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow; otherwise lot 5.
 
 ## Next increments of lot 2
 

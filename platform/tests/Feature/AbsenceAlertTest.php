@@ -7,7 +7,10 @@ use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use App\Mail\GuardianAbsenceMail;
+use App\Support\Formats;
+use App\Support\WhatsApp;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -18,7 +21,7 @@ use Tests\TestCase;
  * The absence thresholds (FR-PRE-01, SQL 073): a pupil absent without excuse as often as the
  * school's threshold within its window raises one alert, its group's followers notified; late
  * arrivals and excused absences do not count; no threshold, no alert. A minor's guardian is emailed
- * when the school turned it on (SQL 074); an adult's never.
+ * when the school turned it on (SQL 074), and sent its WhatsApp template (SQL 075); an adult's never.
  */
 final class AbsenceAlertTest extends TestCase
 {
@@ -193,6 +196,63 @@ final class AbsenceAlertTest extends TestCase
         // The alerts say who was told, and when.
         $this->within($s['school'], $karim, function () {
             Livewire::test(AbsenceAlerts::class)->assertSee(__('attendance.guardians_told'))->assertSee('E-mail envoyé le')->assertSee(__('attendance.no_message'));
+        });
+    }
+
+    public function test_a_minors_guardian_gets_the_schools_whatsapp_template_once_its_account_is_set_up(): void
+    {
+        Http::fake(['graph.facebook.com/*' => Http::sequence()->push(['messages' => [['id' => 'wamid.test']]])
+            ->push(['error' => ['message' => 'Recipient 213550123456 is not on the allowed list']], 400)]);
+        config(['services.whatsapp.token' => 'test-token', 'services.whatsapp.phone_number_id' => '1234567890',
+            'services.whatsapp.template' => 'absence_alert', 'services.whatsapp.version' => 'v21.0']);
+        $s = $this->setting();
+        // Two minors: Yasmine's mother on a mobile, Rania's father on a landline only.
+        $pupils = $guardians = [];
+        foreach ([['Yasmine', '0550 12 34 56'], ['Rania', '023 45 67 89']] as [$name, $phone]) {
+            $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'birth_date' => now()->subYears(12)->toDateString()])
+                ->assertCreated()->json('data.id');
+            $guardian = $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Parent '.$name, 'phone' => $phone])->assertCreated()->json('data.id');
+            $this->postJson("/api/students/$pupil/guardians", ['guardian_id' => $guardian, 'relationship' => 'mother', 'is_primary_contact' => true])->assertCreated();
+            $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
+                ->assertCreated()->json('data.id');
+            $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment])->assertCreated();
+            [$pupils[], $guardians[]] = [$pupil, $guardian];
+        }
+        [$sessions, $karim] = $this->sessions($s);
+        $this->set($s['school'], 'attendance.notify_guardians_whatsapp', true);
+        $this->signIn($karim)->assertOk();
+        foreach ([0, 1, 2] as $session) {
+            $this->postJson("/api/class-sessions/{$sessions[$session]}/roll-call", ['entries' => [['student_id' => $pupils[0], 'status' => 'absent'],
+                ['student_id' => $pupils[1], 'status' => 'absent']]])->assertOk();
+        }
+        // By WhatsApp only, as the school chose; the template sent once, to the mobile in international form.
+        $owner = DB::connection('owner');
+        $messages = $owner->table('school.guardian_message')->whereIn('guardian_id', $guardians)->orderBy('guardian_id')->get()->keyBy('guardian_id');
+        $this->assertSame(['whatsapp', 'whatsapp'], $messages->pluck('channel')->values()->all());
+        $this->artisan('platform:guardian-messages')->assertSuccessful();
+        $alert = $owner->table('school.absence_alert')->where('student_id', $pupils[0])->first();
+        $school = $owner->table('platform.tenant')->where('id', $s['school']->id)->value('name');
+        Http::assertSent(fn ($request) => $request->url() === 'https://graph.facebook.com/v21.0/1234567890/messages' && $request->hasHeader('Authorization', 'Bearer test-token')
+            && $request['to'] === '213550123456' && $request['type'] === 'template' && $request['template']['name'] === 'absence_alert'
+            && $request['template']['language']['code'] === 'fr' && array_column($request['template']['components'][0]['parameters'], 'text')
+                === ['Yasmine', '3', Formats::date($alert->from_day, 'fr'), Formats::date($alert->to_day, 'fr'), $school, '—']);
+        Http::assertSentCount(1);
+        // The landline: failed at once, never sent; and so would every message without an account.
+        $this->assertSame([['sent', null], ['failed', 'guardian_phone_unusable']], [
+            [$owner->table('school.guardian_message')->where('guardian_id', $guardians[0])->value('status'), $owner->table('school.guardian_message')->where('guardian_id', $guardians[0])->value('last_error')],
+            [$owner->table('school.guardian_message')->where('guardian_id', $guardians[1])->value('status'), $owner->table('school.guardian_message')->where('guardian_id', $guardians[1])->value('last_error')]]);
+        $this->assertSame(['213550123456', '213661223344', '33612345678', null, null],
+            array_map([WhatsApp::class, 'number'], ['0550 12 34 56', '+213 661 22 33 44', '0033 6 12 34 56 78', '023 45 67 89', 'abc']));
+        // Refused by the API: tried again later, its reason kept without the number.
+        $owner->table('school.guardian_message')->where('guardian_id', $guardians[0])->update(['status' => 'pending', 'next_attempt_at' => now()->subMinute()]);
+        $this->artisan('platform:guardian-messages')->assertSuccessful();
+        $refused = $owner->table('school.guardian_message')->where('guardian_id', $guardians[0])->first();
+        $this->assertSame('pending', $refused->status);
+        $this->assertStringContainsString('RequestException', $refused->last_error);
+        $this->assertStringNotContainsString('213550123456', $refused->last_error);
+        $owner->table('school.guardian_message')->where('guardian_id', $guardians[0])->update(['status' => 'sent', 'last_error' => null]);
+        $this->within($s['school'], $karim, function () {
+            Livewire::test(AbsenceAlerts::class)->assertSee('WhatsApp envoyé le')->assertSee('WhatsApp en échec');
         });
     }
 }

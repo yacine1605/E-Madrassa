@@ -310,6 +310,8 @@ GRANT SELECT ON school.absence_alert TO school_runtime;
 -- The guardians' messages (074): read with their alert; claimed and finished by the worker, across schools.
 GRANT SELECT ON school.guardian_message TO school_runtime;
 GRANT EXECUTE ON FUNCTION platform.claim_guardian_messages(text, integer, integer), platform.finish_guardian_message(uuid, text) TO school_runtime;
+-- A message that can never be sent (075), failed at once by the worker.
+GRANT EXECUTE ON FUNCTION platform.fail_guardian_message(uuid, text) TO school_runtime;
 -- The finance dashboard (069): its figures summed from the operations by functions with their owner's rights, for `dashboard.finance.read`.
 GRANT EXECUTE ON FUNCTION school.finance_dashboard(date, date), school.program_profitability(date, date) TO school_runtime;
 -- A programme's expenses paid (071), for the result on the cash basis.
@@ -655,6 +657,7 @@ GRANT SELECT, INSERT, UPDATE (status, attempts, next_attempt_at, locked_until, l
 ALTER FUNCTION school.tell_guardians() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.claim_guardian_messages(text, integer, integer) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finish_guardian_message(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.fail_guardian_message(uuid, text) OWNER TO platform_provisioner;
 -- The finance dashboard (069): every operation of the school summed, whatever its reader may read of it.
 GRANT SELECT ON school.refund, school.payroll_run, school.payroll_payout TO platform_provisioner;
 ALTER FUNCTION school.finance_dashboard(date, date) OWNER TO platform_provisioner;

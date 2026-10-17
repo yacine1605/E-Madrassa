@@ -4783,7 +4783,7 @@ await check('a roll calls the pupils the group had that day, by its own teacher 
   await as('school_runtime', a, 1);
 });
 // Absence thresholds (SQL 073, FR-PRE-01): absences without excuse over the last days; one alert at the threshold, told to the group's followers.
-await check('a pupil absent without excuse as often as the threshold over the window raises one alert, told to the group\'s followers, and to a minor\'s guardians when the school turned it on (FR-PRE-01)', async () => {
+await check('a pupil absent without excuse as often as the threshold over the window raises one alert, told to the group\'s followers, and to a minor\'s guardians by email or WhatsApp when the school turned it on (FR-PRE-01)', async () => {
   const teacherAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read', 'group.group.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
   const supervisor = await scopedAccount('internal', 'tenant', null, ['student.record.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
   const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['attendance.student.entry.update']);
@@ -4891,6 +4891,29 @@ await check('a pupil absent without excuse as often as the threshold over the wi
   await as('school_runtime', a, 1);
   await rejects("UPDATE school.guardian_message SET status = 'pending' WHERE id = $1", [queued[0].id], '42501');
   await sql("UPDATE school.setting SET value = 'false' WHERE tenant_id = $1 AND key = 'attendance.notify_guardians_email'", [a]);
+  // By WhatsApp instead (SQL 075): the primary contact's phone, on that channel only; failed at once when it can never be sent.
+  const sami = (await newPupil('Seuil', 'Sami')).id;
+  const father = await contact(sami);
+  const samiJoined = await joinGroup(await enroll(sami, taught), followed);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'attendance.notify_guardians_whatsapp', 'true')", [a]);
+  await as(null);
+  await sql('ALTER TABLE school.group_membership DISABLE TRIGGER USER');
+  await sql('UPDATE school.group_membership SET valid_from = $2::date WHERE id = $1', [samiJoined, await dayAfter(days[0], -7)]);
+  await sql('ALTER TABLE school.group_membership ENABLE TRIGGER USER');
+  await as('school_runtime', a, teacherAccount.user);
+  for (const session of sessions.slice(0, 3)) await first(MARK, [a, session, sami, 'absent']);
+  await as(null);
+  const byPhone = (await sql('SELECT id, channel FROM school.guardian_message WHERE guardian_id = $1', [father])).rows;
+  assert.deepEqual(byPhone.map(m => m.channel), ['whatsapp']);
+  await as('school_runtime', null, null);
+  const claimedPhone = (await sql("SELECT id, phone, first_name_lat FROM platform.claim_guardian_messages('whatsapp', 50, 60)")).rows.filter(r => r.id === byPhone[0].id);
+  assert.deepEqual(claimedPhone.map(r => [r.phone, r.first_name_lat]), [['0550 12 34 56', 'Sami']]);
+  await sql("SELECT platform.fail_guardian_message($1, 'whatsapp_not_configured')", [byPhone[0].id]);
+  await as(null);
+  assert.deepEqual(await first('SELECT status, attempts, last_error FROM school.guardian_message WHERE id = $1', [byPhone[0].id]),
+    { status: 'failed', attempts: 1, last_error: 'whatsapp_not_configured' });
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.setting SET value = 'false' WHERE tenant_id = $1 AND key = 'attendance.notify_guardians_whatsapp'", [a]);
 });
 // The finance dashboard (SQL 069, FR-TDB-01, TST-16): each figure the sum of its operations; a salary payout never counted twice.
 await check('the finance dashboard\'s figures equal their source operations, month by month; a payout is never counted twice (FR-TDB-01 AC1, AC2, TST-16)', async () => {

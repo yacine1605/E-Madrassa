@@ -64,6 +64,11 @@ x-application: &application
   MAIL_PASSWORD: ${MAIL_PASSWORD:-}
   MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@example.com}
   MAIL_FROM_NAME: Madrassa
+  # FR-PRE-01: the school's WhatsApp Business account; empty, no WhatsApp message is sent.
+  WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+  WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+  WHATSAPP_TEMPLATE: ${WHATSAPP_TEMPLATE:-absence_alert}
+  WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v21.0}
 
 services:
   # The schema, the roles' privileges and passwords, the files' bucket; then it stops.
