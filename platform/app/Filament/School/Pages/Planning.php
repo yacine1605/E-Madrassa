@@ -7,6 +7,7 @@ use App\Http\Controllers\SessionSeriesController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
+use App\Support\SessionLength;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
@@ -97,7 +98,7 @@ final class Planning extends SchoolingPage
                         Select::make('weekday')->label(__('planning.weekday'))->options(__('admin.days'))->required(),
                         Select::make('slot_id')->label(__('planning.slot'))->options(fn () => $this->options()['slots'])->live()->helperText(__('planning.slot_help')),
                         $this->timeField('start_time', 'planning.start')->required(fn (Get $get) => !$get('slot_id'))->visible(fn (Get $get) => !$get('slot_id')),
-                        $this->timeField('end_time', 'planning.end')->required(fn (Get $get) => !$get('slot_id'))->visible(fn (Get $get) => !$get('slot_id')),
+                        $this->endField()->visible(fn (Get $get) => !$get('slot_id')),
                         DatePicker::make('date_from')->label(__('planning.from'))->required()->live(),
                         DatePicker::make('date_to')->label(__('planning.until'))->required()->minDate(fn (Get $get) => $get('date_from'))])
                     ->action(fn (array $data) => SchoolScreen::change(null, fn () => SchoolScreen::call('schedule.session.create', SessionSeriesController::class, 'store',
@@ -223,7 +224,13 @@ final class Planning extends SchoolingPage
     private function sessionFields(): array
     {
         return [$this->teacherField(), $this->roomField(), DatePicker::make('day')->label(__('planning.day'))->required(),
-            $this->timeField('start_time', 'planning.start')->required(), $this->timeField('end_time', 'planning.end')->required()];
+            $this->timeField('start_time', 'planning.start')->required(), $this->endField()];
+    }
+
+    /** Left empty, the length of a session of its subject, else the school's (FR-PLN-01). */
+    private function endField(): TextInput
+    {
+        return $this->timeField('end_time', 'planning.end')->helperText(fn () => __('planning.end_help', ['minutes' => Formats::number(SessionLength::minutes())]));
     }
 
     private function sessionData(array $data): array

@@ -7,6 +7,7 @@ use App\Support\AcademicRecords;
 use App\Support\CurrentSchool;
 use App\Support\Paging;
 use App\Support\SessionConflicts;
+use App\Support\SessionLength;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -80,7 +81,7 @@ final class ClassSessionController
     /** What a session would conflict with, before planning or changing it. */
     public function check(Request $request)
     {
-        $data = $request->validate($this->rules() + ['group_id' => 'required|uuid', 'subject_id' => 'required|uuid', 'session_id' => 'nullable|uuid']);
+        $data = $this->timed($request->validate($this->rules() + ['group_id' => 'required|uuid', 'subject_id' => 'required|uuid', 'session_id' => 'nullable|uuid']));
         return ['data' => SessionConflicts::of($data['group_id'], $data['subject_id'], $data['teacher_id'], $data['room_id'] ?? null, $data['day'],
             $data['start_time'], $data['end_time'], $data['session_id'] ?? null)];
     }
@@ -88,7 +89,7 @@ final class ClassSessionController
     /** One session on its own; the warnings of its hours come with it. */
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules() + ['group_id' => 'required|uuid', 'subject_id' => 'required|uuid']);
+        $data = $this->timed($request->validate($this->rules() + ['group_id' => 'required|uuid', 'subject_id' => 'required|uuid']));
         $warnings = $this->warnings($data);
         $id = DB::selectOne("INSERT INTO school.class_session (tenant_id, group_id, subject_id, teacher_id, room_id, starts_at, ends_at)
             VALUES (?, ?, ?, ?, ?, school.local_at(?::date, ?::time), school.local_at(?::date, ?::time)) RETURNING id",
@@ -101,7 +102,7 @@ final class ClassSessionController
     public function update(Request $request, string $session)
     {
         $row = (object) $this->find($session);
-        $data = $request->validate($this->rules() + ['version' => 'required|integer|min:1']);
+        $data = $this->timed($request->validate($this->rules() + ['version' => 'required|integer|min:1']), $row);
         $this->records->version($row, (int) $data['version']);
         $warnings = $this->warnings([...$data, 'group_id' => $row->group_id, 'subject_id' => $row->subject_id], $row->id);
         $changed = DB::selectOne("UPDATE school.class_session SET teacher_id = ?, room_id = ?, starts_at = school.local_at(?::date, ?::time),
@@ -164,7 +165,14 @@ final class ClassSessionController
     private function rules(): array
     {
         return ['teacher_id' => 'required|uuid', 'room_id' => 'nullable|uuid', 'day' => 'required|date_format:Y-m-d',
-            'start_time' => ['required', 'string', 'regex:'.self::TIME], 'end_time' => ['required', 'string', 'regex:'.self::TIME]];
+            'start_time' => ['required', 'string', 'regex:'.self::TIME], 'end_time' => ['nullable', 'string', 'regex:'.self::TIME]];
+    }
+
+    /** Without its end, the length of a session of its subject (FR-PLN-01). */
+    private function timed(array $data, ?object $row = null): array
+    {
+        $data['end_time'] ??= SessionLength::end($data['start_time'], $row->group_id ?? $data['group_id'], $row->subject_id ?? $data['subject_id'], $data['day']);
+        return $data;
     }
 
     /** The warnings only: a blocking conflict is the database's to refuse on writing. */

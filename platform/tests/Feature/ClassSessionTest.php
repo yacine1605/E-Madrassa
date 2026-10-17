@@ -11,7 +11,8 @@ use Tests\TestCase;
 /**
  * Sessions (FR-PLN-02, FR-PLN-03, SQL 062) through their real routes: a weekly series over a term
  * with its closed days skipped, a session changed on its own leaving its series, the conflicts
- * refused by the database and the warnings told, a group's volume follow-up.
+ * refused by the database and the warnings told, a group's volume follow-up, a session given only
+ * its start lasting a session of its subject (FR-PLN-01).
  */
 final class ClassSessionTest extends TestCase
 {
@@ -116,5 +117,26 @@ final class ClassSessionTest extends TestCase
         DB::connection('console')->select('SELECT platform.disable_module(?, ?)', [$s['school']->id, 'attendance']);
         DB::connection('console')->select('SELECT platform.disable_module(?, ?)', [$s['school']->id, 'scheduling_manual']);
         $this->getJson("/api/class-sessions?from=$day&to=$day")->assertForbidden();
+    }
+
+    public function test_a_session_given_only_its_start_lasts_a_session_of_its_subject(): void
+    {
+        $s = $this->setting();
+        $day = $this->next(Carbon::WEDNESDAY);
+        $session = fn (string $start) => $this->postJson('/api/class-sessions', ['group_id' => $s['group'], 'subject_id' => $s['maths'], 'teacher_id' => $s['teacher'],
+            'room_id' => $s['room'], 'day' => $day, 'start_time' => $start]);
+        // FR-PLN-01: the school's hour, which the programme's maths took; then as the programme sets it; never past midnight.
+        $session('08:00')->assertCreated()->assertJsonPath('data.end_time', '09:00');
+        $line = $this->getJson("/api/programs/{$s['program']}/subjects")->assertOk()->json('data.0');
+        $this->putJson("/api/program-subjects/{$line['id']}", ['session_duration_minutes' => 90, 'version' => $line['version']])->assertOk();
+        $session('10:00')->assertCreated()->assertJsonPath('data.end_time', '11:30');
+        $session('22:30')->assertCreated()->assertJsonPath('data.end_time', '24:00');
+        $session('23:00')->assertUnprocessable()->assertJsonPath('code', 'session_spans_days');
+        // A series too, read before and planned; changed from a day on, the same.
+        $series = $this->series($s, ['weekday' => 1, 'start_time' => '14:00', 'end_time' => null, 'date_from' => $this->next(Carbon::MONDAY)]);
+        $this->assertSame([], array_filter(array_column($this->postJson('/api/session-series/check', $series)->assertOk()->json('data'), 'blocking')));
+        $planned = $this->postJson('/api/session-series', $series)->assertCreated()->assertJsonPath('data.end_time', '15:30')->json('data');
+        $this->postJson("/api/session-series/{$planned['id']}/change", ['from' => $series['date_from'], 'teacher_id' => $s['teacher'], 'room_id' => $s['room'],
+            'start_time' => '15:00', 'version' => $planned['version']])->assertOk()->assertJsonPath('data.end_time', '16:30');
     }
 }

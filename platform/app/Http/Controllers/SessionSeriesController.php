@@ -6,6 +6,7 @@ use App\Exceptions\Refusal;
 use App\Support\AcademicRecords;
 use App\Support\CurrentSchool;
 use App\Support\SessionConflicts;
+use App\Support\SessionLength;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -70,9 +71,10 @@ final class SessionSeriesController
     /** From a day on (today or later): its teacher, room and hours, for its sessions still planned and not changed on their own. */
     public function change(Request $request, string $series)
     {
-        $this->records->find('session_series', $series, columns: 'id');
+        $row = $this->records->find('session_series', $series, columns: 'id, group_id, subject_id');
         $data = $request->validate(['from' => 'required|date_format:Y-m-d', 'teacher_id' => 'required|uuid', 'room_id' => 'nullable|uuid',
-            'start_time' => ['required', 'string', 'regex:'.self::TIME], 'end_time' => ['required', 'string', 'regex:'.self::TIME], 'version' => 'required|integer|min:1']);
+            'start_time' => ['required', 'string', 'regex:'.self::TIME], 'end_time' => ['nullable', 'string', 'regex:'.self::TIME], 'version' => 'required|integer|min:1']);
+        $data['end_time'] ??= SessionLength::end($data['start_time'], $row->group_id, $row->subject_id, $data['from']);
         $changed = (int) DB::selectOne('SELECT school.change_series(?, ?::date, ?, ?, ?::time, ?::time, ?) AS n', [$series, $data['from'], $data['teacher_id'],
             $data['room_id'] ?? null, $data['start_time'], $data['end_time'], $data['version']])->n;
         return ['data' => $this->find($series), 'changed' => $changed];
@@ -103,14 +105,16 @@ final class SessionSeriesController
     {
         return $request->validate(['group_id' => 'required|uuid', 'subject_id' => 'required|uuid', 'teacher_id' => 'required|uuid', 'room_id' => 'nullable|uuid',
             'weekday' => 'required|integer|min:0|max:6', 'slot_id' => 'nullable|uuid', 'start_time' => ['required_without:slot_id', 'nullable', 'string', 'regex:'.self::TIME],
-            'end_time' => ['required_without:slot_id', 'nullable', 'string', 'regex:'.self::TIME], 'date_from' => 'required|date_format:Y-m-d',
+            'end_time' => ['nullable', 'string', 'regex:'.self::TIME], 'date_from' => 'required|date_format:Y-m-d',
             'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from']);
     }
 
-    /** The hours: the slot's when one is named, still offered. */
+    /** The hours: the slot's when one is named, still offered; without an end, the length of a session of its subject (FR-PLN-01). */
     private function hours(array $data): array
     {
-        if (!($data['slot_id'] ?? null)) return [$data['start_time'], $data['end_time']];
+        if (!($data['slot_id'] ?? null)) {
+            return [$data['start_time'], $data['end_time'] ?? SessionLength::end($data['start_time'], $data['group_id'], $data['subject_id'], $data['date_from'])];
+        }
         $slot = DB::selectOne("SELECT to_char(start_time, 'HH24:MI') AS s, CASE WHEN end_time = '24:00' THEN '24:00' ELSE to_char(end_time, 'HH24:MI') END AS e
             FROM school.time_slot WHERE tenant_id = ? AND id = ? AND archived_at IS NULL", [$this->school->id(), $data['slot_id']]);
         if (!$slot) throw Refusal::of('time_slot_archived');

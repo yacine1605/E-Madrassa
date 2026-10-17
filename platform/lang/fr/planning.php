@@ -31,6 +31,7 @@ return [
     'duration' => 'Durée',
     'minutes' => ':n min',
     'time_help' => 'Heures et minutes, par exemple 08:00 ; 24:00 pour minuit en fin de journée.',
+    'end_help' => 'Vide : le début plus la durée d’une séance de la matière dans le programme, à défaut celle de l’école (:minutes min) ; 24:00 pour minuit en fin de journée.',
     'add_slot' => 'Ajouter un créneau',
     'archive_slot_help' => 'Il n’est plus proposé pour les nouvelles séances ; celles déjà planifiées gardent leurs heures.',
     'no_slot' => 'Aucun créneau',
