@@ -1,15 +1,15 @@
 # Revue du lot 4 : exploitation
 
-Le lot 4 couvre le planning manuel et ses conflits, les remplacements, le pointage des enseignants, l'appel des élèves et les tableaux de bord (FR-PLN-, FR-PTG-, FR-PRE-01, FR-TDB-). Ses critères de sortie (SRS 1.2, plan de livraison) sont :
+Le lot 4 couvre le planning manuel et ses conflits, les remplacements, le pointage des enseignants, l'appel des élèves et les tableaux de bord (FR-PLN-\*, FR-PTG-\*, FR-PRE-01, FR-TDB-\*). Ses critères de sortie (SRS 1.2, plan de livraison) sont :
 
 1. `TST-05`, `TST-15` et `TST-16` verts ;
 2. les heures assurées et validées intégrées aux rémunérations.
 
 Contrairement au lot 3, aucune validation humaine n'est exigée : la sortie se constate sur les contrôles automatiques. Toutes les données utilisées sont des exemples.
 
-## Les critères, contrôle ++par contrôle++
+## Les critères, contrôle par contrôle
 
-++Les contrôles ci-dessous ont tourné le 17 octobre 2026, à la livraison d++e l'incrément 86. La CI GitHub étant bloquée par la facturation du compte, ses tâches de la plateforme ont été exécutées en local, une à une :
+Les contrôles ci-dessous ont tourné le 17 octobre 2026, à la livraison de l'incrément 86. La CI GitHub étant bloquée par la facturation du compte, ses tâches de la plateforme ont été exécutées en local, une à une :
 
 - 303 tests PHP sur PostgreSQL 16 (15 750 assertions) ;
 - 267 contrôles SQL embarqués et 298 contrôles natifs avec concurrence ;
