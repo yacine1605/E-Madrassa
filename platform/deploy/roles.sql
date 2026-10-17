@@ -320,6 +320,8 @@ GRANT EXECUTE ON FUNCTION school.program_costs_paid(date, date) TO school_runtim
 GRANT EXECUTE ON FUNCTION school.dashboard_group_ids(text), school.operations_dashboard(date, date), school.operations_sessions(uuid, date, date) TO school_runtime;
 -- A group's absences per pupil and the weekly trend (072).
 GRANT EXECUTE ON FUNCTION school.operations_pupils(uuid, date, date), school.operations_weeks(uuid, date, date) TO school_runtime;
+-- The school's stamp (076): when anything last changed in it, never what; the dashboards' cache computes again on a new one.
+GRANT EXECUTE ON FUNCTION school.dashboard_stamp() TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -670,6 +672,7 @@ ALTER FUNCTION school.operations_dashboard(date, date) OWNER TO platform_provisi
 ALTER FUNCTION school.operations_sessions(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.operations_pupils(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.operations_weeks(uuid, date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.dashboard_stamp() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

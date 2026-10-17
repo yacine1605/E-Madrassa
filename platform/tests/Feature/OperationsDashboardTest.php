@@ -15,7 +15,7 @@ use Tests\TestCase;
 /**
  * The operational dashboard (FR-TDB-02): a group's fill = its composition list over its capacity
  * (AC1); its sessions' attendance counted from the rows; a teacher sees their own groups only, and
- * none of the school's figures.
+ * none of the school's figures; the figures kept for their reader until anything changes (FR-TDB-03).
  */
 final class OperationsDashboardTest extends TestCase
 {
@@ -198,5 +198,52 @@ final class OperationsDashboardTest extends TestCase
             Livewire::test(OperationsDashboard::class)->filterTable('period', ['from' => $days[0], 'to' => $days[1]])
                 ->mountTableAction('trend')->assertMountedActionModalSee('50,0');
         });
+    }
+
+    public function test_the_figures_are_kept_for_their_reader_until_anything_changes_in_the_school(): void
+    {
+        $s = $this->setting();
+        $day = now()->toDateString();
+        $read = fn (string $query = '') => $this->getJson("/api/dashboards/operations?from=$day&to=$day$query")->assertOk()->json();
+        $first = $read();
+        $members = collect($first['data'])->firstWhere('group_id', $s['group'])['members'] ?? 0;
+        // FR-TDB-03: read again, the figures kept, as computed then.
+        $this->travel(5)->seconds();
+        $this->assertSame($first['meta']['computed_at'], $read()['meta']['computed_at']);
+        // Anything that changes in the school computes them again: a pupil joins the group.
+        $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Amine', 'birth_date' => '1990-01-01'])->assertCreated()->json('data.id');
+        $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
+            ->assertCreated()->json('data.id');
+        $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment])->assertCreated();
+        $this->travel(5)->seconds();
+        $again = $read();
+        $this->assertNotSame($first['meta']['computed_at'], $again['meta']['computed_at']);
+        $this->assertSame($members + 1, collect($again['data'])->firstWhere('group_id', $s['group'])['members']);
+        // Asked afresh, and after five minutes, too.
+        $this->travel(5)->seconds();
+        $fresh = $read('&fresh=1');
+        $this->assertNotSame($again['meta']['computed_at'], $fresh['meta']['computed_at']);
+        $this->travel(6)->minutes();
+        $this->assertNotSame($fresh['meta']['computed_at'], $read()['meta']['computed_at']);
+        $this->getJson("/api/dashboards/operations?from=$day&to=$day&fresh=maybe")->assertUnprocessable();
+        // Kept for their reader only: a teacher of none of the groups never reads the head's.
+        $teacher = $this->account('teacher');
+        $this->member($s['school'], $teacher);
+        $this->grant($s['school'], $teacher, 'teacher', 'personal');
+        $this->signIn($teacher)->assertOk();
+        $this->assertSame([], $read()['data']);
+        // The screen computes them again on demand.
+        $this->signIn($s['manager'])->assertOk();
+        $kept = $read()['meta']['computed_at'];
+        $this->travel(5)->seconds();
+        $this->actingAs($this->person($s['manager']));
+        $this->withSession(['school.tenant' => $s['school']->id, 'auth.started_at' => time(), 'auth.seen_at' => time()]);
+        Filament::setCurrentPanel(Filament::getPanel('school'));
+        DB::transaction(function () use ($s) {
+            app(CurrentSchool::class)->enter($s['school']->id, $s['manager']['id'], CurrentSchool::requestId(null));
+            app(CurrentSchool::class)->setMode('active');
+            Livewire::test(OperationsDashboard::class)->assertSee(__('dashboard.refresh'))->callTableAction('refresh')->assertHasNoTableActionErrors();
+        });
+        $this->assertNotSame($kept, $read()['meta']['computed_at']);
     }
 }

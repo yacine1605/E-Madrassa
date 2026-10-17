@@ -1580,6 +1580,12 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 95 (lot 4): the dashboards' cache
+
+FR-TDB-03 is complete. The finance and operational dashboards' figures, and a programme's profitability, are kept for their reader (`App\Support\DashboardCache`, in the application's cache, Redis when deployed) and computed again as soon as anything changes in the school, on another day, after five minutes at most, or when the reader asks (« Recalculer » on both screens, `fresh=1` on the API). Every write to a school table leaves a trace in the audit log, so the school's stamp (`school.dashboard_stamp()`, SQL 076) is its last trace and the set of its traces of the last quarter of an hour (a transaction that began before the last trace and commits after it changes that set), with its modules, its mode and its settings. The figures are never shared between readers: their rights choose what the figures count. The screens keep showing when the figures were computed. The exports read the same figures as the screen.
+
+Validation on 17 October 2026: **311 PHP integration tests (16,289 assertions)**; **268 embedded SQL checks and 299 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 864 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 94 (lot 4): a pupil's timetable
 
 FR-PLN-04's views by pupil, for the staff. A pupil's sessions are those of the groups they belonged to on each session's day, as its roll call lists them: a pupil who joined a group on a Tuesday has none of its sessions before. « Planning » filters by pupil (found by name or number, among those the reader may read) and prints the pupil's week and month from there; the API takes `student_id` beside `group_id`, `teacher_id` and `room_id` (`/api/class-sessions`, `/api/timetable/week.pdf`, `month.pdf`, `calendar.ics`). Each session says its group and its teacher, a pupil having several groups. A pupil the reader may not read is not found (404): a teacher with a personal scope reads those of the groups they teach. The pupils and their parents will read their own with the portal (lot 10).
@@ -1674,7 +1680,7 @@ Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16`
 
 Lot 4's requirements still partial were reviewed against the SRS, rule by rule, on 17 October 2026: FR-PLN-02, 03, 05 and 06 and FR-PTG-01 to 03 are complete. FR-PLN-04 waits for the portal (lot 10) for the pupils' and parents' own timetables.
 
-1. FR-TDB-03's cache of the dashboards, invalidated on events.
+Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timetables, which the portal brings (lot 10). Lot 5 waits for the four decisions put to the school (the pupils' space, the marks' scale, the lessons' attachments, their review).
 
 ## Next increments of lot 2
 

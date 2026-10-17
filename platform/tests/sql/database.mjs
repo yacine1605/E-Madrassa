@@ -5036,6 +5036,15 @@ await check('the operational dashboard counts a group\'s fill as its composition
     await rejects('SELECT * FROM school.operations_pupils($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
     await rejects('SELECT * FROM school.operations_weeks($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
   }
+  // The dashboards' cache (SQL 076): the school's stamp stays the same until anything changes in the school.
+  await as('school_runtime', a, reader.user);
+  const stamp = (await first('SELECT school.dashboard_stamp() AS s')).s;
+  assert.equal((await first('SELECT school.dashboard_stamp() AS s')).s, stamp);
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.study_group SET capacity = capacity + 1 WHERE id = $1', [called.group_id]);
+  await sql('UPDATE school.study_group SET capacity = capacity - 1 WHERE id = $1', [called.group_id]);
+  await as('school_runtime', a, reader.user);
+  assert.notEqual((await first('SELECT school.dashboard_stamp() AS s')).s, stamp);
   await as('school_runtime', a, 1);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).

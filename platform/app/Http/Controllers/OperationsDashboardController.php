@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentSchool;
+use App\Support\DashboardCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\DB;
  * entered by no one, their roll calls and the pupils' absences; for the whole school, enrolments
  * waiting and prospects converted. A group's sessions behind its figures are listed as the reader
  * may read them (FR-TDB-03); its pupils' absences, and week by week the absences of the reader's
- * groups or of one of them, the trend (SQL 072).
+ * groups or of one of them, the trend (SQL 072). The figures are kept for their reader until anything
+ * changes in the school (DashboardCache); `fresh` computes them again.
  */
 final class OperationsDashboardController
 {
@@ -25,11 +27,17 @@ final class OperationsDashboardController
     /** The reader's groups with their figures over the period (400 days at most); the school's figures for whoever reads them. */
     public function index(Request $request)
     {
-        return $this->figures(...$this->period($request));
+        [$from, $to] = $this->period($request);
+        return $this->figures($from, $to, $request->boolean('fresh'));
     }
 
     /** The figures over a period, as the screen and its exports show them (FR-TDB-03). */
-    public function figures(string $from, string $to): array
+    public function figures(string $from, string $to, bool $fresh = false): array
+    {
+        return DashboardCache::remember('operations', [$from, $to], fn () => $this->computed($from, $to), $fresh);
+    }
+
+    private function computed(string $from, string $to): array
     {
         $groups = [];
         $school = [];
@@ -107,7 +115,7 @@ final class OperationsDashboardController
 
     private function period(Request $request): array
     {
-        $data = $request->validate(['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from']);
+        $data = $request->validate(['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from', 'fresh' => 'boolean']);
         return [$data['from'], $data['to']];
     }
 

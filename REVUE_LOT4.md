@@ -70,7 +70,7 @@ Exigé : les totaux des tableaux de bord égalent la somme des opérations sourc
 
 ## Les exigences du lot 4
 
-Toutes étaient livrées en partie à la revue de sortie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). Ce qui reste n'empêche pas la sortie. Depuis, relues règle par règle contre le SRS le 17 octobre 2026, toutes sont conformes sauf FR-PLN-04 (portail, lot 10) et FR-TDB-03 (cache) :
+Toutes étaient livrées en partie à la revue de sortie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). Ce qui reste n'empêche pas la sortie. Depuis, relues règle par règle contre le SRS le 17 octobre 2026, toutes sont conformes sauf FR-PLN-04 (portail, lot 10) ; FR-TDB-03 l'est depuis l'incrément 95 :
 
 | Exigence | Reste |
 |---|---|
@@ -82,7 +82,7 @@ Toutes étaient livrées en partie à la revue de sortie (« PARTIEL » dans `RA
 | FR-PRE-01 | seuils d'absence (livrés depuis, à l'incrément 90) ; responsables légaux prévenus par e-mail et WhatsApp (livrés, incréments 91 et 92 : FR-PRE-01 conforme) |
 | FR-TDB-01 | convention du résultat de gestion non paramétrable ; charges communes non réparties entre programmes (livrées depuis, à l'incrément 87 : FR-TDB-01 conforme) |
 | FR-TDB-02 | absences par élève et tendances (livrées depuis, à l'incrément 88 : FR-TDB-02 conforme) |
-| FR-TDB-03 | cache invalidé sur événement, à faire seulement si la lecture devient lente |
+| FR-TDB-03 | cache invalidé sur événement (livré, incrément 95 : FR-TDB-03 conforme) |
 
 ## Points à confirmer par l'établissement
 

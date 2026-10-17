@@ -5,6 +5,8 @@ return [
     'finance' => 'Tableau de bord financier',
     'finance_help' => 'Chaque chiffre est la somme de ses opérations, recalculée à chaque lecture ; survolez un intitulé pour sa base de calcul. Le résultat de gestion = :result : ce n’est ni une trésorerie ni un résultat comptable certifié ; sa base se choisit dans les paramètres de l’école. Les versements de rémunération ne sont pas comptés une seconde fois dans les dépenses.',
     'computed_at' => 'Calculé le :at.',
+    'refresh' => 'Recalculer',
+    'refresh_help' => 'Les chiffres sont gardés et recalculés dès qu’une opération change dans l’établissement, et au plus tard après cinq minutes.',
     'month' => 'Mois',
     'from' => 'Du mois',
     'to' => 'Au mois',

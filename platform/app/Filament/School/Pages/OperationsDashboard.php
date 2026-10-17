@@ -4,6 +4,7 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\OperationsDashboardController;
 use App\Http\Controllers\ExportController;
+use App\Support\DashboardCache;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
@@ -73,7 +74,10 @@ final class OperationsDashboard extends SchoolingPage
                 Filter::make('period')->schema([
                     DatePicker::make('from')->label(__('dashboard.period_from'))->default(now()->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.period_to'))->default(now()->toDateString())]),
-            ])->headerActions([$this->trend(), $this->export()])->recordActions([
+            ])->headerActions([
+                Action::make('refresh')->label(__('dashboard.refresh'))->color('gray')->tooltip(__('dashboard.refresh_help'))
+                    ->action(function () { DashboardCache::refresh(); $this->result = null; }),
+                $this->trend(), $this->export()])->recordActions([
                 Action::make('sessions')->label(__('dashboard.sessions'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.sessions_help'))
                     ->visible(fn (array $record) => $record['sessions_held'] !== null)
                     ->schema(fn (array $record) => [TextEntry::make('sessions')->hiddenLabel()->listWithLineBreaks()->state($this->sessions($record['group_id']))]),

@@ -4,6 +4,7 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\ExportController;
+use App\Support\DashboardCache;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
@@ -66,6 +67,8 @@ final class FinanceDashboard extends SchoolingPage
                     DatePicker::make('from')->label(__('dashboard.from'))->default(now()->subMonths(5)->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.to'))->default(now()->toDateString())]),
             ])->headerActions([
+                Action::make('refresh')->label(__('dashboard.refresh'))->color('gray')->tooltip(__('dashboard.refresh_help'))
+                    ->action(function () { DashboardCache::refresh(); $this->result = null; }),
                 $this->export(),
                 Action::make('programs')->label(__('dashboard.programs'))->color('gray')->modalSubmitAction(false)->modalDescription(fn () => $this->method())
                     ->schema(fn () => [TextEntry::make('programs')->hiddenLabel()->listWithLineBreaks()->state($this->programs())]),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentSchool;
+use App\Support\DashboardCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * twice, AC2), the management result on the school's basis (SQL 071: net receipts − expenses paid −
  * pays paid, or billed − expenses committed − pays committed; neither a cash position nor a certified
  * result), the arrears; a programme's profitability with its method. Each figure's source operations
- * are listed with the reader's own rights.
+ * are listed with the reader's own rights. The figures are kept for their reader until anything
+ * changes in the school (FR-TDB-03, DashboardCache); `fresh` computes them again.
  */
 final class FinanceDashboardController
 {
@@ -26,13 +28,19 @@ final class FinanceDashboardController
     /** Month by month from one month to another (13 at most). */
     public function index(Request $request)
     {
-        return $this->figures(...$this->period($request));
+        [$from, $to] = $this->period($request);
+        return $this->figures($from, $to, $request->boolean('fresh'));
     }
 
     /** The figures from one month to another, as the screen and its exports show them (FR-TDB-03). */
-    public function figures(string $from, string $to): array
+    public function figures(string $from, string $to, bool $fresh = false): array
     {
         [$from, $to] = [Carbon::parse($from)->startOfMonth()->toDateString(), Carbon::parse($to)->startOfMonth()->toDateString()];
+        return DashboardCache::remember('finance', [$from, $to], fn () => $this->computed($from, $to), $fresh);
+    }
+
+    private function computed(string $from, string $to): array
+    {
         $months = [];
         for ($m = Carbon::parse($from); $m <= Carbon::parse($to); $m = $m->addMonth()) {
             $months[$m->toDateString()] = ['id' => $m->toDateString(), 'month' => $m->toDateString()] + array_fill_keys(self::SOURCES, null);
@@ -73,6 +81,11 @@ final class FinanceDashboardController
     public function programs(Request $request)
     {
         [$from, $to] = $this->period($request);
+        return DashboardCache::remember('finance.programs', [$from, $to], fn () => $this->profitability($from, $to), $request->boolean('fresh'));
+    }
+
+    private function profitability(string $from, string $to): array
+    {
         ['basis' => $basis, 'sharing' => $sharing] = self::conventions();
         $rows = array_map(fn (object $row) => (array) $row, DB::select("WITH x AS (SELECT * FROM school.program_profitability(?::date, ?::date)),
               y AS (SELECT * FROM school.program_costs_paid(?::date, ?::date))
@@ -148,7 +161,7 @@ final class FinanceDashboardController
 
     private function period(Request $request): array
     {
-        $data = $request->validate(['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from']);
+        $data = $request->validate(['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from', 'fresh' => 'boolean']);
         return [Carbon::parse($data['from'])->startOfMonth()->toDateString(), Carbon::parse($data['to'])->startOfMonth()->toDateString()];
     }
 
