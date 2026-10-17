@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
  * FR-TDB-01: the finance dashboard, month by month, each figure summed from its source operations
  * when read (SQL 069): billed, net receipts (payments validated − reversals − refunds, TST-16 AC1),
  * expenses committed and paid other than the pays, the pays committed and paid out (never counted
- * twice, AC2), the management result (net receipts − expenses paid − pays paid: neither a cash
- * position nor a certified result), the arrears; a programme's profitability with its method. Each
- * figure's source operations are listed with the reader's own rights.
+ * twice, AC2), the management result on the school's basis (SQL 071: net receipts − expenses paid −
+ * pays paid, or billed − expenses committed − pays committed; neither a cash position nor a certified
+ * result), the arrears; a programme's profitability with its method. Each figure's source operations
+ * are listed with the reader's own rights.
  */
 final class FinanceDashboardController
 {
@@ -46,23 +47,63 @@ final class FinanceDashboardController
         }
         $modules = collect(DB::select('SELECT key FROM unnest(ARRAY[?, ?, ?]) AS key WHERE school.module_enabled(key)', ['student_finance', 'expenses', 'payroll']))
             ->pluck('key')->all();
+        $basis = self::conventions()['basis'];
         foreach ($months as &$month) {
             $receipts = in_array('student_finance', $modules, true) ? $this->sum($month, ['payments'], ['reversals', 'refunds']) : null;
             $month['net_receipts'] = $receipts;
-            $month['net_result'] = $receipts === null ? null : $this->sum($month + ['net_receipts' => $receipts], ['net_receipts'], ['expenses_paid', 'salaries_paid']);
+            $month['net_result'] = $receipts === null ? null : ($basis === 'accrual'
+                ? $this->sum($month, ['billed'], ['expenses_committed', 'salaries_committed'])
+                : $this->sum($month + ['net_receipts' => $receipts], ['net_receipts'], ['expenses_paid', 'salaries_paid']));
         }
-        return ['data' => array_values($months), 'meta' => ['modules' => $modules, 'arrears' => $arrears, 'computed_at' => now()->toIso8601String()]];
+        return ['data' => array_values($months), 'meta' => ['modules' => $modules, 'basis' => $basis, 'arrears' => $arrears, 'computed_at' => now()->toIso8601String()]];
     }
 
-    /** A programme's profitability over the period: billed, received, its direct costs; shared costs and pays not shared out. */
+    /** The school's conventions (SQL 071): the result's basis, `cash` or `accrual`; the common costs `kept` apart or shared in proportion to the revenue `billed`. */
+    public static function conventions(): array
+    {
+        $row = DB::selectOne("SELECT school.setting_value('dashboard.result_basis') #>> '{}' AS basis, school.setting_value('dashboard.common_costs') #>> '{}' AS sharing");
+        return ['basis' => $row->basis, 'sharing' => $row->sharing];
+    }
+
+    /**
+     * A programme's profitability over the period: its revenue billed and received, its direct costs on
+     * the result's basis (the expenses committed to it, or paid), its share of the common costs and the
+     * pays when the school shares them, in proportion to its revenue billed, to the cent; its margin.
+     */
     public function programs(Request $request)
     {
         [$from, $to] = $this->period($request);
-        return ['data' => array_map(fn (object $row) => (array) $row, DB::select("SELECT x.program_id AS id, x.program_id, p.code, p.labels,
-            x.billed::numeric(14, 2)::text AS billed, x.received::numeric(14, 2)::text AS received, x.direct_costs::numeric(14, 2)::text AS direct_costs,
-            CASE WHEN x.direct_costs IS NULL THEN NULL ELSE (x.received - x.direct_costs)::numeric(14, 2)::text END AS margin
-            FROM school.program_profitability(?::date, ?::date) x LEFT JOIN school.program p ON p.tenant_id = ? AND p.id = x.program_id
-            ORDER BY p.code NULLS LAST", [$from, $to, $this->school->id()]))];
+        ['basis' => $basis, 'sharing' => $sharing] = self::conventions();
+        $rows = array_map(fn (object $row) => (array) $row, DB::select("WITH x AS (SELECT * FROM school.program_profitability(?::date, ?::date)),
+              y AS (SELECT * FROM school.program_costs_paid(?::date, ?::date))
+            SELECT k.program_id AS id, k.program_id, p.code, p.labels, coalesce(x.billed, 0)::numeric(14, 2)::text AS billed,
+              coalesce(x.received, 0)::numeric(14, 2)::text AS received, x.direct_costs::numeric(14, 2)::text AS costs_committed,
+              y.amount::numeric(14, 2)::text AS costs_paid
+            FROM (SELECT x.program_id FROM x UNION SELECT y.program_id FROM y) k
+            LEFT JOIN x ON x.program_id IS NOT DISTINCT FROM k.program_id LEFT JOIN y ON y.program_id IS NOT DISTINCT FROM k.program_id
+            LEFT JOIN school.program p ON p.tenant_id = ? AND p.id = k.program_id
+            ORDER BY p.code NULLS LAST", [$from, $to, $from, $to, $this->school->id()]));
+        foreach ($rows as &$row) $row['direct_costs'] = $row[$basis === 'accrual' ? 'costs_committed' : 'costs_paid'];
+        unset($row);
+        $common = null;
+        $shares = [];
+        if ($sharing === 'billed') {
+            // The common costs: the expenses committed to no programme, or paid, and the pays.
+            $expenses = $this->cents(collect($rows)->firstWhere('program_id', null)['direct_costs'] ?? null);
+            $salaries = 0;
+            foreach ($this->figures($from, $to)['data'] as $month) $salaries += $this->cents($month[$basis === 'accrual' ? 'salaries_committed' : 'salaries_paid']);
+            $rows = array_values(array_filter($rows, fn (array $row) => $row['program_id'] !== null));
+            $weights = array_map(fn (array $row) => $this->cents($row['billed']), $rows);
+            $shares = array_sum($weights) > 0 ? $this->shares($expenses + $salaries, $weights) : [];
+            $common = ['expenses' => $this->money($expenses), 'salaries' => $this->money($salaries), 'total' => $this->money($expenses + $salaries),
+                'shared' => $shares !== []];
+        }
+        foreach ($rows as $i => &$row) {
+            $row['shared_costs'] = isset($shares[$i]) ? $this->money($shares[$i]) : null;
+            $row['margin'] = $row['direct_costs'] === null && $row['shared_costs'] === null ? null : $this->money(
+                $this->cents($basis === 'accrual' ? $row['billed'] : $row['received']) - $this->cents($row['direct_costs']) - $this->cents($row['shared_costs']));
+        }
+        return ['data' => $rows, 'meta' => ['basis' => $basis, 'sharing' => $sharing, 'common' => $common]];
     }
 
     /** A figure's source operations in a month, as the reader may read them: none of what they may not. */
@@ -118,5 +159,30 @@ final class FinanceDashboardController
         foreach ($plus as $key) $cents += (int) round(((float) ($month[$key] ?? 0)) * 100);
         foreach ($minus as $key) $cents -= (int) round(((float) ($month[$key] ?? 0)) * 100);
         return number_format($cents / 100, 2, '.', '');
+    }
+
+    private function cents(?string $amount): int
+    {
+        return (int) round(((float) ($amount ?? 0)) * 100);
+    }
+
+    private function money(int $cents): string
+    {
+        return number_format($cents / 100, 2, '.', '');
+    }
+
+    /** An amount in cents shared in proportion to the weights, the cents left to the largest remainders: the shares add up to the amount. */
+    private function shares(int $cents, array $weights): array
+    {
+        $total = array_sum($weights);
+        $shares = $remainders = [];
+        foreach ($weights as $i => $weight) {
+            $exact = $cents * ($weight / $total);
+            $shares[$i] = (int) floor($exact);
+            $remainders[$i] = $exact - $shares[$i];
+        }
+        arsort($remainders);
+        foreach (array_slice(array_keys($remainders), 0, max(0, $cents - array_sum($shares))) as $i) $shares[$i]++;
+        return $shares;
     }
 }

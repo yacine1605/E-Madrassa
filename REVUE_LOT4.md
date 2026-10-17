@@ -1,15 +1,15 @@
 # Revue du lot 4 : exploitation
 
-Le lot 4 couvre le planning manuel et ses conflits, les remplacements, le pointage des enseignants, l'appel des élèves et les tableaux de bord (FR-PLN-\*, FR-PTG-\*, FR-PRE-01, FR-TDB-\*). Ses critères de sortie (SRS 1.2, plan de livraison) sont :
+Le lot 4 couvre le planning manuel et ses conflits, les remplacements, le pointage des enseignants, l'appel des élèves et les tableaux de bord (FR-PLN-, FR-PTG-, FR-PRE-01, FR-TDB-). Ses critères de sortie (SRS 1.2, plan de livraison) sont :
 
 1. `TST-05`, `TST-15` et `TST-16` verts ;
 2. les heures assurées et validées intégrées aux rémunérations.
 
 Contrairement au lot 3, aucune validation humaine n'est exigée : la sortie se constate sur les contrôles automatiques. Toutes les données utilisées sont des exemples.
 
-## Les critères, contrôle par contrôle
+## Les critères, contrôle ++par contrôle++
 
-Les contrôles ci-dessous ont tourné le 17 octobre 2026, à la livraison de l'incrément 86. La CI GitHub étant bloquée par la facturation du compte, ses tâches de la plateforme ont été exécutées en local, une à une :
+++Les contrôles ci-dessous ont tourné le 17 octobre 2026, à la livraison d++e l'incrément 86. La CI GitHub étant bloquée par la facturation du compte, ses tâches de la plateforme ont été exécutées en local, une à une :
 
 - 303 tests PHP sur PostgreSQL 16 (15 750 assertions) ;
 - 267 contrôles SQL embarqués et 298 contrôles natifs avec concurrence ;
@@ -80,14 +80,14 @@ Toutes sont livrées en partie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). 
 | FR-PLN-06 | rien de bloquant |
 | FR-PTG-01 à 03 | rien de bloquant |
 | FR-PRE-01 | seuils d'absence et notifications aux responsables légaux avec le portail (lot 10) |
-| FR-TDB-01 | convention du résultat de gestion non paramétrable ; charges communes non réparties entre programmes |
+| FR-TDB-01 | convention du résultat de gestion non paramétrable ; charges communes non réparties entre programmes (livrées depuis, à l'incrément 87 : FR-TDB-01 conforme) |
 | FR-TDB-02 | absences par élève et tendances |
 | FR-TDB-03 | cache invalidé sur événement, à faire seulement si la lecture devient lente |
 
 ## Points à confirmer par l'établissement
 
 - **Portée de publication du planning** : toute l'école, par période (proposition du 17 octobre).
-- **Résultat de gestion** = encaissements nets − dépenses payées − rémunérations versées. Ce n'est ni une trésorerie ni un résultat comptable certifié. La convention n'est pas paramétrable.
+- **Résultat de gestion** = encaissements nets − dépenses payées − rémunérations versées. Ce n'est ni une trésorerie ni un résultat comptable certifié. Depuis l'incrément 87, l'établissement peut choisir la base facturée et engagée, et répartir les charges communes entre les programmes (paramètres de l'école).
 - **Tableau de bord opérationnel d'un enseignant** : il suit la portée de son rôle. Avec une portée « personnelle », l'enseignant voit ses seuls groupes. Avec une portée « tout l'établissement », il voit toute l'école. Attribuer donc le rôle enseignant en portée personnelle.
 
 ## Conclusion

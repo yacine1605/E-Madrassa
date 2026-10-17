@@ -1580,6 +1580,16 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 87 (lot 4): the finance dashboard's conventions
+
+FR-TDB-01's two conventions, each a school setting (« Paramètres de l'école »), the default reading as before:
+
+- **The management result's basis** (`dashboard.result_basis`): `cash`, net receipts − expenses paid − pays paid out (the default), or `accrual`, revenue billed − expenses committed − pays committed. The dashboard's help and the result's tooltip give the formula in use; it stays neither a cash position nor a certified result.
+- **The common costs** (`dashboard.common_costs`): `kept` out of the programmes' profitability (the default), or shared among the programmes in proportion to their revenue billed: the expenses committed to no programme, or paid, with the pays. The shares are to the cent, the cents left over going to the largest remainders, so that they add up to the common costs; with no revenue billed over the period, nothing is shared and the screen says so.
+- A programme's direct costs and margin follow the result's basis: the revenue billed less the expenses committed to it, or its net receipts less the expenses paid for it (`school.program_costs_paid`, SQL 071). The « Rentabilité par programme » window states the method, and the common costs shared.
+
+Validation on 17 October 2026: **304 PHP integration tests (15,816 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 852 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 86 (lot 4): the dashboards' exports
 
 The dashboards exported (FR-TDB-03):
@@ -1598,8 +1608,7 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. The finance dashboard's result on a basis the school chooses (cash or billed and committed), and the common costs and pays shared among the programmes, the method shown (FR-TDB-01).
-2. Absences per pupil and their trend over the period (FR-TDB-02).
+1. Absences per pupil and their trend over the period (FR-TDB-02).
 
 ## Next increments of lot 2
 

@@ -25,6 +25,10 @@ return [
     'bounds' => 'Entre :min et :max.',
     'days' => ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
     'codes' => [
+        'dashboard' => [
+            'result_basis' => ['cash' => 'Encaissements : encaissé − payé − versé', 'accrual' => 'Engagements : facturé − engagé'],
+            'common_costs' => ['kept' => 'Non réparties : coûts directs seuls', 'billed' => 'Réparties au prorata des revenus facturés'],
+        ],
         'files' => [
             'types' => ['pdf' => 'PDF', 'jpeg' => 'Image JPEG', 'png' => 'Image PNG', 'webp' => 'Image WebP', 'docx' => 'Document Word',
                 'xlsx' => 'Classeur Excel', 'csv' => 'Fichier CSV'],

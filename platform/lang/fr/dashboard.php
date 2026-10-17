@@ -3,7 +3,7 @@
 return [
     // FR-TDB-01: the finance dashboard.
     'finance' => 'Tableau de bord financier',
-    'finance_help' => 'Chaque chiffre est la somme de ses opérations, recalculée à chaque lecture ; survolez un intitulé pour sa base de calcul. Le résultat de gestion = encaissements nets − dépenses payées − rémunérations versées : ce n’est ni une trésorerie ni un résultat comptable certifié. Les versements de rémunération ne sont pas comptés une seconde fois dans les dépenses.',
+    'finance_help' => 'Chaque chiffre est la somme de ses opérations, recalculée à chaque lecture ; survolez un intitulé pour sa base de calcul. Le résultat de gestion = :result : ce n’est ni une trésorerie ni un résultat comptable certifié ; sa base se choisit dans les paramètres de l’école. Les versements de rémunération ne sont pas comptés une seconde fois dans les dépenses.',
     'computed_at' => 'Calculé le :at.',
     'month' => 'Mois',
     'from' => 'Du mois',
@@ -28,13 +28,27 @@ return [
         'expenses_paid' => 'Paiements des dépenses moins leurs contre-opérations, par date de paiement, hors versements de rémunération.',
         'salaries_committed' => 'Net des rémunérations validées, par mois de rémunération.',
         'salaries_paid' => 'Versements de rémunération moins leurs contre-opérations, par date de versement.',
-        'net_result' => 'Encaissements nets − dépenses payées − rémunérations versées.',
+    ],
+    // The management result's basis, the school's setting (SQL 071).
+    'result_bases' => [
+        'cash' => 'encaissements nets − dépenses payées − rémunérations versées',
+        'accrual' => 'revenus facturés − dépenses engagées − rémunérations engagées',
     ],
     'net_receipts_detail' => ':payments − :reversals − :refunds',
     'arrears_line' => 'Impayés au :day : :amount sur :count inscriptions.',
     'programs' => 'Rentabilité par programme',
-    'programs_method' => 'Revenus facturés et encaissements nets des inscriptions du programme, moins ses coûts directs (dépenses rattachées au programme). Méthode : les charges communes et les rémunérations ne sont pas réparties entre les programmes.',
+    'programs_methods' => [
+        'cash' => 'Méthode : encaissements nets des inscriptions du programme, moins ses coûts directs payés (dépenses rattachées au programme).',
+        'accrual' => 'Méthode : revenus facturés aux inscriptions du programme, moins ses coûts directs engagés (dépenses rattachées au programme).',
+    ],
+    'sharing' => [
+        'kept' => 'Les charges communes et les rémunérations ne sont pas réparties entre les programmes.',
+        'billed' => 'Les charges communes (dépenses rattachées à aucun programme) et les rémunérations sont réparties entre les programmes au prorata de leurs revenus facturés, au centime près.',
+    ],
     'program_line' => 'facturé :billed · encaissé :received · coûts directs :costs · marge :margin',
+    'program_line_shared' => 'facturé :billed · encaissé :received · coûts directs :costs · charges réparties :shared · marge :margin',
+    'common_shared' => 'Charges communes réparties : :total (dépenses sans programme :expenses, rémunérations :salaries).',
+    'common_unshared' => 'Charges communes non réparties, faute de revenus facturés sur la période : :total (dépenses sans programme :expenses, rémunérations :salaries).',
     'no_program' => 'Sans programme (charges communes)',
     'costs_missing' => 'aucun coût rattaché',
     'sources' => 'Opérations',

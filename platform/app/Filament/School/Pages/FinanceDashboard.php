@@ -20,6 +20,7 @@ use Filament\Tables\Table;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * FR-TDB-01, « Tableau de bord financier »: month by month, each figure summed from its source
@@ -48,7 +49,7 @@ final class FinanceDashboard extends SchoolingPage
             $rows = collect($this->result($filters)['data'])->keyBy('id');
             return new LengthAwarePaginator($rows->forPage($page, $recordsPerPage), $rows->count(), $recordsPerPage, $page);
         })->paginationPageOptions([13])->defaultPaginationPageOption(13)
-            ->description(fn () => implode(' ', array_filter([__('dashboard.finance_help'), $this->arrears(),
+            ->description(fn () => implode(' ', array_filter([__('dashboard.finance_help', ['result' => $this->basis()]), $this->arrears(),
                 __('dashboard.computed_at', ['at' => Formats::dateTime($this->result($this->tableFilters ?? [])['meta']['computed_at'])])])))
             ->columns([
                 TextColumn::make('month')->label(__('dashboard.month'))->formatStateUsing(fn ($state) => Carbon::parse($state)->locale(app()->getLocale())->translatedFormat('F Y')),
@@ -59,14 +60,14 @@ final class FinanceDashboard extends SchoolingPage
                 $this->figure('expenses_paid', 'expenses'),
                 $this->figure('salaries_committed', 'payroll'),
                 $this->figure('salaries_paid', 'payroll'),
-                $this->figure('net_result', 'student_finance')->weight('bold'),
+                $this->figure('net_result', 'student_finance')->tooltip(fn () => Str::ucfirst($this->basis()).'.')->weight('bold'),
             ])->filters([
                 Filter::make('period')->schema([
                     DatePicker::make('from')->label(__('dashboard.from'))->default(now()->subMonths(5)->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.to'))->default(now()->toDateString())]),
             ])->headerActions([
                 $this->export(),
-                Action::make('programs')->label(__('dashboard.programs'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.programs_method'))
+                Action::make('programs')->label(__('dashboard.programs'))->color('gray')->modalSubmitAction(false)->modalDescription(fn () => $this->method())
                     ->schema(fn () => [TextEntry::make('programs')->hiddenLabel()->listWithLineBreaks()->state($this->programs())]),
             ])->recordActions([
                 Action::make('sources')->label(__('dashboard.sources'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.sources_help'))
@@ -125,6 +126,19 @@ final class FinanceDashboard extends SchoolingPage
         return $value === null ? __('dashboard.none') : $this->money($value);
     }
 
+    /** The management result's formula, on the school's basis (SQL 071). */
+    private function basis(): string
+    {
+        return __('dashboard.result_bases.'.$this->result($this->tableFilters ?? [])['meta']['basis']);
+    }
+
+    /** How the programmes' margins are made: their revenue and direct costs on the result's basis, the common costs kept apart or shared. */
+    private function method(): string
+    {
+        $conventions = FinanceDashboardController::conventions();
+        return __('dashboard.programs_methods.'.$conventions['basis']).' '.__('dashboard.sharing.'.$conventions['sharing']);
+    }
+
     private function arrears(): ?string
     {
         $arrears = $this->result($this->tableFilters ?? [])['meta']['arrears'] ?? null;
@@ -132,18 +146,23 @@ final class FinanceDashboard extends SchoolingPage
             'count' => Formats::number((int) $arrears['enrollments']), 'day' => Formats::date(Carbon::parse($arrears['as_of'])->endOfMonth())]);
     }
 
-    /** Each programme's revenue, receipts, direct costs and margin; the costs no programme carries said missing. */
+    /** Each programme's revenue, receipts, direct costs, share of the common costs and margin; the costs no programme carries said missing, or shared. */
     private function programs(): array
     {
         $filters = $this->tableFilters ?? [];
-        $rows = SchoolScreen::call(static::$permissions, FinanceDashboardController::class, 'programs', [
+        $result = SchoolScreen::call(static::$permissions, FinanceDashboardController::class, 'programs', [
             'from' => substr((string) ($filters['period']['from'] ?? now()->subMonths(5)->startOfMonth()->toDateString()), 0, 10),
-            'to' => substr((string) ($filters['period']['to'] ?? now()->toDateString()), 0, 10)])['data'];
+            'to' => substr((string) ($filters['period']['to'] ?? now()->toDateString()), 0, 10)]);
         $lines = array_map(fn (array $row) => implode(' · ', [$row['code'] !== null ? implode(' ', array_filter([$row['code'], Locales::label(json_decode((string) $row['labels'], true) ?? [])]))
                 : __('dashboard.no_program'),
-            __('dashboard.program_line', ['billed' => $this->money($row['billed']), 'received' => $this->money($row['received']),
-                'costs' => $row['direct_costs'] === null ? __('dashboard.costs_missing') : $this->money($row['direct_costs']),
-                'margin' => $row['margin'] === null ? __('dashboard.none') : $this->money($row['margin'])])]), $rows);
+            __($row['shared_costs'] === null ? 'dashboard.program_line' : 'dashboard.program_line_shared', ['billed' => $this->money($row['billed']),
+                'received' => $this->money($row['received']), 'costs' => $row['direct_costs'] === null ? __('dashboard.costs_missing') : $this->money($row['direct_costs']),
+                'shared' => $row['shared_costs'] === null ? null : $this->money($row['shared_costs']),
+                'margin' => $row['margin'] === null ? __('dashboard.none') : $this->money($row['margin'])])]), $result['data']);
+        if (($common = $result['meta']['common']) !== null) {
+            $lines[] = __($common['shared'] ? 'dashboard.common_shared' : 'dashboard.common_unshared', ['total' => $this->money($common['total']),
+                'expenses' => $this->money($common['expenses']), 'salaries' => $this->money($common['salaries'])]);
+        }
         return $lines === [] ? [__('dashboard.none')] : $lines;
     }
 

@@ -4816,6 +4816,14 @@ await check('the finance dashboard\'s figures equal their source operations, mon
   await as('school_runtime', a, reader.user);
   const programs = (await sql('SELECT program_id, billed::text AS billed, direct_costs::text AS costs FROM school.program_profitability($1::date, $2::date)', [from, to])).rows;
   assert.ok(programs.length > 0);
+  // The programmes' direct costs, with the common costs, are the dashboard's expenses: committed (SQL 069), or paid (SQL 071), on either basis.
+  const total = indicator => rows.filter(r => r.indicator === indicator).reduce((n, r) => n + Number(r.amount), 0).toFixed(2);
+  assert.equal(programs.reduce((n, r) => n + Number(r.costs ?? 0), 0).toFixed(2), total('expenses_committed'));
+  const paid = (await sql('SELECT program_id, amount::numeric(14, 2)::text AS amount FROM school.program_costs_paid($1::date, $2::date)', [from, to])).rows;
+  assert.ok(paid.length > 0, 'the suite\'s expenses are paid');
+  assert.equal(paid.reduce((n, r) => n + Number(r.amount), 0).toFixed(2), total('expenses_paid'));
+  await as('school_runtime', a, sited.user);
+  await rejects('SELECT * FROM school.program_costs_paid($1::date, $2::date)', [from, to], '42501', 'permission_denied');
   await as('school_runtime', a, 1);
 });
 // The operational dashboard (SQL 070, FR-TDB-02): each figure counted from the rows, within the reader's groups.

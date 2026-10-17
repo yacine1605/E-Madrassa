@@ -307,6 +307,8 @@ GRANT UPDATE (status, late_minutes, note) ON school.student_attendance TO school
 GRANT EXECUTE ON FUNCTION school.roll_pupils(uuid) TO school_runtime;
 -- The finance dashboard (069): its figures summed from the operations by functions with their owner's rights, for `dashboard.finance.read`.
 GRANT EXECUTE ON FUNCTION school.finance_dashboard(date, date), school.program_profitability(date, date) TO school_runtime;
+-- A programme's expenses paid (071), for the result on the cash basis.
+GRANT EXECUTE ON FUNCTION school.program_costs_paid(date, date) TO school_runtime;
 -- The operational dashboard (070): its figures counted from the rows by functions with their owner's rights, within the reader's groups.
 GRANT EXECUTE ON FUNCTION school.dashboard_group_ids(text), school.operations_dashboard(date, date), school.operations_sessions(uuid, date, date) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
@@ -641,6 +643,7 @@ ALTER FUNCTION school.roll_pupils(uuid) OWNER TO platform_provisioner;
 GRANT SELECT ON school.refund, school.payroll_run, school.payroll_payout TO platform_provisioner;
 ALTER FUNCTION school.finance_dashboard(date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.program_profitability(date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.program_costs_paid(date, date) OWNER TO platform_provisioner;
 -- The operational dashboard (070): the rows of the reader's groups counted, whatever they may read of them.
 GRANT SELECT ON school.student_attendance TO platform_provisioner;
 ALTER FUNCTION school.dashboard_group_ids(text) OWNER TO platform_provisioner;
