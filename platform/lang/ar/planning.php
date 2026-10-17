@@ -67,7 +67,26 @@ return [
     'saved_with_warnings' => 'سُجّل، مع هذه التنبيهات',
     'timetable' => 'استعمال الزمن',
     'my_timetable' => 'استعمال زمني',
-    'my_timetable_help' => 'حصصك على أربعة أسابيع، بما فيها الملغاة. تُستورد الأجندة (ICS) في رزنامة بتوقيت الجزائر.',
+    'my_timetable_help' => 'حصصك على أربعة أسابيع، بما فيها الملغاة والتي استُخلفت فيها. تُستورد الأجندة (ICS) في رزنامة بتوقيت الجزائر.',
+
+    // FR-PLN-06: replacements and the history of the sessions' changes.
+    'replace_session' => 'استخلاف',
+    'replace_session_help' => 'المستخلِف مؤهل ومتاح وغير مرتبط في هذا التوقيت. اختيار الأستاذ المقرر يعيد إليه الحصة. يُبلَّغ الأساتذة والتلاميذ المعنيون.',
+    'substitute' => 'المستخلِف',
+    'planned_teacher_option' => ':name — الأستاذ المقرر',
+    'no_substitute' => 'لا يوجد أستاذ مؤهل ومتاح وغير مرتبط في هذا التوقيت.',
+    'replaces' => 'يستخلف :name',
+    'replaced_by' => 'يتولاها :name',
+    'substitute_mark' => ':name (مستخلِف)',
+    'session_changes' => 'سجل الحصص',
+    'session_changes_help' => 'الحصص الملغاة أو المستخلَفة أو المعادة إلى أستاذها، خلال ثمانية أسابيع ابتداءً من اليوم المختار.',
+    'no_session_change' => 'لا توجد حصة ملغاة ولا مستخلَفة',
+    'change_kinds' => ['cancelled' => 'ملغاة', 'replaced' => 'مستخلَفة', 'restored' => 'أُعيدت إلى أستاذها'],
+    'change' => 'التغيير',
+    'before' => 'قبل',
+    'after' => 'بعد',
+    'changed_at' => 'بتاريخ',
+    'changed_by' => 'من طرف',
 
     // FR-PLN-03: what is told, never refused.
     'warnings' => [

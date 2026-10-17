@@ -1434,15 +1434,35 @@ Routes: `GET /api/timetable/week.pdf?week=&group_id=|teacher_id=|room_id=`, `GET
 
 Validation on 17 October 2026: **292 PHP integration tests (14,494 assertions)**, the one the first run failed (a dash written in the code as a placeholder) passing once fixed; **260 embedded SQL checks and 291 native PostgreSQL 16 checks including concurrency**; migration 063 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 256 screens without a problem, Planning included. The CI could not start (the GitHub account's billing).
 
+## Increment 79 (lot 4): replacements
+
+A session's teacher replaced, and the history of the sessions' changes (FR-PLN-06):
+
+- **Replace** (« Remplacer », on a session of the Planning screen, before it ends): the substitutes offered are the teachers qualified, available and free at its hours, with no other blocking conflict; the database checks them again on writing (AC1). The reason is required. The session becomes `replaced` and keeps the teacher planned; choosing that teacher gives it back to them. Only its teacher changes while it is replaced; it leaves its weekly course, whose changes no longer touch it. A replaced session can still be cancelled.
+- **Session history** (« Historique des séances », in the Planning section): the sessions cancelled, replaced or given back, of a group or all, eight weeks from the day chosen, each change with its reason, the teacher before and after, who made it and when (AC2). Read as the sessions are; never changed.
+- **Notices**: each cancellation, replacement and return of a session not yet over is told to its teachers (the one planned, the one before, the one after) and to the pupils of the group that day, through their accounts, if they read the planning; the author aside. The notice names the session, its group and its day only (BR-19).
+- The teacher replaced still sees the session, in their timetable and on the Planning screen filtered on them; their agenda (ICS) and their week's PDF show it as not theirs to hold. The group's agenda and timetable show the substitute.
+- SQL 064 (`database/schema/064_replacements.sql`, migration `2026_10_17_000064`): the replacement's columns, its rules in the session's guard, the history table, the notices, `school.substitutes(session)`.
+
+Routes: `GET /api/class-sessions/{session}/substitutes`, `POST /api/class-sessions/{session}/replace` (`teacher_id`, `reason`, `version`), `GET /api/session-changes?from=&to=&group_id=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PLN-06 AC1 | tests/sql and `ReplacementTest`: a teacher not qualified refused (`session_teacher_not_qualified`, its message), one busy refused, a reason required, the substitutes listed qualified and free only |
+| FR-PLN-06 AC2 | tests/sql and `ReplacementTest`: the group's history lists the replacement, the return and the cancellation with their reasons and teachers; the substitute reads the changes they were part of, a pupil without the planning none |
+| FR-PLN-06 | tests/sql: the teacher planned kept by the database, the substitute busy at the session's hours and the teacher planned free; the teachers and the pupil who read the planning told of each change, the author and a pupil without the planning not; `ReplacementTest`: the teacher replaced sees the session, their agenda cancels it; the Planning screen replaces, the history screen lists it |
+
+Validation on 17 October 2026: **295 PHP integration tests (14,680 assertions)**; **261 embedded SQL checks and 292 native PostgreSQL 16 checks including concurrency**; migration 064 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 260 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. Versions and publication (FR-PLN-05), replacements (FR-PLN-06).
-3. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
-4. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
+1. Versions and publication (FR-PLN-05).
+2. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
+3. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2
 

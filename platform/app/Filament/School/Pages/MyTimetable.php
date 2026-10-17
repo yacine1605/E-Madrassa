@@ -17,8 +17,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * FR-PLN-04, « Mon emploi du temps »: a teacher's own sessions, four weeks from the day chosen,
- * cancelled ones shown as such, and their agenda file (ICS). Only for a member whose account is a
- * teacher's record; the database says which sessions are theirs.
+ * cancelled ones shown as such, those they replace or were replaced on said so (FR-PLN-06), and their
+ * agenda file (ICS). Only for a member whose account is a teacher's record; the database says which
+ * sessions are theirs.
  */
 final class MyTimetable extends SchoolingPage
 {
@@ -57,7 +58,13 @@ final class MyTimetable extends SchoolingPage
                 TextColumn::make('group_code')->label(__('planning.group')),
                 TextColumn::make('room_code')->label(__('planning.room'))->placeholder(__('planning.no_room')),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('planning.session_states.'.$state))
-                    ->color(fn (string $state) => $state === 'cancelled' ? 'gray' : 'info'),
+                    ->color(fn (string $state) => match ($state) { 'cancelled' => 'gray', 'replaced' => 'warning', default => 'info' })
+                    ->description(fn (array $record) => match (true) {
+                        $record['status'] !== 'replaced' => null,
+                        // The substitute's name, when the teacher may read their record.
+                        (bool) $record['replaced_mine'] => $record['teacher_name'] !== null ? __('planning.replaced_by', ['name' => Formats::isolated($record['teacher_name'])]) : null,
+                        default => $record['replaced_name'] !== null ? __('planning.replaces', ['name' => Formats::isolated($record['replaced_name'])]) : null,
+                    }),
             ])->filters([
                 Filter::make('from')->schema([DatePicker::make('from')->label(__('planning.from'))->default(now()->toDateString())]),
             ])->headerActions([

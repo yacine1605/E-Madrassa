@@ -24,7 +24,7 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning'];
+  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -202,6 +202,12 @@ async function seed(browser, session) {
     const soon = [1, 2, 3, 4, 5, 6].find(n => new Date(Date.now() + n * 86400000).getUTCDay() === 0);
     if (soon !== undefined) await call('class-sessions', { group_id: group.id, subject_id: subject.id, teacher_id: teacher.id, room_id: room.id, day: day(soon),
       start_time: '08:00', end_time: '09:30' });
+    // FR-PLN-06: a session cancelled with its reason, in the history of the sessions.
+    if (soon !== undefined) {
+      const outing = await call('class-sessions', { group_id: group.id, subject_id: subject.id, teacher_id: teacher.id, room_id: room.id, day: day(soon),
+        start_time: '10:00', end_time: '11:00' });
+      await call(`class-sessions/${outing.id}/cancel`, { reason: 'Sortie pédagogique au musée', version: outing.version });
+    }
     // A family who called, with their child, a visit and a reminder (FR-CRM-01); a brother converted into a pupil (FR-CRM-02).
     const lead = await call('leads', { last_name: 'Haddad', first_name: 'Samia', phone: '0661 22 33 44', relationship: 'mother', source: 'social_media',
       children: [{ first_name: 'Yanis', last_name: 'Haddad', birth_date: '2014-02-10', level_id: grade.id }, { first_name: 'Lina', birth_date: '2016-09-01' }] });

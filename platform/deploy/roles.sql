@@ -276,6 +276,11 @@ GRANT EXECUTE ON FUNCTION school.local_day(timestamptz), school.local_at(date, t
   school.plan_series(uuid, uuid, uuid, uuid, integer, time, time, uuid, date, date, uuid),
   school.change_series(uuid, date, uuid, uuid, time, time, integer), school.end_series(uuid, date, integer), school.session_volume(uuid),
   school.sessions_planned_on(uuid, date, date) TO school_runtime;
+-- Replacements (064): a session's teacher replaced with its reason; the history of the sessions' changes read as the sessions
+-- are, written by the database alone.
+GRANT UPDATE (replace_reason) ON school.class_session TO school_runtime;
+GRANT SELECT ON school.session_change TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.substitutes(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -586,6 +591,9 @@ GRANT EXECUTE ON FUNCTION school.local_day(timestamptz), school.local_at(date, t
 ALTER FUNCTION school.session_conflicts(uuid, uuid, uuid, uuid, timestamptz, timestamptz, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.check_class_session() OWNER TO platform_provisioner;
 ALTER FUNCTION school.sessions_planned_on(uuid, date, date) OWNER TO platform_provisioner;
+-- Replacements (064): each change written to the history and told to the teachers and pupils concerned.
+GRANT SELECT, INSERT ON school.session_change TO platform_provisioner;
+ALTER FUNCTION school.record_session_change() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

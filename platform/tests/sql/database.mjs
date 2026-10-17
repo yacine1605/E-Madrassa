@@ -4401,6 +4401,81 @@ await check('a teacher reads the groups they teach, with their members, while th
   await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Remplacée par un autre cours' WHERE id = $1", [taught]);
   assert.deepEqual(await seen(), [[], 0]);
 });
+// Replacements (SQL 064, FR-PLN-06): a substitute qualified, available and free, with the reason; the session given back; the history and the notices.
+await check('a session\'s teacher is replaced by one qualified and free only, with its reason, and given back; the history and the notices keep it (FR-PLN-06)', async () => {
+  const holderAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read']);
+  const substituteAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read']);
+  const pupilAccount = await scopedAccount('student', 'personal', null, ['schedule.session.read']);
+  const silent = await scopedAccount('student', 'personal', null, ['group.group.read']);
+  await as('school_runtime', a, 1);
+  const holder = (await newStaff('Titulaire', 'Nadia')).id;
+  const substitute = (await newStaff('Suppleant', 'Omar')).id;
+  const unqualified = (await newStaff('Autre', 'Sami')).id;
+  const busy = (await newStaff('Occupe', 'Yacine')).id;
+  for (const t of [holder, substitute, busy]) await first(QUALIFY, [a, t, maths, grade, null, null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [holder, holderAccount.user]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [substitute, substituteAccount.user]);
+  const replacing = await planGroup('PLAN-R', planned.other, 10);
+  const pupil = (await newAdult('Eleve', 'Prevenu')).id;
+  await joinGroup(await enroll(pupil, planned.other), replacing);
+  const classmate = (await newAdult('Eleve', 'Sansdroit')).id;
+  await joinGroup(await enroll(classmate, planned.other), replacing);
+  await as(null);
+  await sql('UPDATE school.student SET user_id = $2 WHERE id = ANY ($1::uuid[])', [[pupil], pupilAccount.user]);
+  await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [classmate, silent.user]);
+  await as('school_runtime', a, 1);
+  const day = await dayAfter(planningFrom, 4);
+  const session = (await first(SESSION, [a, replacing, maths, holder, null, day, '18:00', '19:00'])).id;
+  const elsewhere = await planGroup('PLAN-S', planned.other, 10);
+  await first(SESSION, [a, elsewhere, maths, busy, null, day, '18:30', '19:30']);
+  const REPLACE = "UPDATE school.class_session SET teacher_id = $2, status = 'replaced', replace_reason = $3 WHERE id = $1 RETURNING status, teacher_id, replaced_teacher_id";
+  // AC1: not qualified, busy, without a reason, the same teacher: refused.
+  await rejects(REPLACE, [session, unqualified, 'Absence imprévue'], '23514', 'session_teacher_not_qualified');
+  await rejects(REPLACE, [session, busy, 'Absence imprévue'], '23514', 'session_teacher_busy');
+  await rejects(REPLACE, [session, substitute, '   '], '23514', 'reason_required');
+  await rejects(REPLACE, [session, holder, 'Absence imprévue'], '23514', 'session_replacement_same');
+  const candidates = (await sql('SELECT x AS id FROM school.substitutes($1) x', [session])).rows.map(r => r.id);
+  assert.ok(candidates.includes(substitute), 'qualified and free');
+  assert.ok(![holder, busy, unqualified].some(t => candidates.includes(t)), 'neither its teacher, nor one busy or not qualified');
+  // Replaced: the teacher planned kept by the database, whatever the writer says.
+  assert.deepEqual(await first(REPLACE, [session, substitute, 'Formation de l\'enseignante']), { status: 'replaced', teacher_id: substitute, replaced_teacher_id: holder });
+  await rejects('UPDATE school.class_session SET replaced_teacher_id = $2 WHERE id = $1', [session, busy], '42501');
+  // Its hours change no more; the substitute is the one now busy, the teacher planned is free.
+  await rejects("UPDATE school.class_session SET starts_at = starts_at + interval '1 hour', ends_at = ends_at + interval '1 hour' WHERE id = $1", [session], '23514', 'session_replaced');
+  assert.deepEqual((await sql(CONFLICTS, [elsewhere, maths, substitute, null, day, '18:30', '18:45'])).rows.filter(r => r.blocking).map(r => r.conflict), ['session_group_busy', 'session_teacher_busy']);
+  assert.ok(!(await sql(CONFLICTS, [planned.evening, maths, holder, null, day, '18:00', '19:00'])).rows.some(r => r.conflict === 'session_teacher_busy'));
+  // The teacher replaced still reads it.
+  await as('school_runtime', a, holderAccount.user);
+  assert.deepEqual((await sql('SELECT status FROM school.class_session WHERE id = $1', [session])).rows, [{ status: 'replaced' }]);
+  await as('school_runtime', a, 1);
+  // Given back to the teacher planned, then cancelled.
+  assert.deepEqual(await first(REPLACE, [session, holder, 'Formation reportée']), { status: 'planned', teacher_id: holder, replaced_teacher_id: null });
+  await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Sortie au musée' WHERE id = $1", [session]);
+  // AC2: the group's history, read as its sessions are.
+  const history = 'SELECT kind, teacher_id, new_teacher_id, reason FROM school.session_change WHERE group_id = $1 ORDER BY changed_at';
+  assert.deepEqual((await sql(history, [replacing])).rows, [
+    { kind: 'replaced', teacher_id: holder, new_teacher_id: substitute, reason: 'Formation de l\'enseignante' },
+    { kind: 'restored', teacher_id: substitute, new_teacher_id: holder, reason: 'Formation reportée' },
+    { kind: 'cancelled', teacher_id: holder, new_teacher_id: null, reason: 'Sortie au musée' }]);
+  await rejects("UPDATE school.session_change SET reason = 'Autre' WHERE group_id = $1", [replacing], '42501');
+  await as('school_runtime', a, substituteAccount.user);
+  assert.deepEqual((await sql(history, [replacing])).rows.map(r => r.kind), ['replaced', 'restored'], 'the substitute, the changes they were part of');
+  await as('school_runtime', a, silent.user);
+  assert.equal(await count('SELECT count(*) n FROM school.session_change WHERE group_id = $1', [replacing]), 0);
+  // The notices: the teachers and the pupil who read the planning, each change; the author and a pupil without the planning, none.
+  await as(null);
+  const notices = async user => (await sql("SELECT event FROM school.notification WHERE user_id = $1 AND event LIKE 'schedule.%' ORDER BY created_at", [user])).rows.map(r => r.event);
+  assert.deepEqual(await notices(holderAccount.user), ['schedule.session_replaced', 'schedule.session_restored', 'schedule.session_cancelled']);
+  assert.deepEqual(await notices(substituteAccount.user), ['schedule.session_replaced', 'schedule.session_restored']);
+  assert.deepEqual(await notices(pupilAccount.user), ['schedule.session_replaced', 'schedule.session_restored', 'schedule.session_cancelled']);
+  assert.deepEqual([...await notices(silent.user), ...await notices(1)], []);
+  assert.deepEqual((await first("SELECT data FROM school.notification WHERE user_id = $1 AND event = 'schedule.session_cancelled'", [pupilAccount.user])).data,
+    { session_id: session, group_id: replacing, day });
+  await as('school_runtime', a, 1);
+  // A session over is replaced at attendance, not here.
+  const past = (await first('SELECT id FROM school.class_session WHERE status = $1 AND ends_at < now() LIMIT 1', ['planned']));
+  if (past) await rejects(REPLACE, [past.id, substitute, 'Trop tard'], '23514', 'session_ended');
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

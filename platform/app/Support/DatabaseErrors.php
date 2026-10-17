@@ -64,6 +64,7 @@ final class DatabaseErrors
         'session_spans_days', 'session_group_not_active', 'session_outside_group_dates', 'session_day_closed', 'session_subject_outside_program', 'session_not_teacher', 'session_teacher_left', 'session_teacher_not_qualified', 'session_teacher_unavailable',
         'session_teacher_busy', 'session_group_busy', 'session_room_other_site', 'session_room_unavailable', 'session_room_too_small', 'session_room_busy', 'session_pupil_busy', 'session_not_deletable',
         'session_series_refused', 'session_immutable', 'session_locked', 'session_series_empty', 'session_hours_invalid', 'session_series_past', 'session_series_end_later', 'calendar_sessions_planned',
+        'session_replaced', 'session_ended', 'session_replacement_same',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062). */

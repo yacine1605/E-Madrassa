@@ -67,7 +67,26 @@ return [
     'saved_with_warnings' => 'Enregistré, avec ces avertissements',
     'timetable' => 'Emploi du temps',
     'my_timetable' => 'Mon emploi du temps',
-    'my_timetable_help' => 'Vos séances sur quatre semaines, les annulées comprises. L’agenda (ICS) s’importe dans un calendrier à l’heure d’Alger.',
+    'my_timetable_help' => 'Vos séances sur quatre semaines, les annulées comprises, et celles où vous êtes remplacé. L’agenda (ICS) s’importe dans un calendrier à l’heure d’Alger.',
+
+    // FR-PLN-06: replacements and the history of the sessions' changes.
+    'replace_session' => 'Remplacer',
+    'replace_session_help' => 'Le remplaçant est habilité, disponible et libre à ces heures. Choisir l’enseignant prévu lui rend la séance. Les enseignants et les élèves concernés sont prévenus.',
+    'substitute' => 'Remplaçant',
+    'planned_teacher_option' => ':name — enseignant prévu',
+    'no_substitute' => 'Aucun enseignant habilité, disponible et libre à ces heures.',
+    'replaces' => 'remplace :name',
+    'replaced_by' => 'assurée par :name',
+    'substitute_mark' => ':name (remplaçant)',
+    'session_changes' => 'Historique des séances',
+    'session_changes_help' => 'Les séances annulées, remplacées ou rendues à leur enseignant, des huit semaines à partir du jour choisi.',
+    'no_session_change' => 'Aucune séance annulée ni remplacée',
+    'change_kinds' => ['cancelled' => 'Annulée', 'replaced' => 'Remplacée', 'restored' => 'Rendue à son enseignant'],
+    'change' => 'Changement',
+    'before' => 'Avant',
+    'after' => 'Après',
+    'changed_at' => 'Le',
+    'changed_by' => 'Par',
 
     // FR-PLN-03: what is told, never refused.
     'warnings' => [

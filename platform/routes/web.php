@@ -517,6 +517,8 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:schedule.session.read')->group(function () {
                     Route::get('class-sessions', [ClassSessionController::class, 'index']);
                     Route::get('class-sessions/{session}', [ClassSessionController::class, 'show']);
+                    // FR-PLN-06 AC2: the history of the sessions' cancellations and replacements.
+                    Route::get('session-changes', [ClassSessionController::class, 'changes']);
                     Route::get('session-series', [SessionSeriesController::class, 'index']);
                     Route::get('groups/{group}/volume', [SessionSeriesController::class, 'volume']);
                     // FR-PLN-04: a week's timetable in PDF, an agenda file (ICS) in Algiers' time, a teacher's own sessions.
@@ -532,6 +534,9 @@ Route::prefix('api')->group(function () {
                 });
                 Route::middleware('permission:schedule.session.update')->group(function () {
                     Route::put('class-sessions/{session}', [ClassSessionController::class, 'update']);
+                    // FR-PLN-06: a replacement, by a teacher qualified, available and free.
+                    Route::get('class-sessions/{session}/substitutes', [ClassSessionController::class, 'substitutes']);
+                    Route::post('class-sessions/{session}/replace', [ClassSessionController::class, 'replace']);
                     Route::post('session-series/{series}/change', [SessionSeriesController::class, 'change']);
                     Route::post('session-series/{series}/end', [SessionSeriesController::class, 'end']);
                 });

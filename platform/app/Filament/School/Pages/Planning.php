@@ -27,8 +27,9 @@ use Illuminate\Support\Str;
 /**
  * FR-PLN-02 to 04: the planning of a week, by group, teacher or room. A weekly course is planned
  * once with its sessions; a session is added, changed on its own (it leaves its series) or
- * cancelled with its reason. The database refuses what conflicts (SQL 062); what is only a warning
- * is told once saved. The week prints as a timetable and exports to an agenda (ICS).
+ * cancelled with its reason, or its teacher replaced by one qualified, available and free (FR-PLN-06).
+ * The database refuses what conflicts (SQL 062); what is only a warning is told once saved. The week
+ * prints as a timetable and exports to an agenda (ICS).
  */
 final class Planning extends SchoolingPage
 {
@@ -39,6 +40,7 @@ final class Planning extends SchoolingPage
     protected static ?string $module = 'scheduling_manual';
     protected static string|array $routeMiddleware = ['module:scheduling_manual', 'permission:schedule.session.read'];
     private ?array $options = null;
+    private array $substitutes = [];
 
     public static function getNavigationLabel(): string { return __('planning.planning'); }
     public function getTitle(): string { return __('planning.planning'); }
@@ -59,12 +61,16 @@ final class Planning extends SchoolingPage
                     ->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('subject_code')->label(__('planning.subject'))->state(fn (array $record) => $this->label($record['subject_code'], $record['subject_labels'])),
                 TextColumn::make('group_code')->label(__('planning.group'))->state(fn (array $record) => $this->label($record['group_code'], $record['group_labels'])),
-                TextColumn::make('teacher_last_name')->label(__('planning.teacher'))->state(fn (array $record) => $this->teacherName($record)),
+                TextColumn::make('teacher_last_name')->label(__('planning.teacher'))->state(fn (array $record) => $this->teacherName($record))
+                    ->description(fn (array $record) => $record['replaced_teacher_id'] ? __('planning.replaces', ['name' => $this->teacherName(['teacher_last_name' => $record['replaced_last_name'],
+                        'teacher_first_name' => $record['replaced_first_name'], 'teacher_last_name_ar' => $record['replaced_last_name_ar'],
+                        'teacher_first_name_ar' => $record['replaced_first_name_ar']])]) : null),
                 TextColumn::make('room_code')->label(__('planning.room'))->placeholder(__('planning.no_room')),
                 TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('planning.session_states.'.$state))
-                    ->color(fn (string $state) => $state === 'cancelled' ? 'gray' : 'info')
+                    ->color(fn (string $state) => match ($state) { 'cancelled' => 'gray', 'replaced' => 'warning', default => 'info' })
                     ->description(fn (array $record) => $record['cancel_reason'] !== null ? Formats::isolated($record['cancel_reason'])
-                        : ($record['detached'] ? __('planning.detached') : ($record['series_id'] ? __('planning.weekly') : null))),
+                        : ($record['status'] === 'replaced' ? Formats::isolated($record['replace_reason'])
+                        : ($record['detached'] ? __('planning.detached') : ($record['series_id'] ? __('planning.weekly') : null)))),
             ])->filters([
                 Filter::make('week')->schema([DatePicker::make('week')->label(__('planning.week'))->default(now()->toDateString())]),
                 SelectFilter::make('group')->label(__('planning.group'))->options(fn () => $this->options()['groups'])->searchable(),
@@ -100,12 +106,46 @@ final class Planning extends SchoolingPage
                     ->action(fn (array $record, array $data) => SchoolScreen::changeAt('schedule.session.update', $record['site_id'], fn () => SchoolScreen::call('schedule.session.update',
                         ClassSessionController::class, 'update', $this->sessionData($data) + ['version' => (int) $data['version']], ['session' => $record['id']]),
                         fn (array $result) => $this->saved($result))),
+                Action::make('replace')->label(__('planning.replace_session'))->modalDescription(__('planning.replace_session_help'))
+                    ->visible(fn (array $record) => in_array($record['status'], ['planned', 'replaced'], true) && !$record['locked'] && $this->upcoming($record)
+                        && $this->creatable('schedule.session.update', $record['site_id']))
+                    ->fillForm(fn (array $record) => ['id' => $record['id']])
+                    ->schema([Hidden::make('id'), Select::make('teacher_id')->label(__('planning.substitute'))->options(fn (Get $get) => $this->substitutes($get('id')))
+                        ->searchable()->required()->helperText(fn (Get $get) => $this->substitutes($get('id')) === [] ? __('planning.no_substitute') : null), $this->reason()])
+                    ->action(fn (array $record, array $data) => SchoolScreen::changeAt('schedule.session.update', $record['site_id'], fn () => SchoolScreen::call('schedule.session.update',
+                        ClassSessionController::class, 'replace', ['teacher_id' => $data['teacher_id'], 'reason' => $data['reason'], 'version' => $record['version']],
+                        ['session' => $record['id']]), fn (array $result) => $this->saved($result))),
                 Action::make('cancel')->label(__('planning.cancel_session'))->color('danger')->requiresConfirmation()->modalDescription(__('planning.cancel_session_help'))
-                    ->visible(fn (array $record) => $record['status'] === 'planned' && !$record['locked'] && $this->creatable('schedule.session.cancel', $record['site_id']))
+                    ->visible(fn (array $record) => in_array($record['status'], ['planned', 'replaced'], true) && !$record['locked']
+                        && $this->creatable('schedule.session.cancel', $record['site_id']))
                     ->schema([Textarea::make('reason')->label(__('school.reason'))->required()->minLength(3)->maxLength(1000)])
                     ->action(fn (array $record, array $data) => SchoolScreen::changeAt('schedule.session.cancel', $record['site_id'], fn () => SchoolScreen::call('schedule.session.cancel',
                         ClassSessionController::class, 'cancel', ['reason' => $data['reason'], 'version' => $record['version']], ['session' => $record['id']]))),
             ])]);
+    }
+
+    /** Whether the session is not over yet: one over is replaced at attendance. */
+    private function upcoming(array $record): bool
+    {
+        return Carbon::parse($record['day'], 'Africa/Algiers')->addMinutes($this->minutes($record['end_time']))->isFuture();
+    }
+
+    private function minutes(string $time): int
+    {
+        [$hours, $minutes] = array_map('intval', explode(':', $time));
+        return $hours * 60 + $minutes;
+    }
+
+    /** FR-PLN-06: who could replace the session's teacher, the teacher planned said so. */
+    private function substitutes(?string $session): array
+    {
+        if ($session === null) return [];
+        return $this->substitutes[$session] ??= collect(SchoolScreen::call('schedule.session.update', ClassSessionController::class, 'substitutes', [],
+            ['session' => $session])['data'])->mapWithKeys(function (array $row) {
+                $name = $this->teacherName(['teacher_last_name' => $row['last_name_lat'], 'teacher_first_name' => $row['first_name_lat'],
+                    'teacher_last_name_ar' => $row['last_name_ar'], 'teacher_first_name_ar' => $row['first_name_ar']]).' ('.$row['staff_number'].')';
+                return [$row['id'] => $row['planned'] ? __('planning.planned_teacher_option', ['name' => $name]) : $name];
+            })->all();
     }
 
     /** The week the filter's day falls in, from the school's first day of the week. */
