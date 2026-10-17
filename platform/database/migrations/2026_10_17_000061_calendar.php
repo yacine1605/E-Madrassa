@@ -20,7 +20,9 @@ return new class extends Migration {
             DROP FUNCTION school.guard_time_slot();
             DROP FUNCTION school.guard_calendar_exception();
             DELETE FROM platform.audit_domain WHERE object_type IN ('calendar_exception', 'time_slot');
+            ALTER TABLE school.role_permission DISABLE TRIGGER USER;
             DELETE FROM school.role_permission WHERE permission_code = 'schedule.calendar.manage';
+            ALTER TABLE school.role_permission ENABLE TRIGGER USER;
             DELETE FROM platform.role_template_permission WHERE permission_code = 'schedule.calendar.manage';
             DELETE FROM platform.permission WHERE code = 'schedule.calendar.manage';
             SQL);

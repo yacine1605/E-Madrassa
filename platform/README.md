@@ -1557,13 +1557,36 @@ Routes: `GET /api/dashboards/finance?from=&to=`, `GET /api/dashboards/finance/pr
 
 Validation on 17 October 2026: **302 PHP integration tests (15,524 assertions)**; **266 embedded SQL checks and 297 native PostgreSQL 16 checks including concurrency**; migration 069 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 280 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 85 (lot 4): the operational dashboard
+
+The operational dashboard (FR-TDB-02; FR-TDB-03 for a group's sessions):
+
+- **Operational dashboard** (« Tableau de bord opérationnel », Dashboards section, `dashboard.operations.read`), group by group, each figure counted from the rows when read, its basis on its heading, the time of computation said:
+  - **fill**: the group's members today over its capacity, counted as its composition list and the capacity rule count them (AC1);
+  - over a period of days (400 at most): the **sessions held** (begun, not cancelled), the **teacher's attendance validated** over them, the sessions **entered by no one**, the **roll calls not taken** (a roll not called is no absence), the pupils' **absences** over the marks and their **lates**;
+  - for the whole school: the **enrolments waiting**, and the period's **prospects**, registered and lost, with the conversion rate.
+- **Scope by role** (« un enseignant voit ses groupes, le surveillant la présence »): the groups of the reader's grant, for the whole school, its sites, levels or groups, or a teacher's own (a personal grant: the groups they lead or teach, as SQL 063 opens them); the fill also within `group.group.read`; the school's figures only for whoever holds the dashboard and the enrolments' or prospects' read for the whole school. The grant is added to the direction, the pedagogy head and the teachers.
+- **Sessions**: a group's sessions held in the period, with their teacher's attendance and roll call, those the reader may read.
+- The figures of a module the school does not use do not appear (BR-20).
+- SQL 070 (`database/schema/070_operations_dashboard.sql`, migration `2026_10_17_000070`).
+
+Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operations/sessions?group=&from=&to=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-TDB-02 AC1 | tests/sql: every open group's members equal its composition list (memberships in force), its capacity its own; `OperationsDashboardTest`: 2 members of 25, 8.0 %, the composition list read through the API |
+| FR-TDB-02 | tests/sql: every group's sessions held, attendance entered, validated and missing, roll calls and marks counted again from the rows; enrolments waiting and prospects; refused without the grant and for a period over 400 days. `OperationsDashboardTest`: one absent of two marks, a session entered by no one |
+| FR-TDB-02, FR-TDB-03 | tests/sql: a grant limited to a site sees its groups only and none of the school's figures, and is refused another site's sessions. `OperationsDashboardTest`: a teacher sees their own group only and is refused another's sessions; an accountant has no dashboard; the screen and a group's sessions |
+
+Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. The operational dashboard (FR-TDB-02) and the dashboards' exports (FR-TDB-03); then lot 4's exit review.
+1. The dashboards' exports (FR-TDB-03); then lot 4's exit review.
 
 ## Next increments of lot 2
 

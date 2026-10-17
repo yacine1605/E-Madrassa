@@ -4818,6 +4818,61 @@ await check('the finance dashboard\'s figures equal their source operations, mon
   assert.ok(programs.length > 0);
   await as('school_runtime', a, 1);
 });
+// The operational dashboard (SQL 070, FR-TDB-02): each figure counted from the rows, within the reader's groups.
+await check('the operational dashboard counts a group\'s fill as its composition list and its sessions\' attendance from the rows, within the reader\'s scope (FR-TDB-02 AC1)', async () => {
+  const reader = await scopedAccount('internal', 'tenant', null, ['dashboard.operations.read', 'group.group.read', 'enrollment.enrollment.read', 'crm.lead.read']);
+  const sited = await scopedAccount('internal', 'site', [siteA], ['dashboard.operations.read', 'group.group.read', 'enrollment.enrollment.read', 'crm.lead.read']);
+  const blind = await scopedAccount('internal', 'tenant', null, ['group.group.read']);
+  const [from, to] = [(await first("SELECT (current_date - 400)::text AS d")).d, (await first('SELECT current_date::text AS d')).d];
+  const read = async user => {
+    await as('school_runtime', a, user);
+    const rows = (await sql('SELECT group_id, indicator, value FROM school.operations_dashboard($1::date, $2::date)', [from, to])).rows;
+    await as(null);
+    return rows;
+  };
+  await as('school_runtime', a, blind.user);
+  await rejects('SELECT * FROM school.operations_dashboard($1::date, $2::date)', [from, to], '42501', 'permission_denied');
+  await as('school_runtime', a, reader.user);
+  await rejects('SELECT * FROM school.operations_dashboard($1::date, $2::date)', [to, from], '23514', 'dashboard_range_invalid');
+  const rows = await read(reader.user);
+  const figure = (group, indicator) => rows.find(r => r.group_id === group && r.indicator === indicator)?.value;
+  // AC1: a group's members are those of its composition list, over its capacity.
+  const open = (await sql("SELECT id, capacity FROM school.study_group WHERE tenant_id = $1 AND status = 'active' AND archived_at IS NULL", [a])).rows;
+  assert.ok(open.length > 0);
+  for (const g of open) {
+    assert.equal(figure(g.id, 'capacity'), g.capacity);
+    assert.equal(figure(g.id, 'members'), await count('SELECT count(*) n FROM school.group_membership WHERE group_id = $1 AND valid_to IS NULL', [g.id]));
+  }
+  // The sessions held, their teacher's attendance and their roll calls, counted again from the rows.
+  const held = (await sql(`SELECT c.group_id, count(*)::int AS held, count(t.id)::int AS entered, count(*) FILTER (WHERE t.validation_status = 'validated')::int AS validated,
+      count(*) FILTER (WHERE EXISTS (SELECT 1 FROM school.student_attendance s WHERE s.session_id = c.id AND s.archived_at IS NULL))::int AS roll
+    FROM school.class_session c LEFT JOIN school.teacher_attendance t ON t.session_id = c.id
+    WHERE c.tenant_id = $1 AND c.status <> 'cancelled' AND c.starts_at <= now() AND school.local_day(c.starts_at) BETWEEN $2::date AND $3::date GROUP BY 1`, [a, from, to])).rows;
+  assert.ok(held.some(h => h.entered > 0) && held.some(h => h.roll > 0), 'the suite\'s attendance is there');
+  for (const h of held) {
+    assert.deepEqual([figure(h.group_id, 'sessions_held'), figure(h.group_id, 'teacher_entered'), figure(h.group_id, 'teacher_validated'),
+      figure(h.group_id, 'teacher_missing'), figure(h.group_id, 'roll_taken'), figure(h.group_id, 'roll_missing')],
+      [h.held, h.entered, h.validated, h.held - h.entered, h.roll, h.held - h.roll], h.group_id);
+    const marks = await count(`SELECT count(*) n FROM school.student_attendance s JOIN school.class_session c ON c.id = s.session_id
+      WHERE c.group_id = $1 AND s.archived_at IS NULL AND c.status <> 'cancelled' AND c.starts_at <= now() AND school.local_day(c.starts_at) BETWEEN $2::date AND $3::date`, [h.group_id, from, to]);
+    assert.equal(figure(h.group_id, 'marks') ?? 0, marks);
+  }
+  assert.equal(figure(null, 'enrollments_pending'), await count("SELECT count(*) n FROM school.enrollment WHERE tenant_id = $1 AND status = 'pending' AND archived_at IS NULL", [a]));
+  assert.equal(figure(null, 'leads_created'), await count('SELECT count(*) n FROM school.lead WHERE tenant_id = $1 AND school.local_day(created_at) BETWEEN $2::date AND $3::date', [a, from, to]));
+  // A grant limited to a site: the groups of that site, and none of the school's figures.
+  const sitedRows = await read(sited.user);
+  const elsewhere = (await sql('SELECT id FROM school.study_group WHERE tenant_id = $1 AND site_id <> $2', [a, siteA])).rows.map(r => r.id);
+  assert.ok(sitedRows.length > 0 && sitedRows.every(r => r.group_id !== null && !elsewhere.includes(r.group_id)));
+  // A group's sessions behind its figures: the same as its held sessions; another site's group refused to the site's reader.
+  const busy = held.find(h => h.entered > 0);
+  await as('school_runtime', a, reader.user);
+  assert.equal((await sql('SELECT * FROM school.operations_sessions($1, $2::date, $3::date)', [busy.group_id, from, to])).rows.length, busy.held);
+  if (elsewhere.length > 0) {
+    await as('school_runtime', a, sited.user);
+    await rejects('SELECT * FROM school.operations_sessions($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
+  }
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
