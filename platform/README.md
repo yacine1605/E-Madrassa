@@ -1596,11 +1596,15 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 ## Next increments of lot 4
 
-1. Lot 4's exit review: `TST-05`, `TST-15`, `TST-16` green; the validated hours delivered in the pays.
+Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
+
+1. The finance dashboard's result on a basis the school chooses (cash or billed and committed), and the common costs and pays shared among the programmes, the method shown (FR-TDB-01).
+2. Absences per pupil and their trend over the period (FR-TDB-02).
 
 ## Next increments of lot 2
 
 1. A full group's waiting list once OD-14 is decided. Replacements' groups (the rest of TST-03) come with lot 4's sessions.
-2. The dashboard's conversion rate comes with lot 5's dashboards.
+
+The conversion rate is on the operational dashboard since increment 85.
 
 Lot 1's last exit item is closed: the Arabic labels were confirmed by a native speaker on 16 October 2026, and Arabic keeps the system's font (decision of the same day).
