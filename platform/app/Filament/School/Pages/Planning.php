@@ -25,11 +25,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * FR-PLN-02 to 04: the planning of a week, by group, teacher or room. A weekly course is planned
+ * FR-PLN-02 to 04: the planning of a week or a month, by group, teacher or room. A weekly course is planned
  * once with its sessions; a session is added, changed on its own (it leaves its series) or
  * cancelled with its reason, or its teacher replaced by one qualified, available and free (FR-PLN-06).
  * The database refuses what conflicts (SQL 062); what is only a warning is told once saved. The week
- * prints as a timetable and exports to an agenda (ICS).
+ * and the month print as a timetable and export to an agenda (ICS).
  */
 final class Planning extends SchoolingPage
 {
@@ -48,7 +48,7 @@ final class Planning extends SchoolingPage
     public function table(Table $table): Table
     {
         return $table->records(function (array $filters, int $page, int $recordsPerPage) {
-            [$from, $to] = $this->week($filters);
+            [$from, $to] = $this->period($filters);
             return $this->apiPage(static::$permissions, ClassSessionController::class, 'index', array_filter(['from' => $from, 'to' => $to,
                 'group_id' => $filters['group']['value'] ?? null, 'teacher_id' => $filters['teacher']['value'] ?? null, 'room_id' => $filters['room']['value'] ?? null,
                 'include_cancelled' => ($filters['cancelled']['isActive'] ?? false) ?: null]), $page, $recordsPerPage);
@@ -72,7 +72,11 @@ final class Planning extends SchoolingPage
                         : ($record['status'] === 'replaced' ? Formats::isolated($record['replace_reason'])
                         : ($record['detached'] ? __('planning.detached') : ($record['series_id'] ? __('planning.weekly') : null)))),
             ])->filters([
-                Filter::make('week')->schema([DatePicker::make('week')->label(__('planning.week'))->default(now()->toDateString())]),
+                Filter::make('week')->schema([
+                    Select::make('span')->label(__('planning.span'))->options(['week' => __('planning.span_week'), 'month' => __('planning.span_month')])
+                        ->default('week')->selectablePlaceholder(false)->live(),
+                    DatePicker::make('week')->label(fn (Get $get) => $get('span') === 'month' ? __('planning.month_of') : __('planning.week'))
+                        ->default(now()->toDateString())]),
                 SelectFilter::make('group')->label(__('planning.group'))->options(fn () => $this->options()['groups'])->searchable(),
                 SelectFilter::make('teacher')->label(__('planning.teacher'))->options(fn () => $this->options()['teachers'])->searchable(),
                 SelectFilter::make('room')->label(__('planning.room'))->options(fn () => $this->options()['rooms'])->searchable(),
@@ -80,6 +84,8 @@ final class Planning extends SchoolingPage
             ])->headerActions([
                 Action::make('pdf')->label(__('planning.print_week'))->color('gray')->url(fn () => $this->exportUrl('pdf'), shouldOpenInNewTab: true)
                     ->visible(fn () => $this->exportUrl('pdf') !== null),
+                Action::make('month')->label(__('planning.print_month'))->color('gray')->url(fn () => $this->exportUrl('month'), shouldOpenInNewTab: true)
+                    ->visible(fn () => $this->exportUrl('month') !== null),
                 Action::make('ics')->label(__('planning.export_ics'))->color('gray')->url(fn () => $this->exportUrl('ics'))
                     ->visible(fn () => $this->exportUrl('ics') !== null),
                 Action::make('session')->label(__('planning.add_session'))->visible(fn () => $this->creatable('schedule.session.create'))
@@ -148,6 +154,14 @@ final class Planning extends SchoolingPage
             })->all();
     }
 
+    /** The week or the month the filter's day falls in. */
+    private function period(array $filters): array
+    {
+        if (($filters['week']['span'] ?? 'week') !== 'month') return $this->week($filters);
+        $day = Carbon::parse($filters['week']['week'] ?? now()->toDateString());
+        return [$day->copy()->startOfMonth()->toDateString(), $day->copy()->endOfMonth()->toDateString()];
+    }
+
     /** The week the filter's day falls in, from the school's first day of the week. */
     private function week(array $filters): array
     {
@@ -157,7 +171,7 @@ final class Planning extends SchoolingPage
         return [$day->toDateString(), $day->copy()->addDays(6)->toDateString()];
     }
 
-    /** The week's timetable (PDF) or its agenda (ICS), of the group, teacher or room filtered; none before one is chosen. */
+    /** The week's or the month's timetable (PDF), or the agenda (ICS) from the period's start, of the group, teacher or room filtered; none before one is chosen. */
     private function exportUrl(string $kind): ?string
     {
         $filters = $this->tableFilters ?? [];
@@ -165,9 +179,12 @@ final class Planning extends SchoolingPage
             'room_id' => $filters['room']['value'] ?? null]);
         if ($scope === []) return null;
         $scope = array_slice($scope, 0, 1, true);
-        [$from, $to] = $this->week($filters);
-        return $kind === 'pdf' ? url('/api/timetable/week.pdf?'.http_build_query($scope + ['week' => $from]))
-            : url('/api/timetable/calendar.ics?'.http_build_query($scope + ['from' => $from, 'to' => Carbon::parse($from)->addDays(90)->toDateString()]));
+        [$from] = $this->period($filters);
+        return match ($kind) {
+            'pdf' => url('/api/timetable/week.pdf?'.http_build_query($scope + ['week' => $this->week($filters)[0]])),
+            'month' => url('/api/timetable/month.pdf?'.http_build_query($scope + ['month' => Carbon::parse($filters['week']['week'] ?? now()->toDateString())->format('Y-m')])),
+            default => url('/api/timetable/calendar.ics?'.http_build_query($scope + ['from' => $from, 'to' => Carbon::parse($from)->addDays(90)->toDateString()])),
+        };
     }
 
     /** What the reader may plan with: the active groups, the teachers still with the school, the rooms in use, the subjects, the slots. */

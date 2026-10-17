@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * FR-PLN-04: the planning as others read it. A week's timetable of a group, a teacher or a room
- * in PDF, the open days in columns (RTL in Arabic); the sessions of a stretch of days as an
+ * in PDF, the open days in columns (RTL in Arabic), and a month's, its weeks in rows; the sessions of a stretch of days as an
  * iCalendar file in Algiers' time (AC1); a teacher's own sessions. Cancelled sessions appear as
  * such. What the reader may not see the database keeps from them (SQL 062). A session replaced
  * (FR-PLN-06) shows its substitute; to the teacher replaced it shows as not theirs to hold, and
@@ -60,12 +60,12 @@ final class TimetableController
     {
         $data = $this->filters($request) + $request->validate(['week' => 'required|date_format:Y-m-d']);
         [$where, $bindings, $name] = $this->scope($data);
-        $first = (int) json_decode(DB::selectOne("SELECT school.setting_value('calendar.first_day_of_week') AS v")->v ?? '0');
+        $first = $this->firstDay();
         $start = Carbon::parse($data['week']);
         while ($start->dayOfWeek !== $first) $start = $start->subDay();
         $end = $start->copy()->addDays(6);
         $rows = $this->sessions($where, $bindings, $start->toDateString(), $end->toDateString(), true);
-        $open = json_decode(DB::selectOne("SELECT school.setting_value('calendar.open_days') AS v")->v, true) ?? [];
+        $open = $this->openDays();
         $locale = app()->getLocale();
         $days = [];
         for ($day = $start->copy(); $day <= $end; $day = $day->addDay()) {
@@ -88,6 +88,43 @@ final class TimetableController
         return response($pdf, 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="planning.pdf"', 'Cache-Control' => 'private, no-store']);
     }
 
+    /**
+     * A month's timetable in PDF: its weeks in rows, as the school starts them, the open days in columns
+     * (and any other day a session falls on), each day its sessions in order; cancelled ones struck through.
+     */
+    public function month(Request $request)
+    {
+        $data = $this->filters($request) + $request->validate(['month' => 'required|date_format:Y-m']);
+        [$where, $bindings, $name] = $this->scope($data);
+        $first = $this->firstDay();
+        $month = Carbon::parse($data['month'].'-01');
+        $end = $month->copy()->endOfMonth()->startOfDay();
+        $rows = $this->sessions($where, $bindings, $month->toDateString(), $end->toDateString(), true);
+        $open = $this->openDays();
+        $taken = array_unique(array_map(fn (object $row) => Carbon::parse($row->day)->dayOfWeek, $rows));
+        $weekdays = array_values(array_filter(array_map(fn (int $i) => ($first + $i) % 7, range(0, 6)),
+            fn (int $weekday) => in_array($weekday, $open, true) || in_array($weekday, $taken, true)));
+        $sessions = [];
+        foreach ($rows as $row) {
+            $sessions[$row->day][] = ['hours' => $row->start_time.'–'.$row->end_time, 'subject' => $row->subject_code, 'room' => $row->room_code,
+                'who' => isset($data['group_id']) ? $this->holder($row) : $row->group_code, 'cancelled' => $row->status === 'cancelled' || $this->away($row, $data)];
+        }
+        $start = $month->copy();
+        while ($start->dayOfWeek !== $first) $start = $start->subDay();
+        $weeks = [];
+        for ($week = $start; $week <= $end; $week = $week->copy()->addDays(7)) {
+            $weeks[] = array_map(function (int $weekday) use ($week, $first, $month, $sessions) {
+                $day = $week->copy()->addDays(($weekday - $first + 7) % 7);
+                return ['in' => $day->month === $month->month, 'day' => $day->day, 'sessions' => $sessions[$day->toDateString()] ?? []];
+            }, $weekdays);
+        }
+        $locale = app()->getLocale();
+        $pdf = $this->pdf->render('timetable-month', ['subject' => $name, 'month' => __('finance.months')[$month->month].' '.$month->year,
+            'columns' => array_map(fn (int $weekday) => __('admin.days')[$weekday], $weekdays), 'weeks' => $weeks, 'empty' => $rows === []], $locale,
+            $month->format('Y-m'), __('planning.timetable'), 'A4-L');
+        return response($pdf, 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="planning.pdf"', 'Cache-Control' => 'private, no-store']);
+    }
+
     /** A teacher's own sessions from one day until another (62 at most): those they teach, as the database finds them theirs, and those they were replaced on. */
     public function mine(Request $request)
     {
@@ -96,6 +133,17 @@ final class TimetableController
         $rows = $this->sessions(self::MINE, [], $data['from'], $data['to'], true);
         return ['data' => array_map(fn (object $row) => [...((array) $row), 'subject_labels' => json_decode((string) $row->subject_labels, true),
             'teacher_name' => $this->teacher($row), 'replaced_name' => $this->teacher($row, 'replaced_')], $rows)];
+    }
+
+    /** The day the school starts its weeks on (0, Sunday, to 6). */
+    private function firstDay(): int
+    {
+        return (int) json_decode(DB::selectOne("SELECT school.setting_value('calendar.first_day_of_week') AS v")->v ?? '0');
+    }
+
+    private function openDays(): array
+    {
+        return json_decode(DB::selectOne("SELECT school.setting_value('calendar.open_days') AS v")->v, true) ?? [];
     }
 
     private function filters(Request $request): array

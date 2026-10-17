@@ -1580,6 +1580,17 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 89 (lot 4): the planning by month
+
+FR-PLN-04's monthly view:
+
+- **The Planning screen** reads a week or a month (« Période »): the sessions of the month the day chosen falls in, by group, teacher or room, with the same actions as the week's.
+- **A month's timetable in PDF** (« Imprimer le mois », on the Planning screen once a group, a teacher or a room is chosen, and on « Mon emploi du temps » for a teacher's own): the month's weeks in rows, from the day the school starts its weeks on, the open days in columns (and any other day a session falls on), each day its sessions with their hours, subject, teacher or group, and room; cancelled sessions struck through, and those a teacher was replaced on struck through in their own timetable. Right to left in Arabic. `GET /api/timetable/month.pdf?{group_id|teacher_id|room_id|mine}=&month=YYYY-MM`.
+
+The pupils' and parents' own timetables come with the portal (lot 10).
+
+Validation on 17 October 2026: **305 PHP integration tests (15,958 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 852 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 88 (lot 4): absences per pupil and their trend
 
 The rest of FR-TDB-02, on the operational dashboard, within the groups the reader's `dashboard.operations.read` opens and while the planning and attendance modules are active:
@@ -1617,7 +1628,8 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow; otherwise lot 5.
+1. Absence thresholds the school sets, and the pupils' guardians told by their contacts when one is crossed (FR-PRE-01).
+2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
 
 ## Next increments of lot 2
 

@@ -75,7 +75,7 @@ Toutes sont livrées en partie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). 
 | Exigence | Reste |
 |---|---|
 | FR-PLN-01 à 03 | rien de bloquant ; les avertissements (heures par jour et semaine, volume, temps de trajet) ne bloquent jamais, comme voulu |
-| FR-PLN-04 | vue mensuelle, emploi du temps des élèves et des parents avec le portail (lot 10) |
+| FR-PLN-04 | vue mensuelle (livrée depuis, à l'incrément 89), emploi du temps des élèves et des parents avec le portail (lot 10) |
 | FR-PLN-05 | portée de publication retenue : toute l'école, par période (proposée le 17 octobre, sans réponse contraire) |
 | FR-PLN-06 | rien de bloquant |
 | FR-PTG-01 à 03 | rien de bloquant |

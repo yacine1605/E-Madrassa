@@ -13,6 +13,7 @@ return [
     'rows' => ':count ligne(s)',
     'hours' => 'Heures',
     'no_session' => 'Aucune séance cette semaine.',
+    'no_session_month' => 'Aucune séance ce mois-ci.',
     'payment_receipt' => 'Reçu de paiement',
     'refund_receipt' => 'Reçu de remboursement',
     'duplicate' => 'DUPLICATA',

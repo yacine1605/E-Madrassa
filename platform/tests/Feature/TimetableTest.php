@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * The planning as it is read (FR-PLN-04, FR-PLN-02): the week's screen that plans, changes and
- * cancels; a teacher's own timetable; a week's timetable in PDF and an agenda file whose hours an
+ * cancels, a week or a month; a teacher's own timetable; a week's and a month's timetable in PDF and an agenda file whose hours an
  * agenda shows in Algiers' time (AC1).
  */
 final class TimetableTest extends TestCase
@@ -76,6 +76,20 @@ final class TimetableTest extends TestCase
         foreach (['Emploi du temps', '4AM-1', '08:00–09:30', 'Meziane Karim', 'A101', 'dimanche'] as $expected) $this->assertStringContainsString($expected, $text);
         $text = $this->text($this->get("/api/timetable/week.pdf?teacher_id={$s['teacher']}&week={$series['first']}")->assertOk()->getContent());
         $this->assertStringContainsString('4AM-1', $text);
+        // The month's timetable: its weeks in rows, each day its sessions, the cancelled one too.
+        $month = Carbon::parse($series['first']);
+        $inMonth = collect($sessions)->filter(fn (array $row) => substr($row['day'], 0, 7) === $month->format('Y-m'))->count();
+        // Read with its lines joined: a day's column is narrow, and wraps a session's text.
+        $text = preg_replace('/\s+/u', ' ', str_replace("\u{00A0}", ' ', $this->text($this->get("/api/timetable/month.pdf?group_id={$s['group']}&month=".$month->format('Y-m'))
+            ->assertOk()->assertHeader('Content-Type', 'application/pdf')->getContent())));
+        foreach (['Emploi du temps', '4AM-1', __('finance.months')[$month->month].' '.$month->year, 'Meziane Karim', 'A101', 'dimanche'] as $expected) {
+            $this->assertStringContainsString($expected, $text);
+        }
+        $this->assertSame($inMonth, substr_count($text, '08:00–09:30'));
+        $this->assertStringNotContainsString(__('pdf.no_session_month'), $text);
+        $this->assertStringContainsString(__('pdf.no_session_month'), $this->text($this->get("/api/timetable/month.pdf?room_id={$s['room']}&month=2020-01")->assertOk()->getContent()));
+        $this->getJson("/api/timetable/month.pdf?group_id={$s['group']}&month=2026-13")->assertStatus(422);
+        $this->getJson('/api/timetable/month.pdf?month='.$month->format('Y-m'))->assertStatus(422)->assertJsonPath('code', 'timetable_scope_required');
     }
 
     public function test_the_planning_page_plans_a_weekly_course_changes_and_cancels_a_session(): void
@@ -89,6 +103,12 @@ final class TimetableTest extends TestCase
                 'date_to' => Carbon::parse($first)->addWeeks(1)->toDateString()])->assertHasNoTableActionErrors()->assertNotified(__('school.saved'));
             $sessions = DB::table('school.class_session')->where('group_id', $s['group'])->orderBy('starts_at')->get();
             $this->assertCount(2, $sessions);
+            // The month the day falls in: its sessions, not only the week's.
+            $month = $sessions->filter(fn ($row) => Carbon::parse($row->starts_at)->timezone('Africa/Algiers')->format('Y-m') === Carbon::parse($first)->format('Y-m'))
+                ->pluck('id')->all();
+            Livewire::test(Planning::class)->filterTable('week', ['span' => 'month', 'week' => $first])->assertCanSeeTableRecords($month)
+                ->assertCountTableRecords(count($month))->assertSee(__('planning.month_of'));
+            Livewire::test(Planning::class)->filterTable('week', ['span' => 'week', 'week' => $first])->assertCountTableRecords(1);
             $page = Livewire::test(Planning::class)->filterTable('week', ['week' => $first])->assertCanSeeTableRecords([$sessions[0]->id])->assertSee('10:00–12:00');
             $page->callTableAction('change', $sessions[0]->id, data: ['start_time' => '13:00', 'end_time' => '14:00'])->assertHasNoTableActionErrors()
                 ->assertNotified(__('school.saved'));
@@ -120,7 +140,12 @@ final class TimetableTest extends TestCase
         $this->getJson("/api/timetable/mine?from={$series['first']}&to=$to")->assertOk()->assertJsonCount(4, 'data')->assertJsonPath('data.0.group_code', '4AM-1');
         $ics = $this->get("/api/timetable/calendar.ics?mine=1&from={$series['first']}&to=$to")->assertOk()->getContent();
         $this->assertSame(4, substr_count($ics, 'BEGIN:VEVENT'));
-        $this->get('/school/my-timetable')->assertOk();
+        // Their month: their own sessions, not their colleague's in the same group.
+        $text = $this->text($this->get('/api/timetable/month.pdf?mine=1&month='.substr($series['first'], 0, 7))->assertOk()->getContent());
+        $this->assertStringContainsString(__('planning.my_timetable'), $text);
+        $this->assertStringContainsString('08:00–09:30', $text);
+        $this->assertStringNotContainsString('10:00–11:00', $text);
+        $this->get('/school/my-timetable')->assertOk()->assertSee(__('planning.print_month'));
         $this->within($s['school'], $account, function () use ($series) {
             Livewire::test(MyTimetable::class)->filterTable('from', ['from' => $series['first']])->assertSee('08:00–09:30')->assertDontSee('10:00–11:00');
         });

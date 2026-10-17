@@ -527,8 +527,9 @@ Route::prefix('api')->group(function () {
                     Route::get('session-changes', [ClassSessionController::class, 'changes']);
                     Route::get('session-series', [SessionSeriesController::class, 'index']);
                     Route::get('groups/{group}/volume', [SessionSeriesController::class, 'volume']);
-                    // FR-PLN-04: a week's timetable in PDF, an agenda file (ICS) in Algiers' time, a teacher's own sessions.
+                    // FR-PLN-04: a week's or a month's timetable in PDF, an agenda file (ICS) in Algiers' time, a teacher's own sessions.
                     Route::get('timetable/week.pdf', [TimetableController::class, 'pdf']);
+                    Route::get('timetable/month.pdf', [TimetableController::class, 'month']);
                     Route::get('timetable/calendar.ics', [TimetableController::class, 'ics']);
                     Route::get('timetable/mine', [TimetableController::class, 'mine']);
                 });

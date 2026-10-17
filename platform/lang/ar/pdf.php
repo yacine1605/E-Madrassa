@@ -13,6 +13,7 @@ return [
     'rows' => 'عدد الأسطر: :count',
     'hours' => 'الساعات',
     'no_session' => 'لا حصة في هذا الأسبوع.',
+    'no_session_month' => 'لا حصة في هذا الشهر.',
     'payment_receipt' => 'وصل دفع',
     'refund_receipt' => 'وصل استرداد',
     'duplicate' => 'نسخة طبق الأصل',

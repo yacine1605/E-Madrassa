@@ -17,8 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * FR-PLN-04, « Mon emploi du temps »: a teacher's own sessions, four weeks from the day chosen,
- * cancelled ones shown as such, those they replace or were replaced on said so (FR-PLN-06), and their
- * agenda file (ICS). Only for a member whose account is a teacher's record; the database says which
+ * cancelled ones shown as such, those they replace or were replaced on said so (FR-PLN-06), their
+ * month's timetable (PDF) and their agenda file (ICS). Only for a member whose account is a teacher's record; the database says which
  * sessions are theirs.
  */
 final class MyTimetable extends SchoolingPage
@@ -68,6 +68,9 @@ final class MyTimetable extends SchoolingPage
             ])->filters([
                 Filter::make('from')->schema([DatePicker::make('from')->label(__('planning.from'))->default(now()->toDateString())]),
             ])->headerActions([
+                Action::make('month')->label(__('planning.print_month'))->color('gray')
+                    ->url(fn () => url('/api/timetable/month.pdf?'.http_build_query(['mine' => 1, 'month' => substr($this->range($this->tableFilters ?? [])[0], 0, 7)])),
+                        shouldOpenInNewTab: true),
                 Action::make('ics')->label(__('planning.export_ics'))->color('gray')
                     ->url(fn () => url('/api/timetable/calendar.ics?'.http_build_query(['mine' => 1, 'from' => $this->range($this->tableFilters ?? [])[0],
                         'to' => Carbon::parse($this->range($this->tableFilters ?? [])[0])->addDays(90)->toDateString()]))),
