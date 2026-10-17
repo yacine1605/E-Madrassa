@@ -62,6 +62,7 @@ use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
 use App\Http\Controllers\TimeSlotController;
+use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\UnavailabilityController;
 use Illuminate\Support\Facades\Route;
 
@@ -518,6 +519,10 @@ Route::prefix('api')->group(function () {
                     Route::get('class-sessions/{session}', [ClassSessionController::class, 'show']);
                     Route::get('session-series', [SessionSeriesController::class, 'index']);
                     Route::get('groups/{group}/volume', [SessionSeriesController::class, 'volume']);
+                    // FR-PLN-04: a week's timetable in PDF, an agenda file (ICS) in Algiers' time, a teacher's own sessions.
+                    Route::get('timetable/week.pdf', [TimetableController::class, 'pdf']);
+                    Route::get('timetable/calendar.ics', [TimetableController::class, 'ics']);
+                    Route::get('timetable/mine', [TimetableController::class, 'mine']);
                 });
                 Route::post('class-sessions/check', [ClassSessionController::class, 'check'])->middleware('permission:schedule.session.create,schedule.session.update');
                 Route::middleware('permission:schedule.session.create')->group(function () {

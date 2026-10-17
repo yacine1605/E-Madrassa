@@ -4375,6 +4375,32 @@ await check('sessions are read on their group\'s site, planned within the grant\
   assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'class_session'") > 0);
   await as('school_runtime', a, 1);
 });
+// The planning as a teacher reads it (SQL 063, FR-PLN-04, FR-IAM-04): the groups they teach, with their pupils.
+await check('a teacher reads the groups they teach, with their members, while they teach them; not the others (FR-PLN-04, FR-IAM-04)', async () => {
+  const own = await scopedAccount('internal', 'personal', null, ['group.group.read', 'schedule.session.read']);
+  await as('school_runtime', a, 1);
+  const lyes = (await newStaff('Enseigne', 'Lyes')).id;
+  await first(QUALIFY, [a, lyes, maths, grade, null, null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [lyes, own.user]);
+  const seen = async () => {
+    await as('school_runtime', a, own.user);
+    const groups = (await sql('SELECT id FROM school.study_group WHERE id = ANY ($1::uuid[])', [[planned.group, planned.evening]])).rows.map(r => r.id);
+    const members = await count('SELECT count(*) n FROM school.group_membership WHERE group_id = $1', [planned.evening]);
+    await as('school_runtime', a, 1);
+    return [groups, members];
+  };
+  assert.deepEqual(await seen(), [[], 0]);
+  const taught = (await first(SESSION, [a, planned.evening, maths, lyes, null, await dayAfter(planningFrom, 4), '15:00', '16:00'])).id;
+  const [groups, members] = await seen();
+  assert.deepEqual(groups, [planned.evening], 'the group they teach, not the other');
+  assert.ok(members > 0, 'with its members');
+  await as('school_runtime', a, own.user);
+  assert.equal(await count('SELECT count(*) n FROM school.class_session WHERE id = $1', [taught]), 1);
+  await as('school_runtime', a, 1);
+  // Cancelled, the session opens nothing more.
+  await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Remplacée par un autre cours' WHERE id = $1", [taught]);
+  assert.deepEqual(await seen(), [[], 0]);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

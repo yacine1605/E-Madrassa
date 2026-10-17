@@ -213,6 +213,7 @@ return [
     'session_hours_invalid' => 'La fin d’une séance vient après son début.',
     'session_series_past' => 'Une série se modifie ou se termine à partir d’aujourd’hui.',
     'session_series_end_later' => 'Pour terminer une série plus tôt, choisissez un jour avant sa fin prévue.',
+    'timetable_scope_required' => 'Choisissez un groupe, un enseignant ou une salle.',
     'session_range_too_long' => 'Les séances se lisent 62 jours au plus à la fois.',
     'calendar_sessions_planned' => 'Des séances sont planifiées ces jours-là : annulez-les ou déplacez-les d’abord.',
     'expense_not_author' => 'Seul l’auteur de la dépense la corrige, la soumet ou y joint un justificatif.',

@@ -11,6 +11,8 @@ return [
     'amount' => 'Montant',
     'total' => 'Total',
     'rows' => ':count ligne(s)',
+    'hours' => 'Heures',
+    'no_session' => 'Aucune séance cette semaine.',
     'payment_receipt' => 'Reçu de paiement',
     'refund_receipt' => 'Reçu de remboursement',
     'duplicate' => 'DUPLICATA',

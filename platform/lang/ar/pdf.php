@@ -11,6 +11,8 @@ return [
     'amount' => 'المبلغ',
     'total' => 'المجموع',
     'rows' => 'عدد الأسطر: :count',
+    'hours' => 'الساعات',
+    'no_session' => 'لا حصة في هذا الأسبوع.',
     'payment_receipt' => 'وصل دفع',
     'refund_receipt' => 'وصل استرداد',
     'duplicate' => 'نسخة طبق الأصل',

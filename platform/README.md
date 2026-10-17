@@ -1414,14 +1414,33 @@ Routes: `GET /api/class-sessions?from=&to=&group_id=&teacher_id=&room_id=` (62 d
 
 Validation on 17 October 2026: **289 PHP integration tests (14,134 assertions), 259 embedded SQL checks and 290 native PostgreSQL 16 checks including concurrency** (TST-15); migration 062 rolled back alone on the database the suite had filled, then applied again. No screen changed: the browser acceptance comes with the planning's screens. The CI could not start (the GitHub account's billing).
 
+## Increment 78 (lot 4): the planning's screens, timetables and agendas
+
+The planning as people read it (FR-PLN-04), with the screens of increment 77's sessions:
+
+- **Planning** (« Planning », in the Planning section): the sessions of a week, by group, teacher or room, the cancelled ones on demand. It plans a weekly course (a slot of the grid gives its hours), adds a session, changes one on its own (it then leaves its course) or cancels it with its reason. What conflicts is refused with its reason; what is only a warning is told once saved.
+- **The week's timetable in PDF** of a group, a teacher or a room: the school's open days in columns (and a day exceptionally open), the hours in rows, each session with its subject, room and teacher or group; cancelled ones struck through; right to left in Arabic.
+- **An agenda file (ICS)** of a group, a teacher, a room or one's own sessions, ninety days at most: each start and end written in Algiers' time with its zone, described as UTC+1 all year, so that an agenda shows the school's hours wherever it is opened (AC1); a cancelled session is sent as cancelled so that the agenda drops it.
+- **My timetable** (« Mon emploi du temps », personal section) for a teacher whose account is their staff record: their sessions over four weeks and their agenda.
+- SQL 063 (`database/schema/063_teacher_groups.sql`, migration `2026_10_17_000063`): a teacher's personal grant reads the groups they teach, with their members and pupils, as it reads those they lead: the groups of their sessions not cancelled, from a month ago on.
+
+Routes: `GET /api/timetable/week.pdf?week=&group_id=|teacher_id=|room_id=`, `GET /api/timetable/calendar.ics?from=&to=&group_id=|teacher_id=|room_id=|mine=1`, `GET /api/timetable/mine?from=&to=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PLN-04 AC1 | `TimetableTest`: `DTSTART;TZID=Africa/Algiers:…T080000` for a session at eight, the zone described UTC+1, a cancelled session `STATUS:CANCELLED`, lines folded at 75 octets |
+| FR-PLN-04 | `TimetableTest`: the week's timetable of a group and of a teacher read back from the PDF; the Planning screen plans, changes and cancels; a teacher reads their own timetable, not a colleague's sessions |
+| FR-IAM-04 | tests/sql: a teacher reads the group they teach and its members, not the others; a session cancelled opens nothing more |
+
+Validation on 17 October 2026: **292 PHP integration tests (14,494 assertions)**, the one the first run failed (a dash written in the code as a placeholder) passing once fixed; **260 embedded SQL checks and 291 native PostgreSQL 16 checks including concurrency**; migration 063 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 256 screens without a problem, Planning included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. The planning's screens and views by group, teacher, room and pupil, week and month, with PDF and ICS exports (FR-PLN-04).
-2. Versions and publication (FR-PLN-05), cancellations and replacements (FR-PLN-06).
+1. Versions and publication (FR-PLN-05), replacements (FR-PLN-06).
 3. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
 4. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
