@@ -4643,6 +4643,80 @@ await check('a session begun is entered once, locks the session, corrected by it
   assert.deepEqual(await first('SELECT status, locked FROM school.class_session WHERE id = $1', [sessions[3]]), { status: 'planned', locked: false });
   await as('school_runtime', a, 1);
 });
+// The hours delivered (SQL 067, FR-PTG-03, FR-REM-02 lot 4): validated sessions credited to whoever held them, corrections traced, the pays counting them.
+await check('a month\'s hours are the sum of its validated sessions, which its pay counts; a correction is traced, never once the month is paid (FR-PTG-03 AC1, AC2)', async () => {
+  const supervisor = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'attendance.teacher.entry.create', 'attendance.teacher.entry.update']);
+  const hr = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'attendance.teacher.validation.approve', 'hours.validated.read']);
+  const rules = await scopedAccount('internal', 'tenant', null, ['payroll.rule.manage', 'staff.profile.read']);
+  const gen = await scopedAccount('internal', 'tenant', null, ['payroll.run.generate']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['payroll.run.validate']);
+  const own = await scopedAccount('internal', 'personal', null, ['hours.validated.read']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Heures', 'Nora')).id;
+  const substitute = (await newStaff('Supplee', 'Farid')).id;
+  for (const t of [teacher, substitute]) await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, own.user]);
+  const taught = await programme('HOURS', 90000, 'active', planned.year);
+  await line(taught, maths, { weekly: 10, from: await dayAfter(today, -30) });
+  const held = await planGroup('PLAN-H', taught, 10);
+  const past = (await first(`SELECT d::date::text AS d FROM generate_series(current_date - 1, current_date - 6, interval '-1 day') d
+    WHERE school.day_open(d::date, $1) ORDER BY d DESC LIMIT 1`, [siteA])).d;
+  const month = (await first("SELECT date_trunc('month', $1::date)::date::text AS m", [past])).m;
+  const lastDay = (await first("SELECT ($1::date + interval '1 month' - interval '1 day')::date::text AS d", [month])).d;
+  const s = [];
+  for (const hour of ['08', '09', '10', '11', '12']) s.push((await first(SESSION, [a, held, maths, teacher, null, past, hour + ':00', hour + ':50'])).id);
+  // Paid by the hour, the substitute by the session, from the month before.
+  await as('school_runtime', a, rules.user);
+  const rates = amount => JSON.stringify([{ node_id: null, unit_amount: amount }]);
+  await first(SAVE_PAY_RULE, [teacher, 'hourly', null, null, null, await payMonth(-1), rates('1500'), '[]', uuid()]);
+  await first(SAVE_PAY_RULE, [substitute, 'per_session', null, null, null, await payMonth(-1), rates('3000'), '[]', uuid()]);
+  // Present, 10 minutes late, replaced, absent; the fifth not entered.
+  await as('school_runtime', a, supervisor.user);
+  const entries = [];
+  for (const [i, status, late, replacement] of [[0, 'present', null, null], [1, 'late', 10, null], [2, 'replaced', null, substitute], [3, 'absent', null, null]])
+    entries.push((await first(ATTEND, [a, s[i], status, late, null, null, replacement, null])).id);
+  const hours = async (staff, as_ = hr.user) => { await as('school_runtime', a, as_); const rows = (await sql('SELECT session_id, hours::text AS h, replaced FROM school.delivered_sessions($1, $2::date, $3::date)', [staff, month, lastDay])).rows; await as('school_runtime', a, 1); return rows; };
+  assert.deepEqual(await hours(teacher), [], 'nothing before validation');
+  await as('school_runtime', a, hr.user);
+  await sql("UPDATE school.teacher_attendance SET validation_status = 'validated' WHERE id = ANY ($1::uuid[])", [entries]);
+  // AC1: the planned hours, less a delay; the substitute credited; neither the absence nor the session not entered.
+  assert.deepEqual(await hours(teacher), [{ session_id: s[0], h: '0.83', replaced: false }, { session_id: s[1], h: '0.67', replaced: false }]);
+  assert.deepEqual(await hours(substitute), [{ session_id: s[2], h: '0.83', replaced: true }]);
+  // A teacher reads their own hours, nobody else's.
+  assert.equal((await hours(teacher, own.user)).length, 2);
+  assert.deepEqual(await hours(substitute, own.user), []);
+  // The pays count them: by the hour at its rate, by the session one each.
+  await as('school_runtime', a, gen.user);
+  await sql(GENERATE_PAYROLL, [month, teacher]);
+  await sql(GENERATE_PAYROLL, [month, substitute]);
+  const lines = async staff => { await as('school_runtime', a, gen.user); const rows = (await sql(`SELECT l.quantity::text AS q, l.amount::text AS amount FROM school.payroll_line l
+    JOIN school.payroll_run r ON r.id = l.run_id WHERE r.staff_id = $1 AND r.period = $2::date AND l.kind = 'unit' ORDER BY l.line_no`, [staff, month])).rows; return rows; };
+  assert.deepEqual(await lines(teacher), [{ q: '0.83', amount: '1245.00' }, { q: '0.67', amount: '1005.00' }]);
+  assert.deepEqual(await lines(substitute), [{ q: '1.00', amount: '3000.00' }]);
+  // AC2: a correction traced, the entry itself unchanged; the pay's draft follows it.
+  await as('school_runtime', a, hr.user);
+  const CORRECT = `INSERT INTO school.attendance_correction (tenant_id, attendance_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, reason)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, previous`;
+  await rejects(CORRECT, [a, entries[1], 'late', 10, null, null, null, 'Rien'], '23514', 'attendance_correction_same');
+  await rejects(CORRECT, [a, entries[1], 'present', null, null, null, null, '  '], '23514', 'reason_required');
+  const corrected = await first(CORRECT, [a, entries[1], 'present', null, '09:00', '09:50', null, 'Registre : arrivée à l\'heure']);
+  assert.deepEqual(corrected.previous, { status: 'late', late_minutes: 10, actual_start: null, actual_end: null, replacement_teacher_id: null });
+  assert.deepEqual(await first('SELECT status, late_minutes FROM school.teacher_attendance WHERE id = $1', [entries[1]]), { status: 'late', late_minutes: 10 });
+  assert.equal((await first('SELECT status FROM school.attendance_effective WHERE id = $1', [entries[1]])).status, 'present');
+  await rejects('UPDATE school.attendance_correction SET reason = $2 WHERE id = $1', [corrected.id, 'Autre'], '42501');
+  await as('school_runtime', a, gen.user);
+  await sql(GENERATE_PAYROLL, [month, teacher]);
+  assert.deepEqual(await lines(teacher), [{ q: '0.83', amount: '1245.00' }, { q: '0.83', amount: '1245.00' }]);
+  // Once the month's pay is validated, the month is corrected by the pay, not the attendance.
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payroll_run SET status = 'validated' WHERE staff_id = $1 AND period = $2::date", [teacher, month]);
+  await as('school_runtime', a, hr.user);
+  await rejects(CORRECT, [a, entries[0], 'late', 5, null, null, null, 'Retard oublié'], '23514', 'attendance_month_paid');
+  // Nor is a session moved to a substitute whose month is paid… nor read by whoever reads neither hours nor pays.
+  await as('school_runtime', a, supervisor.user);
+  assert.deepEqual((await sql('SELECT * FROM school.delivered_sessions($1, $2::date, $3::date)', [teacher, month, lastDay])).rows, []);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

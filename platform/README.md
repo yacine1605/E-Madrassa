@@ -1495,13 +1495,31 @@ Routes: `GET /api/teacher-attendance?from=&to=&state=&group_id=&teacher_id=`, `P
 
 Validation on 17 October 2026: **299 PHP integration tests (15,162 assertions)**; **263 embedded SQL checks and 294 native PostgreSQL 16 checks including concurrency**; migration 066 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 268 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 82 (lot 4): the hours delivered, in the pays
+
+The hours delivered come from the validated attendance and feed the pays (FR-PTG-03; FR-REM-02, lot 4):
+
+- **A session's hours**: those actually held when entered, else those planned less the delay; credited to the teacher who held it, the substitute when replaced; an absence, a session not entered or not validated gives none. Hours planned alone never pay.
+- **Hours delivered** (« Heures assurées », Planning section, for `hours.validated.read` and whoever computes the pays): by teacher, a month's sessions held, their hours, those held as a substitute and those corrected. A teacher reads their own only (`GET /api/delivered-hours?from=&to=&staff_id=`, a month at most).
+- **The pays**: a month's draft now counts these sessions as its units, at the rate of their group's level, by the hour or one a session, beside the units entered by hand; the month's hours are the sum of its validated sessions (AC1). A substitute is paid their sessions (AC13).
+- **Correct (trace)** (on a validated entry, `attendance.teacher.validation.approve`): the entry itself is unchanged; the correction keeps the former and the new values, its reason and author (AC2), and the hours and pays follow it. Refused once the month is in a validated pay of the teacher credited before or after: that month is corrected by a pay's adjustment (FR-REM-03). `GET|POST /api/teacher-attendance/{attendance}/corrections`.
+- SQL 067 (`database/schema/067_delivered_hours.sql`, migration `2026_10_17_000067`).
+
+| Requirement | Evidence |
+|---|---|
+| FR-PTG-03 AC1, FR-REM-02 lot 4 | tests/sql: present 0.83 h, 10 minutes late 0.67 h, the replaced session credited to the substitute, the absence and the session not entered none; the hourly pay's unit lines 1,245.00 and 1,005.00, the substitute's one session 3,000.00. `DeliveredHoursTest`: the month's pay net 1,005.00, 1,245.00 once corrected |
+| FR-PTG-03 AC2 | tests/sql and `DeliveredHoursTest`: a correction keeps the former values, the entry unchanged, the same values or no reason refused, never changed; refused once the month's pay is validated |
+| FR-PTG-03 | tests/sql: a teacher reads their own hours and no one else's; whoever reads neither hours nor pays reads none. `DeliveredHoursTest`: the hours screen and the correction on the attendance screen |
+
+Validation on 17 October 2026: **300 PHP integration tests (15,269 assertions)**; **264 embedded SQL checks and 295 native PostgreSQL 16 checks including concurrency**; migration 067 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 272 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. The hours delivered, their traced corrections and their lock, feeding the pays (FR-PTG-03, FR-REM-02); the pupils' roll call (FR-PRE-01).
+1. The pupils' roll call (FR-PRE-01).
 2. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2

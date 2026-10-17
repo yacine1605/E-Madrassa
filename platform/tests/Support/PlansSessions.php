@@ -9,10 +9,10 @@ use Illuminate\Support\Str;
 trait PlansSessions
 {
     /** @return array<string, mixed> a school whose pedagogy and HR manager is signed in, with a class, its programme's subject, a qualified teacher and a room */
-    private function setting(): array
+    private function setting(string $plan = 'pro'): array
     {
         $manager = $this->account('planning');
-        $school = $this->school('pro', $manager, 'private_school_dz');
+        $school = $this->school($plan, $manager, 'private_school_dz');
         $this->member($school, $manager, 'active', ['academic_hr']);
         $this->signIn($manager)->assertOk();
         $owner = DB::connection('owner');

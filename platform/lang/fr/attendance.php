@@ -29,4 +29,17 @@ return [
     'validated_count' => 'Validés : :count. Vos propres pointages laissés : :own.',
     'entered_by' => 'Saisi par :name',
     'decided_by' => 'Décidé par :name',
+
+    // FR-PTG-03: corrections and the hours delivered.
+    'amend' => 'Corriger (trace)',
+    'amend_help' => 'Le pointage validé reste tel quel ; la correction garde l’ancienne valeur, la nouvelle, son motif et son auteur. Un mois dont la rémunération est validée se corrige par un ajustement de rémunération.',
+    'corrected' => 'corrigé',
+    'delivered_hours' => 'Heures assurées',
+    'delivered_hours_help' => 'Les séances assurées du mois selon le pointage validé, tel que corrigé : la durée effective, ou prévue moins le retard ; le remplaçant crédité. Une séance absente, non pointée ou non validée ne compte pas. Les rémunérations du mois comptent ces séances.',
+    'month' => 'Mois',
+    'sessions' => 'Séances',
+    'hours' => 'Heures',
+    'as_substitute' => 'dont :count en remplacement',
+    'corrected_count' => ':count corrigées',
+    'no_hours' => 'Aucune séance assurée validée ce mois',
 ];

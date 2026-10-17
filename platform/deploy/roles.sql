@@ -296,6 +296,10 @@ GRANT SELECT ON school.teacher_attendance TO school_runtime;
 GRANT INSERT (tenant_id, session_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, note) ON school.teacher_attendance TO school_runtime;
 GRANT UPDATE (status, late_minutes, actual_start, actual_end, replacement_teacher_id, note, validation_status, reject_reason, version)
   ON school.teacher_attendance TO school_runtime;
+-- Hours delivered (067): a validated entry corrected by a trace of its own, never changed nor deleted; the hours read through their function.
+GRANT SELECT ON school.attendance_correction, school.attendance_effective TO school_runtime;
+GRANT INSERT (tenant_id, attendance_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, reason) ON school.attendance_correction TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.delivered_sessions(uuid, date, date), school.month_paid(uuid, date) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -616,6 +620,10 @@ ALTER FUNCTION school.notify_timetable(uuid, uuid[]) OWNER TO platform_provision
 -- Teachers' attendance (066): its entry locks the session, its validation makes it held, its rejection tells its author.
 GRANT UPDATE (locked, status) ON school.class_session TO platform_provisioner;
 ALTER FUNCTION school.follow_teacher_attendance() OWNER TO platform_provisioner;
+-- Hours delivered (067): the validated entries as they stand, for the pays' readers who do not read the attendance.
+GRANT SELECT ON school.teacher_attendance, school.attendance_correction, school.attendance_effective TO platform_provisioner;
+ALTER FUNCTION school.delivered_sessions(uuid, date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.month_paid(uuid, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

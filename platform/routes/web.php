@@ -63,6 +63,7 @@ use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
 use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\TeacherAttendanceController;
+use App\Http\Controllers\DeliveredHoursController;
 use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\TimetableVersionController;
 use App\Http\Controllers\UnavailabilityController;
@@ -567,10 +568,16 @@ Route::prefix('api')->group(function () {
                     ->middleware('permission:attendance.teacher.entry.create,attendance.teacher.validation.approve');
                 Route::post('teacher-attendance', [TeacherAttendanceController::class, 'store'])->middleware('permission:attendance.teacher.entry.create');
                 Route::put('teacher-attendance/{attendance}', [TeacherAttendanceController::class, 'update'])->middleware('permission:attendance.teacher.entry.update');
+                Route::get('teacher-attendance/{attendance}/corrections', [TeacherAttendanceController::class, 'corrections'])
+                    ->middleware('permission:attendance.teacher.entry.create,attendance.teacher.validation.approve');
+                // FR-PTG-03: the hours delivered by the validated attendance.
+                Route::get('delivered-hours', [DeliveredHoursController::class, 'index'])->middleware('permission:hours.validated.read,payroll.run.generate');
                 Route::middleware('permission:attendance.teacher.validation.approve')->group(function () {
                     Route::post('teacher-attendance/validate-period', [TeacherAttendanceController::class, 'approvePeriod']);
                     Route::post('teacher-attendance/{attendance}/validate', [TeacherAttendanceController::class, 'approve']);
                     Route::post('teacher-attendance/{attendance}/reject', [TeacherAttendanceController::class, 'reject']);
+                    // FR-PTG-03 AC2: a validated entry corrected by a trace of its own.
+                    Route::post('teacher-attendance/{attendance}/corrections', [TeacherAttendanceController::class, 'correct']);
                 });
             });
 

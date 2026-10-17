@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  * stretch of days are listed with their entry, or none: a session not entered is « not entered »,
  * never an absence (AC1). The supervisor enters present, late, absent or replaced; its author
  * corrects it until it is decided; another person validates or rejects it, never its author
- * (TST-05), one by one or all those of the period at once. The database holds each rule (SQL 066).
+ * (TST-05), one by one or all those of the period at once. A validated entry is corrected by a
+ * trace of its own, the former values kept (FR-PTG-03 AC2). The database holds each rule (SQL 066, 067).
  */
 final class TeacherAttendanceController
 {
@@ -30,9 +31,9 @@ final class TeacherAttendanceController
         to_char(a.actual_end, 'HH24:MI') AS actual_end, a.replacement_teacher_id, rt.last_name_lat AS replacement_last_name, rt.first_name_lat AS replacement_first_name,
         rt.last_name_ar AS replacement_last_name_ar, rt.first_name_ar AS replacement_first_name_ar, a.note, a.validation_status, a.reject_reason,
         a.created_by AS entered_by, (SELECT u.name FROM public.users u WHERE u.id = a.created_by) AS entered_by_name, a.created_at AS entered_at,
-        (SELECT u.name FROM public.users u WHERE u.id = a.decided_by) AS decided_by_name, a.decided_at, a.version
+        (SELECT u.name FROM public.users u WHERE u.id = a.decided_by) AS decided_by_name, a.decided_at, a.correction_id, a.corrected_at, a.version
         FROM school.class_session c
-        LEFT JOIN school.teacher_attendance a ON a.tenant_id = c.tenant_id AND a.session_id = c.id
+        LEFT JOIN school.attendance_effective a ON a.tenant_id = c.tenant_id AND a.session_id = c.id
         LEFT JOIN school.study_group g ON g.tenant_id = c.tenant_id AND g.id = c.group_id
         LEFT JOIN school.subject sj ON sj.tenant_id = c.tenant_id AND sj.id = c.subject_id
         LEFT JOIN school.staff st ON st.tenant_id = c.tenant_id AND st.id = c.teacher_id
@@ -138,6 +139,28 @@ final class TeacherAttendanceController
             WHERE a.tenant_id = ? AND a.validation_status = 'submitted' AND a.created_by = school.actor()
             AND c.starts_at >= school.local_at(?::date, '00:00') AND c.starts_at < school.local_at(?::date + 1, '00:00')", array_slice($bindings, 0, 3))->n;
         return ['data' => ['validated' => $validated, 'own_left' => (int) $own, 'refused' => $refused]];
+    }
+
+    /** FR-PTG-03 AC2: a validated entry's corrections, newest first, with the former values. */
+    public function corrections(string $attendance)
+    {
+        $row = (object) $this->find($attendance);
+        return ['data' => array_map(fn (object $k) => [...((array) $k), 'previous' => json_decode((string) $k->previous, true)], DB::select(
+            "SELECT k.id, k.status, k.late_minutes, to_char(k.actual_start, 'HH24:MI') AS actual_start, to_char(k.actual_end, 'HH24:MI') AS actual_end,
+            k.replacement_teacher_id, k.previous, k.reason, k.created_at, (SELECT u.name FROM public.users u WHERE u.id = k.created_by) AS corrected_by_name
+            FROM school.attendance_correction k WHERE k.tenant_id = ? AND k.attendance_id = ? ORDER BY k.created_at DESC, k.id DESC",
+            [$this->school->id(), $row->attendance_id]))];
+    }
+
+    /** FR-PTG-03 AC2: a validated entry corrected with its reason; the entry itself unchanged, refused once the month is paid. */
+    public function correct(Request $request, string $attendance)
+    {
+        $row = (object) $this->find($attendance);
+        $data = $request->validate($this->rules() + ['reason' => 'required|string|min:3|max:1000']);
+        [$status, $late, $start, $end, $replacement] = $this->values($data);
+        DB::insert('INSERT INTO school.attendance_correction (tenant_id, attendance_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, reason)
+            VALUES (?, ?, ?, ?, ?::time, ?::time, ?, ?)', [$this->school->id(), $row->attendance_id, $status, $late, $start, $end, $replacement, $data['reason']]);
+        return response()->json(['data' => $this->find($row->attendance_id)], 201);
     }
 
     private function rules(): array

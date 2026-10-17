@@ -25,7 +25,8 @@ use Illuminate\Support\Facades\DB;
  * FR-PTG-01, FR-PTG-02, « Pointage des enseignants »: the sessions begun on a day, a week or a
  * month, with their entry or « not entered » (never an absence). The supervisor enters and
  * corrects their own entries; another person validates or rejects them, one by one or all those of
- * the period (TST-05). The database holds each rule (SQL 066).
+ * the period (TST-05); a validated entry is corrected by a trace, the former values kept (FR-PTG-03).
+ * The database holds each rule (SQL 066, 067).
  */
 final class TeacherAttendance extends SchoolingPage
 {
@@ -97,6 +98,12 @@ final class TeacherAttendance extends SchoolingPage
                     ->action(fn (array $record) => SchoolScreen::changeAt('attendance.teacher.validation.approve', $record['site_id'], fn () => SchoolScreen::call(
                         'attendance.teacher.validation.approve', TeacherAttendanceController::class, 'approve', ['version' => $record['version']],
                         ['attendance' => $record['attendance_id']]))),
+                Action::make('amend')->label(__('attendance.amend'))->modalDescription(__('attendance.amend_help'))
+                    ->visible(fn (array $record) => $record['validation_status'] === 'validated' && $this->creatable('attendance.teacher.validation.approve', $record['site_id']))
+                    ->fillForm(fn (array $record) => $record)->schema([...array_slice($this->entryFields(), 0, 5), $this->reason()])
+                    ->action(fn (array $record, array $data) => SchoolScreen::changeAt('attendance.teacher.validation.approve', $record['site_id'], fn () => SchoolScreen::call(
+                        'attendance.teacher.validation.approve', TeacherAttendanceController::class, 'correct', $this->entryData($data) + ['reason' => $data['reason']],
+                        ['attendance' => $record['attendance_id']]))),
                 Action::make('reject')->label(__('attendance.reject'))->color('danger')->modalDescription(__('attendance.reject_help'))
                     ->visible(fn (array $record) => $this->decidable($record))->schema([$this->reason()])
                     ->action(fn (array $record, array $data) => SchoolScreen::changeAt('attendance.teacher.validation.approve', $record['site_id'], fn () => SchoolScreen::call(
@@ -162,6 +169,7 @@ final class TeacherAttendance extends SchoolingPage
             $record['status'] === 'late' ? __('attendance.late_by', ['minutes' => Formats::number((int) $record['late_minutes'])]) : null,
             $record['status'] === 'replaced' ? __('attendance.replaced_by', ['name' => $this->name($record, 'replacement_')]) : null,
             $record['actual_start'] !== null ? $record['actual_start'].'–'.$record['actual_end'] : null,
+            $record['correction_id'] !== null ? __('attendance.corrected') : null,
         ]);
         return $parts === [] ? null : implode(' · ', $parts);
     }
