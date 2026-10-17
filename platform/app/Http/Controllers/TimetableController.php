@@ -13,7 +13,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * FR-PLN-04: the planning as others read it. A week's timetable of a group, a teacher or a room
+ * FR-PLN-04: the planning as others read it. A week's timetable of a group, a teacher, a room or a
+ * pupil (the sessions of the groups they belong to on each day)
  * in PDF, the open days in columns (RTL in Arabic), and a month's, its weeks in rows; the sessions of a stretch of days as an
  * iCalendar file in Algiers' time (AC1); a teacher's own sessions. Cancelled sessions appear as
  * such. What the reader may not see the database keeps from them (SQL 062). A session replaced
@@ -37,10 +38,14 @@ final class TimetableController
         LEFT JOIN school.staff rt ON rt.tenant_id = c.tenant_id AND rt.id = c.replaced_teacher_id";
     private const MAX_DAYS = 92;
     private const MINE = '(school.is_own_staff(c.teacher_id) OR school.is_own_staff(c.replaced_teacher_id))';
+    /** A pupil's sessions: those of the groups they belonged to on the session's day, as its roll call lists them (FR-PRE-01). */
+    public const PUPIL = 'EXISTS (SELECT 1 FROM school.group_membership m JOIN school.enrollment e ON e.tenant_id = m.tenant_id AND e.id = m.enrollment_id
+        WHERE m.tenant_id = c.tenant_id AND m.group_id = c.group_id AND e.student_id = ? AND m.valid_from <= school.local_day(c.starts_at)
+        AND (m.valid_to IS NULL OR m.valid_to >= school.local_day(c.starts_at)))';
 
     public function __construct(private CurrentSchool $school, private Pdf $pdf) {}
 
-    /** AC1: an iCalendar file of the sessions from one day until another (92 at most), of a group, a teacher, a room, or one's own (`mine`). */
+    /** AC1: an iCalendar file of the sessions from one day until another (92 at most), of a group, a teacher, a room, a pupil, or one's own (`mine`). */
     public function ics(Request $request)
     {
         $data = $this->filters($request) + $request->validate(['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from']);
@@ -78,7 +83,7 @@ final class TimetableController
         $grid = [];
         foreach ($rows as $row) {
             $grid[$row->start_time.'–'.$row->end_time][$row->day][] = ['subject' => $this->subject($row), 'room' => $row->room_code,
-                'who' => isset($data['group_id']) ? $this->holder($row) : $row->group_code, 'cancelled' => $row->status === 'cancelled' || $this->away($row, $data)];
+                'who' => $this->who($row, $data), 'cancelled' => $row->status === 'cancelled' || $this->away($row, $data)];
         }
         ksort($grid);
         $title = __('planning.timetable');
@@ -107,7 +112,7 @@ final class TimetableController
         $sessions = [];
         foreach ($rows as $row) {
             $sessions[$row->day][] = ['hours' => $row->start_time.'–'.$row->end_time, 'subject' => $row->subject_code, 'room' => $row->room_code,
-                'who' => isset($data['group_id']) ? $this->holder($row) : $row->group_code, 'cancelled' => $row->status === 'cancelled' || $this->away($row, $data)];
+                'who' => $this->who($row, $data), 'cancelled' => $row->status === 'cancelled' || $this->away($row, $data)];
         }
         $start = $month->copy();
         while ($start->dayOfWeek !== $first) $start = $start->subDay();
@@ -148,23 +153,28 @@ final class TimetableController
 
     private function filters(Request $request): array
     {
-        return $request->validate(['group_id' => 'nullable|uuid', 'teacher_id' => 'nullable|uuid', 'room_id' => 'nullable|uuid', 'mine' => 'boolean']);
+        return $request->validate(['group_id' => 'nullable|uuid', 'teacher_id' => 'nullable|uuid', 'room_id' => 'nullable|uuid', 'student_id' => 'nullable|uuid',
+            'mine' => 'boolean']);
     }
 
-    /** One of a group, a teacher, a room or one's own; and its name for the document. */
+    /** One of a group, a teacher, a room, a pupil or one's own; and its name for the document. A pupil the reader may not read is not found. */
     private function scope(array $data): array
     {
         if (!empty($data['mine'])) return [self::MINE, [], __('planning.my_timetable')];
-        foreach (['group_id' => 'study_group', 'teacher_id' => 'staff', 'room_id' => 'room'] as $column => $table) {
+        foreach (['group_id' => 'study_group', 'teacher_id' => 'staff', 'room_id' => 'room', 'student_id' => 'student'] as $column => $table) {
             if (!isset($data[$column])) continue;
             $row = DB::selectOne("SELECT * FROM school.$table WHERE tenant_id = ? AND id = ?", [$this->school->id(), $data[$column]]);
             abort_unless($row, 404);
             $name = match ($table) {
                 'staff' => trim($row->last_name_lat.' '.$row->first_name_lat) ?: trim($row->last_name_ar.' '.$row->first_name_ar),
+                'student' => $row->matricule.' · '.$this->teacher($row),
                 default => implode(' · ', array_filter([$row->code, Locales::label(json_decode($row->labels, true))])),
             };
-            return $column === 'teacher_id' ? ['(c.teacher_id = ? OR c.replaced_teacher_id = ?)', [$data[$column], $data[$column]], $name]
-                : ["c.$column = ?", [$data[$column]], $name];
+            return match ($column) {
+                'teacher_id' => ['(c.teacher_id = ? OR c.replaced_teacher_id = ?)', [$data[$column], $data[$column]], $name],
+                'student_id' => [self::PUPIL, [$data[$column]], $name],
+                default => ["c.$column = ?", [$data[$column]], $name],
+            };
         }
         throw Refusal::of('timetable_scope_required', 422);
     }
@@ -185,6 +195,13 @@ final class TimetableController
     private function away(object $row, array $data): bool
     {
         return $row->replaced_teacher_id !== null && (!empty($data['mine']) ? (bool) $row->replaced_mine : ($data['teacher_id'] ?? null) === $row->replaced_teacher_id);
+    }
+
+    /** In a cell: who holds the session for a group, also the group for a pupil (they may have several), else the group. */
+    private function who(object $row, array $data): ?string
+    {
+        if (isset($data['student_id'])) return implode(' · ', array_filter([$row->group_code, $this->holder($row)]));
+        return isset($data['group_id']) ? $this->holder($row) : $row->group_code;
     }
 
     /** Who holds the session; a substitute said so. */

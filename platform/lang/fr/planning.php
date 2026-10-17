@@ -28,6 +28,7 @@ return [
     'code_help' => 'De 1 à 20 lettres, chiffres ou tirets, par exemple M1 ; définitif.',
     'start' => 'Début',
     'end' => 'Fin',
+    'pupil' => 'Élève',
     'duration' => 'Durée',
     'minutes' => ':n min',
     'time_help' => 'Heures et minutes, par exemple 08:00 ; 24:00 pour minuit en fin de journée.',

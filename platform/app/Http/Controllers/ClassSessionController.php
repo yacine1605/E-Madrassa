@@ -56,11 +56,11 @@ final class ClassSessionController
 
     public function __construct(private CurrentSchool $school, private AcademicRecords $records) {}
 
-    /** From one day until another (62 days at most), by group, teacher or room; the cancelled ones with `include_cancelled`. */
+    /** From one day until another (62 days at most), by group, teacher, room or pupil (FR-PLN-04); the cancelled ones with `include_cancelled`. */
     public function index(Request $request)
     {
         $data = $request->validate(Paging::RULES + ['from' => 'required|date_format:Y-m-d', 'to' => 'required|date_format:Y-m-d|after_or_equal:from',
-            'group_id' => 'nullable|uuid', 'teacher_id' => 'nullable|uuid', 'room_id' => 'nullable|uuid', 'include_cancelled' => 'boolean']);
+            'group_id' => 'nullable|uuid', 'teacher_id' => 'nullable|uuid', 'room_id' => 'nullable|uuid', 'student_id' => 'nullable|uuid', 'include_cancelled' => 'boolean']);
         if (Carbon::parse($data['from'])->diffInDays(Carbon::parse($data['to'])) >= self::MAX_DAYS) throw Refusal::of('session_range_too_long');
         $sql = self::SELECT." WHERE c.tenant_id = ? AND c.starts_at >= school.local_at(?::date, '00:00') AND c.starts_at < school.local_at(?::date + 1, '00:00')";
         $bindings = [$this->school->id(), $data['from'], $data['to']];
@@ -69,6 +69,12 @@ final class ClassSessionController
         }
         // A teacher's sessions, and those they were replaced on.
         if (isset($data['teacher_id'])) { $sql .= ' AND (c.teacher_id = ? OR c.replaced_teacher_id = ?)'; array_push($bindings, $data['teacher_id'], $data['teacher_id']); }
+        // A pupil the reader may not read is not found.
+        if (isset($data['student_id'])) {
+            $this->records->find('student', $data['student_id'], columns: 'id');
+            $sql .= ' AND '.TimetableController::PUPIL;
+            $bindings[] = $data['student_id'];
+        }
         if (!$request->boolean('include_cancelled')) $sql .= " AND c.status <> 'cancelled'";
         return Paging::select($request, $sql, $bindings, 'c.starts_at, g.code, c.id', fn ($row) => $this->decoded($row));
     }

@@ -15,8 +15,9 @@ use Tests\TestCase;
 
 /**
  * The planning as it is read (FR-PLN-04, FR-PLN-02): the week's screen that plans, changes and
- * cancels, a week or a month; a teacher's own timetable; a week's and a month's timetable in PDF and an agenda file whose hours an
- * agenda shows in Algiers' time (AC1).
+ * cancels, a week or a month; a teacher's own timetable; a pupil's, from the groups they belong to
+ * each day; a week's and a month's timetable in PDF and an agenda file whose hours an agenda shows
+ * in Algiers' time (AC1).
  */
 final class TimetableTest extends TestCase
 {
@@ -152,5 +153,42 @@ final class TimetableTest extends TestCase
         // The manager, who teaches nothing, has no such page.
         $this->signIn($s['manager'])->assertOk();
         $this->get('/school/my-timetable')->assertForbidden();
+    }
+
+    public function test_a_pupils_timetable_shows_the_sessions_of_their_groups_from_the_day_they_joined(): void
+    {
+        $s = $this->setting();
+        $series = $this->planned($s);
+        $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Yasmine', 'birth_date' => now()->subYears(20)->toDateString()])
+            ->assertCreated()->json('data');
+        $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil['id'], 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
+            ->assertCreated()->json('data.id');
+        // In the group from the second Sunday's next day: the third and fourth Sundays are hers, as their roll calls list her.
+        $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment, 'valid_from' => Carbon::parse($series['first'])->addDays(8)->toDateString()])
+            ->assertCreated();
+        $to = Carbon::parse($series['first'])->addWeeks(4)->toDateString();
+        $third = Carbon::parse($series['first'])->addWeeks(2)->toDateString();
+        $listed = $this->getJson("/api/class-sessions?from={$series['first']}&to=$to&student_id={$pupil['id']}")->assertOk()->json('data');
+        $this->assertSame([$third, Carbon::parse($series['first'])->addWeeks(3)->toDateString()], array_column($listed, 'day'));
+        $ics = $this->get("/api/timetable/calendar.ics?student_id={$pupil['id']}&from={$series['first']}&to=$to")->assertOk()->getContent();
+        $this->assertSame(2, substr_count($ics, 'BEGIN:VEVENT'));
+        // Her week and her month in PDF: her name, each session's group and teacher.
+        $read = fn (string $url) => preg_replace('/\s+/u', ' ', str_replace("\u{00A0}", ' ', $this->text($this->get($url)->assertOk()->getContent())));
+        $text = $read("/api/timetable/week.pdf?student_id={$pupil['id']}&week=$third");
+        foreach ([$pupil['matricule'].' · Benali Yasmine', '08:00–09:30', '4AM-1 · Meziane Karim'] as $expected) $this->assertStringContainsString($expected, $text);
+        $this->assertStringNotContainsString('08:00–09:30', $read("/api/timetable/week.pdf?student_id={$pupil['id']}&week={$series['first']}"));
+        $this->assertStringContainsString('Benali Yasmine', $read("/api/timetable/month.pdf?student_id={$pupil['id']}&month=".Carbon::parse($third)->format('Y-m')));
+        // A pupil the reader may not read is not found: a teacher who teaches none of her groups.
+        $teacher = $this->account('teacher');
+        $this->member($s['school'], $teacher);
+        $this->grant($s['school'], $teacher, 'teacher', 'personal');
+        $this->signIn($teacher)->assertOk();
+        $this->get("/api/timetable/week.pdf?student_id={$pupil['id']}&week=$third")->assertNotFound();
+        $this->getJson("/api/class-sessions?from=$third&to=$third&student_id={$pupil['id']}")->assertNotFound();
+        // On the planning screen, the pupil filtered; her timetable printed from there.
+        $this->within($s['school'], $s['manager'], function () use ($pupil, $third, $listed) {
+            Livewire::test(Planning::class)->filterTable('week', ['week' => $third])->filterTable('pupil', $pupil['id'])
+                ->assertCanSeeTableRecords([$listed[0]['id']])->assertCountTableRecords(1)->assertSee(__('planning.print_week'));
+        });
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\ClassSessionController;
 use App\Http\Controllers\SessionSeriesController;
+use App\Http\Controllers\StudentController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
@@ -30,7 +31,8 @@ use Illuminate\Support\Str;
  * once with its sessions; a session is added, changed on its own (it leaves its series) or
  * cancelled with its reason, or its teacher replaced by one qualified, available and free (FR-PLN-06).
  * The database refuses what conflicts (SQL 062); what is only a warning is told once saved. The week
- * and the month print as a timetable and export to an agenda (ICS).
+ * and the month print as a timetable and export to an agenda (ICS), of a group, a teacher, a room or
+ * a pupil whom the reader may read.
  */
 final class Planning extends SchoolingPage
 {
@@ -52,7 +54,7 @@ final class Planning extends SchoolingPage
             [$from, $to] = $this->period($filters);
             return $this->apiPage(static::$permissions, ClassSessionController::class, 'index', array_filter(['from' => $from, 'to' => $to,
                 'group_id' => $filters['group']['value'] ?? null, 'teacher_id' => $filters['teacher']['value'] ?? null, 'room_id' => $filters['room']['value'] ?? null,
-                'include_cancelled' => ($filters['cancelled']['isActive'] ?? false) ?: null]), $page, $recordsPerPage);
+                'student_id' => $filters['pupil']['value'] ?? null, 'include_cancelled' => ($filters['cancelled']['isActive'] ?? false) ?: null]), $page, $recordsPerPage);
         })->paginationPageOptions([50, 100])->defaultPaginationPageOption(50)->description(__('planning.planning_help'))
             ->emptyStateHeading(__('planning.no_session'))->emptyStateDescription(__('planning.no_session_help'))
             ->columns([
@@ -81,6 +83,8 @@ final class Planning extends SchoolingPage
                 SelectFilter::make('group')->label(__('planning.group'))->options(fn () => $this->options()['groups'])->searchable(),
                 SelectFilter::make('teacher')->label(__('planning.teacher'))->options(fn () => $this->options()['teachers'])->searchable(),
                 SelectFilter::make('room')->label(__('planning.room'))->options(fn () => $this->options()['rooms'])->searchable(),
+                SelectFilter::make('pupil')->label(__('planning.pupil'))->searchable()->getSearchResultsUsing(fn (string $search) => $this->pupils($search))
+                    ->getOptionLabelUsing(fn ($value) => $this->pupil($value))->visible(fn () => $this->creatable('student.record.read')),
                 Filter::make('cancelled')->label(__('planning.include_cancelled_sessions'))->toggle(),
             ])->headerActions([
                 Action::make('pdf')->label(__('planning.print_week'))->color('gray')->url(fn () => $this->exportUrl('pdf'), shouldOpenInNewTab: true)
@@ -172,12 +176,12 @@ final class Planning extends SchoolingPage
         return [$day->toDateString(), $day->copy()->addDays(6)->toDateString()];
     }
 
-    /** The week's or the month's timetable (PDF), or the agenda (ICS) from the period's start, of the group, teacher or room filtered; none before one is chosen. */
+    /** The week's or the month's timetable (PDF), or the agenda (ICS) from the period's start, of the group, teacher, room or pupil filtered; none before one is chosen. */
     private function exportUrl(string $kind): ?string
     {
         $filters = $this->tableFilters ?? [];
         $scope = array_filter(['group_id' => $filters['group']['value'] ?? null, 'teacher_id' => $filters['teacher']['value'] ?? null,
-            'room_id' => $filters['room']['value'] ?? null]);
+            'room_id' => $filters['room']['value'] ?? null, 'student_id' => $filters['pupil']['value'] ?? null]);
         if ($scope === []) return null;
         $scope = array_slice($scope, 0, 1, true);
         [$from] = $this->period($filters);
@@ -186,6 +190,20 @@ final class Planning extends SchoolingPage
             'month' => url('/api/timetable/month.pdf?'.http_build_query($scope + ['month' => Carbon::parse($filters['week']['week'] ?? now()->toDateString())->format('Y-m')])),
             default => url('/api/timetable/calendar.ics?'.http_build_query($scope + ['from' => $from, 'to' => Carbon::parse($from)->addDays(90)->toDateString()])),
         };
+    }
+
+    /** FR-PLN-04: the pupils found by name or number, among those the reader may read. */
+    private function pupils(string $search): array
+    {
+        return collect(SchoolScreen::call('student.record.read', StudentController::class, 'index', ['q' => $search, 'per_page' => 50])['data'])
+            ->mapWithKeys(fn (array $pupil) => [$pupil['id'] => $pupil['matricule'].' · '.$this->personName($pupil)])->all();
+    }
+
+    private function pupil(?string $id): ?string
+    {
+        if (!$id) return null;
+        $pupil = SchoolScreen::call('student.record.read', StudentController::class, 'show', parameters: ['student' => $id])['data'];
+        return $pupil['matricule'].' · '.$this->personName($pupil);
     }
 
     /** What the reader may plan with: the active groups, the teachers still with the school, the rooms in use, the subjects, the slots. */

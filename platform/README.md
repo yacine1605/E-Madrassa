@@ -1580,6 +1580,12 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 94 (lot 4): a pupil's timetable
+
+FR-PLN-04's views by pupil, for the staff. A pupil's sessions are those of the groups they belonged to on each session's day, as its roll call lists them: a pupil who joined a group on a Tuesday has none of its sessions before. « Planning » filters by pupil (found by name or number, among those the reader may read) and prints the pupil's week and month from there; the API takes `student_id` beside `group_id`, `teacher_id` and `room_id` (`/api/class-sessions`, `/api/timetable/week.pdf`, `month.pdf`, `calendar.ics`). Each session says its group and its teacher, a pupil having several groups. A pupil the reader may not read is not found (404): a teacher with a personal scope reads those of the groups they teach. The pupils and their parents will read their own with the portal (lot 10).
+
+Validation on 17 October 2026: **310 PHP integration tests (16,246 assertions)**; **268 embedded SQL checks and 299 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 864 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 93 (lot 4): a session's default length
 
 FR-PLN-01 is complete. A session, or a weekly course, given its start without its end lasts a session of its subject in its group's programme that day (`session_duration_minutes`, FR-PRG-02), which takes the school's length when the subject is added (`planning.session_minutes`, 60 minutes, « Paramètres de l'école »). One that would end past midnight is refused (`session_spans_days`). The API (`/api/class-sessions`, `/api/session-series` and its change from a day on) and « Planning » leave the end optional; the sessions already planned keep their hours. No migration: the setting and the subject's length were there since SQL 028.
@@ -1666,9 +1672,8 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. A pupil's timetable for the staff, by week and month, in PDF and ICS (FR-PLN-04); the pupils' and parents' own with the portal (lot 10).
-2. The review of lot 4's requirements still partial against the SRS, each made complete or its remainder written down.
-3. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
+1. The review of lot 4's requirements still partial against the SRS, each made complete or its remainder written down.
+2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
 
 ## Next increments of lot 2
 
