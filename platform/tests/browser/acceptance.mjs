@@ -24,7 +24,7 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes'];
+  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes', 'timetable-versions'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -208,6 +208,11 @@ async function seed(browser, session) {
         start_time: '10:00', end_time: '11:00' });
       await call(`class-sessions/${outing.id}/cancel`, { reason: 'Sortie pédagogique au musée', version: outing.version });
     }
+    // FR-PLN-05: the week's timetable published, and the next term's prepared.
+    const week = await call('timetable-versions', { date_from: day(0), date_to: day(6), reason: 'Emploi du temps de la semaine' });
+    await call(`timetable-versions/${week.id}/validate`, { version: week.version });
+    await call(`timetable-versions/${week.id}/publish`, { version: week.version + 1 });
+    await call('timetable-versions', { date_from: day(30), date_to: day(60), reason: 'Emploi du temps du trimestre' });
     // A family who called, with their child, a visit and a reminder (FR-CRM-01); a brother converted into a pupil (FR-CRM-02).
     const lead = await call('leads', { last_name: 'Haddad', first_name: 'Samia', phone: '0661 22 33 44', relationship: 'mother', source: 'social_media',
       children: [{ first_name: 'Yanis', last_name: 'Haddad', birth_date: '2014-02-10', level_id: grade.id }, { first_name: 'Lina', birth_date: '2016-09-01' }] });

@@ -88,6 +88,33 @@ return [
     'changed_at' => 'بتاريخ',
     'changed_by' => 'من طرف',
 
+    // FR-PLN-05: the timetable's versions and their publication.
+    'versions' => 'نشر جدول التوقيت',
+    'versions_help' => 'تنسخ النسخةُ حصص فترة ما، مع سببها. وبعد المصادقة عليها ونشرها تُبلَّغ إلى الأساتذة والتلاميذ الذين تتغير حصصهم؛ ولا يُبلَّغ أي إلغاء أو استخلاف قبل نشر يومه. لا يُصادَق على نسخة فيها تعارض، أو تغيّرت حصصها منذ نسخها، ولا تُنشر.',
+    'no_version' => 'لا توجد نسخة محضّرة',
+    'version_number' => 'الرقم',
+    'period' => 'الفترة',
+    'version_states' => ['draft' => 'مسودة', 'validated' => 'مصادق عليها', 'published' => 'منشورة', 'superseded' => 'حلّت محلها أخرى', 'discarded' => 'مستبعدة'],
+    'sessions_count' => 'الحصص',
+    'prepared_by' => 'التحضير',
+    'published' => 'النشر',
+    'prepare_version' => 'تحضير نسخة',
+    'refresh_version' => 'تحديث النسخ',
+    'refresh_version_help' => 'تأخذ النسخة الحصص كما هي الآن وتعود مسودة تنتظر المصادقة.',
+    'validate_version' => 'المصادقة',
+    'publish_version' => 'نشر',
+    'publish_version_help' => 'يُبلَّغ الأساتذة والتلاميذ الذين تتغير حصصهم؛ وتحلّ هذه النسخة محل النسخة المنشورة على هذه الأيام.',
+    'published_told' => 'عدد المبلَّغين: :count',
+    'discard_version' => 'استبعاد',
+    'version_conflicts' => 'التعارضات',
+    'no_conflict' => 'لا يوجد تعارض مانع.',
+    'compare_version' => 'مقارنة',
+    'compare_with' => 'مع',
+    'compare_current' => 'الحصص كما هي الآن',
+    'version_option' => 'النسخة :number (:state)',
+    'change_list' => ['added' => 'المضافة', 'removed' => 'المحذوفة', 'changed' => 'المعدّلة'],
+    'no_difference' => 'لا شيء.',
+
     // FR-PLN-03: what is told, never refused.
     'warnings' => [
         'teacher_daily_hours' => 'يتجاوز الأستاذ ساعاته اليومية: :hours سا مقابل :bound سا على الأكثر.',

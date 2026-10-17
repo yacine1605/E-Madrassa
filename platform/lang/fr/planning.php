@@ -88,6 +88,33 @@ return [
     'changed_at' => 'Le',
     'changed_by' => 'Par',
 
+    // FR-PLN-05: the timetable's versions and their publication.
+    'versions' => 'Publications du planning',
+    'versions_help' => 'Une version copie les séances d’une période, avec son motif. Validée puis publiée, elle est annoncée aux enseignants et aux élèves dont elle change les séances ; aucune annulation ni aucun remplacement n’est annoncé avant que son jour soit publié. Une version en conflit, ou dont les séances ont changé depuis sa copie, n’est ni validée ni publiée.',
+    'no_version' => 'Aucune version préparée',
+    'version_number' => 'N°',
+    'period' => 'Période',
+    'version_states' => ['draft' => 'Brouillon', 'validated' => 'Validée', 'published' => 'Publiée', 'superseded' => 'Remplacée par une autre', 'discarded' => 'Écartée'],
+    'sessions_count' => 'Séances',
+    'prepared_by' => 'Préparée',
+    'published' => 'Publiée',
+    'prepare_version' => 'Préparer une version',
+    'refresh_version' => 'Actualiser la copie',
+    'refresh_version_help' => 'La version reprend les séances telles qu’elles sont et redevient un brouillon à valider.',
+    'validate_version' => 'Valider',
+    'publish_version' => 'Publier',
+    'publish_version_help' => 'Les enseignants et les élèves dont les séances changent sont prévenus ; la version publiée sur ces jours est remplacée.',
+    'published_told' => 'Personnes prévenues : :count',
+    'discard_version' => 'Écarter',
+    'version_conflicts' => 'Conflits',
+    'no_conflict' => 'Aucun conflit bloquant.',
+    'compare_version' => 'Comparer',
+    'compare_with' => 'Avec',
+    'compare_current' => 'Les séances telles qu’elles sont',
+    'version_option' => 'Version :number (:state)',
+    'change_list' => ['added' => 'Ajoutées', 'removed' => 'Retirées', 'changed' => 'Modifiées'],
+    'no_difference' => 'Aucune.',
+
     // FR-PLN-03: what is told, never refused.
     'warnings' => [
         'teacher_daily_hours' => 'L’enseignant dépasse ses heures par jour : :hours h pour :bound h au plus.',

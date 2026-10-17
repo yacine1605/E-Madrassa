@@ -63,6 +63,7 @@ use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
 use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\TimetableVersionController;
 use App\Http\Controllers\UnavailabilityController;
 use Illuminate\Support\Facades\Route;
 
@@ -541,6 +542,22 @@ Route::prefix('api')->group(function () {
                     Route::post('session-series/{series}/end', [SessionSeriesController::class, 'end']);
                 });
                 Route::post('class-sessions/{session}/cancel', [ClassSessionController::class, 'cancel'])->middleware('permission:schedule.session.cancel');
+                // FR-PLN-05: the timetable's versions, prepared, validated, published; compared.
+                Route::middleware('permission:schedule.session.read')->group(function () {
+                    Route::get('timetable-versions', [TimetableVersionController::class, 'index']);
+                    Route::get('timetable-versions/{version}', [TimetableVersionController::class, 'show']);
+                    Route::get('timetable-versions/{version}/conflicts', [TimetableVersionController::class, 'conflicts']);
+                    Route::get('timetable-versions/{version}/compare', [TimetableVersionController::class, 'compare']);
+                });
+                Route::middleware('permission:schedule.session.update')->group(function () {
+                    Route::post('timetable-versions', [TimetableVersionController::class, 'store']);
+                    Route::post('timetable-versions/{version}/refresh', [TimetableVersionController::class, 'refresh']);
+                    Route::post('timetable-versions/{version}/discard', [TimetableVersionController::class, 'discard']);
+                });
+                Route::middleware('permission:schedule.timetable.publish')->group(function () {
+                    Route::post('timetable-versions/{version}/validate', [TimetableVersionController::class, 'validateVersion']);
+                    Route::post('timetable-versions/{version}/publish', [TimetableVersionController::class, 'publish']);
+                });
             });
 
             Route::middleware('module:sites_rooms')->group(function () {

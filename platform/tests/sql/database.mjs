@@ -4429,6 +4429,10 @@ await check('a session\'s teacher is replaced by one qualified and free only, wi
   const elsewhere = await planGroup('PLAN-S', planned.other, 10);
   await first(SESSION, [a, elsewhere, maths, busy, null, day, '18:30', '19:30']);
   const REPLACE = "UPDATE school.class_session SET teacher_id = $2, status = 'replaced', replace_reason = $3 WHERE id = $1 RETURNING status, teacher_id, replaced_teacher_id";
+  // Its day published (SQL 065), so that its changes are told.
+  const published = (await first('SELECT school.prepare_timetable($1::date, $1::date, $2) AS id', [day, 'Semaine des remplacements'])).id;
+  await sql('SELECT school.validate_timetable($1, 1)', [published]);
+  await sql('SELECT school.publish_timetable($1, 2)', [published]);
   // AC1: not qualified, busy, without a reason, the same teacher: refused.
   await rejects(REPLACE, [session, unqualified, 'Absence imprévue'], '23514', 'session_teacher_not_qualified');
   await rejects(REPLACE, [session, busy, 'Absence imprévue'], '23514', 'session_teacher_busy');
@@ -4464,7 +4468,7 @@ await check('a session\'s teacher is replaced by one qualified and free only, wi
   assert.equal(await count('SELECT count(*) n FROM school.session_change WHERE group_id = $1', [replacing]), 0);
   // The notices: the teachers and the pupil who read the planning, each change; the author and a pupil without the planning, none.
   await as(null);
-  const notices = async user => (await sql("SELECT event FROM school.notification WHERE user_id = $1 AND event LIKE 'schedule.%' ORDER BY created_at", [user])).rows.map(r => r.event);
+  const notices = async user => (await sql("SELECT event FROM school.notification WHERE user_id = $1 AND event LIKE 'schedule.session%' ORDER BY created_at", [user])).rows.map(r => r.event);
   assert.deepEqual(await notices(holderAccount.user), ['schedule.session_replaced', 'schedule.session_restored', 'schedule.session_cancelled']);
   assert.deepEqual(await notices(substituteAccount.user), ['schedule.session_replaced', 'schedule.session_restored']);
   assert.deepEqual(await notices(pupilAccount.user), ['schedule.session_replaced', 'schedule.session_restored', 'schedule.session_cancelled']);
@@ -4475,6 +4479,90 @@ await check('a session\'s teacher is replaced by one qualified and free only, wi
   // A session over is replaced at attendance, not here.
   const past = (await first('SELECT id FROM school.class_session WHERE status = $1 AND ends_at < now() LIMIT 1', ['planned']));
   if (past) await rejects(REPLACE, [past.id, substitute, 'Trop tard'], '23514', 'session_ended');
+});
+// Versions and publication (SQL 065, FR-PLN-05): prepared, validated and published over a period; never with a blocking conflict nor a copy out of date; nothing told before.
+const PREPARE = 'SELECT school.prepare_timetable($1::date, $2::date, $3) AS id';
+const timetableOf = async id => (await first('SELECT status, version FROM school.timetable_version WHERE id = $1', [id]));
+await check('a timetable is prepared, validated and published without a blocking conflict, the change told after its publication only (FR-PLN-05 AC1, AC2)', async () => {
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read']);
+  const planner = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'schedule.session.update']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Publie', 'Amel')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, null, null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const versioned = await planGroup('PLAN-V', planned.other, 10);
+  const hall = (await room(siteA, 'PLAN-V', 30)).id;
+  const day = await dayAfter(planningFrom, 11);
+  const session = (await first(SESSION, [a, versioned, maths, teacher, hall, day, '08:00', '09:00'])).id;
+  const notices = async () => { await as(null); const rows = (await sql("SELECT event FROM school.notification WHERE user_id = $1 AND event LIKE 'schedule.%' ORDER BY created_at", [teacherAccount.user])).rows.map(r => r.event); await as('school_runtime', a, 1); return rows; };
+  // Prepared over the day, with its reason: a copy of its sessions; one open at a time over the same days.
+  await rejects(PREPARE, [day, day, '  '], '23514', 'reason_required');
+  await rejects(PREPARE, [day, await dayAfter(day, -1), 'Rentrée'], '23514', 'timetable_period_invalid');
+  const first1 = (await first(PREPARE, [day, day, 'Emploi du temps de la rentrée'])).id;
+  assert.ok(await count('SELECT count(*) n FROM school.timetable_version_session WHERE version_id = $1 AND session_id = $2', [first1, session]) === 1);
+  await rejects(PREPARE, [await dayAfter(day, -3), day, 'Autre'], '23514', 'timetable_version_open');
+  // Changed only through its functions; never deleted.
+  await rejects("UPDATE school.timetable_version SET status = 'published' WHERE id = $1", [first1], '23514', 'timetable_version_refused');
+  await rejects("UPDATE school.timetable_version SET reason = 'Autre motif' WHERE id = $1", [first1], '42501');
+  await rejects('DELETE FROM school.timetable_version WHERE id = $1', [first1], '42501');
+  await rejects('DELETE FROM school.timetable_version_session WHERE version_id = $1', [first1], '23514', 'timetable_version_refused');
+  // AC1: a room too small since, a blocking conflict: neither validated nor published.
+  await sql('UPDATE school.room SET capacity = 5 WHERE id = $1', [hall]);
+  assert.deepEqual((await sql('SELECT session_id, conflict FROM school.timetable_conflicts($1)', [first1])).rows, [{ session_id: session, conflict: 'session_room_too_small' }]);
+  await rejects('SELECT school.validate_timetable($1, $2)', [first1, 1], '23514', 'timetable_conflicts');
+  await sql('UPDATE school.room SET capacity = 30 WHERE id = $1', [hall]);
+  // AC2: before its day is published, a replacement is in the history and told to nobody.
+  const substitute = (await newStaff('Remplace', 'Walid')).id;
+  await first(QUALIFY, [a, substitute, maths, grade, null, null]);
+  await sql("UPDATE school.class_session SET teacher_id = $2, status = 'replaced', replace_reason = 'Stage' WHERE id = $1", [session, substitute]);
+  assert.equal(await count('SELECT count(*) n FROM school.session_change WHERE session_id = $1', [session]), 1);
+  assert.deepEqual(await notices(), []);
+  // The copy out of date: validated only once copied again.
+  await rejects('SELECT school.validate_timetable($1, $2)', [first1, 1], '23514', 'timetable_version_stale');
+  assert.deepEqual((await sql('SELECT change FROM school.timetable_diff($1, NULL)', [first1])).rows, [{ change: 'changed' }]);
+  await rejects('SELECT school.publish_timetable($1, $2)', [first1, 1], '23514', 'timetable_version_not_validated');
+  // Given back to its teacher, still told to nobody; the version copied again.
+  await sql("UPDATE school.class_session SET teacher_id = $2, status = 'replaced', replace_reason = 'Stage reporté' WHERE id = $1", [session, teacher]);
+  assert.deepEqual(await notices(), []);
+  await sql('SELECT school.refresh_timetable($1, $2)', [first1, 1]);
+  await rejects('SELECT school.refresh_timetable($1, $2)', [first1, 1], '23514', 'stale_version');
+  // Published by `schedule.timetable.publish` only; the planner prepares, not publishes.
+  await as('school_runtime', a, planner.user);
+  await rejects('SELECT school.validate_timetable($1, $2)', [first1, 2], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+  await sql('SELECT school.validate_timetable($1, $2)', [first1, 2]);
+  assert.deepEqual(await timetableOf(first1), { status: 'validated', version: 3 });
+  assert.ok((await first('SELECT school.publish_timetable($1, $2) AS n', [first1, 3])).n >= 1);
+  assert.equal((await timetableOf(first1)).status, 'published');
+  assert.deepEqual(await notices(), ['schedule.timetable_published'], 'the teacher of the session told once published');
+  // Once its day is published, its changes are told.
+  await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Grève des transports' WHERE id = $1", [session]);
+  assert.deepEqual(await notices(), ['schedule.timetable_published', 'schedule.session_cancelled']);
+  // A second version over these days and the next supersedes the first; the two compared.
+  const second = (await first(PREPARE, [day, await dayAfter(day, 1), 'Après la grève'])).id;
+  assert.deepEqual((await sql('SELECT session_id, change FROM school.timetable_diff($1, $2)', [first1, second])).rows, [{ session_id: session, change: 'removed' }]);
+  await sql('SELECT school.validate_timetable($1, $2)', [second, 1]);
+  await sql('SELECT school.publish_timetable($1, $2)', [second, 2]);
+  assert.deepEqual([(await timetableOf(first1)).status, (await timetableOf(second)).status], ['superseded', 'published']);
+  assert.equal((await first('SELECT school.published_on($1::date) AS p', [day])).p, true);
+  // Told of what changed for them: their session left the timetable.
+  assert.deepEqual(await notices(), ['schedule.timetable_published', 'schedule.session_cancelled', 'schedule.timetable_published']);
+  // A third publication changing nothing of theirs tells them nothing.
+  const quiet = (await first(PREPARE, [day, day, 'Sans changement'])).id;
+  await sql('SELECT school.validate_timetable($1, $2)', [quiet, 1]);
+  assert.equal((await first('SELECT school.publish_timetable($1, $2) AS n', [quiet, 2])).n, 0);
+  assert.equal((await timetableOf(second)).status, 'superseded');
+  // A draft set aside; a published version is closed.
+  const third = (await first(PREPARE, [await dayAfter(day, 2), await dayAfter(day, 2), 'Essai'])).id;
+  await sql('SELECT school.discard_timetable($1, $2)', [third, 1]);
+  assert.equal((await timetableOf(third)).status, 'discarded');
+  await rejects('SELECT school.discard_timetable($1, $2)', [second, (await timetableOf(second)).version], '23514', 'timetable_version_closed');
+  // A teacher reads the copies of their own sessions, not the versions.
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.timetable_version'), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.timetable_version_session WHERE session_id = $1', [session]), 1, 'the first version had it, cancelled it left the others');
+  await as('school_runtime', a, 1);
+  await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [hall]);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);

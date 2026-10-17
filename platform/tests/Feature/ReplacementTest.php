@@ -89,6 +89,10 @@ final class ReplacementTest extends TestCase
         $this->grant($s['school'], $account, 'teacher', 'personal');
         $record = $this->getJson("/api/staff/{$s['teacher']}")->json('data');
         $this->postJson("/api/staff/{$s['teacher']}/account", ['user_id' => $account['id'], 'version' => $record['version']])->assertOk();
+        // Its day published first (FR-PLN-05): a change is told only then.
+        $version = $this->postJson('/api/timetable-versions', ['date_from' => $p['day'], 'date_to' => $p['day'], 'reason' => 'Semaine publiée'])->assertCreated()->json('data');
+        $this->postJson("/api/timetable-versions/{$version['id']}/validate", ['version' => 1])->assertOk();
+        $this->postJson("/api/timetable-versions/{$version['id']}/publish", ['version' => 2])->assertOk();
         $this->postJson("/api/class-sessions/{$p['session']['id']}/replace", ['teacher_id' => $p['substitute'], 'reason' => 'Formation académique', 'version' => 1])->assertOk();
         $this->assertSame(1, DB::connection('owner')->table('school.notification')->where('user_id', $account['id'])->where('event', 'schedule.session_replaced')->count());
         // The teacher replaced: the session among theirs, said held by another (whose record they may not read); their agenda cancels it.

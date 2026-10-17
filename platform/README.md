@@ -1454,15 +1454,34 @@ Routes: `GET /api/class-sessions/{session}/substitutes`, `POST /api/class-sessio
 
 Validation on 17 October 2026: **295 PHP integration tests (14,680 assertions)**; **261 embedded SQL checks and 292 native PostgreSQL 16 checks including concurrency**; migration 064 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 260 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 80 (lot 4): the timetable's versions and publication
+
+The timetable is prepared, validated, then published (FR-PLN-05). A version covers the whole school over a period (the scope proposed on 17 October 2026):
+
+- **Publications** (« Publications du planning », in the Planning section, for those who plan or publish): the versions, newest first, with their period, state, reason, number of sessions, who prepared and published them. **Prepare** a version over a period with its reason: a copy of the sessions not cancelled, one version open at a time over the same days. **Conflicts** lists its sessions in a blocking conflict, checked again as things are now (a room made smaller, a pupil who joined another group, a qualification ended). **Validate** and **Publish** (`schedule.timetable.publish`) are refused while a session is in a blocking conflict (AC1) or has changed since the copy; **Refresh the copy** takes the sessions again and makes it a draft to validate anew. **Discard** sets a version not yet published aside. **Compare** lists the sessions added, removed or changed between the version and another one, or the sessions as they are now.
+- Publishing supersedes the version published over the same days. It tells, through their accounts, the teachers (before and after) and the pupils of the groups whose sessions it adds, removes or changes against the version it supersedes, if they read the planning; nobody else, and nothing when it changes nothing for them.
+- AC2: a cancellation, a replacement or a return (increment 79) is kept in the history at once, but told only once its day has been published.
+- Versions are never deleted; a version and its copy change only through the database's functions.
+- SQL 065 (`database/schema/065_timetable_versions.sql`, migration `2026_10_17_000065`).
+
+Routes: `GET /api/timetable-versions`, `GET /api/timetable-versions/{version}`, `GET …/{version}/conflicts`, `GET …/{version}/compare?with=`, `POST /api/timetable-versions` (`date_from`, `date_to`, `reason`), `POST …/{version}/refresh|discard` (`schedule.session.update`), `POST …/{version}/validate|publish` (`schedule.timetable.publish`), each with `version`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PLN-05 AC1 | tests/sql and `TimetableVersionTest`: a room made too small since, the session listed in conflict with its reason, validation refused (`timetable_conflicts`); refused too with a copy out of date (`timetable_version_stale`) or not validated |
+| FR-PLN-05 AC2 | tests/sql and `TimetableVersionTest`: a replacement and a cancellation before publication told to nobody, the teacher told on publication and of the next cancellation; a publication changing nothing of theirs tells them nothing |
+| FR-PLN-05 | tests/sql: versions numbered, one open at a time over the same days, changed only through their functions, never deleted; validated and published by `schedule.timetable.publish` only; the published one superseded by the next; two versions compared; a teacher reads the copies of their sessions, not the versions. `TimetableVersionTest`: the Publications screen prepares, lists the conflicts, validates, publishes and compares |
+
+Validation on 17 October 2026: **297 PHP integration tests (14,909 assertions)**; **262 embedded SQL checks and 293 native PostgreSQL 16 checks including concurrency**; migration 065 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 264 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. Versions and publication (FR-PLN-05).
-2. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
-3. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
+1. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
+2. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2
 
