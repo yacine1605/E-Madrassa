@@ -67,6 +67,8 @@ final class DatabaseErrors
         'session_replaced', 'session_ended', 'session_replacement_same',
         'timetable_version_refused', 'timetable_version_closed', 'timetable_version_open', 'timetable_period_invalid', 'timetable_version_stale',
         'timetable_conflicts', 'timetable_version_not_validated',
+        'attendance_session_cancelled', 'attendance_future', 'attendance_too_late', 'attendance_exists', 'attendance_validated', 'attendance_not_submitted',
+        'attendance_not_author', 'attendance_late_minutes', 'attendance_replacement_required', 'attendance_hours_invalid',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062). */

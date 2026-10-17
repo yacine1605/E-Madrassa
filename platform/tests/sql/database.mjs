@@ -4564,6 +4564,85 @@ await check('a timetable is prepared, validated and published without a blocking
   await as('school_runtime', a, 1);
   await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [hall]);
 });
+// The teachers' attendance (SQL 066, FR-PTG-01, FR-PTG-02): entered for a session begun, corrected by its author, decided by another (TST-05).
+await as('platform_admin', null, 6);
+await sql("SELECT platform.enable_module($1, 'attendance')", [a]);
+await as('school_runtime', a, 1);
+const ATTEND = `INSERT INTO school.teacher_attendance (tenant_id, session_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, note)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, validation_status, group_id, teacher_id`;
+await check('a session begun is entered once, locks the session, corrected by its author, decided by another person only (FR-PTG-01, FR-PTG-02, TST-05)', async () => {
+  const supervisor = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'attendance.teacher.entry.create', 'attendance.teacher.entry.update']);
+  const hr = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'attendance.teacher.validation.approve']);
+  const both = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'attendance.teacher.entry.create', 'attendance.teacher.entry.update',
+    'attendance.teacher.validation.approve']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Pointe', 'Rania')).id;
+  const outsider = (await newStaff('Horsmatiere', 'Kamel')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  // A programme taught since its year began: sessions of past days.
+  const taught = await programme('ATTEND', 90000, 'active', planned.year);
+  await line(taught, maths, { weekly: 10, from: await dayAfter(today, -30) });
+  const attended = await planGroup('PLAN-P', taught, 10);
+  const past = (await first(`SELECT d::date::text AS d FROM generate_series(current_date - 1, current_date - 6, interval '-1 day') d
+    WHERE school.day_open(d::date, $1) ORDER BY d DESC LIMIT 1`, [siteA])).d;
+  const sessions = [];
+  for (const hour of ['08', '09', '10', '11']) sessions.push((await first(SESSION, [a, attended, maths, teacher, null, past, hour + ':00', hour + ':50'])).id);
+  const coming = (await first(SESSION, [a, attended, maths, teacher, null, await dayAfter(planningFrom, 18), '08:00', '09:00'])).id;
+  await as('school_runtime', a, supervisor.user);
+  // AC2: a session to come is not entered.
+  await rejects(ATTEND, [a, coming, 'present', null, null, null, null, null], '23514', 'attendance_future');
+  // Late needs its minutes; the hours held go together; entered once, the group and teacher the database's.
+  await rejects(ATTEND, [a, sessions[0], 'late', null, null, null, null, null], '23514', 'attendance_late_minutes');
+  await rejects(ATTEND, [a, sessions[0], 'present', null, '08:10', null, null, null], '23514', 'attendance_hours_invalid');
+  assert.deepEqual(await first(ATTEND, [a, sessions[0], 'late', 10, '08:10', '08:50', null, 'Embouteillage']),
+    { id: (await first('SELECT id FROM school.teacher_attendance WHERE session_id = $1', [sessions[0]])).id, validation_status: 'submitted', group_id: attended, teacher_id: teacher });
+  await rejects(ATTEND, [a, sessions[0], 'present', null, null, null, null, null], '23514', 'attendance_exists');
+  // The entry locks its session: neither changed, cancelled nor replaced any more.
+  assert.equal((await first('SELECT locked FROM school.class_session WHERE id = $1', [sessions[0]])).locked, true);
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Trop tard' WHERE id = $1", [sessions[0]], '23514', 'session_locked');
+  await rejects('UPDATE school.class_session SET locked = false WHERE id = $1', [sessions[0]], '42501');
+  // A substitute must teach the subject; nor is the teacher their own substitute.
+  await as('school_runtime', a, supervisor.user);
+  await rejects(ATTEND, [a, sessions[1], 'replaced', null, null, null, outsider, null], '23514', 'session_teacher_not_qualified');
+  await rejects(ATTEND, [a, sessions[1], 'replaced', null, null, null, teacher, null], '23514', 'session_replacement_same');
+  const byBoth = async (session, status) => { await as('school_runtime', a, both.user); const row = await first(ATTEND, [a, session, status, null, null, null, null, null]); await as('school_runtime', a, supervisor.user); return row.id; };
+  const mine = (await first('SELECT id FROM school.teacher_attendance WHERE session_id = $1', [sessions[0]])).id;
+  const theirs = await byBoth(sessions[1], 'present');
+  const absent = await byBoth(sessions[2], 'absent');
+  // Corrected by its author only, before its decision.
+  await rejects("UPDATE school.teacher_attendance SET note = 'Autre' WHERE id = $1", [theirs], '23514', 'attendance_not_author');
+  await sql('UPDATE school.teacher_attendance SET late_minutes = 12 WHERE id = $1', [mine]);
+  // Decided by `attendance.teacher.validation.approve` only.
+  await rejects("UPDATE school.teacher_attendance SET validation_status = 'validated' WHERE id = $1", [theirs], '42501', 'permission_denied');
+  // TST-05: one who holds both rights validates the others' entries, never their own.
+  await as('school_runtime', a, both.user);
+  await rejects("UPDATE school.teacher_attendance SET validation_status = 'validated' WHERE id = $1", [theirs], '23514', 'segregation_of_duties');
+  await sql("UPDATE school.teacher_attendance SET validation_status = 'validated' WHERE id = $1", [mine]);
+  assert.deepEqual(await first('SELECT validation_status, decided_by::int AS by FROM school.teacher_attendance WHERE id = $1', [mine]), { validation_status: 'validated', by: Number(both.user) });
+  assert.equal((await first('SELECT status FROM school.class_session WHERE id = $1', [sessions[0]])).status, 'delivered', 'held, once validated');
+  // Rejected with its reason, back to its author, told; corrected, submitted again, then validated; an absence is not held.
+  await as('school_runtime', a, hr.user);
+  await rejects("UPDATE school.teacher_attendance SET validation_status = 'rejected' WHERE id = $1", [absent], '23514', 'reason_required');
+  await sql("UPDATE school.teacher_attendance SET validation_status = 'rejected', reject_reason = 'Enseignante présente selon le registre' WHERE id = $1", [absent]);
+  await as(null);
+  assert.equal(await count("SELECT count(*) n FROM school.notification WHERE user_id = $1 AND event = 'attendance.teacher_rejected'", [both.user]), 1);
+  await as('school_runtime', a, both.user);
+  await sql("UPDATE school.teacher_attendance SET status = 'absent', note = 'Absence confirmée par la direction' WHERE id = $1", [absent]);
+  assert.equal((await first('SELECT validation_status FROM school.teacher_attendance WHERE id = $1', [absent])).validation_status, 'submitted');
+  await as('school_runtime', a, hr.user);
+  await sql("UPDATE school.teacher_attendance SET validation_status = 'validated' WHERE id = ANY ($1::uuid[])", [[absent, theirs]]);
+  assert.deepEqual((await sql('SELECT status FROM school.class_session WHERE id = ANY ($1::uuid[]) ORDER BY starts_at', [[sessions[1], sessions[2]]])).rows.map(r => r.status),
+    ['delivered', 'planned']);
+  // Validated, it changes no more here; never deleted.
+  await as('school_runtime', a, supervisor.user);
+  await rejects('UPDATE school.teacher_attendance SET late_minutes = 15 WHERE id = $1', [mine], '23514', 'attendance_validated');
+  await rejects('DELETE FROM school.teacher_attendance WHERE id = $1', [mine], '42501');
+  // AC1: the session not entered has no entry, is no absence, and stays planned and open to changes.
+  assert.equal(await count('SELECT count(*) n FROM school.teacher_attendance WHERE session_id = $1', [sessions[3]]), 0);
+  assert.deepEqual(await first('SELECT status, locked FROM school.class_session WHERE id = $1', [sessions[3]]), { status: 'planned', locked: false });
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

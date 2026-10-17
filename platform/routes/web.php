@@ -62,6 +62,7 @@ use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
 use App\Http\Controllers\TimeSlotController;
+use App\Http\Controllers\TeacherAttendanceController;
 use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\TimetableVersionController;
 use App\Http\Controllers\UnavailabilityController;
@@ -557,6 +558,19 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:schedule.timetable.publish')->group(function () {
                     Route::post('timetable-versions/{version}/validate', [TimetableVersionController::class, 'validateVersion']);
                     Route::post('timetable-versions/{version}/publish', [TimetableVersionController::class, 'publish']);
+                });
+            });
+
+            // FR-PTG-01, FR-PTG-02: the teachers' attendance, entered by one person, validated by another (TST-05).
+            Route::middleware('module:attendance')->group(function () {
+                Route::get('teacher-attendance', [TeacherAttendanceController::class, 'index'])
+                    ->middleware('permission:attendance.teacher.entry.create,attendance.teacher.validation.approve');
+                Route::post('teacher-attendance', [TeacherAttendanceController::class, 'store'])->middleware('permission:attendance.teacher.entry.create');
+                Route::put('teacher-attendance/{attendance}', [TeacherAttendanceController::class, 'update'])->middleware('permission:attendance.teacher.entry.update');
+                Route::middleware('permission:attendance.teacher.validation.approve')->group(function () {
+                    Route::post('teacher-attendance/validate-period', [TeacherAttendanceController::class, 'approvePeriod']);
+                    Route::post('teacher-attendance/{attendance}/validate', [TeacherAttendanceController::class, 'approve']);
+                    Route::post('teacher-attendance/{attendance}/reject', [TeacherAttendanceController::class, 'reject']);
                 });
             });
 

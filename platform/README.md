@@ -1474,13 +1474,34 @@ Routes: `GET /api/timetable-versions`, `GET /api/timetable-versions/{version}`, 
 
 Validation on 17 October 2026: **297 PHP integration tests (14,909 assertions)**; **262 embedded SQL checks and 293 native PostgreSQL 16 checks including concurrency**; migration 065 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 264 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 81 (lot 4): the teachers' attendance
+
+The teachers' attendance entered session by session, and validated by someone else (FR-PTG-01, FR-PTG-02, TST-05):
+
+- **Teachers' attendance** (« Pointage des enseignants », in the Planning section, for the supervisor and whoever validates): the sessions begun on a day, a week or a month, with their entry or « not entered ». A session not entered is never an absence (AC1).
+- **Enter** (`attendance.teacher.entry.create`): present, late (minutes), absent, or replaced by a teacher qualified and not elsewhere at those hours; the hours actually held when they differ; a note. Manual only. A session to come is refused (AC2), as is a cancelled one or one older than the school's delay (`attendance.entry_days`, 7 days, in the settings). One entry a session; the entry locks the session (no more changes, cancellation or replacement).
+- **Correct** (`attendance.teacher.entry.update`): by its author only, until it is decided; submitted again.
+- **Validate** or **Reject** with a reason (`attendance.teacher.validation.approve`): never by its author (BR-08), whatever roles they hold, the refusal saying the rule (TST-05). A rejected entry goes back to its author, who is told. **Validate the period's submitted entries** validates at once the others' entries of the day, week or month shown, and says how many of one's own were left. Validated, the session is held (`delivered`) unless the teacher was absent, and the entry no longer changes here (traced corrections come with the hours, FR-PTG-03).
+- SQL 066 (`database/schema/066_teacher_attendance.sql`, migration `2026_10_17_000066`).
+
+Routes: `GET /api/teacher-attendance?from=&to=&state=&group_id=&teacher_id=`, `POST /api/teacher-attendance`, `PUT /api/teacher-attendance/{attendance}`, `POST /api/teacher-attendance/{attendance}/validate|reject`, `POST /api/teacher-attendance/validate-period`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PTG-01 AC1 | `TeacherAttendanceTest`: the sessions not entered listed with no entry, filtered « not entered »; tests/sql: no entry, the session still planned and open |
+| FR-PTG-01 AC2 | tests/sql and `TeacherAttendanceTest`: a session to come refused (`attendance_future`) |
+| FR-PTG-02 AC1, TST-05, FR-IAM-05 AC1, AC2 | tests/sql and `TeacherAttendanceTest`: one holding the supervisor's and the pedagogy manager's roles validates another's entry, never their own (`segregation_of_duties`, its message); the supervisor validates nothing |
+| FR-PTG-01, FR-PTG-02 | tests/sql: late without minutes, hours apart, a substitute not qualified or the teacher themselves refused; one entry a session, which locks it; corrected by its author only; rejected with its reason and its author told; validated, the session held, an absence not; validated, frozen and never deleted. `TeacherAttendanceTest`: the period validated at once, one's own left; the screen enters and validates |
+
+Validation on 17 October 2026: **299 PHP integration tests (15,162 assertions)**; **263 embedded SQL checks and 294 native PostgreSQL 16 checks including concurrency**; migration 066 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 268 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
+1. The hours delivered, their traced corrections and their lock, feeding the pays (FR-PTG-03, FR-REM-02); the pupils' roll call (FR-PRE-01).
 2. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2

@@ -1,0 +1,32 @@
+<?php
+
+return [
+    // FR-PTG-01, FR-PTG-02: the teachers' attendance.
+    'teacher_attendance' => 'حضور الأساتذة',
+    'teacher_attendance_help' => 'الحصص التي بدأت خلال الفترة، مع تسجيل حضورها. الحصة غير المسجلة ليست غيابًا. يصحح التسجيلَ من أدخله إلى حين البت فيه؛ ويصادق عليه أو يرفضه شخص آخر.',
+    'no_session' => 'لا توجد حصة بدأت خلال هذه الفترة',
+    'span' => 'الفترة',
+    'spans' => ['day' => 'اليوم', 'week' => 'الأسبوع', 'month' => 'الشهر'],
+    'state' => 'التسجيل',
+    'states' => ['not_entered' => 'غير مسجلة', 'submitted' => 'مقدَّم', 'validated' => 'مصادق عليه', 'rejected' => 'مرفوض'],
+    'statuses' => ['present' => 'حاضر', 'late' => 'متأخر', 'absent' => 'غائب', 'replaced' => 'مستخلَف'],
+    'presence' => 'الحضور',
+    'late_minutes' => 'التأخر (بالدقائق)',
+    'late_by' => 'تأخر :minutes د',
+    'actual_start' => 'البداية الفعلية',
+    'actual_end' => 'النهاية الفعلية',
+    'actual_help' => 'فقط إذا لم تجرِ الحصة في توقيتها المقرر، مثلًا 08:10.',
+    'replacement' => 'المستخلِف',
+    'replaced_by' => 'استخلفه :name',
+    'note' => 'ملاحظة',
+    'enter' => 'تسجيل',
+    'correct' => 'تصحيح',
+    'validate' => 'المصادقة',
+    'reject' => 'رفض',
+    'reject_help' => 'يعود التسجيل إلى من أدخله، ويُبلَّغ بذلك.',
+    'validate_period' => 'المصادقة على التسجيلات المقدَّمة في الفترة',
+    'validate_period_help' => 'يُصادَق على التسجيلات التي أدخلها غيرك؛ وتنتظر تسجيلاتك شخصًا آخر.',
+    'validated_count' => 'المصادق عليها: :count. تسجيلاتك المتروكة: :own.',
+    'entered_by' => 'أدخله :name',
+    'decided_by' => 'بتّ فيه :name',
+];

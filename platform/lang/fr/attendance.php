@@ -1,0 +1,32 @@
+<?php
+
+return [
+    // FR-PTG-01, FR-PTG-02: the teachers' attendance.
+    'teacher_attendance' => 'Pointage des enseignants',
+    'teacher_attendance_help' => 'Les séances commencées de la période, avec leur pointage. Une séance non pointée n’est pas une absence. Le pointage se corrige par son auteur jusqu’à sa décision ; il est validé ou rejeté par une autre personne.',
+    'no_session' => 'Aucune séance commencée sur cette période',
+    'span' => 'Période',
+    'spans' => ['day' => 'Le jour', 'week' => 'La semaine', 'month' => 'Le mois'],
+    'state' => 'Pointage',
+    'states' => ['not_entered' => 'Non pointée', 'submitted' => 'Soumis', 'validated' => 'Validé', 'rejected' => 'Rejeté'],
+    'statuses' => ['present' => 'Présent', 'late' => 'En retard', 'absent' => 'Absent', 'replaced' => 'Remplacé'],
+    'presence' => 'Présence',
+    'late_minutes' => 'Retard (minutes)',
+    'late_by' => 'retard de :minutes min',
+    'actual_start' => 'Début effectif',
+    'actual_end' => 'Fin effective',
+    'actual_help' => 'Seulement si la séance n’a pas eu lieu aux heures prévues, par exemple 08:10.',
+    'replacement' => 'Remplaçant',
+    'replaced_by' => 'remplacé par :name',
+    'note' => 'Observation',
+    'enter' => 'Pointer',
+    'correct' => 'Corriger',
+    'validate' => 'Valider',
+    'reject' => 'Rejeter',
+    'reject_help' => 'Le pointage revient à son auteur, qui est prévenu.',
+    'validate_period' => 'Valider les pointages soumis de la période',
+    'validate_period_help' => 'Les pointages soumis par d’autres personnes que vous sont validés ; les vôtres attendent une autre personne.',
+    'validated_count' => 'Validés : :count. Vos propres pointages laissés : :own.',
+    'entered_by' => 'Saisi par :name',
+    'decided_by' => 'Décidé par :name',
+];
