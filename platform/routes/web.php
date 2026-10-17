@@ -6,6 +6,7 @@ use App\Http\Controllers\ArrearsController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CalendarExceptionController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
@@ -58,6 +59,7 @@ use App\Http\Controllers\StudentPhotoController;
 use App\Http\Controllers\StudyGroupController;
 use App\Http\Controllers\SupportGrantController;
 use App\Http\Controllers\SupportSessionController;
+use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\UnavailabilityController;
 use Illuminate\Support\Facades\Route;
 
@@ -492,6 +494,21 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:staff.leave.manage')->group(function () {
                     Route::post('staff/{staff}/leaves', [LeaveController::class, 'store']);
                     Route::post('leaves/{leave}/cancel', [LeaveController::class, 'cancel']);
+                });
+            });
+
+            // FR-PLN-01: the school's calendar, read by every member who reads the planning: dated closures and openings, the grid of time slots.
+            Route::middleware('module:scheduling_manual')->group(function () {
+                Route::middleware('permission:schedule.session.read,schedule.calendar.manage')->group(function () {
+                    Route::get('calendar/days', [CalendarExceptionController::class, 'days']);
+                    Route::get('calendar-exceptions', [CalendarExceptionController::class, 'index']);
+                    Route::get('time-slots', [TimeSlotController::class, 'index']);
+                });
+                Route::middleware('permission:schedule.calendar.manage')->group(function () {
+                    Route::post('calendar-exceptions', [CalendarExceptionController::class, 'store']);
+                    Route::post('calendar-exceptions/{exception}/cancel', [CalendarExceptionController::class, 'cancel']);
+                    Route::post('time-slots', [TimeSlotController::class, 'store']);
+                    Route::post('time-slots/{slot}/archive', [TimeSlotController::class, 'archive']);
                 });
             });
 

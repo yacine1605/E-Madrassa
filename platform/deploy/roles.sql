@@ -253,6 +253,14 @@ GRANT INSERT (tenant_id, run_id, kind, reverses_payout_id, amount, paid_on, meth
 GRANT UPDATE (status, decision_reason, version) ON school.payroll_payout TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.payroll_paid(uuid, uuid), school.payroll_state(text, numeric, numeric), school.own_pay(uuid, text),
   school.record_payroll_payout(uuid, numeric, date, text, text, uuid), school.reverse_payroll_payout(uuid, text, uuid) TO school_runtime;
+-- The calendar (061): dated exceptions for the whole school or a site and the grid of time slots, by `schedule.calendar.manage`;
+-- an exception cancelled, a slot archived, never deleted; neither changes otherwise.
+GRANT SELECT ON school.calendar_exception, school.time_slot TO school_runtime;
+GRANT INSERT (tenant_id, site_id, kind, date_from, date_to, reason) ON school.calendar_exception TO school_runtime;
+GRANT UPDATE (status, version) ON school.calendar_exception TO school_runtime;
+GRANT INSERT (tenant_id, code, start_time, end_time) ON school.time_slot TO school_runtime;
+GRANT UPDATE (version, archived_at) ON school.time_slot TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.day_open(date, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;

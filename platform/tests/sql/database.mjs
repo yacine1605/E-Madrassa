@@ -4143,6 +4143,81 @@ await check('a validated pay paid in parts, each payout its `salaries` expense i
   assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'expense' AND object_id = $1", [linked]) >= 1);
   await as('school_runtime', a, 1);
 });
+// The calendar (SQL 061, FR-PLN-01): the week's open days, dated closures and openings for the whole school or a site, the grid of time slots.
+await as('platform_admin', null, 6);
+await sql("SELECT platform.enable_module($1, 'scheduling_manual')", [a]);
+await as('school_runtime', a, 1);
+const EXCEPTION = 'INSERT INTO school.calendar_exception (tenant_id, site_id, kind, date_from, date_to, reason) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id';
+const TIME_SLOT = 'INSERT INTO school.time_slot (tenant_id, code, start_time, end_time) VALUES ($1, $2, $3, $4) RETURNING id';
+await check('the school is open on the week\'s days; a dated closure or opening prevails, a site\'s over the school\'s (FR-PLN-01)', async () => {
+  const open = async (day, site = null) => (await first('SELECT school.day_open($1::date, $2::uuid) AS ok', [day, site])).ok;
+  // Two weeks ahead, clear of the days other checks use.
+  const [sun, mon, tue, wed, thu, fri] = await Promise.all([14, 15, 16, 17, 18, 19].map(n => dayAfter(sunday, n)));
+  // Sunday to Thursday by default; Friday closed.
+  assert.deepEqual([await open(sun), await open(thu), await open(fri), await open(fri, siteA)], [true, true, false, false]);
+  // A public holiday for the whole school closes every site.
+  const holiday = (await first(EXCEPTION, [a, null, 'holiday', mon, mon, 'Fête de l\'indépendance'])).id;
+  assert.deepEqual([await open(mon), await open(mon, siteA), await open(mon, staffSiteB)], [false, false, false]);
+  await rejects(EXCEPTION, [a, null, 'closure', sun, mon, 'Chevauche la fête'], '23514', 'calendar_exception_overlap');
+  // A make-up Friday on one site only.
+  await first(EXCEPTION, [a, siteA, 'opening', fri, fri, 'Rattrapage du lundi férié']);
+  assert.deepEqual([await open(fri, siteA), await open(fri, staffSiteB), await open(fri)], [true, false, false]);
+  // The site's exception prevails over the school's: a vacation for all, one site kept open on its first day.
+  await first(EXCEPTION, [a, null, 'vacation', wed, thu, 'Vacances de printemps']);
+  await first(EXCEPTION, [a, siteA, 'opening', wed, wed, 'Stage intensif']);
+  assert.deepEqual([await open(wed, siteA), await open(thu, siteA), await open(wed, staffSiteB), await open(tue)], [true, false, false, true]);
+  await rejects(EXCEPTION, [a, null, 'closure', yesterday, today, 'Hier'], '23514', 'calendar_exception_past');
+  await rejects(EXCEPTION, [a, siteA, 'closure', thu, wed, 'A l\'envers'], '23514');
+  await rejects(EXCEPTION, [a, siteA, 'closure', tue, tue, '   '], '23514');
+  await rejects(EXCEPTION, [a, siteA, 'party', tue, tue, 'Inconnu'], '23514');
+  // It keeps its days; cancelled, the week's rule is back.
+  await rejects('UPDATE school.calendar_exception SET date_to = date_to + 1 WHERE id = $1', [holiday], '42501');
+  await sql("UPDATE school.calendar_exception SET status = 'cancelled' WHERE id = $1", [holiday]);
+  assert.equal(await open(mon, siteA), true);
+  await rejects("UPDATE school.calendar_exception SET status = 'planned' WHERE id = $1", [holiday], '23514', 'status_transition_refused');
+  // An exception whose days are gone stays as it is.
+  await as(null);
+  await sql('ALTER TABLE school.calendar_exception DISABLE TRIGGER USER');
+  const past = (await first("INSERT INTO school.calendar_exception (tenant_id, kind, date_from, date_to, reason, created_at, updated_at) VALUES ($1, 'closure', current_date - 5, current_date - 3, 'Passée', now(), now()) RETURNING id", [a])).id;
+  await sql('ALTER TABLE school.calendar_exception ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.calendar_exception SET status = 'cancelled' WHERE id = $1", [past], '23514', 'calendar_exception_ended');
+  // A site's grant keeps its site's calendar, never another's nor the whole school's; a reader keeps none.
+  const local = await scopedAccount('internal', 'site', [staffSiteB], ['schedule.calendar.manage']);
+  await as('school_runtime', a, local.user);
+  assert.ok((await first(EXCEPTION, [a, staffSiteB, 'closure', tue, tue, 'Coupure d\'électricité'])).id);
+  await rejects(EXCEPTION, [a, siteA, 'closure', tue, tue, 'Ailleurs'], '42501');
+  await rejects(EXCEPTION, [a, null, 'closure', tue, tue, 'Partout'], '42501');
+  const reader = await scopedAccount('internal', 'tenant', null, ['schedule.session.read']);
+  await as('school_runtime', a, reader.user);
+  assert.equal(await open(tue, staffSiteB), false, 'every member reads the calendar');
+  await rejects(EXCEPTION, [a, null, 'closure', tue, tue, 'Sans droit'], '42501', 'permission_denied');
+  await as('school_runtime', a, 1);
+});
+await check('the grid of time slots: codes unique, to the minute, never changed, archived and never deleted (FR-PLN-01)', async () => {
+  const early = (await first(TIME_SLOT, [a, 'M1', '08:00', '09:30'])).id;
+  await first(TIME_SLOT, [a, 'M2', '09:30', '11:00']);
+  // Slots may overlap one another (a long one over two short ones), never twice the same times.
+  await first(TIME_SLOT, [a, 'M12', '08:00', '11:00']);
+  await rejects(TIME_SLOT, [a, 'M1', '14:00', '15:00'], '23505');
+  await rejects(TIME_SLOT, [a, 'M1-BIS', '08:00', '09:30'], '23505');
+  await rejects(TIME_SLOT, [a, 'X1', '10:00', '09:00'], '23514');
+  await rejects(TIME_SLOT, [a, 'X2', '10:00:30', '11:00'], '23514');
+  await rejects(TIME_SLOT, [a, 'X 3', '10:00', '11:00'], '23514');
+  assert.ok((await first(TIME_SLOT, [a, 'SOIR', '20:00', '24:00'])).id, 'until midnight');
+  await rejects("UPDATE school.time_slot SET start_time = '08:15' WHERE id = $1", [early], '42501');
+  await sql('UPDATE school.time_slot SET archived_at = now() WHERE id = $1', [early]);
+  await rejects('UPDATE school.time_slot SET archived_at = NULL WHERE id = $1', [early], '23514', 'time_slot_archived');
+  assert.ok((await first(TIME_SLOT, [a, 'M1-N', '08:00', '09:30'])).id, 'the same times once the first is archived');
+  await rejects('DELETE FROM school.time_slot WHERE id = $1', [early], '42501');
+  // The whole school's grid: a site's grant changes none of it.
+  const local = await scopedAccount('internal', 'site', [siteA], ['schedule.calendar.manage']);
+  await as('school_runtime', a, local.user);
+  await rejects(TIME_SLOT, [a, 'LOCAL', '12:00', '13:00'], '42501');
+  await as(null);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'time_slot' AND object_id = $1", [early]) >= 2);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -4674,6 +4749,24 @@ if (PgClient) {
     assert.equal(await count('SELECT count(*) n FROM school.room_closure WHERE room_id = $1', [hall]), 1);
     // Its site free to be archived again (FR-SLL-01).
     await sql('UPDATE school.room SET archived_at = now() WHERE id = $1', [hall]);
+  });
+  await check('two overlapping closures of the school made at once are recorded once (FR-PLN-01)', async () => {
+    await as('school_runtime', a, 1);
+    // Three weeks ahead, clear of the calendar's other checks.
+    const day = await dayAfter(sunday, 22);
+    const clients = await Promise.all([0, 1].map(() => connect('school_runtime', a, 1)));
+    const results = await Promise.allSettled(clients.map(async (c, i) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(EXCEPTION, [a, null, 'closure', day, day, 'Grève ' + i]);
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+      } catch (e) { await c.query('ROLLBACK'); throw e; }
+    }));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected').reason.message, 'calendar_exception_overlap');
+    assert.equal(await count("SELECT count(*) n FROM school.calendar_exception WHERE date_from = $1 AND site_id IS NULL AND status = 'planned'", [day]), 1);
   });
   await check('two conversions of a prospect\'s child at once make one pupil; the other\'s pupil is undone with it (FR-CRM-02 AC1)', async () => {
     await as('school_runtime', a, 1);

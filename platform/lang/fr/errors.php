@@ -178,6 +178,15 @@ return [
     'payroll_payout_immutable' => 'Ce versement ne change plus : il se reprend par une contre-opération, qui une fois décidée ne change plus non plus.',
     'expense_payroll' => 'Cette dépense est celle d’un versement de rémunération : elle se paie, se reprend et s’annule depuis la rémunération seulement.',
     'expense_category_missing' => 'La catégorie de dépenses « Salaires » manque à l’établissement : rétablissez les catégories de dépenses avant de verser.',
+
+    // The calendar (FR-PLN-01).
+    'calendar_exception_past' => 'Une fermeture ou une ouverture commence aujourd’hui ou plus tard.',
+    'calendar_exception_end_before_start' => 'Le dernier jour ne peut pas précéder le premier.',
+    'calendar_exception_overlap' => 'Une fermeture ou une ouverture couvre déjà certains de ces jours, pour le même site ou pour tout l’établissement.',
+    'calendar_exception_ended' => 'Ces jours sont passés : la fermeture ou l’ouverture reste telle quelle.',
+    'calendar_range_too_long' => 'Le calendrier se lit 92 jours au plus à la fois.',
+    'time_slot_archived' => 'Ce créneau est archivé : il reste tel quel.',
+    'time_slot_immutable' => 'Un créneau garde son code et ses heures : archivez-le et créez-en un autre.',
     'expense_not_author' => 'Seul l’auteur de la dépense la corrige, la soumet ou y joint un justificatif.',
     'photo_invalid' => 'Choisissez une photo au format JPEG, PNG ou WebP.',
     'photo_too_large' => 'La photo dépasse 2 Mo. Choisissez une image plus légère.',

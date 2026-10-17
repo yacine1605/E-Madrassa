@@ -24,7 +24,7 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll', 'my-pay'];
+  'payroll', 'my-pay', 'school-calendar', 'time-slots'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -165,6 +165,11 @@ async function seed(browser, session) {
     const room = await call('rooms', { site_id: site.id, code: 'A101', labels: { fr: 'Salle 101', ar: 'القاعة 101' }, capacity: 30,
       room_type: 'CLASSROOM', equipment: ['PROJECTOR', 'WHITEBOARD'] });
     await call(`rooms/${room.id}/closures`, { date_from: day(10), date_to: day(12), reason: 'Travaux de peinture' });
+    // FR-PLN-01: a public holiday for the whole school, a make-up day on the site, the day's slots.
+    await call('calendar-exceptions', { kind: 'holiday', date_from: day(20), date_to: day(20), reason: 'Fête de l’indépendance' });
+    await call('calendar-exceptions', { site_id: site.id, kind: 'opening', date_from: day(23), date_to: day(23), reason: 'Rattrapage du jour férié' });
+    for (const [code, start_time, end_time] of [['M1', '08:00', '09:30'], ['M2', '09:45', '11:15'], ['S1', '13:30', '15:00']])
+      await call('time-slots', { code, start_time, end_time });
     // The class they lead, in that room (FR-GRP-01).
     const group = await call('groups', { year_id: year.id, program_id: program.id, site_id: site.id, code: 'ACC-A', group_type: 'class',
       labels: { fr: 'Classe de recette', ar: 'قسم الاختبار' }, capacity: 25, valid_from: day(-30), status: 'active', lead_teacher_id: teacher.id,

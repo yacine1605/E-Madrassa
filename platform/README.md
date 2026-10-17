@@ -1365,9 +1365,40 @@ Routes: `POST /api/payroll-runs/{run}/payouts`, `POST /api/payroll-payouts/{payo
 
 Validation on 17 October 2026: **282 PHP integration tests (13,606 assertions), 252 embedded SQL checks and 281 native PostgreSQL 16 checks including concurrency**; migration 060 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 244 screens without a problem, My pay included. The CI could not start (the GitHub account's billing).
 
+## Increment 75 (lot 3): the finance's Arabic screens
+
+In the « by » columns of an enrolment's finance and of a pay, each person is written on their own line: Latin names no longer run into one another around the Arabic comma. The references (`PAY-`, `RMB-`) keep their own direction, and a refund's state is written one piece of information a line. The Arabic receipts and screens of the review pack were accepted by the project's owner, a native reader, on 17 October 2026 (`REVUE_LOT3.md`).
+
+## Increment 76 (lot 4): the calendar
+
+SQL 061 (`database/schema/061_calendar.sql`, migration `2026_10_17_000061`) gives the school its calendar (FR-PLN-01), on which lot 4's sessions will be planned:
+
+- **The week's open days** stay a setting (`calendar.open_days`, Sunday to Thursday by default).
+- **Dated exceptions** prevail over the week, for the whole school or one site: closures (public holiday, vacation, other) and exceptional openings (a make-up day), from one day until another, with their reason. Never two of the same scope on a day, even for two requests at once; a site's prevails over the whole school's (`school.day_open(day, site)`). An exception starts today or later, keeps its days and reason, and is cancelled until its last day, never deleted.
+- **The grid of time slots**: a code, a start and an end to the minute (until 24:00), never two in use with the same times; a slot keeps its code and times and is archived, never deleted.
+- **Who keeps it**: the new permission `schedule.calendar.manage` (the administrator and the pedagogy and HR manager), for the whole school or on the sites of a scoped grant; the grid needs a school-wide grant. Every member who reads the planning reads the calendar.
+- Screens, in the new **Planning** section: **Calendar** (the week's days, the exceptions to come, adding and cancelling one) and **Time slots**.
+
+Routes: `GET /api/calendar/days?from=&to=&site_id=` (92 days at most), `GET|POST /api/calendar-exceptions`, `POST /api/calendar-exceptions/{exception}/cancel`, `GET|POST /api/time-slots`, `POST /api/time-slots/{slot}/archive`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PLN-01 | `CalendarTest`, tests/sql: Sunday to Thursday by default; a public holiday closes every site; a make-up Friday on one site only; a site's opening prevails over the school's vacation; cancelled, the week is back |
+| FR-PLN-01 | tests/sql natifs: two overlapping closures of the school made at once, one recorded |
+| FR-IAM-04 | `CalendarTest`, tests/sql: a site's grant keeps its site's calendar, never another's nor the whole school's, nor the grid; a teacher reads and changes nothing |
+
+Validation on 17 October 2026: **286 PHP integration tests (13,914 assertions)**, the two the first run failed (the access matrix to regenerate, a placeholder written in the code) passing once fixed; **254 embedded SQL checks and 284 native PostgreSQL 16 checks including concurrency**; migration 061 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 252 screens without a problem, Calendar and Time slots included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. The finance's review of lot 3 before its exit: the reconciliation validated by the finance and the Arabic receipts read by a native speaker (lot 3's exit criteria). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
+1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
+
+## Next increments of lot 4
+
+1. Sessions and weekly recurrences (FR-PLN-02) with the conflicts checked before writing (FR-PLN-03): PostgreSQL exclusion constraints for a teacher, a room and a group, tested in concurrency (TST-15); a pupil in two groups, a teacher not qualified or unavailable, a room closed or too small, a day closed (FR-PLN-01 AC1).
+2. Versions and publication (FR-PLN-05), views and ICS (FR-PLN-04), cancellations and replacements (FR-PLN-06).
+3. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
+4. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2
 

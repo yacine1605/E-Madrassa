@@ -7,6 +7,7 @@ return [
         'schooling' => 'Scolarité',
         'staff' => 'Personnel',
         'finance' => 'Finance',
+        'planning' => 'Planning',
         'data' => 'Imports et exports',
         'people' => 'Personnes et droits',
         'referential' => 'Référentiel',
