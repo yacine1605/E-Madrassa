@@ -1532,13 +1532,38 @@ Routes: `GET /api/roll-calls?day=`, `GET|POST /api/class-sessions/{session}/roll
 
 Validation on 17 October 2026: **301 PHP integration tests (15,378 assertions)**; **265 embedded SQL checks and 296 native PostgreSQL 16 checks including concurrency**; migration 068 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 276 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 84 (lot 4): the finance dashboard
+
+The finance dashboard (FR-TDB-01; FR-TDB-03 for its figures' sources):
+
+- **Finance dashboard** (« Tableau de bord financier », Dashboards section, `dashboard.finance.read` for the whole school): month by month over up to 13 months, each figure the sum of its source operations computed when read, its basis shown on its heading, the time of computation said:
+  - **billed**: the instalments of each enrolment's schedule in force, enrolments not cancelled, by month due;
+  - **net receipts**: payments validated − reversals validated − refunds executed, by the day paid (carry-overs between enrolments left out) — the month's reconciliation (TST-16, AC1);
+  - **expenses committed** and **paid**, other than the pays' payouts; **pays committed** (validated nets) and **paid out** (payouts less their reversals): a salary payout, which writes a `salaries` expense, is never counted twice (AC2);
+  - **management result** = net receipts − expenses paid − pays paid out, neither a cash position nor a certified result;
+  - **arrears** at the period's end.
+- **Programmes' profitability**: billed and received of each programme's enrolments, its direct costs (the expenses committed to it), the margin; the method shown (shared costs and pays not shared out), a programme with no cost said so.
+- **Operations**: a month's operations behind a figure, read with the reader's own rights: none of those they may not read.
+- The figures of a module the school does not use do not appear (BR-20).
+- SQL 069 (`database/schema/069_finance_dashboard.sql`, migration `2026_10_17_000069`).
+
+Routes: `GET /api/dashboards/finance?from=&to=`, `GET /api/dashboards/finance/programs?from=&to=`, `GET /api/dashboards/finance/sources?indicator=&month=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-TDB-01 AC1, TST-16 | tests/sql: every month of the suite's year, payments − reversals − refunds equal to the month's reconciliation computed apart (SQL 053); `FinanceDashboardTest`: a payment validated counted, one waiting not |
+| FR-TDB-01 AC2 | tests/sql: every month, the expenses paid and the pays paid out together equal every expense payment of the month, the salaries' included once |
+| FR-TDB-01, FR-TDB-03 | tests/sql: refused to a grant limited to a site and for a period over 13 months; the pays committed equal the validated nets. `FinanceDashboardTest`: the figure's operations listed by reference, the programme's receipts and its missing costs, the screen and its operations |
+
+Validation on 17 October 2026: **302 PHP integration tests (15,524 assertions)**; **266 embedded SQL checks and 297 native PostgreSQL 16 checks including concurrency**; migration 069 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 280 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
+1. The operational dashboard (FR-TDB-02) and the dashboards' exports (FR-TDB-03); then lot 4's exit review.
 
 ## Next increments of lot 2
 

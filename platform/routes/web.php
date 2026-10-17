@@ -65,6 +65,7 @@ use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\TeacherAttendanceController;
 use App\Http\Controllers\DeliveredHoursController;
 use App\Http\Controllers\RollCallController;
+use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\TimetableVersionController;
 use App\Http\Controllers\UnavailabilityController;
@@ -561,6 +562,13 @@ Route::prefix('api')->group(function () {
                     Route::post('timetable-versions/{version}/validate', [TimetableVersionController::class, 'validateVersion']);
                     Route::post('timetable-versions/{version}/publish', [TimetableVersionController::class, 'publish']);
                 });
+            });
+
+            // FR-TDB-01: the finance dashboard, its figures summed from the operations, their sources read with the reader's rights.
+            Route::middleware(['module:dashboards', 'permission:dashboard.finance.read'])->group(function () {
+                Route::get('dashboards/finance', [FinanceDashboardController::class, 'index']);
+                Route::get('dashboards/finance/programs', [FinanceDashboardController::class, 'programs']);
+                Route::get('dashboards/finance/sources', [FinanceDashboardController::class, 'sources']);
             });
 
             // FR-PTG-01, FR-PTG-02: the teachers' attendance, entered by one person, validated by another (TST-05).

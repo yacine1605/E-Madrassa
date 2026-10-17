@@ -305,6 +305,8 @@ GRANT SELECT ON school.student_attendance, school.student_attendance_change TO s
 GRANT INSERT (tenant_id, session_id, student_id, status, late_minutes, note) ON school.student_attendance TO school_runtime;
 GRANT UPDATE (status, late_minutes, note) ON school.student_attendance TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.roll_pupils(uuid) TO school_runtime;
+-- The finance dashboard (069): its figures summed from the operations by functions with their owner's rights, for `dashboard.finance.read`.
+GRANT EXECUTE ON FUNCTION school.finance_dashboard(date, date), school.program_profitability(date, date) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -633,6 +635,10 @@ ALTER FUNCTION school.month_paid(uuid, date) OWNER TO platform_provisioner;
 GRANT SELECT, INSERT ON school.student_attendance_change TO platform_provisioner;
 ALTER FUNCTION school.record_student_attendance() OWNER TO platform_provisioner;
 ALTER FUNCTION school.roll_pupils(uuid) OWNER TO platform_provisioner;
+-- The finance dashboard (069): every operation of the school summed, whatever its reader may read of it.
+GRANT SELECT ON school.refund, school.payroll_run, school.payroll_payout TO platform_provisioner;
+ALTER FUNCTION school.finance_dashboard(date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.program_profitability(date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

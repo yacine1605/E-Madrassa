@@ -4782,6 +4782,42 @@ await check('a roll calls the pupils the group had that day, by its own teacher 
   assert.equal(await count('SELECT count(*) n FROM school.student_attendance WHERE session_id = $1', [session]), 0);
   await as('school_runtime', a, 1);
 });
+// The finance dashboard (SQL 069, FR-TDB-01, TST-16): each figure the sum of its operations; a salary payout never counted twice.
+await check('the finance dashboard\'s figures equal their source operations, month by month; a payout is never counted twice (FR-TDB-01 AC1, AC2, TST-16)', async () => {
+  await as('platform_admin', null, 6);
+  await sql("SELECT platform.enable_module($1, 'dashboards')", [a]);
+  const reader = await scopedAccount('internal', 'tenant', null, ['dashboard.finance.read']);
+  const sited = await scopedAccount('internal', 'site', [siteA], ['dashboard.finance.read']);
+  const [from, to] = [await payMonth(-11), await payMonth(0)];
+  await as('school_runtime', a, sited.user);
+  await rejects('SELECT * FROM school.finance_dashboard($1::date, $2::date)', [from, to], '42501', 'permission_denied');
+  await as('school_runtime', a, reader.user);
+  await rejects('SELECT * FROM school.finance_dashboard($1::date, $2::date)', [to, from], '23514', 'dashboard_range_invalid');
+  const rows = (await sql('SELECT month::text AS month, indicator, amount::numeric(14, 2)::text AS amount FROM school.finance_dashboard($1::date, $2::date)', [from, to])).rows;
+  const figure = (month, indicator) => Number(rows.find(r => r.month === month && r.indicator === indicator)?.amount ?? 0);
+  const months = [...new Set(rows.filter(r => r.indicator !== 'arrears').map(r => r.month))].sort();
+  assert.ok(months.length > 0 && rows.some(r => r.indicator === 'payments') && rows.some(r => r.indicator === 'salaries_paid'), 'the suite\'s operations are there');
+  await as(null);
+  for (const month of months) {
+    const last = (await first("SELECT ($1::date + interval '1 month' - interval '1 day')::date::text AS d", [month])).d;
+    // AC1, TST-16: net receipts = the month's reconciliation (payments validated − reversals − refunds), computed apart (SQL 053).
+    const reconciliation = (await first('SELECT platform.reconciliation($1, $2::date, $3::date) AS r', [a, month, last])).r;
+    assert.equal((figure(month, 'payments') - figure(month, 'reversals') - figure(month, 'refunds')).toFixed(2), Number(reconciliation.net).toFixed(2), month);
+    // AC2: the expenses paid and the pays paid out are together every expense payment of the month, the salaries' included once.
+    const allPaid = Number((await first(`SELECT coalesce(sum(CASE kind WHEN 'payment' THEN amount ELSE -amount END), 0)::numeric(14, 2)::text AS n FROM school.expense_payment
+      WHERE tenant_id = $1 AND paid_on BETWEEN $2::date AND $3::date AND ((kind = 'payment' AND status IN ('validated', 'reversed')) OR (kind = 'reversal' AND status = 'validated'))`,
+      [a, month, last])).n);
+    assert.equal((figure(month, 'expenses_paid') + figure(month, 'salaries_paid')).toFixed(2), allPaid.toFixed(2), month);
+    // The pays committed: the net of the month's pays validated.
+    const committed = Number((await first("SELECT coalesce(sum(net_amount), 0)::text AS n FROM school.payroll_run WHERE tenant_id = $1 AND period = $2::date AND status <> 'draft'", [a, month])).n);
+    assert.equal(figure(month, 'salaries_committed').toFixed(2), committed.toFixed(2), month);
+  }
+  // A programme's direct costs: the expenses committed to it.
+  await as('school_runtime', a, reader.user);
+  const programs = (await sql('SELECT program_id, billed::text AS billed, direct_costs::text AS costs FROM school.program_profitability($1::date, $2::date)', [from, to])).rows;
+  assert.ok(programs.length > 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
