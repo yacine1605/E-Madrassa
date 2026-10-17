@@ -6,7 +6,9 @@
 @endif
 <p>{{ __('pdf.receipt_number', [], $locale) }} : <b dir="ltr">{{ $reference }}</b></p>
 <p>{{ __('pdf.date', [], $locale) }} : <span dir="ltr">{{ $date }}</span></p>
-<p>{{ __('pdf.pupil', [], $locale) }} : {{ $pupil }}@if ($matricule) (<span dir="ltr">{{ $matricule }}</span>)@endif</p>
+{{-- Each name in its own direction, the matricule in its brackets: a Latin name stays whole on an Arabic receipt. --}}
+<p>{{ __('pdf.pupil', [], $locale) }} : @foreach ($pupil as $i => $name)@if ($i) · @endif<span dir="{{ \App\Support\Formats::direction($name) }}">{{ $name }}</span>@endforeach
+    @if ($matricule)<span dir="ltr">({{ $matricule }})</span>@endif</p>
 <p>{{ __('pdf.program', [], $locale) }} : {{ $program }}</p>
 <table class="grid">
     <tr><th>{{ __('pdf.label', [], $locale) }}</th><th>{{ __('pdf.amount', [], $locale) }}</th></tr>

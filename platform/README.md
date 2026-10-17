@@ -1367,7 +1367,7 @@ Validation on 17 October 2026: **282 PHP integration tests (13,606 assertions), 
 
 ## Next increments of lot 3
 
-1. The finance's review of lot 3 before its exit: the reconciliation validated by the finance and the Arabic receipts read by a native speaker (lot 3's exit criteria). The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
+1. The finance's review of lot 3 before its exit: the reconciliation validated by the finance and the Arabic receipts read by a native speaker (lot 3's exit criteria). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 2
 

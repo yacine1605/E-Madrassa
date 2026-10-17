@@ -29,3 +29,5 @@ Thumbs.db
 /.acceptance
 /.acceptance.env
 /.smoke
+/.review
+/.review.env

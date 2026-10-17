@@ -6,8 +6,8 @@
 // BROWSER_CHANNEL for an installed Chrome or Edge). Run by deploy/acceptance-test.sh against a
 // disposable installation.
 import { chromium, firefox, webkit } from 'playwright';
-import { createHmac } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { signInSchool, totp } from './session.mjs';
 
 const base = process.env.BASE_URL;
 const shots = process.env.SHOTS ?? '.acceptance';
@@ -33,23 +33,6 @@ const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|acc
 const failures = [];
 const report = [];
 mkdirSync(shots, { recursive: true });
-
-// A code is accepted once: the same account signing in again, in the next browser, waits for the next one.
-const usedSteps = new Map();
-async function totp(secret) {
-  while (usedSteps.get(secret) === Math.floor(Date.now() / 30000)) await new Promise(resolve => setTimeout(resolve, 1000));
-  const step = Math.floor(Date.now() / 30000);
-  usedSteps.set(secret, step);
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const char of secret.replace(/=+$/, '')) bits += alphabet.indexOf(char).toString(2).padStart(5, '0');
-  const key = Buffer.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(step));
-  const hash = createHmac('sha1', key).update(counter).digest();
-  const offset = hash[hash.length - 1] & 15;
-  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
-}
 
 // What the Content Security Policy blocks on this page, through every navigation it makes.
 async function watchPolicy(page) {
@@ -124,16 +107,7 @@ async function signIn(browser, kind) {
 
 async function signInSteps(page, kind, account) {
   if (kind === 'admin') {
-    await page.goto(base + '/school/login');
-    await page.getByLabel('E-mail ou identifiant').fill(account.email);
-    await page.locator('input[type="password"]').fill(account.password);
-    await page.getByRole('button', { name: 'Se connecter' }).click();
-    // The page comes again with the code's field: typed only once its scripts are running, or the code is lost.
-    await page.locator('input[autocomplete="one-time-code"]').waitFor();
-    await page.waitForLoadState('networkidle');
-    await page.locator('input[autocomplete="one-time-code"]').fill(await totp(account.secret));
-    await page.getByRole('button', { name: 'Se connecter' }).click();
-    await page.waitForURL('**/school/home');
+    await signInSchool(page, base, account);
   } else {
     await page.goto(base + '/console/login');
     await page.locator('input[type="email"]').fill(account.email);

@@ -72,13 +72,18 @@ final class ReceiptTest extends TestCase
         $this->assertStringContainsString('70 000,00 DA', $copy);
 
         // In Arabic when the school says so: letters joined, amounts left to right (TST-17).
-        DB::connection('owner')->insert("INSERT INTO school.setting (tenant_id, key, value) VALUES (?, 'finance.receipt.locale', '\"ar\"')", [$school->id]);
+        DB::connection('owner')->insert("INSERT INTO school.setting (tenant_id, key, value) VALUES (?, 'finance.receipt.locale', '\"ar\"'),
+            (?, 'identity.address', '\"12, rue des Oliviers, Alger\"')", [$school->id, $school->id]);
         $cash = $pay('10000', 'cash');
         $this->signIn($accountant)->assertOk();
         $arabic = $this->text($this->get("/api/payments/$cash/receipt")->assertOk()->getContent());
         $this->assertMatchesRegularExpression('/[\x{FE70}-\x{FEFC}]/u', $arabic);
         foreach (['10 000,00', '40 000,00', 'REC-'] as $expected) $this->assertStringContainsString($expected, $arabic);
         $this->assertStringNotContainsString('000,00 10', $arabic);
+        // A Latin address, name and matricule, each whole within the Arabic lines.
+        foreach (['12, rue des Oliviers, Alger', 'Hamidi Sara'] as $expected) $this->assertStringContainsString($expected, $arabic);
+        // The Latin name, then its matricule (pdftotext mirrors the bracket that opens the run).
+        $this->assertMatchesRegularExpression('/Hamidi Sara \(\d{6,}/', $arabic);
         // The receipt of the payment of 20,000, never opened, is not issued.
         $this->assertSame(2, DB::connection('owner')->table('school.receipt')->where('tenant_id', $school->id)->distinct()->count('number'));
         // Whoever reads no payment prints no receipt.

@@ -59,7 +59,7 @@ final class ReceiptController
         $left = $centimes($content['balance_after']);
         $digits = (bool) DB::selectOne("SELECT (school.setting_value('locale.arabic_digits'))::boolean AS d")->d;
         return [
-            'pupil' => implode(' · ', array_filter($locale === 'ar' ? [$arabic, $latin] : [$latin, $arabic])),
+            'pupil' => array_values(array_filter($locale === 'ar' ? [$arabic, $latin] : [$latin, $arabic])),
             'matricule' => $pupil['matricule'] ?? null,
             'program' => $content['program']['code'].' · '.($labels[$locale] ?? $labels['fr'] ?? $labels['ar'] ?? ''),
             'date' => Formats::date($content['date'], $locale, $digits),

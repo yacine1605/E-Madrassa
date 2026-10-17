@@ -45,6 +45,15 @@ final class Formats
         return $text === null || $text === '' ? '' : "\u{2068}".$text."\u{2069}";
     }
 
+    /**
+     * The direction a typed text reads in, for a PDF (whose engine ignores the isolates above):
+     * right to left as soon as it has an Arabic letter, else left to right.
+     */
+    public static function direction(?string $text): string
+    {
+        return preg_match('/\p{Arabic}/u', (string) $text) ? 'rtl' : 'ltr';
+    }
+
     public static function digits(string $text, ?string $locale = null, bool $arabicDigits = false): string
     {
         return $arabicDigits && ($locale ?? app()->getLocale()) === 'ar' ? strtr($text, array_combine(range(0, 9), self::ARABIC_INDIC)) : $text;
