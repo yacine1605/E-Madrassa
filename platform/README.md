@@ -1340,9 +1340,34 @@ Routes: `GET /api/payroll-runs?period=`, `POST /api/payroll-runs/generate`, `GET
 
 Validation on 17 October 2026: **281 PHP integration tests (13,369 assertions), 251 embedded SQL checks and 279 native PostgreSQL 16 checks including concurrency**; migration 059 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 240 screens without a problem, Pays and a pay's detail included. The CI could not start (the GitHub account's billing).
 
+## Increment 74 (lot 3): the payouts of the pays and the personal view
+
+SQL 060 (`database/schema/060_payroll_payouts.sql`, migration `2026_10_17_000060`) pays the validated pays (FR-REM-04) and lets a member read their own (FR-REM-05):
+
+- **Payouts** by `payroll.payout.record` (the accountant), of a validated pay only, at once or in parts, never beyond what is left of its net, once per key (BR-05), dated neither to come, before the pay's month nor in a closed month (BR-15). The pay's state follows: `validated`, `partially_paid` (AC1), `paid`.
+- **The expense of each payout** (BR-06): in the payout's transaction, the database writes the validated expense of the `salaries` category, of the same amount and day, with its payment by the same means. No one enters, pays, corrects or takes back an expense of the payroll by hand (`expense_payroll`); each month, the `salaries` expenses committed equal what is paid of the pays, never counted twice (AC2, TST-13).
+- **A payout never changes**: it is taken back by its reversal, its whole amount, with its reason, validated or rejected by `payroll.run.validate` (the direction), never by whoever asked for it (BR-08). Validated, it takes back the expense's payment and cancels the expense, on the day it was asked for; the originals are kept.
+- **The month's closure** waits for the reversals waiting with a day in it, and its reconciliation reports the payouts, their reversals, what is paid of the pays and the `salaries` expenses committed, which equal it.
+- **What a member is paid** is read with the pays' rights only, even as an expense.
+- **Personal view** (FR-REM-05): once the school turns on `payroll.self_view` (off by default, in its settings), a member holding `payroll.self_view` (the teachers) reads their own validated pays: the hours or sessions each counts, its detail and its payouts; never a draft nor anyone else's pay.
+- Screens: the **detail of a pay** pays it, takes a payout back and decides a reversal; **Pays** shows each pay's state and what is left; **My pay** (« Ma rémunération ») for the member; the **closure** shows the payouts.
+
+Routes: `POST /api/payroll-runs/{run}/payouts`, `POST /api/payroll-payouts/{payout}/reverse`, `POST /api/payroll-payouts/{payout}/validate`, `POST /api/payroll-payouts/{payout}/reject`, `GET /api/my-pay`, `GET /api/my-pay/{run}`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-REM-04 AC1 | `PayrollPayoutTest`, tests/sql: half of the net paid, `partially_paid`, and a `salaries` expense of that amount, validated and paid; the rest paid, `paid` |
+| FR-REM-04 AC2, TST-13 | `PayrollPayoutTest`, tests/sql: each month, the `salaries` expenses committed equal what is paid of the pays, a reversal included; one expense a payout |
+| BR-05, BR-06 | tests/sql natifs: a payout sent five times at once, once, with one expense; two payouts at once never beyond the net |
+| BR-08 | `PayrollPayoutTest`, tests/sql: a reversal decided by someone else than whoever asked for it; its expense cancelled with it |
+| FR-DEP-01 AC1 | `PayrollPayoutTest`, tests/sql: an expense of the payroll never paid, corrected nor taken back by hand, nor written but by its payout |
+| FR-REM-05 | `PayrollPayoutTest`, tests/sql: nothing before the school says so; then their own validated pay, its lines and payouts; never a draft nor a colleague's |
+
+Validation on 17 October 2026: **282 PHP integration tests (13,606 assertions), 252 embedded SQL checks and 281 native PostgreSQL 16 checks including concurrency**; migration 060 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 244 screens without a problem, My pay included. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
-1. Payouts (FR-REM-04, FR-REM-05): paid in parts, each one the linked expense of the `salaries` category in the same transaction (TST-13); the personal view.
+1. The finance's review of lot 3 before its exit: the reconciliation validated by the finance and the Arabic receipts read by a native speaker (lot 3's exit criteria). The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 2
 

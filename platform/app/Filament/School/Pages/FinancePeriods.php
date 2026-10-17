@@ -129,6 +129,13 @@ final class FinancePeriods extends SchoolingPage
                     array_keys($report['expense_payments']), $report['expense_payments']),
                 (int) $report['expense_reversals']['count'] > 0 ? $line(__('finance.reconciliation_expense_reversals'), $report['expense_reversals']) : null,
                 __('finance.reconciliation_total', ['label' => __('finance.expenses_paid'), 'amount' => $this->money($report['expenses_paid'])]),
+                // SQL 060: the pays' payouts and their reversals; what is paid of the pays equals the `salaries` expenses committed (TST-13).
+                ...(isset($report['payroll_payouts']) && ((int) $report['payroll_payouts']['count'] > 0 || (int) $report['payroll_reversals']['count'] > 0) ? [
+                    $line(__('finance.reconciliation_payroll_payouts'), $report['payroll_payouts']),
+                    (int) $report['payroll_reversals']['count'] > 0 ? $line(__('finance.reconciliation_payroll_reversals'), $report['payroll_reversals']) : null,
+                    __('finance.reconciliation_total', ['label' => __('finance.payroll_paid'), 'amount' => $this->money($report['payroll_paid'])]),
+                    __('finance.reconciliation_total', ['label' => __('finance.salaries_committed'), 'amount' => $this->money($report['salaries_committed'])]),
+                ] : []),
                 __('finance.reconciliation_total', ['label' => __('finance.cash_balance'), 'amount' => $this->money($report['cash_balance'])]),
             ] : []),
             ($report['pending'] ?? 0) > 0 ? __('finance.reconciliation_pending', ['count' => Formats::number((int) $report['pending'])]) : null,

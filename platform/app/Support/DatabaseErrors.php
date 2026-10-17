@@ -58,6 +58,7 @@ final class DatabaseErrors
         'pay_rule_started', 'pay_rule_immutable', 'pay_rule_end_later', 'pay_rule_end_before_start',
         'payroll_period_future', 'payroll_no_rule', 'payroll_run_validated', 'payroll_run_stale', 'payroll_rate_missing', 'payroll_net_negative',
         'payroll_units_refused', 'payroll_unit_date', 'payroll_unit_sessions', 'payroll_correction_invalid',
+        'payroll_run_not_payable', 'payroll_payout_date', 'payroll_payout_immutable', 'expense_payroll', 'expense_category_missing',
     ];
 
     public static function message(string $rule): string

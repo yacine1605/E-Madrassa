@@ -4025,6 +4025,124 @@ await check('a member\'s pay for a month: one however often generated, the four 
   assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'payroll_adjustment' AND object_id = $1", [adjusted]) >= 1);
   await as('school_runtime', a, 1);
 });
+const PAY_OUT = 'SELECT school.record_payroll_payout($1, $2::numeric, $3::date, $4, $5, $6) AS id';
+const REVERSE_PAYOUT = 'SELECT school.reverse_payroll_payout($1, $2, $3) AS id';
+await check('a validated pay paid in parts, each payout its `salaries` expense in the same transaction, never beyond its net, once per key; taken back by a reversal decided by someone else; a member reads their own (FR-REM-04 AC1, AC2, FR-REM-05, BR-06, TST-13)', async () => {
+  const rules = await scopedAccount('internal', 'tenant', null, ['payroll.rule.manage', 'staff.profile.read']);
+  const gen = await scopedAccount('internal', 'tenant', null, ['payroll.run.generate']);
+  const validator = await scopedAccount('internal', 'tenant', null, ['payroll.run.validate']);
+  const payer = await scopedAccount('internal', 'tenant', null, ['payroll.payout.record', 'payroll.amount.read', 'expense.expense.read', 'expense.expense.pay',
+    'expense.expense.reverse', 'finance.payment.read']);
+  const both = await scopedAccount('internal', 'tenant', null, ['payroll.payout.record', 'payroll.run.validate']);
+  const clerk = await scopedAccount('internal', 'tenant', null, ['expense.expense.read', 'expense.expense.validate', 'expense.expense.pay']);
+  const teacher = await scopedAccount('internal', 'tenant', null, ['payroll.self_view']);
+  await as('school_runtime', a, 1);
+  const member = await first(STAFF, [a, 'Saadi', 'Paie', 'teacher_internal']);
+  const colleague = (await first(STAFF, [a, 'Taleb', 'Paie', 'administrative'])).id;
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [member.id, teacher.user]);
+  const [m1, m0] = await Promise.all([-1, 0].map(payMonth));
+  const day = async (k, d) => (await first('SELECT ($1::date + $2::int)::text AS d', [k, d])).d;
+  const today = (await first('SELECT current_date::text AS d')).d;
+  await as('school_runtime', a, rules.user);
+  await first(SAVE_PAY_RULE, [member.id, 'fixed_monthly', '60000', null, null, m1, '[]', '[]', uuid()]);
+  await first(SAVE_PAY_RULE, [colleague, 'fixed_monthly', '45000', null, null, m1, '[]', '[]', uuid()]);
+  await as('school_runtime', a, gen.user);
+  for (const staff of [member.id, colleague]) for (const month of [m1, m0]) await first(GENERATE_PAYROLL, [month, staff]);
+  const run = async (staff, period) => first(`SELECT r.id, r.status, r.net_amount::text AS net, school.payroll_paid(r.tenant_id, r.id)::text AS paid,
+    school.payroll_state(r.status, r.net_amount, school.payroll_paid(r.tenant_id, r.id)) AS state FROM school.payroll_run r WHERE r.staff_id = $1 AND r.period = $2`, [staff, period]);
+  const pay = (await run(member.id, m1)).id;
+  const draft = (await run(member.id, m0)).id;
+  await as('school_runtime', a, validator.user);
+  await sql("UPDATE school.payroll_run SET status = 'validated' WHERE id = ANY ($1::uuid[])", [[pay, (await run(colleague, m1)).id]]);
+  // Paid by `payroll.payout.record` only, once validated.
+  await rejects(PAY_OUT, [pay, '1000', 'today', 'cash', null, uuid()], '42501');
+  await as('school_runtime', a, payer.user);
+  await rejects(PAY_OUT, [draft, '1000', 'today', 'cash', null, uuid()], '23514', 'payroll_run_not_payable');
+  assert.equal((await run(member.id, m1)).state, 'validated');
+  // AC1: half of it, `partially_paid`, and the expense of that amount, `salaries`, validated and paid, in the same transaction (BR-06).
+  const key = uuid();
+  const half = (await first(PAY_OUT, [pay, '30000', await day(m1, 27), 'transfer', 'VIR 77', key])).id;
+  assert.deepEqual(Object.values(await run(member.id, m1)).slice(1), ['validated', '60000.00', '30000.00', 'partially_paid']);
+  const expense = await first(`SELECT x.id, x.amount::text AS amount, x.expense_date::text AS day, x.status, x.beneficiary, c.code, school.expense_paid(x.tenant_id, x.id)::text AS paid
+    FROM school.expense x JOIN school.expense_category c ON c.id = x.category_id WHERE x.payroll_payout_id = $1`, [half]);
+  assert.deepEqual([expense.amount, expense.day, expense.status, expense.code, expense.paid], ['30000.00', await day(m1, 27), 'validated', 'salaries', '30000.00']);
+  assert.ok(expense.beneficiary.includes('Saadi') && expense.beneficiary.includes(member.staff_number));
+  // BR-05: the same key answers the first payout; another payout with it is refused.
+  assert.equal((await first(PAY_OUT, [pay, '30000', await day(m1, 27), 'transfer', 'VIR 77', key])).id, half);
+  await rejects(PAY_OUT, [pay, '20000', 'today', 'cash', null, key], '23514', 'idempotency_key_reused');
+  assert.equal(await count('SELECT count(*) n FROM school.expense WHERE payroll_payout_id = $1', [half]), 1);
+  // Never beyond what is left of the net, nor on a day to come, before its month, or by a means the school refuses.
+  await rejects(PAY_OUT, [pay, '30000.01', 'today', 'cash', null, uuid()], '23514', 'payment_exceeds_balance');
+  await rejects(PAY_OUT, [pay, '100', await day(m0, 40), 'cash', null, uuid()], '23514', 'payment_future_date');
+  await rejects(PAY_OUT, [pay, '100', await day(m1, -1), 'cash', null, uuid()], '23514', 'payroll_payout_date');
+  await rejects(PAY_OUT, [pay, '100', 'today', 'bitcoin', null, uuid()], '23514', 'payment_method_unknown');
+  const rest = (await first(PAY_OUT, [pay, '30000', 'today', 'cash', null, uuid()])).id;
+  assert.equal((await run(member.id, m1)).state, 'paid');
+  // FR-DEP-01 AC1: the payroll's expense is never entered, paid, corrected nor taken back by hand.
+  const linked = (await first('SELECT id FROM school.expense WHERE payroll_payout_id = $1', [rest])).id;
+  await rejects(PAY_EXPENSE, [linked, '1', 'today', 'cash', null, uuid()], '23514', 'expense_payroll');
+  const linkedPayment = (await first('SELECT id FROM school.expense_payment WHERE expense_id = $1', [linked])).id;
+  await rejects(REVERSE_EXPENSE_PAYMENT, [linkedPayment, 'Par la main', uuid()], '23514', 'expense_payroll');
+  await rejects(CORRECT_EXPENSE, [linked, 'cancellation', null, 'Par la main', uuid()], '23514', 'expense_payroll');
+  const salaries = (await first("SELECT id FROM school.expense_category WHERE tenant_id = $1 AND code = 'salaries'", [a])).id;
+  await rejects('INSERT INTO school.expense (tenant_id, expense_date, amount, category_id, beneficiary, reason, payroll_payout_id, idempotency_key) VALUES ($1, current_date, 1, $2, $3, $4, $5, $6)',
+    [a, salaries, 'Quelqu\'un', 'À la main', half, uuid()], '42501');
+  await rejects('UPDATE school.payroll_payout SET amount = 1 WHERE id = $1', [half], '42501');
+  // What a member is paid is read with the pays' rights only, even as an expense.
+  await as('school_runtime', a, clerk.user);
+  assert.equal(await count('SELECT count(*) n FROM school.expense WHERE id = $1', [linked]), 0);
+  await rejects(PAY_EXPENSE, [linked, '1', 'today', 'cash', null, uuid()], '42501');
+  // A payout taken back by its reversal, asked for with its reason, decided by someone else (BR-08).
+  await as('school_runtime', a, payer.user);
+  await rejects(REVERSE_PAYOUT, [half, '  ', uuid()], '23514', 'reason_required');
+  const back = (await first(REVERSE_PAYOUT, [half, 'Virement rejeté par la banque', uuid()])).id;
+  await rejects(REVERSE_PAYOUT, [half, 'Encore', uuid()], '23514', 'payment_not_reversible');
+  assert.ok((await first('SELECT school.reconciliation(current_date) AS r')).r.pending >= 1, 'a reversal waiting holds its month');
+  assert.equal((await sql("UPDATE school.payroll_payout SET status = 'validated' WHERE id = $1", [back])).rowCount ?? 0, 0);
+  await as('school_runtime', a, both.user);
+  const own = (await first(REVERSE_PAYOUT, [rest, 'Payé deux fois', uuid()])).id;
+  await rejects("UPDATE school.payroll_payout SET status = 'validated' WHERE id = $1", [own], '23514', 'segregation_of_duties');
+  await as('school_runtime', a, validator.user);
+  await rejects("UPDATE school.payroll_payout SET status = 'rejected' WHERE id = $1", [own], '23514', 'reason_required');
+  await sql("UPDATE school.payroll_payout SET status = 'rejected', decision_reason = 'Le paiement en espèces est juste' WHERE id = $1", [own]);
+  await sql("UPDATE school.payroll_payout SET status = 'validated' WHERE id = $1", [back]);
+  await rejects("UPDATE school.payroll_payout SET status = 'rejected', decision_reason = 'Erreur' WHERE id = $1", [back], '23514', 'payroll_payout_immutable');
+  // The payout reversed, the original kept; its expense's payment taken back and the expense cancelled, both on the reversal's day.
+  await as('school_runtime', a, payer.user);
+  assert.equal((await first('SELECT status FROM school.payroll_payout WHERE id = $1', [half])).status, 'reversed');
+  assert.deepEqual(Object.values(await run(member.id, m1)).slice(3), ['30000.00', 'partially_paid']);
+  const cancelled = await first(`SELECT x.amount::text AS amount, school.expense_committed(x.tenant_id, x.id)::text AS committed, school.expense_paid(x.tenant_id, x.id)::text AS paid,
+    (SELECT corrected_on::text FROM school.expense_correction k WHERE k.expense_id = x.id AND k.status = 'validated') AS day FROM school.expense x WHERE x.payroll_payout_id = $1`, [half]);
+  assert.deepEqual(Object.values(cancelled), ['30000.00', '0.00', '0.00', today]);
+  await first(PAY_OUT, [pay, '30000', 'today', 'transfer', 'VIR 78', uuid()]);
+  assert.equal((await run(member.id, m1)).state, 'paid');
+  // TST-13: each month, the `salaries` expenses committed equal what is paid of the pays, never counted twice.
+  for (const month of [m1, m0]) {
+    const report = (await first('SELECT school.reconciliation($1::date) AS r', [month])).r;
+    assert.equal(report.salaries_committed, report.payroll_paid, month);
+    assert.ok(Number(report.payroll_paid) > 0, month);
+  }
+  const current = (await first('SELECT school.reconciliation(current_date) AS r')).r;
+  assert.ok(current.payroll_reversals.count >= 1 && Number(current.expenses_paid) >= Number(current.payroll_paid));
+  // FR-REM-05: a member reads their own validated pays, their lines and payouts, once the school says so; never anyone else's.
+  await as('school_runtime', a, teacher.user);
+  assert.equal(await count('SELECT count(*) n FROM school.payroll_run'), 0, 'not before the school says so');
+  await as('school_runtime', a, 1);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'payroll.self_view', 'true')", [a]);
+  await as('school_runtime', a, teacher.user);
+  assert.deepEqual((await sql('SELECT id FROM school.payroll_run')).rows.map(r => r.id), [pay], 'the validated one, not the draft nor a colleague\'s');
+  assert.ok(await count('SELECT count(*) n FROM school.payroll_line WHERE run_id = $1', [pay]) > 0);
+  assert.equal(await count('SELECT count(*) n FROM school.payroll_payout WHERE run_id = $1', [pay]), 5);
+  assert.equal(await count('SELECT count(*) n FROM school.payroll_unit'), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.expense WHERE payroll_payout_id IS NOT NULL'), 0);
+  await rejects(PAY_OUT, [pay, '1', 'today', 'cash', null, uuid()], '42501');
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.setting SET value = 'false' WHERE tenant_id = $1 AND key = 'payroll.self_view'", [a]);
+  await as(null);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'payroll_payout' AND object_id = $1", [back]) >= 2);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'expense' AND object_id = $1", [linked]) >= 1);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -4846,6 +4964,46 @@ if (PgClient) {
     assert.deepEqual(sent.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
     assert.equal(new Set(sent.map(r => r.value.id)).size, 1);
     assert.equal((await first('SELECT net_amount::text AS n FROM school.payroll_run WHERE id = $1', [run.id])).n, '52000.00');
+    await as('school_runtime', a, 1);
+  });
+  await check('five sendings of a payout at once pay once with one expense; two payouts at once never pass the net (FR-REM-04, BR-05, BR-06, TST-13)', async () => {
+    const rules = await scopedAccount('internal', 'tenant', null, ['payroll.rule.manage', 'staff.profile.read']);
+    const gen = await scopedAccount('internal', 'tenant', null, ['payroll.run.generate']);
+    const validator = await scopedAccount('internal', 'tenant', null, ['payroll.run.validate']);
+    const payer = await scopedAccount('internal', 'tenant', null, ['payroll.payout.record', 'payroll.amount.read']);
+    await as('school_runtime', a, 1);
+    const teacher = (await first(STAFF, [a, 'Hadj', 'Samir', 'teacher_internal'])).id;
+    const period = await payMonth(-1);
+    await as('school_runtime', a, rules.user);
+    await first(SAVE_PAY_RULE, [teacher, 'fixed_monthly', '50000', null, null, period, '[]', '[]', uuid()]);
+    await as('school_runtime', a, gen.user);
+    await first(GENERATE_PAYROLL, [period, teacher]);
+    const run = (await first('SELECT id FROM school.payroll_run WHERE staff_id = $1 AND period = $2', [teacher, period])).id;
+    await as('school_runtime', a, validator.user);
+    await sql("UPDATE school.payroll_run SET status = 'validated' WHERE id = $1", [run]);
+    const clients = await Promise.all([0, 1, 2, 3, 4].map(() => connect('school_runtime', a, payer.user)));
+    const at = (c, s, p, pause = 0.1) => (async () => {
+      await c.query('BEGIN');
+      try {
+        const row = (await c.query(s, p)).rows[0];
+        await c.query(`SELECT pg_sleep(${pause})`);
+        await c.query('COMMIT');
+        return row?.id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    })();
+    const key = uuid();
+    const five = await Promise.allSettled(clients.map(c => at(c, PAY_OUT, [run, '20000', 'today', 'cash', null, key])));
+    assert.deepEqual(five.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+    assert.equal(new Set(five.map(r => r.value)).size, 1);
+    const two = await Promise.allSettled(clients.slice(0, 2).map(c => at(c, PAY_OUT, [run, '20000', 'today', 'transfer', null, uuid()], 0.15)));
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(two.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(two.find(r => r.status === 'rejected').reason.message, 'payment_exceeds_balance');
+    await as('school_runtime', a, payer.user);
+    assert.equal((await first('SELECT school.payroll_paid($1, $2)::text AS p', [a, run])).p, '40000.00');
+    // TST-13: one expense a payout, of the same amount.
+    assert.deepEqual((await sql(`SELECT count(x.id)::int AS n, coalesce(sum(x.amount), 0)::text AS amount FROM school.payroll_payout o
+      JOIN school.expense x ON x.tenant_id = o.tenant_id AND x.payroll_payout_id = o.id WHERE o.run_id = $1`, [run])).rows, [{ n: 2, amount: '40000.00' }]);
     await as('school_runtime', a, 1);
   });
   await check('two administrators ending each other\'s role at once leave one of them (FR-IAM-01 AC2)', async () => {

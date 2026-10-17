@@ -35,7 +35,8 @@ use Illuminate\Support\Str;
  * someone else (AC1), by the direction beyond the school's threshold; decided, it never changes
  * (AC2). Its documents only for `expense.attachment.read` (AC3). A validated expense is paid at once
  * or in parts, its payment state apart from its commitment; filtered, it is exported. Validated, it
- * is corrected or cancelled by its linked negative entry, decided by someone else (FR-DEP-03).
+ * is corrected or cancelled by its linked negative entry, decided by someone else (FR-DEP-03). An
+ * expense of the payroll is its payout's: paid, taken back and cancelled with it alone (FR-REM-04).
  */
 final class Expenses extends SchoolingPage
 {
@@ -60,7 +61,8 @@ final class Expenses extends SchoolingPage
                 TextColumn::make('expense_date')->label(__('expenses.date'))->formatStateUsing(fn ($state) => Formats::date($state))
                     ->description(fn (array $record) => Locales::label($record['category_labels'])),
                 TextColumn::make('beneficiary')->label(__('expenses.beneficiary'))->searchable()->formatStateUsing(fn ($state) => Formats::isolated($state))
-                    ->description(fn (array $record) => Formats::isolated(Formats::list(array_filter([$record['label'], $record['reason'], $record['program']])))),
+                    ->description(fn (array $record) => Formats::isolated(Formats::list(array_filter([$record['label'], $record['payroll_period'] !== null
+                        ? __('payroll.payout_expense', ['month' => $this->month($record['payroll_period'])]) : $record['reason'], $record['program']])))),
                 // Corrected, what is committed of it now; its original amount kept.
                 TextColumn::make('amount')->label(__('expenses.amount'))->formatStateUsing(fn ($state) => $this->money($state))
                     ->description(fn (array $record) => $record['committed'] !== $record['amount'] ? __('expenses.committed_now', ['amount' => $this->money($record['committed'])]) : null),
@@ -147,7 +149,8 @@ final class Expenses extends SchoolingPage
                         ->columns(3)->schema([TextEntry::make('what')->hiddenLabel(), TextEntry::make('amount')->hiddenLabel(), TextEntry::make('when')->hiddenLabel()])]),
                 // FR-DEP-03: part of it taken off, or all that is committed of it, by its linked negative entry with its reason; decided by someone else.
                 Action::make('correct')->label(__('expenses.correct'))->color('danger')->modalDescription(__('expenses.correct_help'))
-                    ->visible(fn (array $record) => $record['status'] === 'validated' && $record['payment_state'] !== 'cancelled' && $this->writable('expense.expense.reverse'))
+                    ->visible(fn (array $record) => $record['status'] === 'validated' && $record['payment_state'] !== 'cancelled' && $record['payroll_payout_id'] === null
+                        && $this->writable('expense.expense.reverse'))
                     ->fillForm(fn () => ['kind' => 'correction', 'idempotency_key' => (string) Str::uuid()])
                     ->schema(fn () => [Radio::make('kind')->label(__('expenses.kind'))->required()->live()->options(__('expenses.correction_kinds')),
                         $this->amountField('amount')->label(__('expenses.correction_amount'))->visible(fn (Get $get) => $get('kind') === 'correction'),

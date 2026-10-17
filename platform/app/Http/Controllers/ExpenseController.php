@@ -16,7 +16,9 @@ use Illuminate\Support\Str;
  * (AC1), by the direction beyond the school's threshold; never changed once decided (AC2). Its
  * documents are added by its author while a draft and read only with `expense.attachment.read`
  * (AC3). Validated, it is corrected or cancelled by its linked negative entry, decided by someone
- * else (FR-DEP-03). Amounts are strings with two decimals (BR-04). The rules are SQL 055 to 057's.
+ * else (FR-DEP-03). An expense of the payroll is its payout's (`payroll_payout_id`), paid and taken
+ * back with it alone (FR-REM-04). Amounts are strings with two decimals (BR-04). The rules are SQL 055
+ * to 057 and 060's.
  */
 final class ExpenseController
 {
@@ -25,14 +27,16 @@ final class ExpenseController
         x.status, x.needs_approval, x.submitted_at, x.decided_at, x.decision_reason, x.version, x.created_by, x.created_at,
         (SELECT u.name FROM public.users u WHERE u.id = x.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = x.decided_by) AS decider,
         y.committed::text AS committed, y.paid::text AS paid, (y.committed - y.paid)::numeric(14, 2)::text AS left_to_pay,
-        school.expense_payment_state(x.status, y.committed, y.paid) AS payment_state
+        school.expense_payment_state(x.status, y.committed, y.paid) AS payment_state, x.payroll_payout_id,
+        (SELECT r.period::text FROM school.payroll_payout o JOIN school.payroll_run r ON r.tenant_id = o.tenant_id AND r.id = o.run_id
+          WHERE o.tenant_id = x.tenant_id AND o.id = x.payroll_payout_id) AS payroll_period
         FROM school.expense x JOIN school.expense_category c ON c.tenant_id = x.tenant_id AND c.id = x.category_id
         CROSS JOIN LATERAL (SELECT school.expense_paid(x.tenant_id, x.id) AS paid, school.expense_committed(x.tenant_id, x.id) AS committed) y";
     public const RULES = ['status' => 'nullable|in:draft,submitted,validated,rejected', 'payment' => 'nullable|in:unpaid,partially_paid,paid,cancelled', 'category' => 'nullable|uuid',
         'program' => 'nullable|uuid', 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'search' => 'nullable|string|max:100'];
     public const PAYMENTS = "SELECT y.id, y.expense_id, y.kind, y.reverses_payment_id, y.amount::text AS amount, y.paid_on::text AS paid_on, y.method_code, y.external_ref,
         y.reason, y.status, y.decided_at, y.decision_reason, y.version, y.created_by, y.created_at, x.beneficiary, x.expense_date::text AS expense_date,
-        (SELECT u.name FROM public.users u WHERE u.id = y.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = y.decided_by) AS decider
+        x.payroll_payout_id, (SELECT u.name FROM public.users u WHERE u.id = y.created_by) AS author, (SELECT u.name FROM public.users u WHERE u.id = y.decided_by) AS decider
         FROM school.expense_payment y JOIN school.expense x ON x.tenant_id = y.tenant_id AND x.id = y.expense_id";
     public const CORRECTIONS = "SELECT k.id, k.expense_id, k.kind, k.amount::text AS amount, k.corrected_on::text AS corrected_on, k.reason, k.status, k.decided_at,
         k.decision_reason, k.version, k.created_by, k.created_at, x.beneficiary, x.expense_date::text AS expense_date, x.amount::text AS expense_amount,

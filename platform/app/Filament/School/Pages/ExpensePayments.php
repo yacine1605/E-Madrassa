@@ -63,7 +63,8 @@ final class ExpensePayments extends SchoolingPage
             ])->recordActions([ActionGroup::make([
                 // Its reversal, the whole amount, dated today, with its reason; once per key.
                 Action::make('reverse')->label(__('expenses.reverse'))->color('danger')->modalDescription(__('expenses.reverse_help'))
-                    ->visible(fn (array $record) => $record['kind'] === 'payment' && $record['status'] === 'validated' && $this->writable('expense.expense.reverse'))
+                    ->visible(fn (array $record) => $record['kind'] === 'payment' && $record['status'] === 'validated' && $record['payroll_payout_id'] === null
+                        && $this->writable('expense.expense.reverse'))
                     ->fillForm(fn () => ['idempotency_key' => (string) Str::uuid()])
                     ->schema([Textarea::make('reason')->label(__('expenses.reason'))->required()->minLength(3)->maxLength(500), Hidden::make('idempotency_key')])
                     ->action(fn (array $record, array $data) => SchoolScreen::change('expense.expense.reverse', fn () => SchoolScreen::call('expense.expense.reverse',

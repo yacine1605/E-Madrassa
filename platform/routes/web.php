@@ -26,8 +26,10 @@ use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\MyPayController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PayrollPayoutController;
 use App\Http\Controllers\PayrollRunController;
 use App\Http\Controllers\PayRuleController;
 use App\Http\Controllers\PermissionController;
@@ -380,7 +382,7 @@ Route::prefix('api')->group(function () {
                     Route::delete('pay-rules/{rule}', [PayRuleController::class, 'destroy']);
                 });
                 // FR-REM-02, FR-REM-03: a month's pays, one per member, computed by the accountant, validated by the direction (BR-08).
-                $pays = 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate';
+                $pays = 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate,payroll.payout.record';
                 Route::get('payroll-runs', [PayrollRunController::class, 'index'])->middleware($pays);
                 Route::get('payroll-runs/{run}', [PayrollRunController::class, 'show'])->middleware($pays);
                 Route::get('payroll-runs/{run}/corrected', [PayrollRunController::class, 'corrected'])->middleware($pays);
@@ -390,6 +392,18 @@ Route::prefix('api')->group(function () {
                     Route::post('payroll-runs/{run}/adjustments', [PayrollRunController::class, 'adjust']);
                 });
                 Route::post('payroll-runs/{run}/validate', [PayrollRunController::class, 'validateRun'])->middleware('permission:payroll.run.validate');
+                // FR-REM-04: a validated pay paid, each payout its `salaries` expense; a payout taken back by its reversal, decided by someone else.
+                Route::middleware('permission:payroll.payout.record')->group(function () {
+                    Route::post('payroll-runs/{run}/payouts', [PayrollPayoutController::class, 'pay']);
+                    Route::post('payroll-payouts/{payout}/reverse', [PayrollPayoutController::class, 'reverse']);
+                });
+                Route::middleware('permission:payroll.run.validate')->group(function () {
+                    Route::post('payroll-payouts/{payout}/validate', [PayrollPayoutController::class, 'validateReversal']);
+                    Route::post('payroll-payouts/{payout}/reject', [PayrollPayoutController::class, 'reject']);
+                });
+                // FR-REM-05: a member's own validated pays, when the school says so.
+                Route::get('my-pay', [MyPayController::class, 'index'])->middleware('permission:payroll.self_view');
+                Route::get('my-pay/{run}', [MyPayController::class, 'show'])->middleware('permission:payroll.self_view');
             });
 
             // FR-DEP-01, FR-DEP-02: the school's expense categories and expenses, decided by someone else than their author.

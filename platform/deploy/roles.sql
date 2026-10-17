@@ -245,6 +245,14 @@ GRANT INSERT (tenant_id, run_id, line_no, kind, node_id, node_code, node_labels,
 GRANT EXECUTE ON FUNCTION school.lock_payroll_run(uuid, date), school.payroll_staff(uuid, uuid), school.payroll_basis(uuid, uuid, date),
   school.payroll_unit_kind(text, text), school.payroll_detail(uuid, uuid), school.payroll_stale(uuid, uuid), school.refresh_payroll_run(uuid, uuid),
   school.generate_payroll(date, uuid), school.save_payroll_units(uuid, jsonb), school.adjust_payroll(uuid, text, numeric, text, uuid, uuid) TO school_runtime;
+-- Payouts (060): a validated pay paid by `payroll.payout.record`, once per key, never beyond its net; a payout taken back by
+-- its linked reversal, decided by `payroll.run.validate`; its expense written by the system (BR-06). A member reads their own (FR-REM-05).
+GRANT SELECT ON school.payroll_payout TO school_runtime;
+GRANT INSERT (tenant_id, run_id, kind, reverses_payout_id, amount, paid_on, method_code, external_ref, reason, idempotency_key)
+  ON school.payroll_payout TO school_runtime;
+GRANT UPDATE (status, decision_reason, version) ON school.payroll_payout TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.payroll_paid(uuid, uuid), school.payroll_state(text, numeric, numeric), school.own_pay(uuid, text),
+  school.record_payroll_payout(uuid, numeric, date, text, text, uuid), school.reverse_payroll_payout(uuid, text, uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -537,6 +545,15 @@ GRANT SELECT ON school.expense_correction TO platform_provisioner;
 ALTER FUNCTION school.pay_staff(uuid, uuid) OWNER TO platform_provisioner;
 -- Pays (059): a pay reads when its member joined and left.
 ALTER FUNCTION school.payroll_staff(uuid, uuid) OWNER TO platform_provisioner;
+-- Payouts (060): a payout writes its `salaries` expense, the expense's payment, and on its reversal their reversal and cancellation.
+GRANT SELECT ON school.payroll_run TO platform_provisioner;
+GRANT SELECT, UPDATE (status, version) ON school.payroll_payout TO platform_provisioner;
+GRANT INSERT (tenant_id, expense_date, amount, category_id, beneficiary, reason, payroll_payout_id, idempotency_key) ON school.expense TO platform_provisioner;
+GRANT INSERT (tenant_id, expense_id, kind, reverses_payment_id, amount, paid_on, method_code, external_ref, reason, idempotency_key),
+  UPDATE (status, version) ON school.expense_payment TO platform_provisioner;
+GRANT INSERT (tenant_id, expense_id, kind, amount, corrected_on, reason, idempotency_key) ON school.expense_correction TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.lock_payroll_run(uuid, date), school.expense_paid(uuid, uuid), school.expense_committed(uuid, uuid) TO platform_provisioner;
+ALTER FUNCTION school.book_payroll_payout() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

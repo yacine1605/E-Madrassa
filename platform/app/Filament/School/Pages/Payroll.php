@@ -17,16 +17,17 @@ use Filament\Tables\Table;
  * FR-REM-02: the pays of a month, one per member of staff, the teaching and the administrative
  * staff told apart. The accountant generates them as drafts from the rule in force that month, as
  * often as needed and never twice (AC1); someone else reads and validates each one (BR-08), which
- * freezes it (AC2). A pay with a unit no rate resolves is not validated (AC8).
+ * freezes it (AC2). A pay with a unit no rate resolves is not validated (AC8). Validated, it is paid
+ * at once or in parts from its detail (FR-REM-04), its state following.
  */
 final class Payroll extends SchoolingPage
 {
     protected static bool $isDiscovered = true;
     protected static ?int $navigationSort = 15;
     protected static ?string $section = 'finance';
-    protected static array $permissions = ['payroll.amount.read', 'payroll.run.generate', 'payroll.run.validate'];
+    protected static array $permissions = ['payroll.amount.read', 'payroll.run.generate', 'payroll.run.validate', 'payroll.payout.record'];
     protected static ?string $module = 'payroll';
-    protected static string|array $routeMiddleware = ['module:payroll', 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate'];
+    protected static string|array $routeMiddleware = ['module:payroll', 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate,payroll.payout.record'];
 
     public static function getNavigationLabel(): string { return __('payroll.runs'); }
     public function getTitle(): string { return __('payroll.runs'); }
@@ -50,9 +51,12 @@ final class Payroll extends SchoolingPage
                     ->color(fn (array $record) => $record['missing_rates'] > 0 ? 'danger' : null),
                 TextColumn::make('extras')->label(__('payroll.bonuses_adjustments'))
                     ->state(fn (array $record) => $this->money((string) round((float) $record['bonus_amount'] + (float) $record['adjustment_amount'], 2))),
-                TextColumn::make('net_amount')->label(__('payroll.net'))->weight('bold')->formatStateUsing(fn ($state) => $this->money($state)),
-                TextColumn::make('status')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('payroll.run_states.'.$state))
-                    ->color(fn (string $state) => $state === 'validated' ? 'success' : 'warning')
+                TextColumn::make('net_amount')->label(__('payroll.net'))->weight('bold')->formatStateUsing(fn ($state) => $this->money($state))
+                    ->description(fn (array $record) => $record['state'] === 'partially_paid'
+                        ? __('payroll.paid_of', ['paid' => $this->money($record['paid']), 'left' => $this->money($record['left_to_pay'])]) : null),
+                // FR-REM-02: draft, validated, then paid in part or whole by its payouts (FR-REM-04).
+                TextColumn::make('state')->label(__('school.status'))->badge()->formatStateUsing(fn (string $state) => __('payroll.run_states.'.$state))
+                    ->color(fn (string $state) => self::color($state))
                     ->description(fn (array $record) => $record['status'] === 'validated'
                         ? __('payroll.validated_by', ['name' => Formats::isolated((string) $record['validator']), 'date' => Formats::dateTime($record['validated_at'])])
                         : __('payroll.computed_by', ['name' => Formats::isolated((string) $record['computer']), 'date' => Formats::dateTime($record['computed_at'])])),
@@ -78,6 +82,11 @@ final class Payroll extends SchoolingPage
                     ->action(fn (array $record) => SchoolScreen::change('payroll.run.validate', fn () => SchoolScreen::call('payroll.run.validate',
                         PayrollRunController::class, 'validateRun', ['version' => $record['version']], ['run' => $record['id']]))),
             ])]);
+    }
+
+    public static function color(string $state): string
+    {
+        return ['draft' => 'warning', 'validated' => 'info', 'partially_paid' => 'warning', 'paid' => 'success'][$state];
     }
 
     /** A draft whose lines all have their rate, for a validator who did not compute it. */

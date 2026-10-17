@@ -150,6 +150,7 @@ return [
         'payroll_unit' => 'Unité d’une rémunération',
         'payroll_adjustment' => 'Prime ou ajustement d’une rémunération',
         'payroll_line' => 'Ligne d’une rémunération',
+        'payroll_payout' => 'Versement d’une rémunération',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

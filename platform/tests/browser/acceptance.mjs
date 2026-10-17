@@ -24,7 +24,7 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll'];
+  'payroll', 'my-pay'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
@@ -240,6 +240,10 @@ async function seed(browser, session) {
     await call('payroll-runs/generate', { period: month, staff_id: teacher.id });
     const pay = (await call(`payroll-runs?period=${month}`))[0];
     await call(`payroll-runs/${pay.id}/units`, { version: pay.version, units: [{ node_id: grade.id, worked_on: month, quantity: '4' }, { worked_on: month, quantity: '2.5' }] });
+    // FR-REM-05: the school lets its members read their own pays; the administrator, no member of staff, reads none.
+    const put = await fetch('/api/settings/payroll.self_view', { method: 'PUT', headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: true }) });
+    if (!put.ok) throw new Error(`payroll.self_view: HTTP ${put.status} ${await put.text()}`);
     return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id, enrollment: enrollment.id, pay: pay.id };
   });
   await context.close();

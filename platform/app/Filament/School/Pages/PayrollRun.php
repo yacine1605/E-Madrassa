@@ -2,6 +2,7 @@
 
 namespace App\Filament\School\Pages;
 
+use App\Http\Controllers\PayrollPayoutController;
 use App\Http\Controllers\PayrollRunController;
 use App\Support\Formats;
 use App\Support\Locales;
@@ -29,15 +30,17 @@ use Livewire\Attributes\Locked;
  * detail line by line with the copy of the level, quantity and rate applied; while a draft, the
  * units done entered by hand (lot 3), the one-off bonuses and adjustments with their reason, a new
  * computation; its validation by someone else than whoever computed it (BR-08), which freezes it.
+ * Validated, it is paid at once or in parts, each payout its `salaries` expense (FR-REM-04); a payout
+ * is taken back by its reversal, decided by someone else than whoever asked for it.
  */
 final class PayrollRun extends SchoolingPage
 {
     protected static bool $isDiscovered = true;
     protected static bool $shouldRegisterNavigation = false;
     protected static ?string $section = 'finance';
-    protected static array $permissions = ['payroll.amount.read', 'payroll.run.generate', 'payroll.run.validate'];
+    protected static array $permissions = ['payroll.amount.read', 'payroll.run.generate', 'payroll.run.validate', 'payroll.payout.record'];
     protected static ?string $module = 'payroll';
-    protected static string|array $routeMiddleware = ['module:payroll', 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate'];
+    protected static string|array $routeMiddleware = ['module:payroll', 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate,payroll.payout.record'];
     protected string $view = 'filament.school.payroll-run';
     #[Locked] public string $run = '';
     private ?array $runRow = null;
@@ -65,7 +68,7 @@ final class PayrollRun extends SchoolingPage
     public function getSubheading(): ?string
     {
         $pay = $this->pay();
-        return Formats::list([__('payroll.runs'), $this->month($pay['period']), __('payroll.kinds.'.$pay['kind']), __('payroll.run_states.'.$pay['status'])]);
+        return Formats::list([__('payroll.runs'), $this->month($pay['period']), __('payroll.kinds.'.$pay['kind']), __('payroll.run_states.'.$pay['state'])]);
     }
 
     /** The parts and the net, the days paid, who computed and validated it. */
@@ -82,13 +85,31 @@ final class PayrollRun extends SchoolingPage
                 TextEntry::make('bonus')->label(__('payroll.bonus_total'))->state($this->money($pay['bonus_amount'])),
                 TextEntry::make('adjustment')->label(__('payroll.adjustment_total'))->state($this->money($pay['adjustment_amount'])),
                 TextEntry::make('net')->label(__('payroll.net'))->state($this->money($pay['net_amount']))->weight('bold'),
-                TextEntry::make('status')->label(__('school.status'))->badge()->state(__('payroll.run_states.'.$pay['status']))
-                    ->color($pay['status'] === 'validated' ? 'success' : 'warning'),
+                TextEntry::make('status')->label(__('school.status'))->badge()->state(__('payroll.run_states.'.$pay['state']))
+                    ->color(Payroll::color($pay['state'])),
+                TextEntry::make('paid')->label(__('payroll.paid'))->state($this->money($pay['paid']))->visible($pay['status'] !== 'draft'),
+                TextEntry::make('left_to_pay')->label(__('payroll.left_to_pay'))->state($this->money($pay['left_to_pay']))->visible($pay['status'] !== 'draft'),
                 TextEntry::make('computed')->label(__('payroll.by'))->columnSpan(2)->state(Formats::list(array_filter([
                     __('payroll.computed_by', ['name' => Formats::isolated((string) $pay['computer']), 'date' => Formats::dateTime($pay['computed_at'])]),
                     $pay['validated_at'] ? __('payroll.validated_by', ['name' => Formats::isolated((string) $pay['validator']), 'date' => Formats::dateTime($pay['validated_at'])]) : null]))),
             ]),
         ]);
+    }
+
+    /** FR-REM-04: the payouts and their reversals, the latest first, with who recorded and decided them. */
+    public function payoutsInfolist(Schema $schema): Schema
+    {
+        return $schema->components([Section::make(__('payroll.payouts'))->visible($this->pay()['status'] !== 'draft')->schema([RepeatableEntry::make('payouts')->hiddenLabel()
+            ->columns(['default' => 2, 'sm' => 4])->placeholder(__('payroll.no_payout'))
+            ->state(array_map(fn (array $row) => ['what' => Formats::list([__('payroll.payout_kinds.'.$row['kind']), __('payroll.payout_statuses.'.$row['status'])]),
+                'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
+                'when' => Formats::list(array_filter([Formats::date($row['paid_on']), __('finance.methods.'.$row['method_code']),
+                    $row['external_ref'] ? Formats::isolated($row['external_ref']) : null])),
+                'by' => Formats::list(array_filter([Formats::isolated((string) $row['author']), $row['reason'] ? Formats::isolated($row['reason']) : null,
+                    $row['decider'] ? Formats::isolated($row['decider']) : null, $row['decision_reason'] ? Formats::isolated($row['decision_reason']) : null]))],
+                $this->pay()['payouts']))
+            ->schema([TextEntry::make('what')->label(__('payroll.kind')), TextEntry::make('amount')->label(__('payroll.amount')),
+                TextEntry::make('when')->label(__('payroll.paid_on')), TextEntry::make('by')->label(__('payroll.by'))])])]);
     }
 
     /** FR-REM-03: the one-off bonuses and adjustments, each with its reason and author, and the pay it corrects. */
@@ -171,7 +192,73 @@ final class PayrollRun extends SchoolingPage
                 ->visible(fn () => Payroll::validatable($this->pay()))
                 ->action(fn () => $this->refreshed(SchoolScreen::change('payroll.run.validate', fn () => SchoolScreen::call('payroll.run.validate', PayrollRunController::class,
                     'validateRun', ['version' => $this->pay()['version']], ['run' => $this->run])))),
+            // FR-REM-04 AC1: all or part of what is left of the net; its `salaries` expense written with it; once per key.
+            Action::make('pay')->label(__('payroll.pay'))->modalDescription(__('payroll.pay_help'))
+                ->visible(fn () => in_array($this->pay()['state'], ['validated', 'partially_paid'], true) && (float) $this->pay()['left_to_pay'] > 0
+                    && $this->writable('payroll.payout.record'))
+                ->fillForm(fn () => ['amount' => number_format((float) $this->pay()['left_to_pay'], 2, ',', ' '), 'paid_on' => now()->toDateString(),
+                    'idempotency_key' => (string) Str::uuid()])
+                ->schema(fn () => [$this->amountField('amount'), DatePicker::make('paid_on')->label(__('payroll.paid_on'))->required()
+                    ->minDate($this->pay()['period'])->maxDate(now()),
+                    Select::make('method_code')->label(__('payroll.method'))->required()->options($this->methods()),
+                    TextInput::make('external_ref')->label(__('payroll.external_ref'))->maxLength(100), Hidden::make('idempotency_key')])
+                ->action(fn (array $data) => $this->payouts('payroll.payout.record', 'pay', ['amount' => $this->sentAmount((string) $data['amount']),
+                    'paid_on' => substr((string) $data['paid_on'], 0, 10), 'method_code' => $data['method_code'], 'external_ref' => $data['external_ref'] ?: null,
+                    'idempotency_key' => $data['idempotency_key']], ['run' => $this->run])),
+            // A payout taken back by its reversal, its whole amount, with its reason; decided by someone else.
+            Action::make('reverse')->label(__('payroll.reverse'))->color('danger')->modalDescription(__('payroll.reverse_help'))
+                ->visible(fn () => $this->reversible() !== [] && $this->writable('payroll.payout.record'))
+                ->fillForm(fn () => ['idempotency_key' => (string) Str::uuid()])
+                ->schema(fn () => [Select::make('payout')->label(__('payroll.payouts'))->required()->options($this->reversible()),
+                    Textarea::make('reason')->label(__('payroll.reason'))->required()->minLength(3)->maxLength(500), Hidden::make('idempotency_key')])
+                ->action(fn (array $data) => $this->payouts('payroll.payout.record', 'reverse', ['reason' => $data['reason'],
+                    'idempotency_key' => $data['idempotency_key']], ['payout' => $data['payout']])),
+            // BR-08: by someone else than whoever asked for it; the payout's expense cancelled with it.
+            Action::make('validate_reversal')->label(__('payroll.validate_reversal'))->modalDescription(__('payroll.validate_reversal_help'))
+                ->visible(fn () => $this->decidable() !== [])
+                ->schema(fn () => [Select::make('payout')->label(__('payroll.reverse'))->required()->options($this->decidable())])
+                ->action(fn (array $data) => $this->payouts('payroll.run.validate', 'validateReversal', ['version' => $this->payout($data['payout'])['version']],
+                    ['payout' => $data['payout']])),
+            Action::make('reject_reversal')->label(__('payroll.reject_reversal'))->color('danger')->visible(fn () => $this->decidable() !== [])
+                ->schema(fn () => [Select::make('payout')->label(__('payroll.reverse'))->required()->options($this->decidable()),
+                    Textarea::make('reason')->label(__('payroll.reason'))->required()->minLength(3)->maxLength(500)])
+                ->action(fn (array $data) => $this->payouts('payroll.run.validate', 'reject', ['version' => $this->payout($data['payout'])['version'],
+                    'reason' => $data['reason']], ['payout' => $data['payout']])),
         ];
+    }
+
+    /** @return array<string, string> the payouts not taken back nor waiting to be, by date, amount and means */
+    private function reversible(): array
+    {
+        $payouts = $this->pay()['payouts'];
+        $taken = array_column(array_filter($payouts, fn (array $row) => $row['kind'] === 'reversal' && $row['status'] !== 'rejected'), 'reverses_payout_id');
+        return collect($payouts)->filter(fn (array $row) => $row['kind'] === 'payout' && $row['status'] === 'validated' && !in_array($row['id'], $taken, true))
+            ->mapWithKeys(fn (array $row) => [$row['id'] => $this->described($row)])->all();
+    }
+
+    /** @return array<string, string> the reversals waiting, for a validator who did not ask for them */
+    private function decidable(): array
+    {
+        if (!$this->writable('payroll.run.validate')) return [];
+        return collect($this->pay()['payouts'])->filter(fn (array $row) => $row['status'] === 'pending_validation' && (int) $row['created_by'] !== (int) auth()->id())
+            ->mapWithKeys(fn (array $row) => [$row['id'] => Formats::list([$this->described($row), Formats::isolated((string) $row['reason'])])])->all();
+    }
+
+    /** « 12/10/2026 · 30 000,00 DA · virement · VIR 77 » */
+    private function described(array $row): string
+    {
+        return Formats::list(array_filter([Formats::date($row['paid_on']), $this->money($row['amount']), __('finance.methods.'.$row['method_code']),
+            $row['external_ref'] ? Formats::isolated($row['external_ref']) : null]));
+    }
+
+    private function payout(string $id): array
+    {
+        return collect($this->pay()['payouts'])->firstWhere('id', $id) ?? abort(404);
+    }
+
+    private function payouts(string $permission, string $method, array $data, array $parameters): void
+    {
+        $this->refreshed(SchoolScreen::change($permission, fn () => SchoolScreen::call($permission, PayrollPayoutController::class, $method, $data, $parameters)));
     }
 
     /** A draft, for whoever computes the pays for the whole school. */
@@ -227,6 +314,7 @@ final class PayrollRun extends SchoolingPage
         $this->runRow = null;
         $this->cacheSchema('summaryInfolist', null);
         $this->cacheSchema('adjustmentsInfolist', null);
+        $this->cacheSchema('payoutsInfolist', null);
         return $result;
     }
 }

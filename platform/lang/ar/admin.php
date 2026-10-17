@@ -149,6 +149,7 @@ return [
         'payroll_unit' => 'وحدة أجر',
         'payroll_adjustment' => 'منحة أو تسوية أجر',
         'payroll_line' => 'سطر أجر',
+        'payroll_payout' => 'دفع أجر',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

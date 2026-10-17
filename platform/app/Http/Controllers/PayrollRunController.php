@@ -17,8 +17,10 @@ use Illuminate\Support\Str;
  * the month's earliest (AC11), the recurring and one-off bonuses, the adjustments with their reason.
  * A unit without a rate blocks the validation (AC8, BR-16). Validated by someone else than whoever
  * computed it (BR-08), a pay is frozen with its detail (BR-03); a correction then is an adjustment
- * of a month to come linked to it. Amounts are strings with two decimals (BR-04). Read with
- * `payroll.amount.read`, `payroll.run.generate` or `payroll.run.validate`. The rules are SQL 059's.
+ * of a month to come linked to it. Validated, it is paid at once or in parts (FR-REM-04), its state
+ * following (`partially_paid`, `paid`). Amounts are strings with two decimals (BR-04). Read with
+ * `payroll.amount.read`, `payroll.run.generate`, `payroll.run.validate` or `payroll.payout.record`.
+ * The rules are SQL 059 and 060's.
  */
 final class PayrollRunController
 {
@@ -27,10 +29,14 @@ final class PayrollRunController
         r.bonus_amount::text AS bonus_amount, r.adjustment_amount::text AS adjustment_amount, r.net_amount::text AS net_amount, r.missing_rates,
         r.computed_at, r.computed_by, r.validated_at, r.validated_by, r.version, s.staff_number, s.staff_type, s.last_name_lat, s.first_name_lat,
         s.last_name_ar, s.first_name_ar, (SELECT u.name FROM public.users u WHERE u.id = r.computed_by) AS computer,
-        (SELECT u.name FROM public.users u WHERE u.id = r.validated_by) AS validator
-        FROM school.payroll_run r LEFT JOIN school.staff s ON s.tenant_id = r.tenant_id AND s.id = r.staff_id";
+        (SELECT u.name FROM public.users u WHERE u.id = r.validated_by) AS validator, y.paid::text AS paid,
+        (r.net_amount - y.paid)::numeric(14, 2)::text AS left_to_pay, school.payroll_state(r.status, r.net_amount, y.paid) AS state
+        FROM school.payroll_run r LEFT JOIN school.staff s ON s.tenant_id = r.tenant_id AND s.id = r.staff_id
+        CROSS JOIN LATERAL (SELECT school.payroll_paid(r.tenant_id, r.id) AS paid) y";
     // Formateurs and administratifs, told apart (FR-REM-02).
     public const GROUPS = ['teaching' => ['teacher_internal', 'teacher_external'], 'administrative' => ['administrative', 'other']];
+    // FR-REM-02: a pay's states, the last two following its payouts (FR-REM-04).
+    public const STATES = ['draft', 'validated', 'partially_paid', 'paid'];
     private const MONTH = ['required', 'date_format:Y-m-d', 'regex:/-01$/'];
     // Above or below zero, two decimals at most.
     private const SIGNED = ['required', 'string', 'regex:/^-?(?!0+(\.0+)?$)(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$/'];
@@ -40,12 +46,12 @@ final class PayrollRunController
     /** A month's pays, by member. */
     public function index(Request $request)
     {
-        $data = $request->validate(Paging::RULES + ['period' => self::MONTH, 'status' => 'nullable|in:draft,validated',
+        $data = $request->validate(Paging::RULES + ['period' => self::MONTH, 'status' => 'nullable|in:'.implode(',', self::STATES),
             'group' => 'nullable|in:'.implode(',', array_keys(self::GROUPS)), 'search' => 'nullable|string|max:100']);
         $request->merge(['paginate' => true]);
         $sql = 'SELECT '.self::COLUMNS.' WHERE r.tenant_id = ? AND r.period = ?::date';
         $bindings = [$this->school->id(), $data['period']];
-        if (isset($data['status'])) { $sql .= ' AND r.status = ?'; $bindings[] = $data['status']; }
+        if (isset($data['status'])) { $sql .= ' AND school.payroll_state(r.status, r.net_amount, y.paid) = ?'; $bindings[] = $data['status']; }
         if (isset($data['group'])) { $sql .= ' AND s.staff_type = ANY (?::text[])'; $bindings[] = '{'.implode(',', self::GROUPS[$data['group']]).'}'; }
         if (isset($data['search']) && trim($data['search']) !== '') {
             $sql .= ' AND '.Paging::search(['s.last_name_lat', 's.first_name_lat', 's.last_name_ar', 's.first_name_ar', 's.staff_number']);
@@ -63,7 +69,7 @@ final class PayrollRunController
         return ['data' => ['period' => $data['period'], 'generated' => (int) $count]];
     }
 
-    /** A pay with its detail line by line (FR-REM-03), its units and its adjustments. */
+    /** A pay with its detail line by line (FR-REM-03), its units, its adjustments and its payouts. */
     public function show(string $run)
     {
         return ['data' => $this->run($run, true)];
@@ -132,6 +138,7 @@ final class PayrollRunController
             a.corrects_run_id, c.period::text AS corrects_period, a.created_at, (SELECT u.name FROM public.users u WHERE u.id = a.created_by) AS author
             FROM school.payroll_adjustment a LEFT JOIN school.payroll_run c ON c.tenant_id = a.tenant_id AND c.id = a.corrects_run_id
             WHERE a.tenant_id = ? AND a.run_id = ? ORDER BY a.created_at, a.id', [$tenant, $id]));
+        $data['payouts'] = PayrollPayoutController::of($tenant, $id);
         return $data;
     }
 }
