@@ -42,4 +42,17 @@ return [
     'as_substitute' => 'dont :count en remplacement',
     'corrected_count' => ':count corrigées',
     'no_hours' => 'Aucune séance assurée validée ce mois',
+
+    // FR-PRE-01: the pupils' roll call.
+    'roll_call' => 'Appel des élèves',
+    'roll_call_help' => 'Les séances commencées du jour que vous appelez ; un enseignant, les siennes. L’appel liste les élèves du groupe à la date de la séance. Un appel non fait n’est pas une absence ; une correction garde l’ancienne valeur.',
+    'no_roll' => 'Aucune séance à appeler ce jour',
+    'roll' => 'Appel',
+    'roll_not_called' => 'Non fait',
+    'roll_marked' => ':marked / :pupils',
+    'absent_count' => ':count absents',
+    'call' => 'Faire l’appel',
+    'roll_statuses' => ['present' => 'Présent', 'absent' => 'Absent', 'late' => 'En retard', 'excused' => 'Excusé'],
+    'roll_history' => 'Historique',
+    'no_roll_change' => 'Aucune modification.',
 ];

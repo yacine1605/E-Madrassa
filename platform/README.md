@@ -1513,14 +1513,32 @@ The hours delivered come from the validated attendance and feed the pays (FR-PTG
 
 Validation on 17 October 2026: **300 PHP integration tests (15,269 assertions)**; **264 embedded SQL checks and 295 native PostgreSQL 16 checks including concurrency**; migration 067 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 272 screens without a problem (continuous integration still blocked by the GitHub account's billing).
 
+## Increment 83 (lot 4): the pupils' roll call
+
+The roll call, session by session (FR-PRE-01):
+
+- **Roll call** (« Appel des élèves », Planning section, `attendance.student.entry.create`): the sessions begun on a day that the reader calls, a teacher their own only, the supervisor those of the school or their sites; for each, how many pupils are marked and absent. **Call the roll** lists the pupils the group has on the session's day (AC1: one who joined it later is not called) and marks them present, absent, late (minutes optional) or excused, all together. A roll not called is no absence.
+- A mark changed (`attendance.student.entry.update`) keeps its former value, who changed it and when (AC2), read in the session's **History**. Marks are never deleted; a session to come or cancelled is not called.
+- Absence thresholds and notices to the families wait for the portal (lot 10).
+- SQL 068 (`database/schema/068_student_attendance.sql`, migration `2026_10_17_000068`).
+
+Routes: `GET /api/roll-calls?day=`, `GET|POST /api/class-sessions/{session}/roll-call` (`entries`: `student_id`, `status`, `late_minutes`, `note`), `GET /api/class-sessions/{session}/roll-call/history`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PRE-01 AC1 | tests/sql: two pupils in the group since before the session called, the third, joined after it, refused (`roll_not_member`) |
+| FR-PRE-01 AC2 | tests/sql and `RollCallTest`: absent changed to excused or late, the former value, who and when kept, the history never changed |
+| FR-PRE-01 | tests/sql: the session's own teacher calls it, a colleague not; a session to come refused; a pupil not called has no mark and no absence. `RollCallTest`: the teacher's sessions of the day, the roll saved together, the screen calls it; whoever calls no roll has no such screen |
+
+Validation on 17 October 2026: **301 PHP integration tests (15,378 assertions)**; **265 embedded SQL checks and 296 native PostgreSQL 16 checks including concurrency**; migration 068 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 276 screens without a problem (continuous integration still blocked by the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. The pupils' roll call (FR-PRE-01).
-2. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
+1. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 
 ## Next increments of lot 2
 

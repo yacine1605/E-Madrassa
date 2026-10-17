@@ -42,4 +42,17 @@ return [
     'as_substitute' => 'منها :count بالاستخلاف',
     'corrected_count' => ':count مصحَّحة',
     'no_hours' => 'لا توجد حصص منجزة مصادق عليها هذا الشهر',
+
+    // FR-PRE-01: the pupils' roll call.
+    'roll_call' => 'مناداة التلاميذ',
+    'roll_call_help' => 'حصص اليوم التي بدأت والتي تتولى مناداتها؛ والأستاذ حصصه. تعرض المناداة تلاميذ الفوج في تاريخ الحصة. المناداة غير المنجزة ليست غيابًا؛ ويحتفظ التصحيح بالقيمة القديمة.',
+    'no_roll' => 'لا توجد حصة للمناداة في هذا اليوم',
+    'roll' => 'المناداة',
+    'roll_not_called' => 'لم تُنجز',
+    'roll_marked' => ':marked / :pupils',
+    'absent_count' => ':count غائبين',
+    'call' => 'إجراء المناداة',
+    'roll_statuses' => ['present' => 'حاضر', 'absent' => 'غائب', 'late' => 'متأخر', 'excused' => 'غياب مبرَّر'],
+    'roll_history' => 'السجل',
+    'no_roll_change' => 'لا يوجد تعديل.',
 ];

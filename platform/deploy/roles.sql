@@ -300,6 +300,11 @@ GRANT UPDATE (status, late_minutes, actual_start, actual_end, replacement_teache
 GRANT SELECT ON school.attendance_correction, school.attendance_effective TO school_runtime;
 GRANT INSERT (tenant_id, attendance_id, status, late_minutes, actual_start, actual_end, replacement_teacher_id, reason) ON school.attendance_correction TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.delivered_sessions(uuid, date, date), school.month_paid(uuid, date) TO school_runtime;
+-- The pupils' roll call (068): marked by the session's teacher or the supervisor, changed with the former value kept; never deleted.
+GRANT SELECT ON school.student_attendance, school.student_attendance_change TO school_runtime;
+GRANT INSERT (tenant_id, session_id, student_id, status, late_minutes, note) ON school.student_attendance TO school_runtime;
+GRANT UPDATE (status, late_minutes, note) ON school.student_attendance TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.roll_pupils(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -624,6 +629,10 @@ ALTER FUNCTION school.follow_teacher_attendance() OWNER TO platform_provisioner;
 GRANT SELECT ON school.teacher_attendance, school.attendance_correction, school.attendance_effective TO platform_provisioner;
 ALTER FUNCTION school.delivered_sessions(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.month_paid(uuid, date) OWNER TO platform_provisioner;
+-- The pupils' roll call (068): each change of a mark written to its history by the database alone.
+GRANT SELECT, INSERT ON school.student_attendance_change TO platform_provisioner;
+ALTER FUNCTION school.record_student_attendance() OWNER TO platform_provisioner;
+ALTER FUNCTION school.roll_pupils(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

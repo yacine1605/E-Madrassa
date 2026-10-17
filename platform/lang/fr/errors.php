@@ -237,6 +237,8 @@ return [
     'attendance_not_validated' => 'Seul un pointage validé se corrige par une trace ; avant, son auteur le corrige.',
     'attendance_correction_same' => 'La correction ne change rien au pointage.',
     'attendance_month_paid' => 'La rémunération de ce mois est validée : corrigez-la par un ajustement de rémunération.',
+    'roll_not_member' => 'Cet élève n’est pas dans le groupe de la séance ce jour-là.',
+    'roll_late_minutes' => 'Des minutes de retard pour un retard seulement.',
     'timetable_scope_required' => 'Choisissez un groupe, un enseignant ou une salle.',
     'session_range_too_long' => 'Les séances se lisent 62 jours au plus à la fois.',
     'calendar_sessions_planned' => 'Des séances sont planifiées ces jours-là : annulez-les ou déplacez-les d’abord.',

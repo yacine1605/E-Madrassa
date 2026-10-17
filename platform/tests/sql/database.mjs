@@ -4717,6 +4717,71 @@ await check('a month\'s hours are the sum of its validated sessions, which its p
   assert.deepEqual((await sql('SELECT * FROM school.delivered_sessions($1, $2::date, $3::date)', [teacher, month, lastDay])).rows, []);
   await as('school_runtime', a, 1);
 });
+// The pupils' roll call (SQL 068, FR-PRE-01): the pupils of the group that day, marked by the session's teacher or the supervisor, changes kept.
+await check('a roll calls the pupils the group had that day, by its own teacher or the supervisor; a change keeps the former value (FR-PRE-01 AC1, AC2)', async () => {
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read', 'group.group.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read', 'group.group.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
+  const supervisor = await scopedAccount('internal', 'tenant', null, ['schedule.session.read', 'student.record.read', 'group.group.read',
+    'attendance.student.entry.create', 'attendance.student.entry.update']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Appel', 'Samia')).id;
+  const colleague = (await newStaff('Voisin', 'Hakim')).id;
+  for (const t of [teacher, colleague]) await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [colleague, colleagueAccount.user]);
+  const taught = await programme('ROLL', 90000, 'active', planned.year);
+  await line(taught, maths, { weekly: 10, from: await dayAfter(today, -30) });
+  const called = await planGroup('PLAN-C', taught, 10);
+  const past = (await first(`SELECT d::date::text AS d FROM generate_series(current_date - 1, current_date - 6, interval '-1 day') d
+    WHERE school.day_open(d::date, $1) ORDER BY d DESC LIMIT 1`, [siteA])).d;
+  // Two pupils in the group since before the session; a third joins today, after it (AC1).
+  const pupils = [];
+  for (const name of ['Amine', 'Lina', 'Yanis']) {
+    const pupil = (await newAdult('Appele', name)).id;
+    const membership = await joinGroup(await enroll(pupil, taught), called);
+    if (name !== 'Yanis') {
+      await as(null);
+      await sql('ALTER TABLE school.group_membership DISABLE TRIGGER USER');
+      await sql('UPDATE school.group_membership SET valid_from = $2::date WHERE id = $1', [membership, await dayAfter(past, -7)]);
+      await sql('ALTER TABLE school.group_membership ENABLE TRIGGER USER');
+      await as('school_runtime', a, 1);
+    }
+    pupils.push(pupil);
+  }
+  const session = (await first(SESSION, [a, called, maths, teacher, null, past, '08:00', '08:50'])).id;
+  const coming = (await first(SESSION, [a, called, maths, teacher, null, await dayAfter(planningFrom, 25), '08:00', '08:50'])).id;
+  // Read by whoever calls it: the supervisor, not the school's administrator.
+  assert.deepEqual((await sql('SELECT student_id FROM school.roll_pupils($1)', [session])).rows, []);
+  await as('school_runtime', a, supervisor.user);
+  assert.deepEqual((await sql('SELECT student_id FROM school.roll_pupils($1) ORDER BY student_id', [session])).rows.map(r => r.student_id), pupils.slice(0, 2).sort());
+  const MARK = 'INSERT INTO school.student_attendance (tenant_id, session_id, student_id, status, late_minutes, note) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, group_id, teacher_id';
+  // Its own teacher calls it; a colleague does not, nor a session to come, nor a pupil who joined later.
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects(MARK, [a, session, pupils[0], 'present', null, null], '42501');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects(MARK, [a, coming, pupils[0], 'present', null, null], '23514', 'attendance_future');
+  await rejects(MARK, [a, session, pupils[2], 'present', null, null], '23514', 'roll_not_member');
+  await rejects(MARK, [a, session, pupils[0], 'absent', 5, null], '23514', 'roll_late_minutes');
+  const absent = await first(MARK, [a, session, pupils[0], 'absent', null, null]);
+  assert.deepEqual([absent.group_id, absent.teacher_id], [called, teacher]);
+  await rejects(MARK, [a, session, pupils[0], 'present', null, null], '23505');
+  // The second pupil is not called yet: no mark, no absence.
+  assert.equal(await count("SELECT count(*) n FROM school.student_attendance WHERE session_id = $1 AND status = 'absent'", [session]), 1);
+  assert.equal(await count('SELECT count(*) n FROM school.student_attendance WHERE session_id = $1 AND student_id = $2', [session, pupils[1]]), 0);
+  // AC2: the supervisor excuses the absence; the former value kept, with who changed it.
+  await as('school_runtime', a, supervisor.user);
+  await sql("UPDATE school.student_attendance SET status = 'excused', note = 'Certificat médical' WHERE id = $1", [absent.id]);
+  assert.deepEqual(await first('SELECT previous_status, status, note, changed_by::int AS by FROM school.student_attendance_change WHERE attendance_id = $1', [absent.id]),
+    { previous_status: 'absent', status: 'excused', note: 'Certificat médical', by: Number(supervisor.user) });
+  await rejects("UPDATE school.student_attendance_change SET status = 'absent' WHERE attendance_id = $1", [absent.id], '42501');
+  await rejects('DELETE FROM school.student_attendance WHERE id = $1', [absent.id], '42501');
+  // The teacher reads their session's roll and its history; the colleague neither.
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.student_attendance_change WHERE session_id = $1', [session]), 1);
+  await as('school_runtime', a, colleagueAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.student_attendance WHERE session_id = $1', [session]), 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
