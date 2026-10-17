@@ -85,6 +85,18 @@ return [
     'roll_none' => 'non fait',
     'roll_line' => ':marks marques, :absent absents',
     'no_session' => 'Aucune séance que vous puissiez lire.',
+    // A group's absences per pupil and the weekly trend (SQL 072).
+    'pupils' => 'Absences par élève',
+    'pupils_help' => 'Les élèves marqués aux appels des séances du groupe dans la période, les plus absents d’abord ; un élève dont vous ne lisez pas le dossier reste anonyme. Puis la tendance du groupe, semaine par semaine.',
+    'pupil_line' => ':pupil · absences :absent / :marks (:rate %) · retards :late · excusées :excused · dernière absence : :last',
+    'pupil_hidden' => 'Élève dont vous ne lisez pas le dossier',
+    'no_pupil' => 'Aucun élève marqué dans la période.',
+    'trend' => 'Tendance des absences',
+    'trend_help' => 'Semaine par semaine, du dimanche au samedi, pour vos groupes : les séances tenues, les marques « absent » sur l’ensemble des marques d’appel, les retards, et l’écart du taux d’absence avec la dernière semaine où l’appel a été fait, en points.',
+    'week_line' => 'Semaine du :week · :held séances · absences :absent / :marks (:rate %) · retards :late · écart :change',
+    'week_empty' => 'Semaine du :week · :held séances · aucun appel',
+    'points' => ':points pts',
+    'no_week' => 'Aucune semaine à montrer.',
     // FR-TDB-03: the operational dashboard's columns in its exports.
     'columns' => [
         'group' => 'Groupe',

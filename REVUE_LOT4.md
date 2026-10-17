@@ -81,7 +81,7 @@ Toutes sont livrées en partie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). 
 | FR-PTG-01 à 03 | rien de bloquant |
 | FR-PRE-01 | seuils d'absence et notifications aux responsables légaux avec le portail (lot 10) |
 | FR-TDB-01 | convention du résultat de gestion non paramétrable ; charges communes non réparties entre programmes (livrées depuis, à l'incrément 87 : FR-TDB-01 conforme) |
-| FR-TDB-02 | absences par élève et tendances |
+| FR-TDB-02 | absences par élève et tendances (livrées depuis, à l'incrément 88 : FR-TDB-02 conforme) |
 | FR-TDB-03 | cache invalidé sur événement, à faire seulement si la lecture devient lente |
 
 ## Points à confirmer par l'établissement

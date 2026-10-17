@@ -85,6 +85,18 @@ return [
     'roll_none' => 'لم يتم',
     'roll_line' => ':marks علامة، :absent غائبون',
     'no_session' => 'لا توجد حصة يمكنك الاطلاع عليها.',
+    // A group's absences per pupil and the weekly trend (SQL 072).
+    'pupils' => 'الغيابات حسب التلميذ',
+    'pupils_help' => 'التلاميذ المسجَّلون في نداءات حصص الفوج خلال الفترة، الأكثر غيابًا أولًا؛ ويبقى دون اسم التلميذ الذي لا تطّلع على ملفه. ثم اتجاه الفوج أسبوعًا بأسبوع.',
+    'pupil_line' => ':pupil · غيابات :absent / :marks (:rate %) · تأخرات :late · مبرَّرة :excused · آخر غياب: :last',
+    'pupil_hidden' => 'تلميذ لا تطّلع على ملفه',
+    'no_pupil' => 'لا يوجد تلميذ مسجَّل في الفترة.',
+    'trend' => 'اتجاه الغيابات',
+    'trend_help' => 'أسبوعًا بأسبوع، من الأحد إلى السبت، لأفواجك: الحصص المنعقدة، وعلامات «غائب» من مجموع علامات النداء، والتأخرات، والفرق في نسبة الغياب عن آخر أسبوع أُجري فيه النداء، بالنقاط.',
+    'week_line' => 'أسبوع :week · :held حصص · غيابات :absent / :marks (:rate %) · تأخرات :late · الفرق :change',
+    'week_empty' => 'أسبوع :week · :held حصص · لا نداء',
+    'points' => ':points نقطة',
+    'no_week' => 'لا يوجد أسبوع للعرض.',
     // FR-TDB-03: the operational dashboard's columns in its exports.
     'columns' => [
         'group' => 'الفوج',

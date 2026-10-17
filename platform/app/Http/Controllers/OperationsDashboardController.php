@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\DB;
  * AC1); over a period, its sessions held, their teacher's attendance entered and validated, those
  * entered by no one, their roll calls and the pupils' absences; for the whole school, enrolments
  * waiting and prospects converted. A group's sessions behind its figures are listed as the reader
- * may read them (FR-TDB-03).
+ * may read them (FR-TDB-03); its pupils' absences, and week by week the absences of the reader's
+ * groups or of one of them, the trend (SQL 072).
  */
 final class OperationsDashboardController
 {
@@ -69,6 +70,39 @@ final class OperationsDashboardController
             LEFT JOIN school.subject sj ON sj.tenant_id = c.tenant_id AND sj.id = c.subject_id
             LEFT JOIN school.staff st ON st.tenant_id = c.tenant_id AND st.id = c.teacher_id
             ORDER BY c.starts_at, c.id", [$group, $from, $to, $this->school->id()]))];
+    }
+
+    /** A group's pupils marked in the period, the most absent first; named where the reader reads their record (029). */
+    public function pupils(Request $request)
+    {
+        [$from, $to] = $this->period($request);
+        $group = $request->validate(['group' => 'required|uuid'])['group'];
+        return ['data' => array_map(function (object $row) {
+            $row = (array) $row;
+            $row['absence_rate'] = $this->rate($row['absent'], $row['marks']);
+            return $row;
+        }, DB::select('SELECT x.student_id AS id, s.id IS NOT NULL AS readable, s.matricule, s.last_name_lat, s.first_name_lat, s.last_name_ar, s.first_name_ar,
+            x.marks, x.absent, x.late, x.excused, x.last_absence::text AS last_absence
+            FROM school.operations_pupils(?::uuid, ?::date, ?::date) x LEFT JOIN school.student s ON s.tenant_id = ? AND s.id = x.student_id
+            ORDER BY x.absent DESC, x.late DESC, s.last_name_lat, s.first_name_lat, s.last_name_ar, x.student_id', [$group, $from, $to, $this->school->id()]))];
+    }
+
+    /** The trend: week by week, the absences of the reader's groups or of one of them, with the change from the week before in points. */
+    public function weeks(Request $request)
+    {
+        [$from, $to] = $this->period($request);
+        $group = $request->validate(['group' => 'nullable|uuid'])['group'] ?? null;
+        $rows = [];
+        $previous = null;
+        foreach (DB::select('SELECT week::text AS week, sessions_held, marks, absent, late, excused FROM school.operations_weeks(?::uuid, ?::date, ?::date)',
+            [$group, $from, $to]) as $row) {
+            $row = (array) $row;
+            $row['absence_rate'] = $this->rate($row['absent'], $row['marks']);
+            $row['change'] = $row['absence_rate'] === null || $previous === null ? null : number_format(round((float) $row['absence_rate'] - (float) $previous, 1) + 0.0, 1, '.', '');
+            if ($row['absence_rate'] !== null) $previous = $row['absence_rate'];
+            $rows[] = $row;
+        }
+        return ['data' => $rows, 'meta' => ['from' => $from, 'to' => $to, 'group' => $group]];
     }
 
     private function period(Request $request): array

@@ -4879,6 +4879,30 @@ await check('the operational dashboard counts a group\'s fill as its composition
     await as('school_runtime', a, sited.user);
     await rejects('SELECT * FROM school.operations_sessions($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
   }
+  // A group's absences per pupil (SQL 072): its marks and absences, pupil by pupil.
+  const called = held.find(h => h.roll > 0);
+  await as('school_runtime', a, reader.user);
+  const pupils = (await sql('SELECT * FROM school.operations_pupils($1, $2::date, $3::date)', [called.group_id, from, to])).rows;
+  assert.ok(pupils.length > 0);
+  assert.deepEqual([pupils.reduce((n, p) => n + p.marks, 0), pupils.reduce((n, p) => n + p.absent, 0), pupils.reduce((n, p) => n + p.late, 0)],
+    [figure(called.group_id, 'marks'), figure(called.group_id, 'absent'), figure(called.group_id, 'late')]);
+  assert.ok(pupils.every(p => (p.absent > 0) === (p.last_absence !== null)));
+  // The trend: every week of the period from its first day, together the period's sessions and marks.
+  const weeks = (await sql('SELECT week::text AS week, sessions_held, marks, absent FROM school.operations_weeks(NULL, $1::date, $2::date)', [from, to])).rows;
+  assert.equal(weeks[0].week, from);
+  assert.equal(weeks.length, (await first("SELECT (($2::date - ($1::date - extract(dow FROM $1::date)::int)) / 7 + 1)::int AS n", [from, to])).n);
+  assert.deepEqual([weeks.reduce((n, w) => n + w.sessions_held, 0), weeks.reduce((n, w) => n + w.marks, 0), weeks.reduce((n, w) => n + w.absent, 0)],
+    [held.reduce((n, h) => n + h.held, 0), held.reduce((n, h) => n + (figure(h.group_id, 'marks') ?? 0), 0), held.reduce((n, h) => n + (figure(h.group_id, 'absent') ?? 0), 0)]);
+  const one = (await sql('SELECT sum(marks)::int AS n FROM school.operations_weeks($1, $2::date, $3::date)', [called.group_id, from, to])).rows[0].n;
+  assert.equal(one, figure(called.group_id, 'marks'));
+  await rejects('SELECT * FROM school.operations_weeks(NULL, $1::date, $2::date)', [to, from], '23514', 'dashboard_range_invalid');
+  await as('school_runtime', a, blind.user);
+  await rejects('SELECT * FROM school.operations_weeks(NULL, $1::date, $2::date)', [from, to], '42501', 'permission_denied');
+  if (elsewhere.length > 0) {
+    await as('school_runtime', a, sited.user);
+    await rejects('SELECT * FROM school.operations_pupils($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
+    await rejects('SELECT * FROM school.operations_weeks($1, $2::date, $3::date)', [elsewhere[0], from, to], '42501', 'permission_denied');
+  }
   await as('school_runtime', a, 1);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).

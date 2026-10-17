@@ -571,10 +571,12 @@ Route::prefix('api')->group(function () {
                 Route::get('dashboards/finance/programs', [FinanceDashboardController::class, 'programs']);
                 Route::get('dashboards/finance/sources', [FinanceDashboardController::class, 'sources']);
             });
-            // FR-TDB-02: the operational dashboard, for the reader's groups; a group's sessions behind its figures.
+            // FR-TDB-02: the operational dashboard, for the reader's groups; a group's sessions behind its figures, its pupils' absences, the weekly trend.
             Route::middleware(['module:dashboards', 'permission:dashboard.operations.read'])->group(function () {
                 Route::get('dashboards/operations', [OperationsDashboardController::class, 'index']);
                 Route::get('dashboards/operations/sessions', [OperationsDashboardController::class, 'sessions']);
+                Route::get('dashboards/operations/pupils', [OperationsDashboardController::class, 'pupils']);
+                Route::get('dashboards/operations/weeks', [OperationsDashboardController::class, 'weeks']);
             });
 
             // FR-PTG-01, FR-PTG-02: the teachers' attendance, entered by one person, validated by another (TST-05).

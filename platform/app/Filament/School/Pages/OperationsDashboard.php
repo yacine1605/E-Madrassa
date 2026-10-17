@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\DB;
  * period its sessions held, their teacher's attendance validated, those entered by no one, the roll
  * calls not taken and the pupils' absences; for the whole school, the enrolments waiting and the
  * prospects converted. Each figure's basis on its heading; a group's sessions behind its figures
- * (FR-TDB-03). A module's figures appear only while the school uses it (BR-20).
+ * (FR-TDB-03), its pupils' absences, and week by week the trend of the absences (SQL 072). A module's figures appear only while the school uses it (BR-20).
  */
 final class OperationsDashboard extends SchoolingPage
 {
@@ -73,11 +73,24 @@ final class OperationsDashboard extends SchoolingPage
                 Filter::make('period')->schema([
                     DatePicker::make('from')->label(__('dashboard.period_from'))->default(now()->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.period_to'))->default(now()->toDateString())]),
-            ])->headerActions([$this->export()])->recordActions([
+            ])->headerActions([$this->trend(), $this->export()])->recordActions([
                 Action::make('sessions')->label(__('dashboard.sessions'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.sessions_help'))
                     ->visible(fn (array $record) => $record['sessions_held'] !== null)
                     ->schema(fn (array $record) => [TextEntry::make('sessions')->hiddenLabel()->listWithLineBreaks()->state($this->sessions($record['group_id']))]),
+                Action::make('pupils')->label(__('dashboard.pupils'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.pupils_help'))
+                    ->visible(fn (array $record) => $record['marks'] !== null)
+                    ->schema(fn (array $record) => [
+                        TextEntry::make('pupils')->label(__('dashboard.pupils'))->listWithLineBreaks()->state($this->pupils($record['group_id'])),
+                        TextEntry::make('weeks')->label(__('dashboard.trend'))->listWithLineBreaks()->state($this->weeks($record['group_id']))]),
             ]);
+    }
+
+    /** The trend of the reader's groups, week by week over the period. */
+    private function trend(): Action
+    {
+        return Action::make('trend')->label(__('dashboard.trend'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.trend_help'))
+            ->visible(fn () => $this->uses('scheduling_manual') && $this->uses('attendance'))
+            ->schema(fn () => [TextEntry::make('weeks')->hiddenLabel()->listWithLineBreaks()->state($this->weeks(null))]);
     }
 
     /** FR-TDB-03: the dashboard as it shows, for whoever also exports, logged like any export (FR-IMP-02). */
@@ -144,5 +157,36 @@ final class OperationsDashboard extends SchoolingPage
                     'absent' => Formats::number($row['absent'])])]),
             SchoolScreen::call(static::$permissions, OperationsDashboardController::class, 'sessions', $this->period($this->tableFilters ?? []) + ['group' => $group])['data']);
         return $lines === [] ? [__('dashboard.no_session')] : $lines;
+    }
+
+    /** A group's pupils marked in the period, the most absent first; a pupil whose record the reader does not read stays unnamed. */
+    private function pupils(string $group): array
+    {
+        $lines = array_map(fn (array $row) => __('dashboard.pupil_line', ['pupil' => !$row['readable'] ? __('dashboard.pupil_hidden') : $this->name($row),
+                'absent' => Formats::number($row['absent']), 'marks' => Formats::number($row['marks']), 'rate' => $this->rate($row['absence_rate']),
+                'late' => Formats::number($row['late']), 'excused' => Formats::number($row['excused']),
+                'last' => $row['last_absence'] === null ? __('dashboard.none') : Formats::date($row['last_absence'])]),
+            SchoolScreen::call(static::$permissions, OperationsDashboardController::class, 'pupils', $this->period($this->tableFilters ?? []) + ['group' => $group])['data']);
+        return $lines === [] ? [__('dashboard.no_pupil')] : $lines;
+    }
+
+    /** Week by week, the absences over the marks and the change from the week before, in points. */
+    private function weeks(?string $group): array
+    {
+        $lines = array_map(fn (array $row) => $row['marks'] === 0
+                ? __('dashboard.week_empty', ['week' => Formats::date($row['week']), 'held' => Formats::number($row['sessions_held'])])
+                : __('dashboard.week_line', ['week' => Formats::date($row['week']), 'held' => Formats::number($row['sessions_held']),
+                    'absent' => Formats::number($row['absent']), 'marks' => Formats::number($row['marks']), 'rate' => $this->rate($row['absence_rate']),
+                    'late' => Formats::number($row['late']), 'change' => $row['change'] === null ? __('dashboard.none')
+                        : __('dashboard.points', ['points' => ((float) $row['change'] > 0 ? '+' : '').Formats::number((float) $row['change'], 1)])]),
+            SchoolScreen::call(static::$permissions, OperationsDashboardController::class, 'weeks', $this->period($this->tableFilters ?? []) + array_filter(['group' => $group]))['data']);
+        return $lines === [] ? [__('dashboard.no_week')] : $lines;
+    }
+
+    private function name(array $record): string
+    {
+        $latin = trim(($record['last_name_lat'] ?? '').' '.($record['first_name_lat'] ?? ''));
+        $arabic = trim(($record['last_name_ar'] ?? '').' '.($record['first_name_ar'] ?? ''));
+        return Formats::isolated(app()->getLocale() === 'ar' ? ($arabic ?: $latin) : ($latin ?: $arabic));
     }
 }

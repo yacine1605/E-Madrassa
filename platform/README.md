@@ -1580,6 +1580,15 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 88 (lot 4): absences per pupil and their trend
+
+The rest of FR-TDB-02, on the operational dashboard, within the groups the reader's `dashboard.operations.read` opens and while the planning and attendance modules are active:
+
+- **Absences per pupil** (« Absences par élève », on each group's line): the pupils marked at the roll calls of the group's sessions held in the period, the most absent first, with their marks, absences, late arrivals, excused absences, absence rate and last absence. A pupil is named only where the reader reads their record (the pupil's own rules, SQL 029 and 063): a teacher no longer reads a pupil who has left their group, who stays counted but unnamed. `GET /api/dashboards/operations/pupils?group=&from=&to=`, `school.operations_pupils` (SQL 072).
+- **The trend** (« Tendance des absences », in the header, and in each group's window): week by week, Sunday to Saturday, every week of the period even without a session, the sessions held, the absences over the marks, the late arrivals, the absence rate and its change in points from the last week with a roll call. `GET /api/dashboards/operations/weeks?[group=]&from=&to=`, `school.operations_weeks` (SQL 072); without a group, the reader's whole scope.
+
+Validation on 17 October 2026: **305 PHP integration tests (15,904 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 852 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 87 (lot 4): the finance dashboard's conventions
 
 FR-TDB-01's two conventions, each a school setting (« Paramètres de l'école »), the default reading as before:
@@ -1608,7 +1617,7 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. Absences per pupil and their trend over the period (FR-TDB-02).
+1. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow; otherwise lot 5.
 
 ## Next increments of lot 2
 
