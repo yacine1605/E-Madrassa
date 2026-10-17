@@ -61,7 +61,14 @@ final class DatabaseErrors
         'payroll_run_not_payable', 'payroll_payout_date', 'payroll_payout_immutable', 'expense_payroll', 'expense_category_missing',
         'calendar_exception_past', 'calendar_exception_end_before_start', 'calendar_exception_overlap', 'calendar_exception_ended',
         'time_slot_archived', 'time_slot_immutable',
+        'session_spans_days', 'session_group_not_active', 'session_outside_group_dates', 'session_day_closed', 'session_subject_outside_program', 'session_not_teacher', 'session_teacher_left', 'session_teacher_not_qualified', 'session_teacher_unavailable',
+        'session_teacher_busy', 'session_group_busy', 'session_room_other_site', 'session_room_unavailable', 'session_room_too_small', 'session_room_busy', 'session_pupil_busy', 'session_not_deletable',
+        'session_series_refused', 'session_immutable', 'session_locked', 'session_series_empty', 'session_hours_invalid', 'session_series_past', 'session_series_end_later', 'calendar_sessions_planned',
     ];
+
+    /** The exclusion constraints whose refusal says which conflict (SQL 062). */
+    private const EXCLUSIONS = ['class_session_teacher_free' => 'session_teacher_busy', 'class_session_room_free' => 'session_room_busy',
+        'class_session_group_free' => 'session_group_busy'];
 
     public static function message(string $rule): string
     {
@@ -94,6 +101,10 @@ final class DatabaseErrors
             return [409, 'account_exists', __('errors.account_exists')];
         }
         if ($state === '23505') return [409, 'duplicate', __('errors.duplicate')];
+        // TST-15: a session's exclusion constraints, met by two requests at once.
+        foreach (self::EXCLUSIONS as $constraint => $rule) {
+            if ($state === '23P01' && str_contains($detail, $constraint)) return [409, $rule, __('errors.'.$rule)];
+        }
         if ($state === '23P01') return [409, 'overlap', __('errors.overlap')];
         if (in_array($state, ['23503', '55P03', '40001', '40P01'], true)) {
             return [409, 'domain_conflict', __('errors.domain_conflict_retry')];

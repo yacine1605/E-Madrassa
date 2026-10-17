@@ -35,4 +35,15 @@ return [
     'archive_slot_help' => 'لم تعد مقترحة للحصص الجديدة؛ وتحتفظ الحصص المبرمجة بتوقيتها.',
     'no_slot' => 'لا توجد فترات',
     'no_slot_help' => 'أضف فترات اليوم، مثلًا 08:00–09:30.',
+
+    // FR-PLN-03: what is told, never refused.
+    'warnings' => [
+        'teacher_daily_hours' => 'يتجاوز الأستاذ ساعاته اليومية: :hours سا مقابل :bound سا على الأكثر.',
+        'teacher_weekly_hours' => 'يتجاوز الأستاذ ساعاته الأسبوعية: :hours سا مقابل :bound سا على الأكثر.',
+        'volume_sessions_exceeded' => 'تجاوز الحجم المقرر في البرنامج: :sessions حصة مقابل :volume مقررة.',
+        'volume_hours_exceeded' => 'تجاوز الحجم المقرر في البرنامج: :hours سا مقابل :volume سا مقررة.',
+        'volume_weekly_exceeded' => 'تتجاوز ساعات الأسبوع البرنامج: :hours سا مقابل :volume سا أسبوعيًا.',
+        'teacher_site_change' => 'يغيّر الأستاذ الموقع (الفوج :group) دون :minutes دقيقة للتنقل.',
+        'session_day_skipped' => 'يوم مغلق: لا حصة في هذا اليوم.',
+    ],
 ];

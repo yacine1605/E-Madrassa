@@ -35,4 +35,15 @@ return [
     'archive_slot_help' => 'Il n’est plus proposé pour les nouvelles séances ; celles déjà planifiées gardent leurs heures.',
     'no_slot' => 'Aucun créneau',
     'no_slot_help' => 'Ajoutez les créneaux de la journée, par exemple 08:00–09:30.',
+
+    // FR-PLN-03: what is told, never refused.
+    'warnings' => [
+        'teacher_daily_hours' => 'L’enseignant dépasse ses heures par jour : :hours h pour :bound h au plus.',
+        'teacher_weekly_hours' => 'L’enseignant dépasse ses heures par semaine : :hours h pour :bound h au plus.',
+        'volume_sessions_exceeded' => 'Le volume du programme est dépassé : :sessions séances pour :volume prévues.',
+        'volume_hours_exceeded' => 'Le volume du programme est dépassé : :hours h pour :volume h prévues.',
+        'volume_weekly_exceeded' => 'Les heures de la semaine dépassent le programme : :hours h pour :volume h par semaine.',
+        'teacher_site_change' => 'L’enseignant change de site (groupe :group) sans :minutes minutes de trajet.',
+        'session_day_skipped' => 'Jour fermé : aucune séance ce jour-là.',
+    ],
 ];

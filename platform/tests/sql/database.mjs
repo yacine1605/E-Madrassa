@@ -4218,6 +4218,163 @@ await check('the grid of time slots: codes unique, to the minute, never changed,
   assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'time_slot' AND object_id = $1", [early]) >= 2);
   await as('school_runtime', a, 1);
 });
+// Sessions (SQL 062, FR-PLN-02, FR-PLN-03): a weekly series generating its sessions on the open days, a session changed on its own, the conflicts refused or told.
+const SERIES = 'SELECT school.plan_series($1, $2, $3, $4, $5, $6::time, $7::time, $8, $9::date, $10::date, $11) AS id';
+const SESSION = `INSERT INTO school.class_session (tenant_id, group_id, subject_id, teacher_id, room_id, starts_at, ends_at)
+  VALUES ($1, $2, $3, $4, $5, school.local_at($6::date, $7::time), school.local_at($6::date, $8::time)) RETURNING id`;
+const CONFLICTS = `SELECT conflict, blocking FROM school.session_conflicts($1, $2, $3, $4, school.local_at($5::date, $6::time), school.local_at($5::date, $7::time))
+  ORDER BY blocking DESC, conflict`;
+const localTime = async id => (await first("SELECT to_char(starts_at AT TIME ZONE 'Africa/Algiers', 'HH24:MI') || '-' || to_char(ends_at AT TIME ZONE 'Africa/Algiers', 'HH24:MI') AS t FROM school.class_session WHERE id = $1", [id])).t;
+// Four weeks ahead and later, clear of the calendar's checks.
+const planningFrom = await dayAfter(sunday, 28);
+const planned = {};
+// A class of the planning's year, open from its first day.
+const planGroup = async (code, program, capacity) => (await first(`INSERT INTO school.study_group (tenant_id, year_id, code, labels, group_type, program_id, site_id,
+  capacity, valid_from, status) SELECT $1, y.id, $2, $3, 'class', $4, $5, $6, y.start_date, 'active' FROM school.academic_year y WHERE y.id = $7 RETURNING id`,
+  [a, code, JSON.stringify({ fr: 'Groupe ' + code }), program, siteA, capacity, planned.year])).id;
+await check('a weekly series over a term makes one session a week on the open days, closures skipped (FR-PLN-02 AC1, FR-PLN-01 AC1)', async () => {
+  // A year of its own around today: a programme's subjects are taught within its year.
+  planned.year = (await first(YEAR, [a, 'PLANNING', await dayAfter(today, -30), await dayAfter(today, 300), 'planned'])).id;
+  planned.program = await programme('PLANNING', 120000, 'active', planned.year);
+  await line(planned.program, maths, { weekly: 4, total: 120 });
+  planned.group = await planGroup('PLAN-A', planned.program, 20);
+  planned.teacher = (await newStaff('Planif', 'Nadia')).id;
+  await first(QUALIFY, [a, planned.teacher, maths, grade, null, null]);
+  planned.room = (await room(siteA, 'PLAN-1', 30)).id;
+  // Thirteen Sundays; a public holiday on the third, a vacation of the site over the sixth and seventh.
+  const sundays = await Promise.all([...Array(13).keys()].map(w => dayAfter(planningFrom, 7 * w)));
+  await first(EXCEPTION, [a, null, 'holiday', sundays[2], sundays[2], 'Fête nationale']);
+  await first(EXCEPTION, [a, siteA, 'vacation', sundays[5], await dayAfter(sundays[6], 4), 'Vacances d\'hiver']);
+  const key = uuid();
+  planned.series = (await first(SERIES, [planned.group, maths, planned.teacher, planned.room, 0, '08:00', '09:30', null, sundays[0], sundays[12], key])).id;
+  const sessions = (await sql('SELECT id, school.local_day(starts_at)::text AS day FROM school.class_session WHERE series_id = $1 ORDER BY starts_at', [planned.series])).rows;
+  assert.equal(sessions.length, 10);
+  assert.ok(!sessions.some(s => [sundays[2], sundays[5], sundays[6]].includes(s.day)));
+  assert.equal(await localTime(sessions[0].id), '08:00-09:30', 'in Algiers\' time');
+  planned.sessions = sessions.map(s => s.id);
+  planned.sundays = sundays;
+  // The same key plans nothing more; reused for another course, refused.
+  assert.equal((await first(SERIES, [planned.group, maths, planned.teacher, planned.room, 0, '08:00', '09:30', null, sundays[0], sundays[12], key])).id, planned.series);
+  await rejects(SERIES, [planned.group, physics, planned.teacher, planned.room, 1, '08:00', '09:30', null, sundays[0], sundays[12], key], '23514', 'idempotency_key_reused');
+  // A slot of the grid gives its hours; an archived one, none.
+  const slot = (await first(TIME_SLOT, [a, 'PLAN-S', '14:00', '15:30'])).id;
+  const afternoon = (await first(SERIES, [planned.group, maths, planned.teacher, planned.room, 1, null, null, slot, await dayAfter(sundays[0], 1), await dayAfter(sundays[1], 1), uuid()])).id;
+  assert.deepEqual((await sql("SELECT to_char(start_time, 'HH24:MI') || '-' || to_char(end_time, 'HH24:MI') AS t FROM school.session_series WHERE id = $1", [afternoon])).rows, [{ t: '14:00-15:30' }]);
+  await sql('UPDATE school.time_slot SET archived_at = now() WHERE id = $1', [slot]);
+  await rejects(SERIES, [planned.group, maths, planned.teacher, planned.room, 2, null, null, slot, sundays[0], sundays[1], uuid()], '23514', 'time_slot_archived');
+  // Only closed days: nothing to plan.
+  await rejects(SERIES, [planned.group, maths, planned.teacher, planned.room, 5, '08:00', '09:00', null, sundays[0], sundays[1], uuid()], '23514', 'session_series_empty');
+  // FR-PLN-01 AC1 the other way round: a day with sessions is closed no more.
+  await rejects(EXCEPTION, [a, null, 'closure', sundays[3], sundays[3], 'Grève'], '23514', 'calendar_sessions_planned');
+  await rejects(EXCEPTION, [a, siteA, 'closure', sundays[4], sundays[4], 'Travaux'], '23514', 'calendar_sessions_planned');
+  assert.ok((await first(EXCEPTION, [a, staffSiteB, 'closure', sundays[4], sundays[4], 'Travaux à l\'annexe'])).id, 'another site');
+});
+await check('a session changed on its own leaves its series; the series changed from a day changes the others, ended sooner removes them (FR-PLN-02 AC2)', async () => {
+  const [, second, third] = planned.sessions;
+  const day = (await first('SELECT school.local_day(starts_at)::text AS d FROM school.class_session WHERE id = $1', [second])).d;
+  await sql("UPDATE school.class_session SET starts_at = school.local_at($2::date, '10:00'), ends_at = school.local_at($2::date, '11:30') WHERE id = $1", [second, day]);
+  assert.equal((await first('SELECT detached FROM school.class_session WHERE id = $1', [second])).detached, true);
+  // From the third session on, an hour later: the detached one stays as it was changed.
+  const from = (await first('SELECT school.local_day(starts_at)::text AS d FROM school.class_session WHERE id = $1', [third])).d;
+  const version = (await first('SELECT version FROM school.session_series WHERE id = $1', [planned.series])).version;
+  assert.equal((await first('SELECT school.change_series($1, $2::date, $3, $4, $5::time, $6::time, $7) AS n', [planned.series, from, planned.teacher, planned.room, '09:00', '10:30', version])).n, 8);
+  assert.deepEqual([await localTime(planned.sessions[0]), await localTime(second), await localTime(third)], ['08:00-09:30', '10:00-11:30', '09:00-10:30']);
+  await rejects('SELECT school.change_series($1, $2::date, $3, $4, $5::time, $6::time, $7) AS n', [planned.series, from, planned.teacher, planned.room, '09:00', '10:30', version], '23514', 'stale_version');
+  await rejects('SELECT school.change_series($1, $2::date, $3, $4, $5::time, $6::time, $7) AS n', [planned.series, yesterday, planned.teacher, planned.room, '09:00', '10:30', version + 1], '23514', 'session_series_past');
+  // Ended after its tenth Sunday: the three planned after it go.
+  assert.equal((await first('SELECT school.end_series($1, $2::date, $3) AS n', [planned.series, planned.sundays[9], version + 1])).n, 3);
+  assert.equal(await count('SELECT count(*) n FROM school.class_session WHERE series_id = $1', [planned.series]), 7);
+  assert.equal((await first('SELECT date_to::text AS d FROM school.session_series WHERE id = $1', [planned.series])).d, planned.sundays[9]);
+  // A series' session is made and removed by its series only; a series changes only through its functions.
+  await rejects(`INSERT INTO school.class_session (tenant_id, group_id, subject_id, teacher_id, series_id, starts_at, ends_at)
+    VALUES ($1, $2, $3, $4, $5, now() + interval '30 days', now() + interval '30 days 1 hour')`, [a, planned.group, maths, planned.teacher, planned.series], '23514', 'session_series_refused');
+  await rejects('DELETE FROM school.class_session WHERE id = $1', [third], '23514', 'session_not_deletable');
+  await rejects("UPDATE school.session_series SET end_time = '11:00' WHERE id = $1", [planned.series], '23514', 'session_series_refused');
+  await rejects('UPDATE school.class_session SET subject_id = $2 WHERE id = $1', [third, physics], '42501');
+  // Cancelled with its reason, then it changes no more.
+  await rejects("UPDATE school.class_session SET status = 'cancelled' WHERE id = $1", [third], '23514', 'reason_required');
+  await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Enseignante en formation' WHERE id = $1", [third]);
+  await rejects("UPDATE school.class_session SET starts_at = starts_at + interval '1 hour', ends_at = ends_at + interval '1 hour' WHERE id = $1", [third], '23514', 'session_immutable');
+});
+await check('a teacher, a room, a group never have two sessions at once; nor a pupil in two groups of different programmes (FR-PLN-03 AC1, AC2, TST-15)', async () => {
+  const day = await dayAfter(planningFrom, 1);
+  const other = await programme('PLANNING-B', 90000, 'active', planned.year);
+  await line(other, maths, { weekly: 6 });
+  const evening = await planGroup('PLAN-B', other, 15);
+  const colleague = (await newStaff('Collegue', 'Samir')).id;
+  await first(QUALIFY, [a, colleague, maths, grade, null, null]);
+  const lab = (await room(siteA, 'PLAN-2', 30)).id;
+  const held = (await first(SESSION, [a, planned.group, maths, planned.teacher, planned.room, day, '10:00', '11:00'])).id;
+  await rejects(SESSION, [a, evening, maths, planned.teacher, lab, day, '10:30', '11:30'], '23514', 'session_teacher_busy');
+  await rejects(SESSION, [a, evening, maths, colleague, planned.room, day, '10:30', '11:30'], '23514', 'session_room_busy');
+  await rejects(SESSION, [a, planned.group, maths, colleague, lab, day, '10:30', '11:30'], '23514', 'session_group_busy');
+  await rejects(SESSION, [a, evening, maths, colleague, lab, day, '11:00', '10:00'], '23514', 'session_hours_invalid');
+  // Back to back is no conflict.
+  assert.ok((await first(SESSION, [a, evening, maths, planned.teacher, planned.room, day, '11:00', '12:00'])).id);
+  // AC2: a pupil in both groups.
+  const pupil = (await newAdult('Double', 'Inscrit')).id;
+  await joinGroup(await enroll(pupil, planned.program), planned.group);
+  await joinGroup(await enroll(pupil, other), evening);
+  await rejects(SESSION, [a, evening, maths, colleague, lab, day, '09:30', '10:30'], '23514', 'session_pupil_busy');
+  // Cancelled, the session frees its hours.
+  await sql("UPDATE school.class_session SET status = 'cancelled', cancel_reason = 'Sortie pédagogique' WHERE id = $1", [held]);
+  assert.ok((await first(SESSION, [a, evening, maths, colleague, lab, day, '09:30', '10:30'])).id);
+  // The database refuses even what the check would not see: its exclusion constraints.
+  await as(null);
+  await sql('ALTER TABLE school.class_session DISABLE TRIGGER rules');
+  await as('school_runtime', a, 1);
+  await rejects(SESSION, [a, planned.group, maths, colleague, planned.room, day, '09:45', '10:15'], '23P01');
+  await as(null);
+  await sql('ALTER TABLE school.class_session ENABLE TRIGGER rules');
+  await as('school_runtime', a, 1);
+  planned.other = other; planned.evening = evening; planned.colleague = colleague; planned.lab = lab;
+});
+await check('a teacher not qualified, unavailable or not a teacher, a room closed, elsewhere or too small, a closed day are refused; bounds and volume are told (FR-PLN-03)', async () => {
+  const day = await dayAfter(planningFrom, 2);
+  const conflicts = async (teacher, roomId, on, from, until, groupId = planned.group, subject = maths) =>
+    (await sql(CONFLICTS, [groupId, subject, teacher, roomId, on, from, until])).rows.map(r => r.conflict + (r.blocking ? '' : ' (warning)'));
+  assert.deepEqual(await conflicts(planned.teacher, planned.room, day, '08:00', '09:00'), []);
+  const stranger = (await newStaff('Nonhabilite', 'Ali')).id;
+  assert.deepEqual(await conflicts(stranger, planned.room, day, '08:00', '09:00'), ['session_teacher_not_qualified']);
+  await rejects(SESSION, [a, planned.group, maths, stranger, planned.room, day, '08:00', '09:00'], '23514', 'session_teacher_not_qualified');
+  const clerk = (await newStaff('Secretaire', 'Lina', 'administrative')).id;
+  assert.ok((await conflicts(clerk, null, day, '08:00', '09:00')).includes('session_not_teacher'));
+  await first(DAY_OFF, [a, planned.colleague, day, day, 'Rendez-vous médical']);
+  assert.deepEqual(await conflicts(planned.colleague, null, day, '08:00', '09:00'), ['session_teacher_unavailable']);
+  // The room: closed that day, on another site, too small for the group's twenty places.
+  await first(CLOSURE, [a, planned.lab, day, day, 'Désinfection']);
+  assert.deepEqual(await conflicts(planned.teacher, planned.lab, day, '08:00', '09:00'), ['session_room_unavailable']);
+  const annex = (await room(staffSiteB, 'PLAN-B1', 40)).id;
+  assert.deepEqual(await conflicts(planned.teacher, annex, day, '08:00', '09:00'), ['session_room_other_site']);
+  const box = (await room(siteA, 'PLAN-10', 10)).id;
+  assert.deepEqual(await conflicts(planned.teacher, box, day, '08:00', '09:00'), ['session_room_too_small']);
+  // A Friday; a subject the programme does not teach.
+  assert.ok((await conflicts(planned.teacher, planned.room, await dayAfter(planningFrom, 5), '08:00', '09:00')).includes('session_day_closed'));
+  assert.ok((await conflicts(planned.teacher, planned.room, day, '08:00', '09:00', planned.group, physics)).includes('session_subject_outside_program'));
+  // Warnings only: the teacher's two hours a day, the programme's four hours a week.
+  await first(DECLARE, [a, planned.teacher, today, JSON.stringify([0, 1, 2, 3, 4].map(d => slot(d, '07:00', '20:00'))), null, 2, 30]);
+  assert.deepEqual(await conflicts(planned.teacher, planned.room, day, '13:00', '16:00'), ['teacher_daily_hours (warning)', 'volume_weekly_exceeded (warning)']);
+  assert.ok((await first(SESSION, [a, planned.group, maths, planned.teacher, planned.room, day, '13:00', '16:00'])).id, 'a warning never refuses');
+  // Outside the hours they declared: unavailable.
+  assert.deepEqual(await conflicts(planned.teacher, planned.room, day, '19:30', '20:30'),
+    ['session_teacher_unavailable', 'teacher_daily_hours (warning)', 'volume_weekly_exceeded (warning)']);
+  // The volume follow-up: planned against the programme's.
+  const volume = (await first('SELECT planned_sessions, planned_hours::text AS hours, volume_hours::text AS volume, weekly_hours::text AS weekly FROM school.session_volume($1) WHERE subject_id = $2', [planned.group, maths]));
+  assert.ok(volume.planned_sessions >= 8 && volume.volume === '120.00' && volume.weekly === '4.00', JSON.stringify(volume));
+});
+await check('sessions are read on their group\'s site, planned within the grant\'s sites; a member without the right plans none (FR-PLN-02, FR-IAM-04)', async () => {
+  const local = await scopedAccount('internal', 'site', [staffSiteB], ['schedule.session.read', 'schedule.session.create']);
+  await as('school_runtime', a, local.user);
+  assert.equal(await count('SELECT count(*) n FROM school.class_session WHERE group_id = $1', [planned.group]), 0, 'another site\'s');
+  await rejects(SESSION, [a, planned.group, maths, planned.teacher, null, await dayAfter(planningFrom, 3), '15:00', '16:00'], '42501');
+  const reader = await scopedAccount('internal', 'tenant', null, ['schedule.session.read']);
+  await as('school_runtime', a, reader.user);
+  assert.ok(await count('SELECT count(*) n FROM school.class_session WHERE group_id = $1', [planned.group]) > 0);
+  await rejects(SESSION, [a, planned.group, maths, planned.teacher, null, await dayAfter(planningFrom, 3), '15:00', '16:00'], '42501', 'permission_denied');
+  await as(null);
+  assert.ok(await count("SELECT count(*) n FROM school.audit_log WHERE object_type = 'class_session'") > 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);
@@ -4767,6 +4924,40 @@ if (PgClient) {
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal(results.find(r => r.status === 'rejected').reason.message, 'calendar_exception_overlap');
     assert.equal(await count("SELECT count(*) n FROM school.calendar_exception WHERE date_from = $1 AND site_id IS NULL AND status = 'planned'", [day]), 1);
+  });
+  await check('five sessions of one teacher at the same hour sent at once: one planned; two groups sharing a pupil planned at once: one (TST-15, FR-PLN-03 AC1, AC2)', async () => {
+    await as('school_runtime', a, 1);
+    const day = await dayAfter(planningFrom, 3);
+    const groups = [], rooms = [];
+    for (const i of [1, 2, 3, 4, 5]) {
+      groups.push(await planGroup('RACE-' + i, planned.program, 10));
+      rooms.push((await room(siteA, 'RACE-' + i, 30)).id);
+    }
+    const clients = await Promise.all(groups.map(() => connect('school_runtime', a, 1)));
+    const at = (c, params) => (async () => {
+      await c.query('BEGIN');
+      try {
+        const row = (await c.query(SESSION, params)).rows[0];
+        await c.query('SELECT pg_sleep(0.15)');
+        await c.query('COMMIT');
+        return row.id;
+      } catch (err) { await c.query('ROLLBACK'); throw err; }
+    })();
+    const five = await Promise.allSettled(clients.map((c, i) => at(c, [a, groups[i], maths, planned.teacher, rooms[i], day, '16:00', '17:00'])));
+    assert.equal(five.filter(r => r.status === 'fulfilled').length, 1);
+    // The others refused by the check, or by the exclusion constraint when they ran side by side.
+    assert.ok(five.filter(r => r.status === 'rejected').every(r => r.reason.code === '23P01' || r.reason.message === 'session_teacher_busy'),
+      five.map(r => r.reason?.message).join());
+    // One pupil in two groups: two teachers, two rooms, the same hour.
+    const two = await Promise.allSettled([at(clients[0], [a, planned.group, maths, planned.teacher, rooms[0], day, '17:00', '18:00']),
+      at(clients[1], [a, planned.evening, maths, planned.colleague, rooms[1], day, '17:00', '18:00'])]);
+    await Promise.all(clients.map(c => c.end()));
+    assert.equal(two.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(two.find(r => r.status === 'rejected').reason.message, 'session_pupil_busy');
+    await as('school_runtime', a, 1);
+    assert.equal(await count("SELECT count(*) n FROM school.class_session WHERE teacher_id = $1 AND status <> 'cancelled' AND school.local_day(starts_at) = $2::date AND starts_at = school.local_at($2::date, '16:00')", [planned.teacher, day]), 1);
+    // Their site free to be archived again (FR-SLL-01).
+    await sql('UPDATE school.room SET archived_at = now() WHERE id = ANY ($1::uuid[])', [rooms]);
   });
   await check('two conversions of a prospect\'s child at once make one pupil; the other\'s pupil is undone with it (FR-CRM-02 AC1)', async () => {
     await as('school_runtime', a, 1);

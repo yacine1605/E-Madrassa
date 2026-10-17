@@ -1389,14 +1389,39 @@ Routes: `GET /api/calendar/days?from=&to=&site_id=` (92 days at most), `GET|POST
 
 Validation on 17 October 2026: **286 PHP integration tests (13,914 assertions)**, the two the first run failed (the access matrix to regenerate, a placeholder written in the code) passing once fixed; **254 embedded SQL checks and 284 native PostgreSQL 16 checks including concurrency**; migration 061 rolled back alone on the database the suite had filled, then applied again; local browser acceptance in Chromium: 252 screens without a problem, Calendar and Time slots included. The CI could not start (the GitHub account's billing).
 
+## Increment 77 (lot 4): sessions and their weekly series
+
+SQL 062 (`database/schema/062_sessions.sql`, migration `2026_10_17_000062`) plans the sessions (FR-PLN-02) and refuses their conflicts before writing (FR-PLN-03); the API comes first, the screens with the planning's views:
+
+- **A weekly series**: a group, a subject, a teacher, a room or none, a day of the week and its hours (typed, or a slot of the grid), from one day until another, planned once per key. Its sessions are generated on the days its group's site is open (AC1: closures and closed days skipped), in Algiers' time; a blocking conflict on any day refuses the whole series. Read beforehand day by day (`session-series/check`).
+- **A session** is planned on its own or by its series. Changed on its own (teacher, room, day, hours), it leaves its series (AC2); the series changed from a day on (today or later) changes its sessions still planned and not changed on their own; ended sooner, the sessions after its new last day go. A session is cancelled with its reason, never deleted; only a planned one changes, never one whose attendance is entered (`locked`, ready for the attendance).
+- **Blocking conflicts**, refused by the database: a teacher, a room or a group already taken — PostgreSQL exclusion constraints keep it for requests at the same moment (TST-15) — and a pupil of the group in another group of any programme at the same time (AC2, the group's pupils locked one by one so that the second request sees the first); a teacher not qualified (FR-STF-02), unavailable (FR-STF-03), gone or not a teacher; a room of another site, closed or unavailable (FR-SLL-02), or with fewer places than the group; a day closed (FR-PLN-01 AC1); a subject the programme does not teach; a group not active or outside its dates.
+- **Warnings**, told and never refused: the teacher's hours a day or a week beyond their bounds, the programme's volume (sessions, hours, hours a week), a change of site without the travel time (`planning.travel_minutes`, 30 by default).
+- **The calendar the other way round**: a day with sessions is closed no more, and an opening is cancelled only while none of its days has a session.
+- **The volume follow-up** of a group: by subject, the sessions and hours planned and delivered (attendance, next increments) against the programme's volume in force.
+- Read with `schedule.session.read` (the whole school, the group's site, the groups of a scoped grant, or one's own sessions as their teacher); planned with `schedule.session.create`, changed with `schedule.session.update`, cancelled with `schedule.session.cancel`, on the group's site.
+
+Routes: `GET /api/class-sessions?from=&to=&group_id=&teacher_id=&room_id=` (62 days at most), `GET /api/class-sessions/{session}`, `POST /api/class-sessions/check`, `POST /api/class-sessions`, `PUT /api/class-sessions/{session}`, `POST /api/class-sessions/{session}/cancel`, `GET /api/session-series?group_id=`, `POST /api/session-series/check`, `POST /api/session-series`, `POST /api/session-series/{series}/change`, `POST /api/session-series/{series}/end`, `GET /api/groups/{group}/volume`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-PLN-02 AC1 | tests/sql: thirteen Sundays, a public holiday and two of vacation, ten sessions; `ClassSessionTest`: eight Sundays, a holiday, seven |
+| FR-PLN-02 AC2 | tests/sql, `ClassSessionTest`: a session moved on its own keeps its hours when the series changes; the others follow |
+| FR-PLN-03 AC1, TST-15 | tests/sql natifs: five sessions of one teacher at the same hour sent at once, one; the exclusion constraints refuse what the check would not see |
+| FR-PLN-03 AC2 | tests/sql (and natifs, at once), `ClassSessionTest`: a pupil in two groups of different programmes, refused |
+| FR-PLN-03 | tests/sql, `ClassSessionTest`: not qualified, unavailable, room closed, elsewhere or too small, closed day, subject outside the programme refused; daily, weekly and volume bounds told only |
+| FR-PLN-01 AC1 | tests/sql, `ClassSessionTest`: no session on a closed day; a day with sessions closed no more |
+
+Validation on 17 October 2026: **289 PHP integration tests (14,134 assertions), 259 embedded SQL checks and 290 native PostgreSQL 16 checks including concurrency** (TST-15); migration 062 rolled back alone on the database the suite had filled, then applied again. No screen changed: the browser acceptance comes with the planning's screens. The CI could not start (the GitHub account's billing).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. Sessions and weekly recurrences (FR-PLN-02) with the conflicts checked before writing (FR-PLN-03): PostgreSQL exclusion constraints for a teacher, a room and a group, tested in concurrency (TST-15); a pupil in two groups, a teacher not qualified or unavailable, a room closed or too small, a day closed (FR-PLN-01 AC1).
-2. Versions and publication (FR-PLN-05), views and ICS (FR-PLN-04), cancellations and replacements (FR-PLN-06).
+1. The planning's screens and views by group, teacher, room and pupil, week and month, with PDF and ICS exports (FR-PLN-04).
+2. Versions and publication (FR-PLN-05), cancellations and replacements (FR-PLN-06).
 3. Teachers' attendance validated by someone else (FR-PTG-01, FR-PTG-02, TST-05), the hours delivered feeding the pays (FR-PTG-03); the pupils' roll call (FR-PRE-01).
 4. Dashboards whose figures equal their source operations (FR-TDB-01 to 03, TST-16).
 

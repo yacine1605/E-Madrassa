@@ -261,6 +261,21 @@ GRANT UPDATE (status, version) ON school.calendar_exception TO school_runtime;
 GRANT INSERT (tenant_id, code, start_time, end_time) ON school.time_slot TO school_runtime;
 GRANT UPDATE (version, archived_at) ON school.time_slot TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.day_open(date, uuid) TO school_runtime;
+-- Sessions (062): a weekly series planned by `schedule.session.create` with its sessions, changed and ended through its
+-- functions by `schedule.session.update`; a session changed on its own or cancelled with its reason, deleted by its series' end only.
+GRANT SELECT ON school.session_series, school.class_session TO school_runtime;
+GRANT INSERT (tenant_id, group_id, subject_id, teacher_id, room_id, weekday, start_time, end_time, slot_id, date_from, date_to, idempotency_key)
+  ON school.session_series TO school_runtime;
+GRANT UPDATE (teacher_id, room_id, start_time, end_time, slot_id, date_to, version) ON school.session_series TO school_runtime;
+GRANT INSERT (tenant_id, group_id, subject_id, teacher_id, room_id, series_id, starts_at, ends_at) ON school.class_session TO school_runtime;
+GRANT UPDATE (teacher_id, room_id, starts_at, ends_at, status, cancel_reason, version) ON school.class_session TO school_runtime;
+GRANT DELETE ON school.class_session TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.local_day(timestamptz), school.local_at(date, time),
+  school.session_conflicts(uuid, uuid, uuid, uuid, timestamptz, timestamptz, uuid), school.series_days(integer, date, date),
+  school.series_conflicts(uuid, uuid, uuid, uuid, integer, time, time, date, date),
+  school.plan_series(uuid, uuid, uuid, uuid, integer, time, time, uuid, date, date, uuid),
+  school.change_series(uuid, date, uuid, uuid, time, time, integer), school.end_series(uuid, date, integer), school.session_volume(uuid),
+  school.sessions_planned_on(uuid, date, date) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -562,6 +577,15 @@ GRANT INSERT (tenant_id, expense_id, kind, reverses_payment_id, amount, paid_on,
 GRANT INSERT (tenant_id, expense_id, kind, amount, corrected_on, reason, idempotency_key) ON school.expense_correction TO platform_provisioner;
 GRANT EXECUTE ON FUNCTION school.lock_payroll_run(uuid, date), school.expense_paid(uuid, uuid), school.expense_committed(uuid, uuid) TO platform_provisioner;
 ALTER FUNCTION school.book_payroll_payout() OWNER TO platform_provisioner;
+-- Sessions (062): a session's conflicts read every group's sessions, a pupil's other groups, the teacher's qualifications,
+-- availability and other sessions, the rooms and the calendar, of the school in context only.
+GRANT SELECT ON school.class_session, school.room, school.room_closure, school.calendar_exception TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.local_day(timestamptz), school.local_at(date, time), school.day_open(date, uuid), school.open_day(date),
+  school.qualified(uuid, uuid, uuid, date), school.available(uuid, date, time, time), school.availability_on(uuid, date),
+  school.room_available(uuid, date) TO platform_provisioner;
+ALTER FUNCTION school.session_conflicts(uuid, uuid, uuid, uuid, timestamptz, timestamptz, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_class_session() OWNER TO platform_provisioner;
+ALTER FUNCTION school.sessions_planned_on(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

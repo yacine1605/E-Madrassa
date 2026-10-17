@@ -7,6 +7,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CalendarExceptionController;
+use App\Http\Controllers\ClassSessionController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomOptionController;
 use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SessionController;
+use App\Http\Controllers\SessionSeriesController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\StaffController;
@@ -510,6 +512,25 @@ Route::prefix('api')->group(function () {
                     Route::post('time-slots', [TimeSlotController::class, 'store']);
                     Route::post('time-slots/{slot}/archive', [TimeSlotController::class, 'archive']);
                 });
+                // FR-PLN-02, FR-PLN-03: the sessions and their weekly series; conflicts refused by the database, warnings told.
+                Route::middleware('permission:schedule.session.read')->group(function () {
+                    Route::get('class-sessions', [ClassSessionController::class, 'index']);
+                    Route::get('class-sessions/{session}', [ClassSessionController::class, 'show']);
+                    Route::get('session-series', [SessionSeriesController::class, 'index']);
+                    Route::get('groups/{group}/volume', [SessionSeriesController::class, 'volume']);
+                });
+                Route::post('class-sessions/check', [ClassSessionController::class, 'check'])->middleware('permission:schedule.session.create,schedule.session.update');
+                Route::middleware('permission:schedule.session.create')->group(function () {
+                    Route::post('class-sessions', [ClassSessionController::class, 'store']);
+                    Route::post('session-series/check', [SessionSeriesController::class, 'check']);
+                    Route::post('session-series', [SessionSeriesController::class, 'store']);
+                });
+                Route::middleware('permission:schedule.session.update')->group(function () {
+                    Route::put('class-sessions/{session}', [ClassSessionController::class, 'update']);
+                    Route::post('session-series/{series}/change', [SessionSeriesController::class, 'change']);
+                    Route::post('session-series/{series}/end', [SessionSeriesController::class, 'end']);
+                });
+                Route::post('class-sessions/{session}/cancel', [ClassSessionController::class, 'cancel'])->middleware('permission:schedule.session.cancel');
             });
 
             Route::middleware('module:sites_rooms')->group(function () {
