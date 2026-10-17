@@ -70,7 +70,7 @@ Exigé : les totaux des tableaux de bord égalent la somme des opérations sourc
 
 ## Les exigences du lot 4
 
-Toutes sont livrées en partie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). Ce qui reste n'empêche pas la sortie :
+Toutes étaient livrées en partie à la revue de sortie (« PARTIEL » dans `RAPPORT_ECART_SRS_1_2.md`). Ce qui reste n'empêche pas la sortie. Depuis, relues règle par règle contre le SRS le 17 octobre 2026, toutes sont conformes sauf FR-PLN-04 (portail, lot 10) et FR-TDB-03 (cache) :
 
 | Exigence | Reste |
 |---|---|

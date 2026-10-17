@@ -1672,8 +1672,9 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. The review of lot 4's requirements still partial against the SRS, each made complete or its remainder written down.
-2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
+Lot 4's requirements still partial were reviewed against the SRS, rule by rule, on 17 October 2026: FR-PLN-02, 03, 05 and 06 and FR-PTG-01 to 03 are complete. FR-PLN-04 waits for the portal (lot 10) for the pupils' and parents' own timetables.
+
+1. FR-TDB-03's cache of the dashboards, invalidated on events.
 
 ## Next increments of lot 2
 
