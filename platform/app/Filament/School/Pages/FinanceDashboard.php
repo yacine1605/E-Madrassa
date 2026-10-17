@@ -3,13 +3,16 @@
 namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\ExportController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -62,6 +65,7 @@ final class FinanceDashboard extends SchoolingPage
                     DatePicker::make('from')->label(__('dashboard.from'))->default(now()->subMonths(5)->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.to'))->default(now()->toDateString())]),
             ])->headerActions([
+                $this->export(),
                 Action::make('programs')->label(__('dashboard.programs'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.programs_method'))
                     ->schema(fn () => [TextEntry::make('programs')->hiddenLabel()->listWithLineBreaks()->state($this->programs())]),
             ])->recordActions([
@@ -72,6 +76,20 @@ final class FinanceDashboard extends SchoolingPage
                         TextEntry::make('operations')->hiddenLabel()->listWithLineBreaks()->state(fn (Get $get) => $this->sources($get('indicator'), $record['month'])),
                     ]),
             ]);
+    }
+
+    /** FR-TDB-03: the dashboard as it shows, for whoever also exports, logged like any export (FR-IMP-02). */
+    private function export(): Action
+    {
+        return Action::make('export')->label(__('services.new_export'))->color('gray')->visible(fn () => $this->writable('export.job.create'))
+            ->schema([Radio::make('format')->label(__('services.format'))->required()->default('xlsx')->options(__('services.formats'))])
+            ->action(fn (array $data) => SchoolScreen::change('export.job.create', fn () => SchoolScreen::call('export.job.create', ExportController::class, 'store',
+                ['kind' => 'finance_dashboard', 'format' => $data['format'], 'filters' => ['from' => substr((string) ($this->tableFilters['period']['from'] ?? now()->subMonths(5)->startOfMonth()->toDateString()), 0, 10),
+                    'to' => substr((string) ($this->tableFilters['period']['to'] ?? now()->toDateString()), 0, 10)]]),
+                fn (array $result) => isset($result['data']['job'])
+                    ? Notification::make()->title(__('services.export_queued'))->info()
+                    : Notification::make()->title(__('services.export_ready', ['rows' => Formats::number($result['data']['rows'])]))->success()->persistent()
+                        ->actions([Action::make('download')->label(__('services.download'))->url('/api/files/'.$result['data']['file']['id'].'/content')->openUrlInNewTab()])));
     }
 
     private function result(array $filters): array

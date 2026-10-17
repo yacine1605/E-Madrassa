@@ -40,6 +40,8 @@ final class FinanceDashboardTest extends TestCase
         // The manager reads no finance dashboard.
         $this->getJson("/api/dashboards/finance?from=$month&to=$month")->assertForbidden();
         $this->get('/school/finance-dashboard')->assertForbidden();
+        // Nor exports it, though they export other lists.
+        $this->postJson('/api/exports', ['kind' => 'finance_dashboard', 'format' => 'csv', 'filters' => ['from' => $month, 'to' => $month]])->assertForbidden();
         // Two payments, one validated, then reversed in part by a validated reversal; one waiting.
         $this->signIn($accountant)->assertOk();
         $pay = fn (string $amount) => $this->postJson("/api/enrollments/$enrollment/payments", ['amount' => $amount, 'paid_on' => now()->toDateString(),
@@ -60,6 +62,14 @@ final class FinanceDashboardTest extends TestCase
         $this->getJson("/api/dashboards/finance/programs?from=$month&to=$month")->assertOk()->assertJsonPath('data.0.code', 'TDB-1')
             ->assertJsonPath('data.0.received', '30000.00')->assertJsonPath('data.0.direct_costs', null);
         $this->getJson("/api/dashboards/finance?from=$month&to=".now()->addYears(2)->toDateString())->assertConflict()->assertJsonPath('code', 'dashboard_range_invalid');
+        // FR-TDB-03: exported as it shows, the month's figures in their columns.
+        $export = $this->postJson('/api/exports', ['kind' => 'finance_dashboard', 'format' => 'csv', 'filters' => ['from' => $month, 'to' => $month]])
+            ->assertCreated()->json('data');
+        $this->assertSame(1, $export['rows']);
+        $this->assertSame(['month', 'billed', 'payments', 'reversals', 'refunds', 'net_receipts', 'expenses_committed', 'expenses_paid', 'salaries_committed',
+            'salaries_paid', 'net_result'], $export['columns']);
+        $this->assertStringContainsString('30000.00', $this->get("/api/files/{$export['file']['id']}/content")->assertOk()->streamedContent());
+        $this->postJson('/api/exports', ['kind' => 'finance_dashboard', 'format' => 'pdf', 'filters' => ['from' => $month, 'to' => $month]])->assertCreated();
         // The screen.
         $this->get('/school/finance-dashboard')->assertOk()->assertSee(__('dashboard.indicators.net_receipts'));
         $this->actingAs($this->person($validator));
@@ -70,6 +80,10 @@ final class FinanceDashboardTest extends TestCase
             app(CurrentSchool::class)->setMode('active');
             Livewire::test(FinanceDashboard::class)->assertSee("30\u{00A0}000,00")->mountTableAction('sources', $month)->setTableActionData(['indicator' => 'payments'])
                 ->assertMountedActionModalSee($first['reference']);
+            Livewire::test(FinanceDashboard::class)->callTableAction('export', data: ['format' => 'xlsx'])->assertNotified();
         });
+        // The screen's own period: this month and the five before it.
+        $this->assertSame(6, DB::connection('owner')->table('school.export_log')->where('tenant_id', $school->id)->where('kind', 'finance_dashboard')
+            ->where('format', 'xlsx')->value('row_count'));
     }
 }

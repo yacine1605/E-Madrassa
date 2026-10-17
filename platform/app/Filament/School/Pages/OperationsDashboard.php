@@ -3,12 +3,15 @@
 namespace App\Filament\School\Pages;
 
 use App\Http\Controllers\OperationsDashboardController;
+use App\Http\Controllers\ExportController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
@@ -70,11 +73,24 @@ final class OperationsDashboard extends SchoolingPage
                 Filter::make('period')->schema([
                     DatePicker::make('from')->label(__('dashboard.period_from'))->default(now()->startOfMonth()->toDateString()),
                     DatePicker::make('to')->label(__('dashboard.period_to'))->default(now()->toDateString())]),
-            ])->recordActions([
+            ])->headerActions([$this->export()])->recordActions([
                 Action::make('sessions')->label(__('dashboard.sessions'))->color('gray')->modalSubmitAction(false)->modalDescription(__('dashboard.sessions_help'))
                     ->visible(fn (array $record) => $record['sessions_held'] !== null)
                     ->schema(fn (array $record) => [TextEntry::make('sessions')->hiddenLabel()->listWithLineBreaks()->state($this->sessions($record['group_id']))]),
             ]);
+    }
+
+    /** FR-TDB-03: the dashboard as it shows, for whoever also exports, logged like any export (FR-IMP-02). */
+    private function export(): Action
+    {
+        return Action::make('export')->label(__('services.new_export'))->color('gray')->visible(fn () => $this->writable('export.job.create'))
+            ->schema([Radio::make('format')->label(__('services.format'))->required()->default('xlsx')->options(__('services.formats'))])
+            ->action(fn (array $data) => SchoolScreen::change('export.job.create', fn () => SchoolScreen::call('export.job.create', ExportController::class, 'store',
+                ['kind' => 'operations_dashboard', 'format' => $data['format'], 'filters' => $this->period($this->tableFilters ?? [])]),
+                fn (array $result) => isset($result['data']['job'])
+                    ? Notification::make()->title(__('services.export_queued'))->info()
+                    : Notification::make()->title(__('services.export_ready', ['rows' => Formats::number($result['data']['rows'])]))->success()->persistent()
+                        ->actions([Action::make('download')->label(__('services.download'))->url('/api/files/'.$result['data']['file']['id'].'/content')->openUrlInNewTab()])));
     }
 
     private function period(array $filters): array

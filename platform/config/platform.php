@@ -70,6 +70,9 @@ return [
         'arrears' => App\Exports\ArrearsExport::class,
         // FR-DEP-02: the expenses, for whoever reads them.
         'expenses' => App\Exports\ExpensesExport::class,
+        // FR-TDB-03: the dashboards, as their screens show them, for whoever reads them.
+        'finance_dashboard' => App\Exports\FinanceDashboardExport::class,
+        'operations_dashboard' => App\Exports\OperationsDashboardExport::class,
     ],
     'export_background_rows' => 2000,
 

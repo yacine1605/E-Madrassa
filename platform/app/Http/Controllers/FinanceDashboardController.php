@@ -25,7 +25,13 @@ final class FinanceDashboardController
     /** Month by month from one month to another (13 at most). */
     public function index(Request $request)
     {
-        [$from, $to] = $this->period($request);
+        return $this->figures(...$this->period($request));
+    }
+
+    /** The figures from one month to another, as the screen and its exports show them (FR-TDB-03). */
+    public function figures(string $from, string $to): array
+    {
+        [$from, $to] = [Carbon::parse($from)->startOfMonth()->toDateString(), Carbon::parse($to)->startOfMonth()->toDateString()];
         $months = [];
         for ($m = Carbon::parse($from); $m <= Carbon::parse($to); $m = $m->addMonth()) {
             $months[$m->toDateString()] = ['id' => $m->toDateString(), 'month' => $m->toDateString()] + array_fill_keys(self::SOURCES, null);

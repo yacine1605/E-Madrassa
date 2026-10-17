@@ -71,4 +71,21 @@ return [
     'roll_none' => 'non fait',
     'roll_line' => ':marks marques, :absent absents',
     'no_session' => 'Aucune séance que vous puissiez lire.',
+    // FR-TDB-03: the operational dashboard's columns in its exports.
+    'columns' => [
+        'group' => 'Groupe',
+        'program' => 'Programme',
+        'capacity' => 'Capacité',
+        'members' => 'Élèves',
+        'fill_rate' => 'Remplissage (%)',
+        'sessions_held' => 'Séances tenues',
+        'teacher_validated' => 'Pointages validés',
+        'teacher_validated_rate' => 'Pointage validé (%)',
+        'teacher_missing' => 'Séances non pointées',
+        'roll_missing' => 'Appels non faits',
+        'marks' => 'Marques d’appel',
+        'absent' => 'Absences',
+        'absence_rate' => 'Absences (%)',
+        'late' => 'Retards',
+    ],
 ];

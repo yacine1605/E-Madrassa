@@ -24,7 +24,12 @@ final class OperationsDashboardController
     /** The reader's groups with their figures over the period (400 days at most); the school's figures for whoever reads them. */
     public function index(Request $request)
     {
-        [$from, $to] = $this->period($request);
+        return $this->figures(...$this->period($request));
+    }
+
+    /** The figures over a period, as the screen and its exports show them (FR-TDB-03). */
+    public function figures(string $from, string $to): array
+    {
         $groups = [];
         $school = [];
         foreach (DB::select('SELECT group_id, indicator, value FROM school.operations_dashboard(?::date, ?::date)', [$from, $to]) as $row) {

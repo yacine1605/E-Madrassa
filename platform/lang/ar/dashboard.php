@@ -71,4 +71,21 @@ return [
     'roll_none' => 'لم يتم',
     'roll_line' => ':marks علامة، :absent غائبون',
     'no_session' => 'لا توجد حصة يمكنك الاطلاع عليها.',
+    // FR-TDB-03: the operational dashboard's columns in its exports.
+    'columns' => [
+        'group' => 'الفوج',
+        'program' => 'البرنامج',
+        'capacity' => 'السعة',
+        'members' => 'التلاميذ',
+        'fill_rate' => 'نسبة الملء (%)',
+        'sessions_held' => 'الحصص المنجزة',
+        'teacher_validated' => 'تسجيلات الحضور المصادق عليها',
+        'teacher_validated_rate' => 'تسجيل الحضور المصادق عليه (%)',
+        'teacher_missing' => 'حصص غير مسجلة',
+        'roll_missing' => 'نداءات لم تتم',
+        'marks' => 'علامات النداء',
+        'absent' => 'الغيابات',
+        'absence_rate' => 'الغيابات (%)',
+        'late' => 'التأخرات',
+    ],
 ];

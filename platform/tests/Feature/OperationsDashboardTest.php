@@ -58,6 +58,8 @@ final class OperationsDashboardTest extends TestCase
         $this->assertSame([$s['group']], array_column($mine['data'], 'group_id'));
         $this->assertNull($mine['meta']['school']);
         $this->getJson("/api/dashboards/operations/sessions?group=$other&from=$day&to=$day")->assertForbidden();
+        // A teacher exports nothing.
+        $this->postJson('/api/exports', ['kind' => 'operations_dashboard', 'format' => 'csv', 'filters' => ['from' => $day, 'to' => $day]])->assertForbidden();
         $this->getJson("/api/dashboards/operations/sessions?group={$s['group']}&from=$day&to=$day")->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.teacher_status', 'not_entered')->assertJsonPath('data.0.roll_marks', 2)->assertJsonPath('data.0.absent', 1);
 
@@ -74,6 +76,15 @@ final class OperationsDashboardTest extends TestCase
         $this->assertSame(3, $result['meta']['school']['enrollments_pending']);
         $this->assertSame([0, 0, null], [$result['meta']['school']['leads_created'], $result['meta']['school']['leads_registered'], $result['meta']['school']['conversion_rate']]);
         $this->getJson("/api/dashboards/operations?from=$day&to=".now()->addYears(2)->toDateString())->assertConflict()->assertJsonPath('code', 'dashboard_range_invalid');
+        // FR-TDB-03: exported as it shows, a row per group, the group and its programme named.
+        $export = $this->postJson('/api/exports', ['kind' => 'operations_dashboard', 'format' => 'csv', 'filters' => ['from' => $day, 'to' => $day]])
+            ->assertCreated()->json('data');
+        $this->assertSame(2, $export['rows']);
+        $this->assertSame(['group', 'program', 'capacity', 'members', 'fill_rate', 'sessions_held', 'teacher_validated', 'teacher_validated_rate', 'teacher_missing',
+            'roll_missing', 'marks', 'absent', 'absence_rate', 'late'], $export['columns']);
+        $csv = $this->get("/api/files/{$export['file']['id']}/content")->assertOk()->streamedContent();
+        $this->assertStringContainsString('4AM-1 · 4AM 1', $csv);
+        $this->assertStringContainsString('50.0', $csv);
 
         // The screen and a group's sessions.
         $this->get('/school/operations-dashboard')->assertOk()->assertSee(__('dashboard.fill'));
@@ -86,7 +97,11 @@ final class OperationsDashboardTest extends TestCase
             Livewire::test(OperationsDashboard::class)->filterTable('period', ['from' => $day, 'to' => $day])->assertSee('2 / 25')->assertSee('1 / 2')
                 ->mountTableAction('sessions', $s['group'])->assertMountedActionModalSee('Meziane Karim')
                 ->assertMountedActionModalSee(__('attendance.states.not_entered'));
+            Livewire::test(OperationsDashboard::class)->filterTable('period', ['from' => $day, 'to' => $day])->callTableAction('export', data: ['format' => 'pdf'])
+                ->assertNotified();
         });
+        $this->assertSame(2, DB::connection('owner')->table('school.export_log')->where('tenant_id', $s['school']->id)->where('kind', 'operations_dashboard')
+            ->where('format', 'pdf')->value('row_count'));
 
         // An accountant reads no operational dashboard.
         $accountant = $this->account('accountant');

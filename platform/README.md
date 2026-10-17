@@ -1580,13 +1580,23 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 86 (lot 4): the dashboards' exports
+
+The dashboards exported (FR-TDB-03):
+
+- **Export** on the finance and the operational dashboards (« Nouvel export »): CSV, Excel or PDF, the dashboard as its screen shows it for the screen's period: the finance month by month, the operations group by group (the group named with its programme, the rates in percent).
+- Under `export.job.create` and the dashboard's own permission, as every export (FR-IMP-02): the figures within the reader's scope (a teacher's groups only), the columns of a module the school does not use left out (BR-20), each export logged; the export screen offers both to whoever reads them.
+- The export kinds' screen also names the expenses' export, which it showed by its key.
+
+Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
+
 ## Next increments of lot 3
 
 1. The finance's review of lot 3 before its exit: the reconciliation to be validated by the finance (lot 3's exit criterion; the Arabic receipts were accepted on 17 October 2026). `sh deploy/review-lot3.sh` prepares it on an installation of its own: the example school « École Les Oliviers », four accounts with MFA, and a month entered through the API by the people who would enter it (payments, a refund, expenses, pays and their payouts, then two things taken back the next month). It writes the receipts, the screens in French and Arabic, and a sheet comparing the reconciliation it expects with the one it gets to `.review/`; it fails on any figure that differs. `REVUE_LOT3.md` (at the repository's root) is the reviewers' guide and record. The hours and sessions of the pays come from lot 4's validated attendance (FR-PTG-03), a replacement paid to whoever taught (FR-REM-02 AC13).
 
 ## Next increments of lot 4
 
-1. The dashboards' exports (FR-TDB-03); then lot 4's exit review.
+1. Lot 4's exit review: `TST-05`, `TST-15`, `TST-16` green; the validated hours delivered in the pays.
 
 ## Next increments of lot 2
 
