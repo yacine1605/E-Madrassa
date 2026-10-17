@@ -89,7 +89,7 @@ final class PayrollRun extends SchoolingPage
                     ->color(Payroll::color($pay['state'])),
                 TextEntry::make('paid')->label(__('payroll.paid'))->state($this->money($pay['paid']))->visible($pay['status'] !== 'draft'),
                 TextEntry::make('left_to_pay')->label(__('payroll.left_to_pay'))->state($this->money($pay['left_to_pay']))->visible($pay['status'] !== 'draft'),
-                TextEntry::make('computed')->label(__('payroll.by'))->columnSpan(2)->state(Formats::list(array_filter([
+                TextEntry::make('computed')->label(__('payroll.by'))->columnSpan(2)->listWithLineBreaks()->state(array_values(array_filter([
                     __('payroll.computed_by', ['name' => Formats::isolated((string) $pay['computer']), 'date' => Formats::dateTime($pay['computed_at'])]),
                     $pay['validated_at'] ? __('payroll.validated_by', ['name' => Formats::isolated((string) $pay['validator']), 'date' => Formats::dateTime($pay['validated_at'])]) : null]))),
             ]),
@@ -105,11 +105,11 @@ final class PayrollRun extends SchoolingPage
                 'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
                 'when' => Formats::list(array_filter([Formats::date($row['paid_on']), __('finance.methods.'.$row['method_code']),
                     $row['external_ref'] ? Formats::isolated($row['external_ref']) : null])),
-                'by' => Formats::list(array_filter([Formats::isolated((string) $row['author']), $row['reason'] ? Formats::isolated($row['reason']) : null,
-                    $row['decider'] ? Formats::isolated($row['decider']) : null, $row['decision_reason'] ? Formats::isolated($row['decision_reason']) : null]))],
+                'by' => array_values(array_filter([Formats::isolated((string) $row['author']), Formats::isolated($row['reason']),
+                    Formats::isolated($row['decider']), Formats::isolated($row['decision_reason'])]))],
                 $this->pay()['payouts']))
             ->schema([TextEntry::make('what')->label(__('payroll.kind')), TextEntry::make('amount')->label(__('payroll.amount')),
-                TextEntry::make('when')->label(__('payroll.paid_on')), TextEntry::make('by')->label(__('payroll.by'))])])]);
+                TextEntry::make('when')->label(__('payroll.paid_on')), TextEntry::make('by')->label(__('payroll.by'))->listWithLineBreaks()])])]);
     }
 
     /** FR-REM-03: the one-off bonuses and adjustments, each with its reason and author, and the pay it corrects. */
@@ -119,9 +119,9 @@ final class PayrollRun extends SchoolingPage
             ->columns(['default' => 2, 'sm' => 4])->placeholder(__('payroll.no_adjustment'))
             ->state(array_map(fn (array $row) => ['kind' => __('payroll.adjustment_kinds.'.$row['kind']), 'amount' => $this->money($row['amount']),
                 'reason' => Formats::list(array_filter([Formats::isolated($row['reason']), $row['corrects_period'] ? __('payroll.correcting', ['month' => $this->month($row['corrects_period'])]) : null])),
-                'by' => Formats::list([Formats::isolated((string) $row['author']), Formats::dateTime($row['created_at'])])], $this->pay()['adjustments']))
+                'by' => [Formats::isolated((string) $row['author']), Formats::dateTime($row['created_at'])]], $this->pay()['adjustments']))
             ->schema([TextEntry::make('kind')->label(__('payroll.kind')), TextEntry::make('amount')->label(__('payroll.amount')),
-                TextEntry::make('reason')->label(__('payroll.reason')), TextEntry::make('by')->label(__('payroll.by'))])])]);
+                TextEntry::make('reason')->label(__('payroll.reason')), TextEntry::make('by')->label(__('payroll.by'))->listWithLineBreaks()])])]);
     }
 
     /** The detail line by line (FR-REM-03), as computed and, once validated, frozen. */

@@ -130,10 +130,10 @@ final class EnrollmentFinance extends SchoolingPage
             ->columns(['default' => 2, 'sm' => 5])->placeholder(__('finance.no_adjustment'))
             ->state(array_map(fn (array $row) => ['kind' => __('finance.kinds.'.$row['kind']), 'amount' => $this->money($row['amount']),
                 'reason' => Formats::isolated($row['reason']), 'status' => __('finance.adjustment_states.'.$row['status']).($row['decision_reason'] ? ' · '.$row['decision_reason'] : ''),
-                'by' => Formats::isolated($row['author']).($row['decider'] ? ' · '.Formats::isolated($row['decider']) : '')], $this->finance()['adjustments']))
+                'by' => array_values(array_filter([Formats::isolated($row['author']), Formats::isolated($row['decider'])]))], $this->finance()['adjustments']))
             ->schema([TextEntry::make('kind')->label(__('finance.kind')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by'))])])]);
+                $this->byEntry()])])]);
     }
 
     /** The payments and reversals, newest first, with their state and who recorded and validated them. */
@@ -142,22 +142,21 @@ final class EnrollmentFinance extends SchoolingPage
         return $schema->components([Section::make(__('finance.payments'))->description(__('finance.payments_help'))->schema([RepeatableEntry::make('payments')->hiddenLabel()
             ->columns(['default' => 2, 'sm' => 7])->placeholder(__('finance.no_payment'))
             ->state(array_map(fn (array $row) => [
-                'reference' => $row['reference'].($row['kind'] === 'reversal' ? ' · '.__('finance.reversal_of', ['reference' => $row['reverses_reference']]) : ''),
+                'reference' => Formats::isolated($row['reference']).($row['kind'] === 'reversal' ? ' · '.__('finance.reversal_of', ['reference' => Formats::isolated($row['reverses_reference'])]) : ''),
                 'amount' => ($row['kind'] === 'reversal' ? '− ' : '').$this->money($row['amount']),
                 'paid' => Formats::list(array_filter([Formats::date($row['paid_on']), $row['method_code'] ? __('finance.methods.'.$row['method_code']) : null,
                     $row['external_ref'] ? Formats::isolated($row['external_ref']) : null])),
                 'status' => Formats::list(array_filter([__('finance.payment_states.'.$row['status']), $row['overpayment'] ? __('finance.overpayment') : null,
                     $row['self_validated'] ? __('finance.self_validated') : null, $row['reason'] ? Formats::isolated($row['reason']) : null,
                     $row['cancel_reason'] ? Formats::isolated($row['cancel_reason']) : null])),
-                'by' => Formats::list(array_filter([Formats::isolated($row['author']).($row['delegated'] ? ' ('.__('finance.delegated').')' : ''),
-                    $row['validator'] ? Formats::isolated($row['validator']) : null])),
+                'by' => array_values(array_filter([Formats::isolated($row['author']).($row['delegated'] ? ' ('.__('finance.delegated').')' : ''), Formats::isolated($row['validator'])])),
                 // FR-FIN-05: a validated payment's receipt, issued by its first download.
                 'receipt' => $row['kind'] === 'payment' && $row['validated_at'] ? url('/api/payments/'.$row['id'].'/receipt') : null,
                 // FR-FIN-02: its supporting document, read with the payment.
                 'document' => $row['attachment_file_id'] ? url('/api/payments/'.$row['id'].'/attachment') : null], $this->finance()['payments']))
             ->schema([TextEntry::make('reference')->label(__('finance.reference')), TextEntry::make('amount')->label(__('finance.amount')),
                 TextEntry::make('paid')->label(__('finance.paid_on')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry(),
+                $this->byEntry(), $this->receiptEntry(),
                 TextEntry::make('document')->label(__('finance.attachment'))->formatStateUsing(fn () => __('finance.open_attachment'))
                     ->url(fn (?string $state) => $state, shouldOpenInNewTab: true)->color('primary')])])]);
     }
@@ -171,15 +170,23 @@ final class EnrollmentFinance extends SchoolingPage
                 'kind' => __('finance.refund_kinds.'.$row['kind']).($row['target_program'] ? ' · '.$row['target_program'] : ''),
                 'amount' => $this->money($row['amount']),
                 'reason' => Formats::isolated($row['reason']),
-                'status' => Formats::list(array_filter([__('finance.refund_states.'.$row['status']), $row['reference'],
+                'status' => array_values(array_filter([__('finance.refund_states.'.$row['status']), Formats::isolated($row['reference']),
                     $row['method_code'] ? __('finance.methods.'.$row['method_code']) : null, $row['paid_on'] ? Formats::date($row['paid_on']) : null,
-                    $row['decision_reason'] ? Formats::isolated($row['decision_reason']) : null])),
-                'by' => Formats::list(array_filter([Formats::isolated($row['author']), $row['decider'] ? Formats::isolated($row['decider']) : null,
-                    $row['executor'] ? Formats::isolated($row['executor']) : null])),
+                    Formats::isolated($row['decision_reason'])])),
+                'by' => array_values(array_filter([Formats::isolated($row['author']), Formats::isolated($row['decider']), Formats::isolated($row['executor'])])),
                 'receipt' => $row['kind'] === 'refund' && $row['status'] === 'executed' ? url('/api/refunds/'.$row['id'].'/receipt') : null], $this->finance()['refunds']))
             ->schema([TextEntry::make('kind')->label(__('finance.kind')), TextEntry::make('amount')->label(__('finance.amount')),
-                TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status')),
-                TextEntry::make('by')->label(__('finance.by')), $this->receiptEntry()])])]);
+                TextEntry::make('reason')->label(__('schooling.history_reason')), TextEntry::make('status')->label(__('school.status'))->listWithLineBreaks(),
+                $this->byEntry(), $this->receiptEntry()])])]);
+    }
+
+    /**
+     * Who recorded, decided and executed it, one per line: names typed in Latin letters stay whole
+     * in an Arabic page instead of wrapping into one another around a comma.
+     */
+    private function byEntry(): TextEntry
+    {
+        return TextEntry::make('by')->label(__('finance.by'))->listWithLineBreaks();
     }
 
     /** The receipt's link of a payment or a refund: the first opening issues it, the next ones print a duplicate. */
@@ -345,8 +352,8 @@ final class EnrollmentFinance extends SchoolingPage
 
     private function paymentOptions(callable $filter): array
     {
-        return collect($this->finance()['payments'])->filter($filter)->mapWithKeys(fn (array $row) => [$row['id'] => Formats::list([$row['reference'],
-            $row['kind'] === 'reversal' ? __('finance.reversal_of', ['reference' => $row['reverses_reference']]) : $this->money($row['amount']),
+        return collect($this->finance()['payments'])->filter($filter)->mapWithKeys(fn (array $row) => [$row['id'] => Formats::list([Formats::isolated($row['reference']),
+            $row['kind'] === 'reversal' ? __('finance.reversal_of', ['reference' => Formats::isolated($row['reverses_reference'])]) : $this->money($row['amount']),
             Formats::date($row['paid_on'])])])->all();
     }
 

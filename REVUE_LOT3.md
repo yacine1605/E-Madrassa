@@ -122,11 +122,10 @@ Pour chacun des sept reçus arabes :
 
 Le reçu français (`04-…`) sert de comparaison.
 
-Écrans arabes (`ecrans/ar-*`) : défauts déjà relevés en préparant la revue, à confirmer puis à corriger ensemble :
+Écrans arabes (`ecrans/ar-*`) : défauts relevés en préparant la revue, corrigés depuis (incrément 75) :
 
-- dans les colonnes « من طرف » (par), les noms latins suivis d'une virgule arabe se mélangent : « (Rachid Bouzid. » ou « Direction · Bouzid) (Samira Haddad) » ;
-- dans une cellule qui mêle de l'arabe et une référence, la référence se coupe : « RMB-2026- منفَّذ، 000001 » ;
-- dans un intitulé, un nom latin suivi d'une virgule perd sa ponctuation : « Comptable (Rachid Bouzid). ».
+- dans les colonnes « من طرف » (par), les noms latins se mélangeaient autour de la virgule arabe : chaque personne est désormais sur sa ligne ;
+- une référence mêlée à de l'arabe se coupait (« RMB-2026- منفَّذ، 000001 ») : les références gardent leur propre sens d'écriture et l'état d'un remboursement s'écrit une information par ligne.
 
 ## Personnalisation des reçus par l'école
 
@@ -158,4 +157,4 @@ Remarque relevée en préparant la revue : le choix des chiffres arabes est lu a
 | | Nom | Date | Décision | Remarques |
 |---|---|---|---|---|
 | Rapprochement (finance) | | | validé / à reprendre | |
-| Reçus arabes (lecteur natif) | | | validés / à reprendre | |
+| Reçus arabes (lecteur natif) | porteur du projet | 17/10/2026 | validés | reçus et écrans arabes jugés bons ; gabarit de reçu propre à chaque école à fournir plus tard |

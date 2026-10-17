@@ -39,7 +39,7 @@ final class PaymentValidations extends SchoolingPage
             ->recordUrl(fn (array $record) => EnrollmentFinance::getUrl(['enrollment' => $record['enrollment_id']]))
             ->columns([
                 TextColumn::make('reference')->label(__('finance.reference'))
-                    ->description(fn (array $record) => $record['kind'] === 'reversal' ? __('finance.reversal_of', ['reference' => $record['reverses_reference']]) : null),
+                    ->description(fn (array $record) => $record['kind'] === 'reversal' ? __('finance.reversal_of', ['reference' => Formats::isolated($record['reverses_reference'])]) : null),
                 TextColumn::make('pupil')->label(__('schooling.student'))
                     ->state(fn (array $record) => $record['enrollment'] && $record['enrollment']['matricule'] ? $record['enrollment']['matricule'].' · '.$this->personName($record['enrollment']) : ''),
                 TextColumn::make('program')->label(__('schooling.program'))->state(fn (array $record) => $record['enrollment']['program'] ?? ''),
