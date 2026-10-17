@@ -145,6 +145,10 @@ return [
         'pay_rule' => 'قاعدة أجر',
         'pay_rule_rate' => 'تعريفة قاعدة أجر',
         'pay_rule_bonus' => 'منحة قاعدة أجر',
+        'payroll_run' => 'أجر شهر',
+        'payroll_unit' => 'وحدة أجر',
+        'payroll_adjustment' => 'منحة أو تسوية أجر',
+        'payroll_line' => 'سطر أجر',
     ],
     'masked' => 'محجوب',
     // The journal names the fields a change touched.

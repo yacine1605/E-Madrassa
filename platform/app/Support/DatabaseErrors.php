@@ -56,6 +56,8 @@ final class DatabaseErrors
         'correction_below_paid', 'expense_correction_immutable', 'pay_rule_kind_refused', 'pay_rule_incomplete', 'pay_rule_rate_refused', 'pay_rule_default_rate_required',
         'pay_rule_rate_duplicate', 'pay_rule_node_unknown', 'pay_rule_month', 'pay_rule_retroactive', 'pay_rule_overlap',
         'pay_rule_started', 'pay_rule_immutable', 'pay_rule_end_later', 'pay_rule_end_before_start',
+        'payroll_period_future', 'payroll_no_rule', 'payroll_run_validated', 'payroll_run_stale', 'payroll_rate_missing', 'payroll_net_negative',
+        'payroll_units_refused', 'payroll_unit_date', 'payroll_unit_sessions', 'payroll_correction_invalid',
     ];
 
     public static function message(string $rule): string

@@ -146,6 +146,10 @@ return [
         'pay_rule' => 'Règle de rémunération',
         'pay_rule_rate' => 'Tarif d’une règle de rémunération',
         'pay_rule_bonus' => 'Prime d’une règle de rémunération',
+        'payroll_run' => 'Rémunération d’un mois',
+        'payroll_unit' => 'Unité d’une rémunération',
+        'payroll_adjustment' => 'Prime ou ajustement d’une rémunération',
+        'payroll_line' => 'Ligne d’une rémunération',
     ],
     'masked' => 'masqué',
     // The journal names the fields a change touched.

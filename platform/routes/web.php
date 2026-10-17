@@ -28,6 +28,7 @@ use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PayrollRunController;
 use App\Http\Controllers\PayRuleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
@@ -378,6 +379,17 @@ Route::prefix('api')->group(function () {
                     Route::post('pay-rules/{rule}/end', [PayRuleController::class, 'end']);
                     Route::delete('pay-rules/{rule}', [PayRuleController::class, 'destroy']);
                 });
+                // FR-REM-02, FR-REM-03: a month's pays, one per member, computed by the accountant, validated by the direction (BR-08).
+                $pays = 'permission:payroll.amount.read,payroll.run.generate,payroll.run.validate';
+                Route::get('payroll-runs', [PayrollRunController::class, 'index'])->middleware($pays);
+                Route::get('payroll-runs/{run}', [PayrollRunController::class, 'show'])->middleware($pays);
+                Route::get('payroll-runs/{run}/corrected', [PayrollRunController::class, 'corrected'])->middleware($pays);
+                Route::middleware('permission:payroll.run.generate')->group(function () {
+                    Route::post('payroll-runs/generate', [PayrollRunController::class, 'generate']);
+                    Route::post('payroll-runs/{run}/units', [PayrollRunController::class, 'units']);
+                    Route::post('payroll-runs/{run}/adjustments', [PayrollRunController::class, 'adjust']);
+                });
+                Route::post('payroll-runs/{run}/validate', [PayrollRunController::class, 'validateRun'])->middleware('permission:payroll.run.validate');
             });
 
             // FR-DEP-01, FR-DEP-02: the school's expense categories and expenses, decided by someone else than their author.

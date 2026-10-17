@@ -23,11 +23,12 @@ const screens = name => ({
 let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
-  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections'];
+  'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
+  'payroll'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.
-const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|account|console|errors|validation|messages|formats|exports|pdf|mail)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
+const rawKey = /\b(?:school|admin|schooling|staff|services|reference|finance|account|console|errors|validation|messages|formats|exports|pdf|mail|payroll)\.[a-z_]+(?:\.[a-z_]+)*\b|\bfilament[a-z-]*::/;
 
 const failures = [];
 const report = [];
@@ -152,8 +153,8 @@ async function signInSteps(page, kind, account) {
 // year, a programme with a subject, a room with a closure, a qualified teacher with their week, a
 // day off, a contract and a leave, leading a class in that room, a pupil with a guardian in it. The
 // lists then have rows, and the pupil's sheet, the class's members, the programme's subjects, the
-// room's closures and the teacher's qualifications, availability, days off, contracts and leave are
-// screens too.
+// room's closures and the teacher's qualifications, availability, days off, contracts, leave, pay rule
+// and pay are screens too.
 async function seed(browser, session) {
   const context = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: session });
   const page = await context.newPage();
@@ -232,7 +233,14 @@ async function seed(browser, session) {
     // A payment by cheque waiting for its validation (FR-FIN-02).
     await call(`enrollments/${enrollment.id}/payments`, { amount: '40000', paid_on: day(0), method_code: 'cheque', external_ref: 'CHQ 0012345',
       idempotency_key: crypto.randomUUID() });
-    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id, enrollment: enrollment.id };
+    // How the teacher is paid (FR-REM-01), and this month's pay as a draft with its hours of the first day (FR-REM-02).
+    const month = day(0).slice(0, 8) + '01';
+    await call(`staff/${teacher.id}/pay-rules`, { kind: 'hourly', valid_from: month, rates: [{ unit_amount: '1500' }, { node_id: grade.id, unit_amount: '1800' }],
+      bonuses: [{ label: 'Prime de transport', amount: '3000' }], idempotency_key: crypto.randomUUID() });
+    await call('payroll-runs/generate', { period: month, staff_id: teacher.id });
+    const pay = (await call(`payroll-runs?period=${month}`))[0];
+    await call(`payroll-runs/${pay.id}/units`, { version: pay.version, units: [{ node_id: grade.id, worked_on: month, quantity: '4' }, { worked_on: month, quantity: '2.5' }] });
+    return { pupil: pupil.id, group: group.id, program: program.id, teacher: teacher.id, room: room.id, lead: lead.id, enrollment: enrollment.id, pay: pay.id };
   });
   await context.close();
   return records;
@@ -247,7 +255,7 @@ async function run(browser) {
       `program-subjects?program=${records.program}`, `staff-qualifications?staff=${records.teacher}`,
       `staff-availability?staff=${records.teacher}`, `staff-unavailability?staff=${records.teacher}`, `staff-contracts?staff=${records.teacher}`, `staff-pay-rules?staff=${records.teacher}`,
       `staff-leaves?staff=${records.teacher}`, `room-closures?room=${records.room}`, `lead-sheet?lead=${records.lead}`,
-      `enrollment-finance?enrollment=${records.enrollment}`]], ['operator', 'console', consolePages]]) {
+      `enrollment-finance?enrollment=${records.enrollment}`, `payroll-run?run=${records.pay}`]], ['operator', 'console', consolePages]]) {
       const setup = await browser.newContext({ ...viewports.desktop, ignoreHTTPSErrors: true, storageState: sessions[kind] });
       await setLocale(setup, prefix + '/' + pages[0], locale);
       sessions[kind] = await setup.storageState();
