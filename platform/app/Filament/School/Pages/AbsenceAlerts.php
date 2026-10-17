@@ -13,7 +13,8 @@ use Filament\Tables\Table;
  * FR-PRE-01, « Alertes d'absence »: the pupils who reached the school's threshold of absences
  * without excuse within its window (SQL 073), the latest first, with the group, the absences
  * counted and the window. For whoever corrects the group's rolls for the whole school or on its
- * site, and its lead teacher; a pupil whose record the reader does not read stays unnamed.
+ * site, and its lead teacher; a pupil whose record the reader does not read stays unnamed. What the
+ * guardians were sent, and when (SQL 074).
  */
 final class AbsenceAlerts extends SchoolingPage
 {
@@ -44,6 +45,10 @@ final class AbsenceAlerts extends SchoolingPage
                 TextColumn::make('absences')->label(__('attendance.absences'))->badge()->color('danger')
                     ->state(fn (array $record) => __('attendance.alert_absences', ['absences' => Formats::number($record['absences']),
                         'threshold' => Formats::number($record['threshold'])])),
+                TextColumn::make('messages')->label(__('attendance.guardians_told'))->listWithLineBreaks()
+                    ->state(fn (array $record) => array_map(fn (array $message) => __('attendance.message_states.'.$message['status'], [
+                        'channel' => __('attendance.channels.'.$message['channel']), 'at' => Formats::dateTime($message['sent_at'])]), $record['messages']))
+                    ->placeholder(__('attendance.no_message')),
             ]);
     }
 

@@ -7,6 +7,7 @@ use App\Support\MultiFactor;
 use App\Support\DatabaseErrors;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
+use App\Support\GuardianMessages;
 use App\Support\Outbox;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -189,6 +190,14 @@ Artisan::command('platform:outbox {--limit=50}', function (Outbox $outbox) {
 })->purpose('Send the notification emails that are due (as school_runtime)');
 
 Schedule::command('platform:outbox')->everyMinute()->withoutOverlapping();
+
+// FR-PRE-01: the guardians told of an absence alert by email, when the school turned it on (SQL 074).
+Artisan::command('platform:guardian-messages {--limit=50}', function (GuardianMessages $messages) {
+    $done = $messages->work((int) $this->option('limit'));
+    $this->info("Messages to guardians sent: {$done['sent']}, failed: {$done['failed']}.");
+})->purpose('Send the messages to guardians that are due (as school_runtime)');
+
+Schedule::command('platform:guardian-messages')->everyMinute()->withoutOverlapping();
 
 // FR-CRM-01 AC1: the prospects' reminders that are due notify their assignee, once.
 Artisan::command('platform:lead-reminders {--limit=500}', function () {

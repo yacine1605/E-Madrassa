@@ -4783,7 +4783,7 @@ await check('a roll calls the pupils the group had that day, by its own teacher 
   await as('school_runtime', a, 1);
 });
 // Absence thresholds (SQL 073, FR-PRE-01): absences without excuse over the last days; one alert at the threshold, told to the group's followers.
-await check('a pupil absent without excuse as often as the threshold over the window raises one alert, told to the group\'s followers (FR-PRE-01)', async () => {
+await check('a pupil absent without excuse as often as the threshold over the window raises one alert, told to the group\'s followers, and to a minor\'s guardians when the school turned it on (FR-PRE-01)', async () => {
   const teacherAccount = await scopedAccount('internal', 'personal', null, ['schedule.session.read', 'group.group.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
   const supervisor = await scopedAccount('internal', 'tenant', null, ['student.record.read', 'attendance.student.entry.create', 'attendance.student.entry.update']);
   const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['attendance.student.entry.update']);
@@ -4857,7 +4857,40 @@ await check('a pupil absent without excuse as often as the threshold over the wi
     await as('school_runtime', a, user);
     assert.equal(await count('SELECT count(*) n FROM school.absence_alert WHERE group_id = $1', [followed]), n);
   }
+  // A minor's guardians emailed once the school turned it on (SQL 074): the primary contacts with an address, an adult's never.
   await as('school_runtime', a, 1);
+  const yanis = (await newPupil('Seuil', 'Yanis')).id;
+  const mother = await contact(yanis);
+  const uncle = await contact(yanis, '0661 00 00 00', false);
+  await sql("UPDATE school.guardian SET email = 'famille.' || id || '@example.test' WHERE id = ANY ($1::uuid[])", [[mother, uncle]]);
+  const joined = await joinGroup(await enroll(yanis, taught), followed);
+  await sql("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'attendance.notify_guardians_email', 'true')", [a]);
+  await as(null);
+  await sql('ALTER TABLE school.group_membership DISABLE TRIGGER USER');
+  await sql('UPDATE school.group_membership SET valid_from = $2::date WHERE id = $1', [joined, await dayAfter(days[0], -7)]);
+  await sql('ALTER TABLE school.group_membership ENABLE TRIGGER USER');
+  await as('school_runtime', a, teacherAccount.user);
+  for (const session of sessions.slice(0, 3)) await first(MARK, [a, session, yanis, 'absent']);
+  await as(null);
+  const queued = (await sql(`SELECT m.id, m.guardian_id, m.channel, m.status FROM school.guardian_message m JOIN school.absence_alert x ON x.id = m.alert_id
+    WHERE x.group_id = $1`, [followed])).rows;
+  assert.deepEqual(queued.map(m => [m.guardian_id, m.channel, m.status]), [[mother, 'email', 'pending']]);
+  // Read with its alert, by whoever reads the alert.
+  for (const [user, n] of [[supervisor.user, 1], [elsewhere.user, 0]]) {
+    await as('school_runtime', a, user);
+    assert.equal(await count('SELECT count(*) n FROM school.guardian_message WHERE id = $1', [queued[0].id]), n);
+  }
+  // The worker claims it once, with what it says; sent, it is kept with when.
+  await as('school_runtime', null, null);
+  const claimed = (await sql("SELECT * FROM platform.claim_guardian_messages('email', 50, 60)")).rows.filter(r => r.id === queued[0].id);
+  assert.deepEqual(claimed.map(r => [r.email, r.first_name_lat, r.absences]), [[`famille.${mother}@example.test`, 'Yanis', 3]]);
+  assert.equal((await sql("SELECT * FROM platform.claim_guardian_messages('email', 50, 60)")).rows.filter(r => r.id === queued[0].id).length, 0);
+  await sql('SELECT platform.finish_guardian_message($1, NULL)', [queued[0].id]);
+  await as(null);
+  assert.deepEqual(await first('SELECT status, sent_at IS NOT NULL AS sent FROM school.guardian_message WHERE id = $1', [queued[0].id]), { status: 'sent', sent: true });
+  await as('school_runtime', a, 1);
+  await rejects("UPDATE school.guardian_message SET status = 'pending' WHERE id = $1", [queued[0].id], '42501');
+  await sql("UPDATE school.setting SET value = 'false' WHERE tenant_id = $1 AND key = 'attendance.notify_guardians_email'", [a]);
 });
 // The finance dashboard (SQL 069, FR-TDB-01, TST-16): each figure the sum of its operations; a salary payout never counted twice.
 await check('the finance dashboard\'s figures equal their source operations, month by month; a payout is never counted twice (FR-TDB-01 AC1, AC2, TST-16)', async () => {

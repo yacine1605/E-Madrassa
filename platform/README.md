@@ -63,7 +63,7 @@ php artisan filament:assets                         # the console's styles and s
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
-Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox and the prospects' due reminders, `platform:lead-reminders`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
+Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, the prospects' due reminders, `platform:lead-reminders`, and the messages to guardians, `platform:guardian-messages`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
 
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
@@ -1580,6 +1580,16 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 91 (lot 4): the guardians told by email
+
+FR-PRE-01's notification to the guardians, as decided on 17 October 2026:
+
+- **When**: the school turns it on (`attendance.notify_guardians_email`, « Paramètres de l'école », off by default). An absence alert raised for a **minor** (under `student.majority_age`) then queues one message to each of the pupil's primary contacts with an email address; an adult learner's alert stays within the school.
+- **What**: the pupil's first name, the absences without excuse and their window, and the school to contact with its phone (`identity.phone`), in the school's language then the other (Arabic and French); nothing more (BR-19), and no reply expected.
+- **How**: the messages are kept in `school.guardian_message` (SQL 074) and sent by `php artisan platform:guardian-messages`, every minute through the scheduler, as the notification emails are: claimed once across schools, tried five times, the failure kept without the address. « Alertes d'absence » shows, for each alert, what the guardians were sent and when.
+
+Validation on 17 October 2026: **307 PHP integration tests (16,141 assertions)**; **268 embedded SQL checks and 299 native PostgreSQL 16 checks including concurrency**; every migration reset and applied again on the database the suite had filled; dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 864 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job.
+
 ## Increment 90 (lot 4): absence thresholds
 
 FR-PRE-01's thresholds, decided with the school on 17 October 2026:
@@ -1640,9 +1650,8 @@ Validation on 17 October 2026: **303 PHP integration tests (15,750 assertions)**
 
 Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16` green, the validated hours delivered in the pays; lot 4 can exit. `REVUE_LOT4.md` (at the repository's root) records each criterion with its checks, what remains of each requirement and the points the school is to confirm.
 
-1. The guardians told of an absence alert by email, when the school turns it on (FR-PRE-01).
-2. And by WhatsApp, through the WhatsApp Business Platform, when the school turns it on and its account is set up (FR-PRE-01).
-3. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
+1. The guardians told of an absence alert by WhatsApp, through the WhatsApp Business Platform, when the school turns it on and its account is set up (FR-PRE-01).
+2. FR-TDB-03's cache, invalidated on events, only if reading the dashboards becomes slow.
 
 ## Next increments of lot 2
 

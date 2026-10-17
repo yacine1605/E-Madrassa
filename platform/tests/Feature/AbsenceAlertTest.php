@@ -6,7 +6,9 @@ use App\Filament\School\Pages\AbsenceAlerts;
 use App\Support\CurrentSchool;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
+use App\Mail\GuardianAbsenceMail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Support\PlansSessions;
@@ -15,7 +17,8 @@ use Tests\TestCase;
 /**
  * The absence thresholds (FR-PRE-01, SQL 073): a pupil absent without excuse as often as the
  * school's threshold within its window raises one alert, its group's followers notified; late
- * arrivals and excused absences do not count; no threshold, no alert.
+ * arrivals and excused absences do not count; no threshold, no alert. A minor's guardian is emailed
+ * when the school turned it on (SQL 074); an adult's never.
  */
 final class AbsenceAlertTest extends TestCase
 {
@@ -34,7 +37,7 @@ final class AbsenceAlertTest extends TestCase
     }
 
     /** The school's setting, as the school would set it. */
-    private function set(object $school, string $key, int $value): void
+    private function set(object $school, string $key, int|bool $value): void
     {
         $owner = DB::connection('owner');
         $owner->unprepared('ALTER TABLE school.setting DISABLE TRIGGER USER');
@@ -48,18 +51,12 @@ final class AbsenceAlertTest extends TestCase
         return DB::connection('owner')->table('school.notification')->where('user_id', $account['id'])->where('event', 'attendance.absence_threshold')->count();
     }
 
-    public function test_a_pupil_reaching_the_threshold_raises_one_alert_and_its_followers_are_told(): void
+    /**
+     * Four sessions of the group, nine, six, three and one day ago, its pupils in it since before;
+     * its teacher, who leads it, with an account, and a supervisor for the whole school.
+     */
+    private function sessions(array $s): array
     {
-        $s = $this->setting();
-        $pupils = [];
-        foreach (['Amine', 'Lina'] as $name) {
-            $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'birth_date' => '1990-01-01'])->assertCreated()->json('data.id');
-            $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
-                ->assertCreated()->json('data.id');
-            $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment])->assertCreated();
-            $pupils[] = $pupil;
-        }
-        // Four sessions, nine, six, three and one day ago.
         $sessions = [];
         foreach ([9, 6, 3, 1] as $i => $ago) {
             $sessions[] = $this->postJson('/api/class-sessions', ['group_id' => $s['group'], 'subject_id' => $s['maths'], 'teacher_id' => $s['teacher'],
@@ -74,7 +71,6 @@ final class AbsenceAlertTest extends TestCase
         $owner->table('school.group_membership')->where('group_id', $s['group'])->update(['valid_from' => now()->subDays(20)->toDateString()]);
         $owner->table('school.study_group')->where('id', $s['group'])->update(['lead_teacher_id' => $s['teacher']]);
         $owner->unprepared('ALTER TABLE school.class_session ENABLE TRIGGER USER; ALTER TABLE school.group_membership ENABLE TRIGGER USER; ALTER TABLE school.study_group ENABLE TRIGGER USER');
-        // The group's teacher, who leads it, and a supervisor for the whole school.
         $karim = $this->account('karim');
         $this->member($s['school'], $karim, 'active');
         $this->grant($s['school'], $karim, 'teacher', 'personal');
@@ -83,6 +79,22 @@ final class AbsenceAlertTest extends TestCase
         $nadia = $this->account('nadia');
         $this->member($s['school'], $nadia, 'active');
         $this->grant($s['school'], $nadia, 'supervisor');
+        return [$sessions, $karim, $nadia];
+    }
+
+    public function test_a_pupil_reaching_the_threshold_raises_one_alert_and_its_followers_are_told(): void
+    {
+        $s = $this->setting();
+        $pupils = [];
+        foreach (['Amine', 'Lina'] as $name) {
+            $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'birth_date' => '1990-01-01'])->assertCreated()->json('data.id');
+            $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
+                ->assertCreated()->json('data.id');
+            $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment])->assertCreated();
+            $pupils[] = $pupil;
+        }
+        [$sessions, $karim, $nadia] = $this->sessions($s);
+        $owner = DB::connection('owner');
 
         $this->signIn($karim)->assertOk();
         $call = fn (int $session, string $amine, string $lina) => $this->postJson("/api/class-sessions/{$sessions[$session]}/roll-call",
@@ -132,5 +144,55 @@ final class AbsenceAlertTest extends TestCase
         $this->signIn($s['manager'])->assertOk();
         $this->getJson('/api/absence-alerts')->assertForbidden();
         $this->get('/school/absence-alerts')->assertForbidden();
+    }
+
+    public function test_a_minors_guardian_is_emailed_when_the_school_turned_it_on_an_adults_never(): void
+    {
+        Mail::fake();
+        $s = $this->setting();
+        DB::connection('owner')->insert("INSERT INTO school.setting (tenant_id, key, value, created_at, updated_at) VALUES (?, 'identity.phone', '\"023 45 67 89\"', now(), now())",
+            [$s['school']->id]);
+        // Yasmine, a minor, her mother her primary contact with an address; Amine, an adult, his father too.
+        $pupils = [];
+        foreach ([['Yasmine', now()->subYears(12)->toDateString(), 'mere.yasmine@example.test'], ['Amine', '1990-01-01', 'pere.amine@example.test']] as [$name, $born, $email]) {
+            $pupil = $this->postJson('/api/students', ['last_name_lat' => 'Benali', 'first_name_lat' => $name, 'first_name_ar' => $name === 'Yasmine' ? 'ياسمين' : 'أمين',
+                'last_name_ar' => 'بن علي', 'birth_date' => $born])->assertCreated()->json('data.id');
+            $guardian = $this->postJson('/api/guardians', ['last_name_lat' => 'Benali', 'first_name_lat' => 'Parent '.$name, 'phone' => '0550123456', 'email' => $email])
+                ->assertCreated()->json('data.id');
+            $this->postJson("/api/students/$pupil/guardians", ['guardian_id' => $guardian, 'relationship' => 'mother', 'is_primary_contact' => true])->assertCreated();
+            $enrolment = $this->postJson('/api/enrollments', ['student_id' => $pupil, 'program_id' => $s['program'], 'idempotency_key' => (string) Str::uuid()])
+                ->assertCreated()->json('data.id');
+            $this->postJson("/api/groups/{$s['group']}/memberships", ['enrollment_id' => $enrolment])->assertCreated();
+            $pupils[] = $pupil;
+        }
+        [$sessions, $karim, $nadia] = $this->sessions($s);
+        $this->set($s['school'], 'attendance.notify_guardians_email', true);
+        $this->signIn($karim)->assertOk();
+        foreach ([0, 1, 2] as $session) {
+            $this->postJson("/api/class-sessions/{$sessions[$session]}/roll-call", ['entries' => [['student_id' => $pupils[0], 'status' => 'absent'],
+                ['student_id' => $pupils[1], 'status' => 'absent']]])->assertOk();
+        }
+        // Two alerts; a message for the minor's guardian only, queued with it, by email.
+        $owner = DB::connection('owner');
+        $this->assertSame(2, $owner->table('school.absence_alert')->where('group_id', $s['group'])->count());
+        $alerts = $owner->table('school.absence_alert')->where('group_id', $s['group'])->pluck('id');
+        $message = $owner->table('school.guardian_message')->whereIn('alert_id', $alerts)->sole();
+        $this->assertSame(['email', 'pending'], [$message->channel, $message->status]);
+        $this->assertSame($pupils[0], $owner->table('school.absence_alert')->where('id', $message->alert_id)->value('student_id'));
+        // The worker sends it: the first name, the absences, the window, the school to call; in its language, then Arabic.
+        $this->artisan('platform:guardian-messages')->assertSuccessful();
+        Mail::assertSent(GuardianAbsenceMail::class, function (GuardianAbsenceMail $mail) {
+            $text = $mail->render();
+            return $mail->hasTo('mere.yasmine@example.test') && str_contains($text, 'Yasmine a manqué 3 séances sans justification')
+                && str_contains($text, 'سُجّل غياب ياسمين عن 3 حصص دون تبرير') && str_contains($text, '023 45 67 89') && !str_contains($text, 'Benali');
+        });
+        Mail::assertSentCount(1);
+        $this->assertSame('sent', $owner->table('school.guardian_message')->where('id', $message->id)->value('status'));
+        $this->artisan('platform:guardian-messages')->assertSuccessful();
+        Mail::assertSentCount(1);
+        // The alerts say who was told, and when.
+        $this->within($s['school'], $karim, function () {
+            Livewire::test(AbsenceAlerts::class)->assertSee(__('attendance.guardians_told'))->assertSee('E-mail envoyé le')->assertSee(__('attendance.no_message'));
+        });
     }
 }

@@ -22,4 +22,13 @@ return [
         'details' => 'سجّل الدخول للاطلاع على التفاصيل.',
         'why' => 'تصلك هذه الرسالة وفق تفضيلات الإشعارات الخاصة بك، ويمكنك تعديلها في التطبيق.',
     ],
+    // FR-PRE-01: a minor's absences told to their guardian (SQL 074).
+    'guardian' => [
+        'subject' => 'غيابات :pupil',
+        'greeting' => 'السلام عليكم،',
+        'absences' => 'سُجّل غياب :pupil عن :absences حصص دون تبرير بين :from و:to.',
+        'contact' => 'يُرجى الاتصال بالمؤسسة :school.',
+        'contact_phone' => 'يُرجى الاتصال بالمؤسسة :school على الرقم :phone.',
+        'automatic' => 'هذه رسالة آلية، يُرجى عدم الرد عليها.',
+    ],
 ];

@@ -22,4 +22,13 @@ return [
         'details' => 'Connectez-vous pour en voir le détail.',
         'why' => 'Vous recevez ce message selon vos préférences de notification, modifiables dans l’application.',
     ],
+    // FR-PRE-01: a minor's absences told to their guardian (SQL 074).
+    'guardian' => [
+        'subject' => 'Absences de :pupil',
+        'greeting' => 'Bonjour,',
+        'absences' => ':pupil a manqué :absences séances sans justification entre le :from et le :to.',
+        'contact' => 'Merci de prendre contact avec l’établissement :school.',
+        'contact_phone' => 'Merci de prendre contact avec l’établissement :school au :phone.',
+        'automatic' => 'Ce message est envoyé automatiquement : n’y répondez pas.',
+    ],
 ];

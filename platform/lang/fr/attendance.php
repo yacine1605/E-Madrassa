@@ -66,4 +66,9 @@ return [
     'absences' => 'Absences',
     'alert_absences' => ':absences absences (seuil :threshold)',
     'see_absence_alerts' => 'Voir les alertes d’absence',
+    'guardians_told' => 'Responsables prévenus',
+    'channels' => ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'],
+    'message_states' => ['pending' => ':channel en attente', 'sending' => ':channel en cours d’envoi', 'sent' => ':channel envoyé le :at',
+        'failed' => ':channel en échec'],
+    'no_message' => 'aucun message',
 ];

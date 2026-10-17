@@ -66,4 +66,9 @@ return [
     'absences' => 'الغيابات',
     'alert_absences' => ':absences غيابات (العتبة :threshold)',
     'see_absence_alerts' => 'عرض تنبيهات الغياب',
+    'guardians_told' => 'إعلام الأولياء',
+    'channels' => ['email' => 'البريد الإلكتروني', 'whatsapp' => 'واتساب'],
+    'message_states' => ['pending' => ':channel في الانتظار', 'sending' => ':channel قيد الإرسال', 'sent' => ':channel أُرسل في :at',
+        'failed' => ':channel تعذّر الإرسال'],
+    'no_message' => 'لا رسالة',
 ];
