@@ -95,6 +95,7 @@ Se connecter avec le compte du comptable, puis :
 
 1. **Chaque élève** (Inscriptions > fiche > Finance) : dû, payé, reste, état et historique sont ceux du tableau des encaissements.
 2. **Impayés** : Amine (50 000), Sara (90 000) et Nadir (120 000) y figurent, chacun avec son reste dû. L'échéancier proposé n'a qu'une échéance, au jour de la génération : aucune n'est donc encore en retard.
+
    Pour Yasmine et Ilyes, une remise a été accordée après l'échéancier. Leur fiche signale donc « échéancier à revoir » : c'est voulu, et la finance peut enregistrer une nouvelle version de l'échéancier.
 3. **Dépenses** et **Paiements des dépenses** : le vidéoprojecteur est « partiellement payé » ; les dépenses « Salaires » ne peuvent être ni modifiées, ni payées, ni annulées à la main.
 4. **Rémunérations** : les deux rémunérations de M sont « payées ». La fiche de Karim montre le versement repris et le nouveau versement.
