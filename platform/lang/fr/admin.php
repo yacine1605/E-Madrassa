@@ -24,6 +24,7 @@ return [
     'value' => 'Valeur',
     'default' => 'Par défaut',
     'bounds' => 'Entre :min et :max.',
+    'domain_set_help' => 'Un nom de domaine par entrée, par exemple drive.google.com ; ses sous-domaines sont aussi autorisés.',
     'days' => ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
     'codes' => [
         'dashboard' => [

@@ -10,6 +10,7 @@ use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
@@ -82,6 +83,8 @@ final class Settings extends SchoolPage implements HasTable
                 ->options(array_intersect_key(Locales::NAMES, array_flip(Locales::AVAILABLE))),
             'code' => Select::make('value')->label($label)->required()
                 ->options(collect($record['allowed_values'])->mapWithKeys(fn (string $code) => [$code => self::code($record, $code)])->all()),
+            // Lot 5: the school's allow-list of domains, typed one by one.
+            'domain_set' => TagsInput::make('value')->label($label)->required()->helperText(__('admin.domain_set_help')),
             'code_set' => CheckboxList::make('value')->label($label)->required()->columns(3)
                 ->options(collect($record['allowed_values'])->mapWithKeys(fn (string $code) => [$code => self::code($record, $code)])->all()),
         };
@@ -95,6 +98,7 @@ final class Settings extends SchoolPage implements HasTable
             'boolean' => (bool) $value,
             'text', 'code' => (string) ($value ?? ''),
             'day_set' => array_map('intval', array_values($value ?? [])),
+            'domain_set' => array_values(array_unique(array_map(fn ($domain) => strtolower(trim((string) $domain)), $value ?? []))),
             default => array_values($value ?? []),
         };
     }
@@ -110,6 +114,7 @@ final class Settings extends SchoolPage implements HasTable
             'language_set' => Formats::list(array_map(fn ($locale) => Locales::NAMES[$locale] ?? $locale, $value)),
             'code' => self::code($record, (string) $value),
             'code_set' => Formats::list(array_map(fn ($code) => self::code($record, $code), $value)),
+            'domain_set' => Formats::list($value),
         };
     }
 

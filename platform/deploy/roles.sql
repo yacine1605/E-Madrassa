@@ -330,6 +330,18 @@ GRANT UPDATE (valid_to, version) ON school.teaching_assignment TO school_runtime
 GRANT EXECUTE ON FUNCTION school.teaches(uuid, uuid, date), school.learner_groups(), school.staff_account(bigint) TO school_runtime;
 -- A pupil's own account (077), linked by whoever changes their record.
 GRANT UPDATE (user_id) ON school.student TO school_runtime;
+-- Courses (078): a programme's subject, its chapters and lessons kept by the manager; the lessons' states and versions written
+-- by the publication alone. A document's nodes and links checked by the database; the published lessons read through a function.
+GRANT SELECT ON school.course, school.course_chapter, school.lesson, school.lesson_version TO school_runtime;
+GRANT INSERT (tenant_id, program_id, subject_id, description) ON school.course TO school_runtime;
+GRANT UPDATE (description, version) ON school.course TO school_runtime;
+GRANT INSERT (tenant_id, course_id, title, position) ON school.course_chapter TO school_runtime;
+GRANT UPDATE (title, position, version, archived_at) ON school.course_chapter TO school_runtime;
+GRANT INSERT (tenant_id, chapter_id, title, objectives, prerequisites, duration_minutes, content, position) ON school.lesson TO school_runtime;
+GRANT UPDATE (title, objectives, prerequisites, duration_minutes, content, position, version, archived_at) ON school.lesson TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.lms_link_error(text), school.lms_node_error(jsonb, text, integer), school.lms_content_error(jsonb),
+  school.lms_course_ids(), school.course_readable(uuid), school.published_lessons(uuid), school.publication_preview(text, uuid),
+  school.publish_lessons(text, uuid, timestamptz), school.submit_lesson(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -690,6 +702,18 @@ ALTER FUNCTION school.teaches(uuid, uuid, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.learner_groups() OWNER TO platform_provisioner;
 ALTER FUNCTION school.staff_account(bigint) OWNER TO platform_provisioner;
 ALTER FUNCTION school.check_student_account() OWNER TO platform_provisioner;
+-- Courses (078): the programme's subjects whatever the writer may read; the courses a teacher's assignments or a pupil's
+-- enrolments reach; the published lessons; the publication, which writes the versions and the lessons' states.
+GRANT SELECT ON school.course, school.course_chapter, school.lesson, school.lesson_version TO platform_provisioner;
+GRANT INSERT ON school.lesson_version TO platform_provisioner;
+GRANT UPDATE (status, published_version, submitted_by, submitted_at) ON school.lesson TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.lms_link_error(text), school.lms_node_error(jsonb, text, integer), school.lms_content_error(jsonb),
+  school.course_readable(uuid), school.publication_preview(text, uuid), school.require_everywhere(text), school.can(text) TO platform_provisioner;
+ALTER FUNCTION school.check_course() OWNER TO platform_provisioner;
+ALTER FUNCTION school.lms_course_ids() OWNER TO platform_provisioner;
+ALTER FUNCTION school.published_lessons(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.publish_lessons(text, uuid, timestamptz) OWNER TO platform_provisioner;
+ALTER FUNCTION school.submit_lesson(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

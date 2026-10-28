@@ -73,11 +73,16 @@ final class DatabaseErrors
         'assignment_begun', 'assignment_past', 'assignment_ended', 'assignment_end_past', 'assignment_end_before_start', 'assignment_group_closed',
         'assignment_subject_outside_program', 'assignment_not_teacher', 'assignment_teacher_left', 'assignment_teacher_not_qualified',
         'pupil_account_staff', 'pupil_account_linked',
+        'lms_link_invalid', 'lms_link_domain_blocked', 'lms_content_invalid', 'lms_subject_outside_program', 'lms_chapter_archived', 'lms_lesson_archived',
+        'lms_review_required', 'lms_review_self', 'lms_review_off', 'lms_publication_empty', 'lms_publish_past',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
     private const EXCLUSIONS = ['class_session_teacher_free' => 'session_teacher_busy', 'class_session_room_free' => 'session_room_busy',
         'class_session_group_free' => 'session_group_busy', 'teaching_assignment_once' => 'assignment_overlap'];
+
+    /** The rules refusing what was sent rather than the state it meets: a link or a document (lot 5 §7, `422`). */
+    private const STATUS = ['lms_link_invalid' => 422, 'lms_link_domain_blocked' => 422, 'lms_content_invalid' => 422];
 
     public static function message(string $rule): string
     {
@@ -102,7 +107,7 @@ final class DatabaseErrors
         if ($state === '25006') return [403, 'tenant_read_only', __('errors.tenant_read_only')];
         if ($state === '23514') {
             foreach (self::RULES as $rule) {
-                if (preg_match('/ERROR:\s+'.preg_quote($rule, '/').'\b/', $detail)) return [409, $rule, __('errors.'.$rule)];
+                if (preg_match('/ERROR:\s+'.preg_quote($rule, '/').'\b/', $detail)) return [self::STATUS[$rule] ?? 409, $rule, __('errors.'.$rule)];
             }
             return [409, 'domain_conflict', __('errors.domain_conflict')];
         }

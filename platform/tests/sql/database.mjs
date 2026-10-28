@@ -5147,6 +5147,175 @@ await check('a pupil\'s record is linked once to their own account, never one\'s
   await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Dossier incomplet' WHERE id = $1", [e]);
   assert.deepEqual(await learns(pupilAccount), []);
 });
+// Courses (SQL 078, FR-LMS-01, lot 5 §2): a structured document and links of the school's allow-list; lessons published in versions, read by those they are for.
+const setSetting = async (key, value) => {
+  await as(null);
+  await sql(`INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, $2, $3::jsonb)
+    ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value`, [a, key, JSON.stringify(value)]);
+};
+const doc = (...blocks) => JSON.stringify({ type: 'doc', content: blocks });
+const para = (text, marks) => ({ type: 'paragraph', content: [{ type: 'text', text, ...(marks ? { marks } : {}) }] });
+await check('a lesson\'s document holds only the schema\'s nodes, marks and attributes, its links and images on the school\'s allow-list (FR-LMS-01, lot 5 §2)', async () => {
+  await as('school_runtime', a, 1);
+  const link = async url => (await first('SELECT school.lms_link_error($1) AS e', [url])).e;
+  for (const [url, e] of [['https://drive.google.com/file/d/1', null], ['https://Docs.Google.com/document/d/2/edit#h', null], ['https://github.com:443/a/b', null],
+    ['http://github.com/a', 'lms_link_invalid'], ['https://user:pass@github.com/a', 'lms_link_invalid'], ['https://github.com/a b', 'lms_link_invalid'],
+    ['javascript:alert(1)', 'lms_link_invalid'], ['https://docs.google.com.evil.dz/x', 'lms_link_domain_blocked'], ['https://evilgithub.com/x', 'lms_link_domain_blocked'],
+    ['https://raw.github.com/x', null]])
+    assert.equal(await link(url), e, url);
+  const content = async value => (await first('SELECT school.lms_content_error($1::jsonb) AS e', [value])).e;
+  const rich = doc({ type: 'heading', attrs: { level: 2, textAlign: 'center' }, content: [{ type: 'text', text: 'Les fractions' }] },
+    para('Voir le cours', [{ type: 'bold' }, { type: 'link', attrs: { href: 'https://docs.google.com/d/1', target: '_blank' } }]),
+    { type: 'bulletList', content: [{ type: 'listItem', content: [para('Un demi')] }] },
+    { type: 'image', attrs: { src: 'https://drive.google.com/uc?id=9', alt: 'Une tarte', title: null } },
+    { type: 'codeBlock', attrs: { language: 'python' }, content: [{ type: 'text', text: 'print(1/2)' }] });
+  assert.equal(await content(rich), null);
+  let deep = para('fond');
+  for (let i = 0; i < 25; i++) deep = { type: 'blockquote', content: [deep] };
+  for (const [value, e] of [
+    [doc({ type: 'html', content: [] }), 'lms_content_invalid'],
+    [doc({ type: 'paragraph', attrs: { onclick: 'alert(1)' } }), 'lms_content_invalid'],
+    [doc({ type: 'paragraph', attrs: { style: 'color:red' } }), 'lms_content_invalid'],
+    [doc(para('x', [{ type: 'textStyle', attrs: { color: 'red' } }])), 'lms_content_invalid'],
+    [doc(para('x', [{ type: 'link', attrs: { href: 'https://github.com/a', onclick: 'x' } }])), 'lms_content_invalid'],
+    [doc(para('x', [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }])), 'lms_link_invalid'],
+    [doc({ type: 'image', attrs: { src: 'https://images.evil.dz/x.png' } }), 'lms_link_domain_blocked'],
+    [doc({ type: 'paragraph', content: [{ type: 'paragraph' }] }), 'lms_content_invalid'],
+    [doc({ type: 'heading', attrs: { level: 7 }, content: [] }), 'lms_content_invalid'],
+    [JSON.stringify({ type: 'paragraph' }), 'lms_content_invalid'],
+    [doc(deep), 'lms_content_invalid'],
+    [JSON.stringify('<script>alert(1)</script>'), 'lms_content_invalid']])
+    assert.equal(await content(value), e, value.slice(0, 80));
+  // The allow-list is the school's: a list of domain names, each once; a link it no longer holds is refused.
+  await as(null);
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'lms.link_domains', '[\"Google\"]')", [a], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'lms.link_domains', '[\"com\"]')", [a], '23514', 'setting_invalid');
+  await rejects("INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'lms.link_domains', '[\"github.com\", \"github.com\"]')", [a], '23514', 'setting_invalid');
+  await setSetting('lms.link_domains', ['drive.google.com', 'docs.google.com', 'onedrive.live.com', 'ecole.dz']);
+  await as('school_runtime', a, 1);
+  assert.deepEqual([await link('https://github.com/a'), await link('https://moodle.ecole.dz/x')], ['lms_link_domain_blocked', null]);
+  await setSetting('lms.link_domains', ['drive.google.com', 'docs.google.com', 'github.com', 'onedrive.live.com', '1drv.ms']);
+  await as('school_runtime', a, 1);
+});
+await check('a course\'s lessons are published by the manager in versions, all or nothing, now or later; a pupil reads only what is visible of their programme, a teacher their subject\'s (FR-LMS-01, lot 5 §2)', async () => {
+  const managerPerms = ['lms.course.manage', 'lms.course.read', 'group.group.read', 'lms.assignment.manage', 'program.program.read'];
+  const manager = await scopedAccount('internal', 'tenant', null, managerPerms);
+  const reviewer = await scopedAccount('internal', 'tenant', null, managerPerms);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.course.read', 'group.group.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.course.read', 'group.group.read']);
+  const pupilAccount = await scopedAccount('student', 'personal', null, ['lms.course.read']);
+  const outsiderAccount = await scopedAccount('student', 'personal', null, ['lms.course.read']);
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-COURS', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-C', program, 20);
+  const teacher = (await newStaff('Cours', 'Amel')).id;
+  const colleague = (await newStaff('Voisine', 'Sara')).id;
+  for (const [t, account] of [[teacher, teacherAccount], [colleague, colleagueAccount]]) {
+    await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+    await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [t, account.user]);
+  }
+  const pupil = (await newAdult('Lecteur', 'Imane')).id;
+  await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupilAccount.user]);
+  const enrolment = await enroll(pupil, program);
+  await joinGroup(enrolment, klass);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+  await as('school_runtime', a, manager.user);
+  await first('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4) RETURNING id', [a, klass, maths, teacher]);
+
+  // The course: a subject the programme teaches, kept by the manager alone.
+  const COURSE = 'INSERT INTO school.course (tenant_id, program_id, subject_id) VALUES ($1, $2, $3) RETURNING id';
+  await rejects(COURSE, [a, program, physics], '23514', 'lms_subject_outside_program');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects(COURSE, [a, program, maths], '42501');
+  await as('school_runtime', a, manager.user);
+  const course = (await first(COURSE, [a, program, maths])).id;
+  const CHAPTER = 'INSERT INTO school.course_chapter (tenant_id, course_id, title) VALUES ($1, $2, $3) RETURNING id, position';
+  const one = await first(CHAPTER, [a, course, 'Les fractions']);
+  const two = await first(CHAPTER, [a, course, 'Les décimaux']);
+  assert.deepEqual([one.position, two.position], [1, 2]);
+  const LESSON = 'INSERT INTO school.lesson (tenant_id, chapter_id, title, content) VALUES ($1, $2, $3, $4::jsonb) RETURNING id, position, status';
+  await rejects(LESSON, [a, one.id, 'Script', doc({ type: 'html' })], '23514', 'lms_content_invalid');
+  const first1 = await first(LESSON, [a, one.id, 'Partager une tarte', doc(para('Une tarte en deux.'))]);
+  const second = await first(LESSON, [a, one.id, 'Simplifier', doc(para('Deux quarts font un demi.', [{ type: 'link', attrs: { href: 'https://github.com/ecole/fractions' } }]))]);
+  assert.deepEqual([first1.position, second.position, first1.status], [1, 2, 'draft']);
+  // A new order, written at once: positions are checked at the transaction's end.
+  await sql('BEGIN');
+  await sql('UPDATE school.course_chapter SET position = CASE id WHEN $1::uuid THEN 2 ELSE 1 END WHERE id IN ($1, $2)', [one.id, two.id]);
+  await sql('COMMIT');
+  await sql('BEGIN');
+  await sql('UPDATE school.course_chapter SET position = CASE id WHEN $1::uuid THEN 1 ELSE 2 END WHERE id IN ($1, $2)', [one.id, two.id]);
+  await sql('COMMIT');
+  await rejects('UPDATE school.course_chapter SET position = 1 WHERE id = $1', [two.id], '23505');
+  // The states and versions are the publication's alone.
+  await rejects("UPDATE school.lesson SET status = 'published' WHERE id = $1", [first1.id], '42501');
+  await rejects(`INSERT INTO school.lesson_version (tenant_id, lesson_id, course_id, program_id, version, title, content, visible_from)
+    VALUES ($1, $2, $3, $4, 1, 'x', '{}', now())`, [a, first1.id, course, program], '42501');
+
+  const PUBLISH = 'SELECT lesson_id, version FROM school.publish_lessons($1, $2, $3::timestamptz) ORDER BY lesson_id';
+  const reads = async account => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT lesson_id, version, title, chapter_title FROM school.published_lessons($1) ORDER BY chapter_position, lesson_position', [course])).rows;
+    const courses = await count('SELECT count(*) n FROM school.course WHERE id = $1', [course]);
+    await as('school_runtime', a, manager.user);
+    return { rows: rows.map(r => `${r.title} v${r.version}`), courses };
+  };
+  assert.deepEqual((await sql(PUBLISH, ['lesson', first1.id, null])).rows, [{ lesson_id: first1.id, version: 1 }]);
+  assert.deepEqual(await reads(pupilAccount), { rows: ['Partager une tarte v1'], courses: 1 });
+  // A change makes a draft again; the pupil still reads the version published.
+  await sql("UPDATE school.lesson SET content = $2::jsonb WHERE id = $1", [first1.id, doc(para('Une tarte en deux parts égales.'))]);
+  assert.equal((await first('SELECT status FROM school.lesson WHERE id = $1', [first1.id])).status, 'draft');
+  assert.deepEqual((await reads(pupilAccount)).rows, ['Partager une tarte v1']);
+  // The chapter, all of it: an invalid link stops everything (the allow-list changed), nothing is published.
+  await setSetting('lms.link_domains', ['drive.google.com', 'docs.google.com']);
+  await as('school_runtime', a, manager.user);
+  await rejects(PUBLISH, ['chapter', one.id, null], '23514', 'lms_link_domain_blocked');
+  assert.equal(await count('SELECT count(*) n FROM school.lesson_version WHERE course_id = $1', [course]), 1);
+  await setSetting('lms.link_domains', ['drive.google.com', 'docs.google.com', 'github.com', 'onedrive.live.com', '1drv.ms']);
+  await as('school_runtime', a, manager.user);
+  assert.deepEqual((await sql(PUBLISH, ['chapter', one.id, null])).rows.map(r => r.version).sort(), [1, 2]);
+  assert.deepEqual((await reads(pupilAccount)).rows, ['Partager une tarte v2', 'Simplifier v1']);
+  // Scheduled: visible from tomorrow, the pupil reads the version before until then; never in the past.
+  await sql('UPDATE school.lesson SET title = $2 WHERE id = $1', [second.id, 'Simplifier une fraction']);
+  await rejects(PUBLISH, ['lesson', second.id, '2020-01-01T08:00:00+01'], '23514', 'lms_publish_past');
+  await sql(PUBLISH, ['lesson', second.id, new Date(Date.now() + 86400e3).toISOString()]);
+  assert.deepEqual((await reads(pupilAccount)).rows, ['Partager une tarte v2', 'Simplifier v1']);
+  // A teacher reads their subject's course; a colleague not assigned, an outsider, nothing; a pupil reads no draft.
+  assert.deepEqual(await reads(teacherAccount), { rows: ['Partager une tarte v2', 'Simplifier v1'], courses: 1 });
+  assert.deepEqual(await reads(colleagueAccount), { rows: [], courses: 0 });
+  assert.deepEqual(await reads(outsiderAccount), { rows: [], courses: 0 });
+  await as('school_runtime', a, pupilAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.lesson'), 0);
+  assert.equal(await count('SELECT count(*) n FROM school.lesson_version'), 0);
+  await as('school_runtime', a, manager.user);
+  await rejects("UPDATE school.lesson_version SET title = 'x' WHERE lesson_id = $1", [first1.id], '42501');
+  // Access withdrawn: the course closes at once.
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Dossier incomplet' WHERE id = $1", [enrolment]);
+  assert.deepEqual(await reads(pupilAccount), { rows: [], courses: 0 });
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+  assert.deepEqual((await reads(pupilAccount)).rows, ['Partager une tarte v2', 'Simplifier v1']);
+  // Archived, a lesson leaves the pupils' view.
+  await sql('UPDATE school.lesson SET archived_at = now() WHERE id = $1', [first1.id]);
+  assert.deepEqual((await reads(pupilAccount)).rows, ['Simplifier v1']);
+  await rejects("UPDATE school.lesson SET title = 'Retour' WHERE id = $1", [first1.id], '23514', 'lms_lesson_archived');
+  // A review when the school asks for one: submitted by a manager, approved by another.
+  await setSetting('lms.lesson.review_required', true);
+  await as('school_runtime', a, manager.user);
+  const third = await first(LESSON, [a, two.id, 'Les dixièmes', doc(para('Un dixième.'))]);
+  await rejects(PUBLISH, ['lesson', third.id, null], '23514', 'lms_review_required');
+  await sql('SELECT school.submit_lesson($1)', [third.id]);
+  await rejects(PUBLISH, ['lesson', third.id, null], '23514', 'lms_review_self');
+  await as('school_runtime', a, reviewer.user);
+  await sql(PUBLISH, ['lesson', third.id, null]);
+  assert.deepEqual(await first('SELECT submitted_by::int AS s, approved_by::int AS r FROM school.lesson_version WHERE lesson_id = $1', [third.id]),
+    { s: Number(manager.user), r: Number(reviewer.user) });
+  await setSetting('lms.lesson.review_required', false);
+  await as('school_runtime', a, manager.user);
+  await rejects('SELECT school.submit_lesson($1)', [second.id], '23514', 'lms_review_off');
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

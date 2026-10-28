@@ -10,6 +10,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CalendarExceptionController;
 use App\Http\Controllers\ClassSessionController;
 use App\Http\Controllers\ContractController;
+use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\GroupMembershipController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadOptionController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LessonController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
@@ -623,6 +625,29 @@ Route::prefix('api')->group(function () {
                     Route::post('teaching-assignments', [TeachingAssignmentController::class, 'store']);
                     Route::post('teaching-assignments/{assignment}/end', [TeachingAssignmentController::class, 'end']);
                     Route::delete('teaching-assignments/{assignment}', [TeachingAssignmentController::class, 'destroy']);
+                });
+                // FR-LMS-01: the courses, read by whom they are for; kept and published by the pedagogy manager.
+                Route::middleware('permission:lms.course.read,lms.course.manage')->group(function () {
+                    Route::get('courses', [CourseController::class, 'index']);
+                    Route::get('courses/{course}/lessons', [CourseController::class, 'lessons']);
+                });
+                Route::middleware('permission:lms.course.manage')->group(function () {
+                    Route::post('courses', [CourseController::class, 'store']);
+                    Route::put('courses/{course}', [CourseController::class, 'update']);
+                    Route::get('courses/{course}/outline', [CourseController::class, 'outline']);
+                    Route::post('courses/{course}/chapters', [CourseController::class, 'storeChapter']);
+                    Route::post('courses/{course}/chapters/order', [CourseController::class, 'orderChapters']);
+                    Route::put('chapters/{chapter}', [CourseController::class, 'updateChapter']);
+                    Route::post('chapters/{chapter}/archive', [CourseController::class, 'archiveChapter']);
+                    Route::post('chapters/{chapter}/lessons', [LessonController::class, 'store']);
+                    Route::post('chapters/{chapter}/lessons/order', [LessonController::class, 'order']);
+                    Route::get('lessons/{lesson}', [LessonController::class, 'show']);
+                    Route::get('lessons/{lesson}/versions/{version}', [LessonController::class, 'version']);
+                    Route::put('lessons/{lesson}', [LessonController::class, 'update']);
+                    Route::post('lessons/{lesson}/archive', [LessonController::class, 'archive']);
+                    Route::post('lessons/{lesson}/submit', [LessonController::class, 'submit']);
+                    Route::post('publications/preview', [CourseController::class, 'preview']);
+                    Route::post('publications', [CourseController::class, 'publish']);
                 });
             });
 
