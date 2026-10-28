@@ -8,6 +8,7 @@ return [
         'staff' => 'Personnel',
         'finance' => 'Finance',
         'planning' => 'Planning',
+        'pedagogy' => 'Pédagogie',
         'dashboards' => 'Tableaux de bord',
         'data' => 'Imports et exports',
         'people' => 'Personnes et droits',

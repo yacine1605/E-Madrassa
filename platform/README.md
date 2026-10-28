@@ -1580,6 +1580,27 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 96 (lot 5): teaching assignments and the pupils' own accounts
+
+Lot 5's base, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §1 describes it (its defaults stand until the school answers `questions.md` §4). SQL 077 (`database/schema/077_teaching_assignments.sql`, migration `2026_10_28_000077`), module `lms`:
+
+- **A teaching assignment** names the teacher of a group's subject from a day until another (included), one teacher at a time, even for two requests at once (an exclusion constraint): a teacher is replaced by ending their assignment, then assigning the next from the day after. On its first day, the group's programme teaches the subject, and the teacher, still with the school, is qualified for it at the programme's level (FR-STF-02). It starts today or later and keeps its group, subject, teacher and first day; its end, yesterday at the earliest, is final; one not begun is removed, one begun is ended, never deleted.
+- **Who assigns**: the new permission `lms.assignment.manage` (the pedagogy and HR manager), for the whole school or on the group's site. Assignments are read with the groups (`group.group.read`); a teacher's personal grant now also reads the groups they are assigned to, now or later, with their pupils (as those they lead or teach, 033 and 063).
+- **Whether the caller teaches** a group's subject on a day (`school.teaches`): their own staff record, still with the school, assigned that day. Lot 5's activities ask it before a teacher publishes or corrects; assigning is not teaching.
+- **The pupil's own account**: a pupil's record is linked to the account they sign in with (role `student`, their own data), by whoever changes the record; never one's own, a revoked membership's, a member of staff's or another pupil's. **The groups a pupil learns in** (`school.learner_groups`): those they are placed in today, by an enrolment that grants access to courses (FR-INS-04): validated, paid as far as the school asks; a suspended enrolment, an ended membership or a blocked record opens nothing.
+- Screens: **Teaching assignments** (« Affectations d'enseignement », in the new **Pedagogy** section): the assignments of the groups the reader sees, theirs marked, assigned, ended or removed by the manager; the pupil's sheet names their account, linked and unlinked from it.
+
+Routes: `GET|POST /api/teaching-assignments` (`group_id`, `subject_id`, `staff_id`, `mine`, `include_ended`), `POST /api/teaching-assignments/{assignment}/end`, `DELETE /api/teaching-assignments/{assignment}`, `GET /api/students/accounts`, `POST /api/students/{student}/account`.
+
+| Requirement | Evidence |
+|---|---|
+| Lot 5 §1 (affectation en vigueur) | tests/sql, `TeachingAssignmentTest`: a subject outside the programme, a teacher not qualified, not a teacher or a day gone refused; a second teacher over the same days refused; the first ended, the next from the day after; only the teacher assigned that day teaches, the manager does not; a teacher reads their groups' assignments, another nothing; one begun never deleted |
+| FR-IAM-04 | tests/sql: a site's grant elsewhere assigns nothing; a teacher's personal grant reads the groups of their assignments |
+| FR-INS-04, lot 5 §1 | tests/sql: a pupil learns in their group once their enrolment is validated; with the full payment required and missing, or suspended, nothing; another pupil's account learns nothing |
+| Lot 5 §1 (comptes élèves) | tests/sql, `TeachingAssignmentTest`: a pupil's account linked once, never one's own nor a member of staff's; the sheet names it and unlinks it |
+
+Validation on 28 October 2026: **313 PHP integration tests (16,510 assertions)**, the one the first run failed (`PupilRecordsTest`: the pupil's API never shows the account's identifier, so it says `has_account` and the account's name) passing once fixed; **270 embedded SQL checks and 301 native PostgreSQL 16 checks including concurrency**; migration 077 rolled back alone on the database the suite had filled, then applied again. The browser acceptance, which lists the new screen, was not run. The CI could not start (the GitHub account's billing).
+
 ## Increment 95 (lot 4): the dashboards' cache
 
 FR-TDB-03 is complete. The finance and operational dashboards' figures, and a programme's profitability, are kept for their reader (`App\Support\DashboardCache`, in the application's cache, Redis when deployed) and computed again as soon as anything changes in the school, on another day, after five minutes at most, or when the reader asks (« Recalculer » on both screens, `fresh=1` on the API). Every write to a school table leaves a trace in the audit log, so the school's stamp (`school.dashboard_stamp()`, SQL 076) is its last trace and the set of its traces of the last quarter of an hour (a transaction that began before the last trace and commits after it changes that set), with its modules, its mode and its settings. The figures are never shared between readers: their rights choose what the figures count. The screens keep showing when the figures were computed. The exports read the same figures as the screen.
@@ -1680,7 +1701,21 @@ Lot 4's exit review was held on 17 October 2026: `TST-05`, `TST-15` and `TST-16`
 
 Lot 4's requirements still partial were reviewed against the SRS, rule by rule, on 17 October 2026: FR-PLN-02, 03, 05 and 06 and FR-PTG-01 to 03 are complete. FR-PLN-04 waits for the portal (lot 10) for the pupils' and parents' own timetables.
 
-Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timetables, which the portal brings (lot 10). Lot 5 waits for the four decisions put to the school (the pupils' space, the marks' scale, the lessons' attachments, their review).
+Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timetables, which the portal brings (lot 10).
+
+## Next increments of lot 5
+
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults stand until the school answers `questions.md` §4; each is a setting or an activity's choice, so that an answer changes a value, not the design. Increment 96 laid its base (assignments, the pupils' accounts and their access). In order:
+
+1. The course (FR-LMS-01): a programme's subject in chapters and lessons, in an explicit order; each lesson's title, objectives, prerequisites, length and structured content (a ProseMirror document validated by the database, never HTML); images and resources as HTTPS links of the school's allow-list (Google Drive and Docs, GitHub, OneDrive by default, the domain's boundary checked); draft, optional review (`lms.lesson.review_required`, off), published or scheduled in Algiers' time, archived; every published change a new version. Published by lesson, chapter or course after a preview, refused whole when one item is invalid. A pupil reads the published lessons of their groups' programmes only.
+2. The course's screens: the manager's editor and preview as a pupil, the teachers' own resources on a visible lesson, « Mes cours » for the pupil.
+3. Activities (FR-LMS-02, 03): a quiz or a homework of an assigned teacher's group and subject, draft, scheduled, open, closed, archived; a version frozen at publication, the audience of the day, deadline, scale, coefficient; never published to a group the teacher does not teach (`LMS_GROUP_FORBIDDEN`).
+4. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
+5. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
+6. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
+7. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+8. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+9. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

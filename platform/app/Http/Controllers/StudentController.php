@@ -5,17 +5,21 @@ namespace App\Http\Controllers;
 use App\Exceptions\Refusal;
 use App\Http\Controllers\Concerns\HandlesLabels;
 use App\Support\CurrentSchool;
+use App\Support\Paging;
 use App\Support\PupilRecords;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class StudentController
 {
     use HandlesLabels;
 
+    // With the name of the account the pupil signs in with, as the reader may see the school's people (020).
     private const SELECT = 'SELECT id, matricule, last_name_ar, first_name_ar, last_name_lat, first_name_lat,
         birth_date, birth_place, gender, phone, email, address, status, status_reason, origin_school, custom, site_id, left_on, anonymised_at,
-        photo_file_id IS NOT NULL AS has_photo, version, archived_at, created_at, updated_at FROM school.student';
+        photo_file_id IS NOT NULL AS has_photo, user_id IS NOT NULL AS has_account, (SELECT u.name FROM public.users u WHERE u.id = student.user_id) AS account_name,
+        version, archived_at, created_at, updated_at FROM school.student';
 
     public function __construct(private CurrentSchool $school, private PupilRecords $records) {}
 
@@ -168,6 +172,39 @@ final class StudentController
         DB::table('school.student')->where('tenant_id', $this->school->id())->where('id', $current->id)
             ->update(['archived_at' => now(), 'version' => $data['version']]);
         return $this->show($current->id);
+    }
+
+    /**
+     * The account the pupil signs in with (their own data, role `student`), among the school's (not
+     * revoked); none to unlink. Never one's own, a member of staff's or another pupil's (SQL 077).
+     */
+    public function account(Request $request, string $student)
+    {
+        $current = $this->find($student, true);
+        $this->records->requireAction('student.record.update', 'student', $current->id);
+        $data = $request->validate(['user_id' => 'present|nullable|integer|min:1', 'version' => 'required|integer|min:1']);
+        if ($data['user_id'] !== null && !DB::selectOne("SELECT 1 FROM school.membership WHERE tenant_id = ? AND user_id = ? AND status <> 'revoked'",
+            [$this->school->id(), $data['user_id']])) {
+            throw ValidationException::withMessages(['user_id' => __('errors.account_unknown')]);
+        }
+        if ((int) $data['version'] !== (int) $current->version) throw Refusal::of('stale_version');
+        DB::table('school.student')->where('tenant_id', $this->school->id())->where('id', $current->id)
+            ->update(['user_id' => $data['user_id'], 'version' => $data['version']]);
+        return $this->show($current->id);
+    }
+
+    /** The school's accounts a pupil may be linked to: not revoked, neither a member of staff's nor a pupil's the reader sees. */
+    public function accounts(Request $request)
+    {
+        $this->records->createPermission('student.record.update');
+        $data = $request->validate(Paging::RULES + ['q' => 'nullable|string|max:100']);
+        $sql = "SELECT m.user_id AS id, u.name, u.email, m.username, m.status FROM school.membership m JOIN public.users u ON u.id = m.user_id
+            WHERE m.tenant_id = ? AND m.status <> 'revoked' AND NOT EXISTS (SELECT 1 FROM school.staff s WHERE s.tenant_id = m.tenant_id AND s.user_id = m.user_id)
+            AND NOT EXISTS (SELECT 1 FROM school.student s WHERE s.tenant_id = m.tenant_id AND s.user_id = m.user_id)";
+        $bindings = [$this->school->id()];
+        if (isset($data['q']) && $data['q'] !== '') { $sql .= ' AND '.Paging::search(['u.name', 'u.email', 'm.username']); $bindings[] = $data['q']; }
+        $request->merge(['paginate' => true]);
+        return Paging::select($request, $sql, $bindings, 'u.name, m.user_id');
     }
 
     /** @return list<array> the pupil's enrolments not cancelled that the reader may see: programme, year, state */

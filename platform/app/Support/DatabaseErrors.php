@@ -70,11 +70,14 @@ final class DatabaseErrors
         'attendance_session_cancelled', 'attendance_future', 'attendance_too_late', 'attendance_exists', 'attendance_validated', 'attendance_not_submitted',
         'attendance_not_author', 'attendance_late_minutes', 'attendance_replacement_required', 'attendance_hours_invalid',
         'attendance_not_validated', 'attendance_correction_same', 'attendance_month_paid', 'roll_not_member', 'roll_late_minutes', 'dashboard_range_invalid',
+        'assignment_begun', 'assignment_past', 'assignment_ended', 'assignment_end_past', 'assignment_end_before_start', 'assignment_group_closed',
+        'assignment_subject_outside_program', 'assignment_not_teacher', 'assignment_teacher_left', 'assignment_teacher_not_qualified',
+        'pupil_account_staff', 'pupil_account_linked',
     ];
 
-    /** The exclusion constraints whose refusal says which conflict (SQL 062). */
+    /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
     private const EXCLUSIONS = ['class_session_teacher_free' => 'session_teacher_busy', 'class_session_room_free' => 'session_room_busy',
-        'class_session_group_free' => 'session_group_busy'];
+        'class_session_group_free' => 'session_group_busy', 'teaching_assignment_once' => 'assignment_overlap'];
 
     public static function message(string $rule): string
     {

@@ -5047,6 +5047,106 @@ await check('the operational dashboard counts a group\'s fill as its composition
   assert.notEqual((await first('SELECT school.dashboard_stamp() AS s')).s, stamp);
   await as('school_runtime', a, 1);
 });
+// Teaching assignments (SQL 077, lot 5 §1): a group's subject and its one teacher from a day; the pupils' own accounts and the groups they learn in.
+await check('a group\'s subject is assigned to one qualified teacher at a time, within the scope of whoever assigns; only the teacher assigned that day teaches it (lot 5 §1)', async () => {
+  await as('platform_admin', null, 6);
+  await sql("SELECT platform.enable_module($1, 'lms')", [a]);
+  const manager = await scopedAccount('internal', 'tenant', null, ['group.group.read', 'lms.assignment.manage']);
+  const elsewhere = await scopedAccount('internal', 'site', [scopeSiteB], ['group.group.read', 'lms.assignment.manage']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['group.group.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['group.group.read']);
+  const outsiderAccount = await scopedAccount('internal', 'personal', null, ['group.group.read']);
+  await as('school_runtime', a, 1);
+  const teacher = (await newStaff('Affecte', 'Samir')).id;
+  const colleague = (await newStaff('Collegue', 'Rym')).id;
+  const outsider = (await newStaff('Ailleurs', 'Farid')).id;
+  const unqualified = (await newStaff('Sans', 'Habilitation')).id;
+  const clerk = (await newStaff('Bureau', 'Nawel', 'administrative')).id;
+  for (const t of [teacher, colleague, outsider]) await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+  for (const [t, account] of [[teacher, teacherAccount], [colleague, colleagueAccount], [outsider, outsiderAccount]])
+    await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [t, account.user]);
+  const taught = await programme('LMS', 90000, 'active', planned.year);
+  await line(taught, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-A', taught, 20);
+  const ASSIGN = `INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id, valid_from, valid_to) VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id, valid_from::text AS valid_from`;
+  // Within the scope of whoever assigns: a site's grant elsewhere does not.
+  await as('school_runtime', a, elsewhere.user);
+  await rejects(ASSIGN, [a, klass, maths, teacher, null, null], '42501');
+  await as('school_runtime', a, manager.user);
+  await rejects(ASSIGN, [a, klass, physics, teacher, null, null], '23514', 'assignment_subject_outside_program');
+  await rejects(ASSIGN, [a, klass, maths, unqualified, null, null], '23514', 'assignment_teacher_not_qualified');
+  await rejects(ASSIGN, [a, klass, maths, clerk, null, null], '23514', 'assignment_not_teacher');
+  await rejects(ASSIGN, [a, klass, maths, teacher, yesterday, null], '23514', 'assignment_past');
+  const assigned = await first(ASSIGN, [a, klass, maths, teacher, null, null]);
+  assert.equal(assigned.valid_from, today);
+  // One teacher at a time: the colleague follows the day after the first one ends; the end is final.
+  const handover = await dayAfter(today, 10);
+  await rejects(ASSIGN, [a, klass, maths, colleague, handover, null], '23P01');
+  await rejects('UPDATE school.teaching_assignment SET staff_id = $2 WHERE id = $1', [assigned.id, colleague], '42501');
+  await sql('UPDATE school.teaching_assignment SET valid_to = $2 WHERE id = $1', [assigned.id, await dayAfter(today, 9)]);
+  await rejects('UPDATE school.teaching_assignment SET valid_to = $2 WHERE id = $1', [assigned.id, await dayAfter(today, 20)], '23514', 'assignment_ended');
+  const next = await first(ASSIGN, [a, klass, maths, colleague, handover, null]);
+  await rejects('DELETE FROM school.teaching_assignment WHERE id = $1', [assigned.id], '23514', 'assignment_begun');
+  // Only the teacher assigned that day teaches the group's subject, and reads the group.
+  const teaches = async (account, day) => {
+    await as('school_runtime', a, account.user);
+    return (await first('SELECT school.teaches($1, $2, $3::date) AS ok', [klass, maths, day])).ok;
+  };
+  assert.deepEqual([await teaches(teacherAccount, today), await teaches(teacherAccount, handover)], [true, false]);
+  assert.deepEqual([await teaches(colleagueAccount, today), await teaches(colleagueAccount, handover)], [false, true]);
+  assert.equal(await teaches(outsiderAccount, today), false);
+  assert.equal(await teaches(manager, today), false, 'assigning is not teaching');
+  for (const [account, n] of [[teacherAccount, 2], [colleagueAccount, 2], [outsiderAccount, 0]]) {
+    await as('school_runtime', a, account.user);
+    assert.equal(await count('SELECT count(*) n FROM school.teaching_assignment WHERE group_id = $1', [klass]), n);
+    assert.equal(await count('SELECT count(*) n FROM school.study_group WHERE id = $1', [klass]), Math.min(n, 1));
+  }
+  // An assignment to come is deleted; the colleague then teaches nothing.
+  await as('school_runtime', a, manager.user);
+  await sql('DELETE FROM school.teaching_assignment WHERE id = $1', [next.id]);
+  assert.equal(await teaches(colleagueAccount, handover), false);
+  await as('school_runtime', a, 1);
+});
+await check('a pupil\'s record is linked once to their own account, never one\'s own nor a member of staff\'s; they learn in a group only through an enrolment granting access (FR-INS-04, lot 5 §1)', async () => {
+  const pupilAccount = await scopedAccount('student', 'personal', null, ['referential.node.read']);
+  const otherAccount = await scopedAccount('student', 'personal', null, ['referential.node.read']);
+  await as('school_runtime', a, 1);
+  const pupil = (await newAdult('Apprenant', 'Yasmine')).id;
+  const other = (await newAdult('Apprenant', 'Walid')).id;
+  await rejects('UPDATE school.student SET user_id = 1 WHERE id = $1', [pupil], '23514', 'self_account');
+  const staffed = (await first('SELECT user_id FROM school.staff WHERE tenant_id = $1 AND user_id IS NOT NULL LIMIT 1', [a])).user_id;
+  await rejects('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, staffed], '23514', 'pupil_account_staff');
+  await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupilAccount.user]);
+  await rejects('UPDATE school.student SET user_id = $2 WHERE id = $1', [other, pupilAccount.user], '23514', 'pupil_account_linked');
+  const taught = await programme('LMS-APP', 90000, 'active', planned.year);
+  const klass = await planGroup('LMS-B', taught, 20);
+  const e = await enroll(pupil, taught);
+  await joinGroup(e, klass);
+  await joinGroup(await enroll(other, taught), klass);
+  const learns = async account => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT group_id, student_id FROM school.learner_groups()')).rows;
+    await as('school_runtime', a, 1);
+    return rows;
+  };
+  assert.deepEqual(await learns(pupilAccount), [], 'pending');
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [e]);
+  assert.deepEqual(await learns(pupilAccount), [{ group_id: klass, student_id: pupil }]);
+  // The other pupil's account is linked to nothing; it learns nothing, not even its classmate's group.
+  assert.deepEqual(await learns(otherAccount), []);
+  // A payment required and missing, then a suspended enrolment: nothing.
+  await as(null);
+  await sql(`INSERT INTO school.setting (tenant_id, key, value) VALUES ($1, 'enrollment.access.require_payment', '"full"')
+    ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value`, [a]);
+  await as('school_runtime', a, 1);
+  assert.deepEqual(await learns(pupilAccount), []);
+  await as(null);
+  await sql("UPDATE school.setting SET value = '\"none\"' WHERE tenant_id = $1 AND key = 'enrollment.access.require_payment'", [a]);
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Dossier incomplet' WHERE id = $1", [e]);
+  assert.deepEqual(await learns(pupilAccount), []);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

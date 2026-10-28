@@ -322,6 +322,14 @@ GRANT EXECUTE ON FUNCTION school.dashboard_group_ids(text), school.operations_da
 GRANT EXECUTE ON FUNCTION school.operations_pupils(uuid, date, date), school.operations_weeks(uuid, date, date) TO school_runtime;
 -- The school's stamp (076): when anything last changed in it, never what; the dashboards' cache computes again on a new one.
 GRANT EXECUTE ON FUNCTION school.dashboard_stamp() TO school_runtime;
+-- Teaching assignments (077): a group's subject and its teacher from a day; ended, or deleted before it begins. Whether
+-- the caller teaches a group's subject, and the groups they learn in, are the database's.
+GRANT SELECT, DELETE ON school.teaching_assignment TO school_runtime;
+GRANT INSERT (tenant_id, group_id, subject_id, staff_id, valid_from, valid_to) ON school.teaching_assignment TO school_runtime;
+GRANT UPDATE (valid_to, version) ON school.teaching_assignment TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.teaches(uuid, uuid, date), school.learner_groups(), school.staff_account(bigint) TO school_runtime;
+-- A pupil's own account (077), linked by whoever changes their record.
+GRANT UPDATE (user_id) ON school.student TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -673,6 +681,15 @@ ALTER FUNCTION school.operations_sessions(uuid, date, date) OWNER TO platform_pr
 ALTER FUNCTION school.operations_pupils(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.operations_weeks(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.dashboard_stamp() OWNER TO platform_provisioner;
+-- Teaching assignments (077): the group, its programme and the teacher's qualifications, whatever the writer may read;
+-- whether the caller teaches, the groups a pupil learns in by an enrolment granting access, an account's one record.
+GRANT SELECT ON school.teaching_assignment TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.access_open(text, uuid) TO platform_provisioner;
+ALTER FUNCTION school.check_teaching_assignment() OWNER TO platform_provisioner;
+ALTER FUNCTION school.teaches(uuid, uuid, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.learner_groups() OWNER TO platform_provisioner;
+ALTER FUNCTION school.staff_account(bigint) OWNER TO platform_provisioner;
+ALTER FUNCTION school.check_student_account() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

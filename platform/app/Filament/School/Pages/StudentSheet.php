@@ -188,7 +188,8 @@ final class StudentSheet extends SchoolingPage
         $pupil = $this->pupil();
         $rows = [__('schooling.site') => $this->siteName($pupil['site_id']), __('schooling.birth_place') => $pupil['birth_place'], __('schooling.gender') => $pupil['gender'] ? __('schooling.genders.'.$pupil['gender']) : null,
             __('schooling.phone') => $pupil['phone'], __('school.email') => $pupil['email'], __('schooling.address') => $pupil['address'],
-            __('schooling.origin_school') => $pupil['origin_school'], __('schooling.block_reason') => $pupil['status_reason']];
+            __('schooling.origin_school') => $pupil['origin_school'], __('schooling.block_reason') => $pupil['status_reason'],
+            __('pedagogy.pupil_account') => $pupil['account_name']];
         foreach ($this->customDefinitions('student', true) as $field) {
             $value = $pupil['custom'][$field['key']] ?? null;
             if ($value !== null && $value !== '') $rows[Locales::label($field['labels']) ?? $field['key']] = $this->customValue($field, $value);
@@ -246,6 +247,16 @@ final class StudentSheet extends SchoolingPage
                         fn () => SchoolScreen::call('student.record.update', StudentPhotoController::class, 'destroy',
                             ['version' => $this->pupil()['version']], ['student' => $this->student])))),
             ])->label(__('schooling.photo'))->icon('heroicon-m-camera')->button()->color('gray')->visible(fn () => $this->editable()),
+            // Lot 5 §1: the account the pupil signs in with, one of the school's that is nobody else's.
+            ActionGroup::make([
+                Action::make('account')->label(__('pedagogy.link_pupil_account'))
+                    ->schema([Select::make('user_id')->label(__('pedagogy.pupil_account'))->required()->searchable()->helperText(__('pedagogy.pupil_account_help'))
+                        ->getSearchResultsUsing(fn (string $search) => $this->accountOptions($search))])
+                    ->action(fn (array $data) => $this->linkAccount((int) $data['user_id'])),
+                Action::make('unlinkAccount')->label(__('pedagogy.unlink_pupil_account'))->color('danger')->requiresConfirmation()
+                    ->modalDescription(__('pedagogy.unlink_pupil_account_help'))->visible(fn () => $this->pupil()['has_account'])
+                    ->action(fn () => $this->linkAccount(null)),
+            ])->label(__('pedagogy.pupil_account'))->icon('heroicon-m-key')->button()->color('gray')->visible(fn () => $this->editable()),
             Action::make('archive')->label(__('school.archive'))->color('danger')->requiresConfirmation()->modalDescription(__('schooling.archive_help'))
                 ->visible(fn () => $this->pupil()['status'] === 'former' && !$this->pupil()['archived_at']
                     && $this->writableFor('student.record.archive', 'student', $this->student))
@@ -254,6 +265,19 @@ final class StudentSheet extends SchoolingPage
                     fn () => SchoolScreen::call('student.record.archive', StudentController::class, 'archive',
                         [...$data, 'version' => $this->pupil()['version']], ['student' => $this->student])))),
         ];
+    }
+
+    private function linkAccount(?int $user): void
+    {
+        $this->changed(SchoolScreen::changeFor('student.record.update', 'student', $this->student, fn () => SchoolScreen::call('student.record.update',
+            StudentController::class, 'account', ['user_id' => $user, 'version' => $this->pupil()['version']], ['student' => $this->student])));
+    }
+
+    /** @return array<int, string> the school's accounts free for a pupil, matching the search, at most 50 */
+    private function accountOptions(string $search): array
+    {
+        return collect(SchoolScreen::call('student.record.update', StudentController::class, 'accounts', ['q' => $search, 'per_page' => 50])['data'])
+            ->mapWithKeys(fn (array $account) => [$account['id'] => implode(' · ', array_filter([$account['name'], $account['username'], $account['email']]))])->all();
     }
 
     /** The pupil's guardians (FR-ELV-02). */

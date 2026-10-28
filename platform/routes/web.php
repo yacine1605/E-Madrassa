@@ -68,6 +68,7 @@ use App\Http\Controllers\DeliveredHoursController;
 use App\Http\Controllers\RollCallController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\OperationsDashboardController;
+use App\Http\Controllers\TeachingAssignmentController;
 use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\TimetableVersionController;
 use App\Http\Controllers\UnavailabilityController;
@@ -279,6 +280,8 @@ Route::prefix('api')->group(function () {
             });
 
             Route::middleware('module:students_crm')->group(function () {
+                // Lot 5 §1: the account a pupil signs in with, among the school's.
+                Route::get('students/accounts', [StudentController::class, 'accounts'])->middleware('permission:student.record.update');
                 Route::middleware('permission:student.record.read')->group(function () {
                     Route::get('students', [StudentController::class, 'index']);
                     Route::get('students/{student}', [StudentController::class, 'show']);
@@ -289,6 +292,7 @@ Route::prefix('api')->group(function () {
                 Route::post('students', [StudentController::class, 'store'])->middleware('permission:student.record.create');
                 Route::put('students/{student}', [StudentController::class, 'update'])->middleware('permission:student.record.update');
                 Route::post('students/{student}/status', [StudentController::class, 'status'])->middleware('permission:student.record.update');
+                Route::post('students/{student}/account', [StudentController::class, 'account'])->middleware('permission:student.record.update');
                 Route::middleware('permission:student.record.update')->group(function () {
                     Route::post('students/{student}/photo', [StudentPhotoController::class, 'store']);
                     Route::delete('students/{student}/photo', [StudentPhotoController::class, 'destroy']);
@@ -609,6 +613,16 @@ Route::prefix('api')->group(function () {
                     Route::post('teacher-attendance/{attendance}/reject', [TeacherAttendanceController::class, 'reject']);
                     // FR-PTG-03 AC2: a validated entry corrected by a trace of its own.
                     Route::post('teacher-attendance/{attendance}/corrections', [TeacherAttendanceController::class, 'correct']);
+                });
+            });
+
+            // Lot 5 §1: who teaches a group's subject, one teacher at a time; read with the groups.
+            Route::middleware('module:lms')->group(function () {
+                Route::get('teaching-assignments', [TeachingAssignmentController::class, 'index'])->middleware('permission:group.group.read');
+                Route::middleware('permission:lms.assignment.manage')->group(function () {
+                    Route::post('teaching-assignments', [TeachingAssignmentController::class, 'store']);
+                    Route::post('teaching-assignments/{assignment}/end', [TeachingAssignmentController::class, 'end']);
+                    Route::delete('teaching-assignments/{assignment}', [TeachingAssignmentController::class, 'destroy']);
                 });
             });
 
