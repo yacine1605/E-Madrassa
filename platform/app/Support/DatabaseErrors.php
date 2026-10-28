@@ -74,7 +74,8 @@ final class DatabaseErrors
         'assignment_subject_outside_program', 'assignment_not_teacher', 'assignment_teacher_left', 'assignment_teacher_not_qualified',
         'pupil_account_staff', 'pupil_account_linked',
         'lms_link_invalid', 'lms_link_domain_blocked', 'lms_content_invalid', 'lms_subject_outside_program', 'lms_chapter_archived', 'lms_lesson_archived',
-        'lms_review_required', 'lms_review_self', 'lms_review_off', 'lms_publication_empty', 'lms_publish_past',
+        'lms_review_required', 'lms_review_self', 'lms_review_off', 'lms_publication_empty', 'lms_publish_past', 'lms_lesson_not_visible',
+        'lms_resource_withdrawn',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
@@ -127,6 +128,10 @@ final class DatabaseErrors
         // RLS refused the row: a refusal, not a fault.
         if ($state === '42501' && preg_match('/ERROR:\s+permission_denied\b/', $detail)) {
             return [403, 'permission_denied', __('errors.permission_denied')];
+        }
+        // Lot 5 §7: a group or a subject the teacher does not teach, said without telling more of it.
+        if ($state === '42501' && preg_match('/ERROR:\s+lms_group_forbidden\b/', $detail)) {
+            return [403, 'lms_group_forbidden', __('errors.lms_group_forbidden')];
         }
         if ($state === '42501') return [403, 'forbidden', __('errors.forbidden')];
         return null;

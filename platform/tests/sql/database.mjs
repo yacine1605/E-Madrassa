@@ -5316,6 +5316,69 @@ await check('a course\'s lessons are published by the manager in versions, all o
   await rejects('SELECT school.submit_lesson($1)', [second.id], '23514', 'lms_review_off');
   await as('school_runtime', a, 1);
 });
+// The teachers' own resources (SQL 079, FR-LMS-01, lot 5 §2): a link on a visible lesson of a course one teaches, withdrawn by its author or the manager.
+await check('a teacher adds a link of the allow-list to a visible lesson of their subject, published at once, and withdraws only their own; the manager withdraws any (FR-LMS-01, lot 5 §2)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.course.manage', 'lms.course.read', 'lms.resource.manage', 'lms.assignment.manage', 'group.group.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.course.read', 'lms.resource.manage', 'group.group.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.course.read', 'lms.resource.manage', 'group.group.read']);
+  const pupilAccount = await scopedAccount('student', 'personal', null, ['lms.course.read']);
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-RES', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-R', program, 20);
+  const teacher = (await newStaff('Ressource', 'Nora')).id;
+  const colleague = (await newStaff('Autre', 'Ilyes')).id;
+  for (const [t, account] of [[teacher, teacherAccount], [colleague, colleagueAccount]]) {
+    await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+    await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [t, account.user]);
+  }
+  const pupil = (await newAdult('Ressource', 'Adam')).id;
+  await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupilAccount.user]);
+  const enrolment = await enroll(pupil, program);
+  await joinGroup(enrolment, klass);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  const course = (await first('INSERT INTO school.course (tenant_id, program_id, subject_id) VALUES ($1, $2, $3) RETURNING id', [a, program, maths])).id;
+  const chapter = (await first("INSERT INTO school.course_chapter (tenant_id, course_id, title) VALUES ($1, $2, 'Géométrie') RETURNING id", [a, course])).id;
+  const LESSON = "INSERT INTO school.lesson (tenant_id, chapter_id, title) VALUES ($1, $2, $3) RETURNING id";
+  const shown = (await first(LESSON, [a, chapter, 'Le triangle'])).id;
+  const draft = (await first(LESSON, [a, chapter, 'Le cercle'])).id;
+  await sql("SELECT school.publish_lessons('lesson', $1)", [shown]);
+  const ADD = 'INSERT INTO school.lesson_resource (tenant_id, lesson_id, title, url) VALUES ($1, $2, $3, $4) RETURNING id, course_id';
+  // The assigned teacher, on a visible lesson, a link of the allow-list; the colleague and the pupil, nothing.
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects(ADD, [a, shown, 'Exercices', 'https://docs.google.com/d/1'], '42501', 'lms_group_forbidden');
+  await as('school_runtime', a, pupilAccount.user);
+  await rejects(ADD, [a, shown, 'Exercices', 'https://docs.google.com/d/1'], '42501', 'permission_denied');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects(ADD, [a, draft, 'Exercices', 'https://docs.google.com/d/1'], '23514', 'lms_lesson_not_visible');
+  await rejects(ADD, [a, shown, 'Exercices', 'https://exercices.evil.dz/1'], '23514', 'lms_link_domain_blocked');
+  const own = await first(ADD, [a, shown, 'Exercices', 'https://docs.google.com/d/1']);
+  assert.equal(own.course_id, course);
+  await rejects("UPDATE school.lesson_resource SET url = 'https://github.com/x' WHERE id = $1", [own.id], '42501');
+  await as('school_runtime', a, manager.user);
+  const theirs = await first(ADD, [a, shown, 'Corrigé', 'https://github.com/ecole/corrige']);
+  // Read by the course's readers at once, without review.
+  const listed = async account => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT title, withdrawable FROM school.lesson_resources($1)', [course])).rows;
+    await as('school_runtime', a, 1);
+    return rows.map(r => `${r.title}${r.withdrawable ? '*' : ''}`);
+  };
+  assert.deepEqual(await listed(pupilAccount), ['Exercices', 'Corrigé']);
+  assert.deepEqual(await listed(teacherAccount), ['Exercices*', 'Corrigé']);
+  assert.deepEqual(await listed(colleagueAccount), []);
+  // The teacher withdraws their own only; the manager any; for good.
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal((await sql('UPDATE school.lesson_resource SET archived_at = now() WHERE id = $1 RETURNING id', [theirs.id])).rows.length, 0);
+  await sql('UPDATE school.lesson_resource SET archived_at = now() WHERE id = $1', [own.id]);
+  await rejects('DELETE FROM school.lesson_resource WHERE id = $1', [own.id], '42501');
+  await as('school_runtime', a, manager.user);
+  assert.equal((await first('SELECT withdrawn_by::int AS w FROM school.lesson_resource WHERE id = $1', [own.id])).w, Number(teacherAccount.user));
+  await sql('UPDATE school.lesson_resource SET archived_at = now() WHERE id = $1', [theirs.id]);
+  assert.deepEqual(await listed(pupilAccount), []);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

@@ -28,6 +28,7 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadOptionController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LessonController;
+use App\Http\Controllers\LessonResourceController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
@@ -630,6 +631,11 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:lms.course.read,lms.course.manage')->group(function () {
                     Route::get('courses', [CourseController::class, 'index']);
                     Route::get('courses/{course}/lessons', [CourseController::class, 'lessons']);
+                });
+                // FR-LMS-01: a teacher's own resources, on a visible lesson of a course they teach.
+                Route::middleware('permission:lms.resource.manage')->group(function () {
+                    Route::post('lessons/{lesson}/resources', [LessonResourceController::class, 'store']);
+                    Route::post('lesson-resources/{resource}/withdraw', [LessonResourceController::class, 'withdraw']);
                 });
                 Route::middleware('permission:lms.course.manage')->group(function () {
                     Route::post('courses', [CourseController::class, 'store']);

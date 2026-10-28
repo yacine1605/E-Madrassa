@@ -78,7 +78,11 @@ final class CourseController
         abort_unless(Str::isUuid($course), 404);
         if (!DB::selectOne('SELECT school.course_readable(?::uuid) AS ok', [$course])->ok) throw Refusal::of('lms_access_denied', 403);
         $row = $this->find($course);
-        $lessons = array_map(fn ($lesson) => [...(array) $lesson, 'content' => json_decode($lesson->content, true, 64, JSON_THROW_ON_ERROR)],
+        // The teachers' resources of each lesson (SQL 079), with whether the reader may withdraw them.
+        $resources = collect(DB::select('SELECT r.*, x.version FROM school.lesson_resources(?) r
+            LEFT JOIN school.lesson_resource x ON x.tenant_id = ? AND x.id = r.id', [$row->id, $this->school->id()]))->groupBy('lesson_id');
+        $lessons = array_map(fn ($lesson) => [...(array) $lesson, 'content' => json_decode($lesson->content, true, 64, JSON_THROW_ON_ERROR),
+            'resources' => $resources->get($lesson->lesson_id, collect())->map(fn ($resource) => (array) $resource)->values()->all()],
             DB::select('SELECT * FROM school.published_lessons(?) ORDER BY chapter_position, lesson_position', [$row->id]));
         return ['data' => [...$this->present($row), 'lessons' => $lessons]];
     }

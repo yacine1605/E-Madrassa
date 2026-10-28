@@ -1580,6 +1580,26 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 98 (lot 5): the course's screens and the teachers' own resources
+
+FR-LMS-01 on screen, and its last rule. SQL 079 (`database/schema/079_lesson_resources.sql`, migration `2026_10_28_000079`):
+
+- **The teachers' own resources**: a teacher adds a link (a title and an HTTPS address of the school's allow-list) to a lesson pupils can read now, of a course whose subject they teach today in one of its programme's groups; published at once, without review. Its lesson, title and address never change; it is withdrawn by its author, or by the pedagogy manager whoever added it, never deleted. The new permission `lms.resource.manage` (teachers and the pedagogy manager). A colleague not assigned is refused (`403 lms_group_forbidden`), a lesson not yet published too (`lms_lesson_not_visible`). They are read with the course's published lessons, each with its author.
+- **Courses** (« Cours », « Mes cours » for whoever only reads them, in the Pedagogy section): the courses the reader reaches; the manager creates a programme's subject's course.
+- **A course's outline**, for the manager: its chapters and lessons in their order, each lesson's state (draft, in review, published, scheduled) and version. Chapters and lessons are added, renamed, moved up and down and archived; a lesson is written in the editor (title, objectives, prerequisites, length, its document: formatted text, headings, lists, quotations, code and links, no file), previewed as a pupil will read it, submitted when the school asks for a review, and published, with its chapter or the whole course, now or from a moment in Algiers' time, after a list of what the publication does lesson by lesson and of what stops it. The editor's own attributes (a link's `rel` and `class`, empty ones) are dropped before sending (`App\Support\LessonDocument`); anything else the database refuses, with its reason.
+- **A course as its pupils read it**: its chapters, each lesson at its last version published, its objectives and prerequisites, its document and the teachers' resources. A document is drawn from its tree by Blade views with escaped text, never as HTML (`lesson-node`, `lesson-text`): a `<script>` typed in a lesson shows as text. Links open in a new tab with `rel="noopener noreferrer"`, marked ↗, with a note that they lead out of the platform. An image of another site is shown as a link to open there: the page asks nothing of a third party (the Content Security Policy allows the platform's images only). The teacher adds and withdraws their resources there.
+
+Routes: `POST /api/lessons/{lesson}/resources`, `POST /api/lesson-resources/{resource}/withdraw`; `GET /api/courses/{course}/lessons` now gives each lesson's resources. Screens: `/school/courses`, `/school/course-outline?course=`, `/school/course-reader?course=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-01 (ressources des enseignants) | tests/sql, `CourseScreensTest`: the assigned teacher adds a link of the allow-list to a visible lesson, read at once by the pupil; a colleague not assigned, a pupil, a draft lesson, another site refused; withdrawn by its author from the screen, by the manager whoever added it, never deleted |
+| FR-LMS-01 (aperçu, publication) | `CourseScreensTest`: the manager creates the course, adds and moves chapters, writes and publishes a lesson from the outline; the preview draws the working copy |
+| Lot 5 §2 (contenu, liens) | `CourseScreensTest`: the pupil reads the lesson drawn from its document, the link with `rel="noopener noreferrer"`, a typed `<script>` as text; the editor's extra attributes dropped, unknown nodes left for the database to refuse |
+| Lot 5 §7 | `CourseScreensTest`: the pupil opens no outline and adds no resource |
+
+Validation on 28 October 2026: **316 PHP integration tests (16,967 assertions)**, the one the first run failed (`PseudoLocalizationTest`: four texts written in the code or hidden from its view check, moved to the catalogs and helpers) passing once fixed; **273 embedded SQL checks and 304 native PostgreSQL 16 checks including concurrency**; migration 079 rolled back alone on the database the suite had filled, then applied again. The browser acceptance, which lists the Courses screen, was not run; the outline and the reader, opened with a course, are covered by `CourseScreensTest`. The CI could not start (the GitHub account's billing).
+
 ## Increment 97 (lot 5): the course, its chapters and lessons, published in versions
 
 FR-LMS-01's rules, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §2 sets them. SQL 078 (`database/schema/078_courses.sql`, migration `2026_10_28_000078`); the screens come next:
@@ -1728,16 +1748,15 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults stand until the school answers `questions.md` §4; each is a setting or an activity's choice, so that an answer changes a value, not the design. Increment 96 laid its base (assignments, the pupils' accounts and their access), increment 97 the course's rules (FR-LMS-01). In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults stand until the school answers `questions.md` §4; each is a setting or an activity's choice, so that an answer changes a value, not the design. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01). In order:
 
-1. The course's screens: the manager's editor and preview as a pupil, the teachers' own resources on a visible lesson, « Mes cours » for the pupil.
-2. Activities (FR-LMS-02, 03): a quiz or a homework of an assigned teacher's group and subject, draft, scheduled, open, closed, archived; a version frozen at publication, the audience of the day, deadline, scale, coefficient; never published to a group the teacher does not teach (`LMS_GROUP_FORBIDDEN`).
-3. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
-4. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
-5. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
-6. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-7. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-8. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Activities (FR-LMS-02, 03): a quiz or a homework of an assigned teacher's group and subject, draft, scheduled, open, closed, archived; a version frozen at publication, the audience of the day, deadline, scale, coefficient; never published to a group the teacher does not teach (`LMS_GROUP_FORBIDDEN`).
+2. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
+3. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
+4. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
+5. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+6. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+7. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

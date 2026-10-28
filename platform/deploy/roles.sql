@@ -342,6 +342,12 @@ GRANT UPDATE (title, objectives, prerequisites, duration_minutes, content, posit
 GRANT EXECUTE ON FUNCTION school.lms_link_error(text), school.lms_node_error(jsonb, text, integer), school.lms_content_error(jsonb),
   school.lms_course_ids(), school.course_readable(uuid), school.published_lessons(uuid), school.publication_preview(text, uuid),
   school.publish_lessons(text, uuid, timestamptz), school.submit_lesson(uuid) TO school_runtime;
+-- The teachers' own resources (079): a link added to a visible lesson of a course one teaches, withdrawn by its author or the
+-- manager, never deleted; read by the course's readers through a function.
+GRANT SELECT ON school.lesson_resource TO school_runtime;
+GRANT INSERT (tenant_id, lesson_id, title, url) ON school.lesson_resource TO school_runtime;
+GRANT UPDATE (archived_at, version) ON school.lesson_resource TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.lesson_course(uuid), school.lesson_visible(uuid), school.teaches_course(uuid), school.lesson_resources(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -714,6 +720,12 @@ ALTER FUNCTION school.lms_course_ids() OWNER TO platform_provisioner;
 ALTER FUNCTION school.published_lessons(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.publish_lessons(text, uuid, timestamptz) OWNER TO platform_provisioner;
 ALTER FUNCTION school.submit_lesson(uuid) OWNER TO platform_provisioner;
+-- The teachers' own resources (079): the lesson and the course a resource names, whatever the writer may read.
+GRANT SELECT ON school.lesson_resource TO platform_provisioner;
+ALTER FUNCTION school.lesson_course(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.lesson_visible(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.teaches_course(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.lesson_resources(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
