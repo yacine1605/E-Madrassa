@@ -35,26 +35,24 @@ Ces conditions s'ajoutent aux exigences communes de clôture décrites plus bas.
 
 Périmètre : leçons, devoirs, quiz, notes et moyennes simples (`FR-LMS-*`).
 
-### Les quatre décisions à prendre
+### Décisions retenues pour la spécification
 
-| Sujet | Réponse attendue | Conséquence pour la spécification |
+| Sujet | Décision retenue |
 |---|---|---|
-| Espace élève | Les élèves se connectent-ils pour consulter, déposer leurs devoirs et passer leurs quiz, ou les enseignants saisissent-ils tout ? | Définir les parcours, les permissions et les écrans de chaque rôle |
-| Notation | Retenir le barème, le pas et la méthode d'arrondi, le seuil de réussite et les variations autorisées par année ou programme ; 20 points et 10/20 sont des exemples à confirmer | Versionner les règles pour préserver les résultats des années précédentes |
-| Pièces jointes et liens | Fixer les types de fichiers, la taille maximale par fichier, le quota par école et les liens externes autorisés | Définir les contrôles de dépôt, de stockage et d'accès |
-| Relecture avant publication | Décider si un responsable pédagogique doit approuver les leçons et si cette règle est configurable par école | Définir le cycle de publication et les habilitations |
+| Rôles et accès | Responsable pédagogique, enseignant et élève connecté. Accès aux activités conditionné côté serveur par l'affectation, l'inscription et `access_granted`. |
+| Activités | Une entité avec deux types : quiz chronométré et devoir maison ; les deux ont une échéance. |
+| Notation | Barème choisi par activité ; échelle versionnée par programme ou niveau ; stockage en points bruts/max ; seuil de réussite configurable, 50 % par défaut. |
+| Ressources | Remises et ressources LMS par liens HTTPS sur liste blanche ; aucun téléversement LMS. Images de l'éditeur par URL externe autorisée, contenu structuré et validé. |
+| Relecture | Programme et leçons de référence gérés par le responsable pédagogique. Relecture configurable par école, désactivée par défaut. Les enseignants publient uniquement des ressources complémentaires. |
+| Retards et tentatives | Remise tardive refusée par défaut ; acceptation tardive jusqu'à une date explicite ou prolongation individuelle. Quiz : une tentative par défaut, mode `latest`; choix par activité. |
 
 Les comptes élèves liés à leur dossier constituent un socle réutilisable. Leur existence ne suffit pas à livrer les parcours pédagogiques.
 
-Le SRS prévoit déjà le dépôt de devoirs et les tentatives de quiz par les élèves. Retenir une saisie exclusivement par l'enseignant demanderait donc de réviser explicitement ce périmètre.
-
-### Spécification à rédiger
-
-Décrire les parcours de création, relecture, publication, consultation, remise et correction. Préciser les échéances, les tentatives, les dates de visibilité des résultats et les erreurs possibles. Reprendre les garanties du SRS : accès conditionné par `access_granted`, ressources privées, dépôt idempotent, versions conservées et note manquante différente de zéro.
+Le [document de spécification détaillée du lot 5](SPECIFICATION_LOT5_PEDAGOGIE.md) fixe les parcours, états, règles de notation, permissions, erreurs et critères d'acceptation. Les valeurs par défaut y sont proposées pour permettre la réalisation et peuvent être ajustées par configuration d'activité ou d'école lorsque cela est prévu.
 
 ### Validation attendue
 
-Un enseignant publie un contenu destiné à son groupe ; un élève autorisé le consulte et réalise l'activité prévue ; l'enseignant corrige et publie le résultat ; l'élève lit uniquement les informations auxquelles il a droit. Le parcours doit couvrir les choix finalement retenus.
+Un enseignant affecté publie une activité ; un élève autorisé la réalise ; le résultat est corrigé puis publié selon la politique choisie. La recette couvre aussi le refus d'accès sans `access_granted`, la publication interdite vers un groupe non enseigné, l'isolation des notes entre élèves, les échéances, les tentatives, les liens invalides et les relances idempotentes.
 
 ## Lot 6 — Optimisation des emplois du temps
 
