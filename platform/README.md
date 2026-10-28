@@ -63,7 +63,7 @@ php artisan filament:assets                         # the console's styles and s
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
-Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, the prospects' due reminders, `platform:lead-reminders`, the messages to guardians, `platform:guardian-messages`, and the quiz attempts past their end, `platform:close-attempts`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
+Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, the prospects' due reminders, `platform:lead-reminders`, the messages to guardians, `platform:guardian-messages`, the quiz attempts past their end, `platform:close-attempts`, and the results due after their deadline, `platform:publish-marks`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
 
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
@@ -1580,6 +1580,31 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 102 (lot 5): correction and the results' publication
+
+FR-LMS-03's correction and FR-LMS-04's results, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §4 to §6 set them. SQL 083 (`database/schema/083_results.sql`, migration `2026_10_28_000083`):
+
+- **A pupil's result** for an activity is kept by the database from their work, recomputed whenever an attempt closes, a homework gets a version, an answer is corrected or a decision taken: raw points and the maximum, exact, with the coefficient. A quiz takes the activity's selection over the attempts submitted: the latest, the best ratio (a tie to the latest) or the average of ratios, complete only once every open answer counted is corrected. A homework takes the teacher's mark on the version to correct; a newer version waits for its own. States: `not_submitted`, `absent_excused`, `to_grade`, `graded`, `published`; a submission handed in late keeps its mark.
+- **The teacher's correction** (the teacher of the group's subject today, or the pedagogy manager): an open answer's points, from zero to the question's, to the hundredth, with a comment for the pupil; a homework's mark with its feedback. **Decisions**, with their reason: a zero for a missing work only once the pupil's deadline passed and nothing was handed in (never automatically: a missing work is not a zero, BR-14), or an excused absence, neither a mark nor a zero; withdrawn as they were taken.
+- **Publication**: a result is shown to its pupil only once published, as the activity says: at once when complete (`immediate`), once the pupil's deadline passed (`after_deadline`, by the scheduler's new run every minute, `php artisan platform:publish-marks`, and any change after it), or when the teacher publishes one pupil's or all of them (`on_teacher_publish`, the default). Each publication is a version kept, with who and, for a result already published, why; the pupil reads the last one published until the next. The pupil is told by a notification naming the activity, never the mark (`lms.result_published`).
+- **The answer key** is shown on its own rule, never during an attempt, and with several attempts allowed not before the last one or the quiz's close: at once, after the pupil's deadline once their correction is complete (the default), or once the teacher published it. A pupil reads their submitted attempt back: their answers, the key when due, the points and comments once the result is published.
+- **A re-correction** is the pedagogy manager's alone, with its reason: every attempt's choice answers graded again on the activity's last version (a key corrected), the results recomputed, the old and new values journaled, published again as the activity's rule says (with the reason).
+- **The pupil** reads their published results through `school.my_results()`, even once their access is withdrawn, as long as their account is; never another pupil's, never what is not published.
+
+Routes: `GET /api/activities/{activity}/results`, `GET|POST /api/attempts/{attempt}/correction`, `POST /api/activities/{activity}/grades`, `POST /api/activities/{activity}/decisions`, `POST /api/activities/{activity}/results/publish`, `POST /api/activities/{activity}/key/publish`, `POST /api/activities/{activity}/regrade`, `GET /api/my-results`, `GET /api/attempts/{attempt}/review`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-03 AC | tests/sql, `ResultTest`: no result shown before its publication; a quiz waiting for its open answer, complete once corrected and published at once |
+| FR-LMS-04, BR-14 | tests/sql, `ResultTest`: a missing work stays missing; a zero only decided, with a reason, after the deadline, nothing handed in; an excused absence no mark |
+| Lot 5 §4 (sélection) | tests/sql: two attempts, the best kept |
+| Lot 5 §6 (publication, versions) | tests/sql, `ResultTest`: the teacher's publication; after the deadline by the background run; a result changed after its publication published again with its reason, both versions kept, the first one shown until then |
+| Lot 5 §6 (corrigé) | tests/sql, `ResultTest`: the key shown at once with one attempt used, hidden until the teacher publishes it otherwise; points and comments once published |
+| Lot 5 §3 (re-correction) | tests/sql: refused to the teacher, done by the manager with its reason, the marks recomputed |
+| Lot 5 §6 (notification) | tests/sql, `ResultTest`: the pupil told, the activity only in the message |
+
+Validation on 28 October 2026: **320 PHP integration tests (17,293 assertions)**; **277 embedded SQL checks and 308 native PostgreSQL 16 checks including concurrency**; migration 083 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+
 ## Increment 101 (lot 5): homework handed in by links
 
 FR-LMS-02's submissions, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §5 sets them. SQL 082 (`database/schema/082_homework_submissions.sql`, migration `2026_10_28_000082`):
@@ -1815,12 +1840,11 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication. In order:
 
-1. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
-2. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-3. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-4. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+2. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+3. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

@@ -215,6 +215,14 @@ Artisan::command('platform:close-attempts {--limit=500}', function () {
 
 Schedule::command('platform:close-attempts')->everyMinute()->withoutOverlapping();
 
+// FR-LMS-04: the results shown after the deadline, published once it passed (SQL 083).
+Artisan::command('platform:publish-marks {--limit=500}', function () {
+    $published = DB::selectOne('SELECT platform.publish_due_marks(?) AS n', [(int) $this->option('limit')])->n;
+    $this->info("Results published: $published.");
+})->purpose('Publish the results due after their deadline, every minute (as school_runtime)');
+
+Schedule::command('platform:publish-marks')->everyMinute()->withoutOverlapping();
+
 // FR-FIN-06: the finance hears each morning of the instalments falling on the school's offsets (J-3, J, J+7 by default).
 Artisan::command('platform:finance-reminders {--day=}', function () {
     $sent = DB::selectOne('SELECT platform.notify_installments(?::date) AS n', [$this->option('day') ?: now()->timezone('Africa/Algiers')->toDateString()])->n;

@@ -5687,6 +5687,139 @@ await check('a pupil hands in links of the allow-list, each submission a version
   assert.equal(await count('SELECT count(*) n FROM school.homework_submission WHERE activity_id = $1', [strict]), 3);
   await as('school_runtime', a, 1);
 });
+// Results (SQL 083, FR-LMS-03, FR-LMS-04, lot 5 §4 to §6): corrections, selections, decisions, publication in versions, answer keys, re-correction.
+await check('a result is computed from the work and the corrections, published as the activity says, in versions; a missing work is never a zero unless decided; the pupil reads only their own published results and the key when it is due (FR-LMS-03, FR-LMS-04, lot 5 §6)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.activity.manage', 'lms.assignment.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [];
+  for (let i = 0; i < 3; i++) pupils.push(await scopedAccount('student', 'personal', null, ['lms.activity.take']));
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-NOTE', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-N', program, 20);
+  const teacher = (await newStaff('Correcteur', 'Yacine')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const records = [];
+  for (const [i, name] of ['Amel', 'Bilal', 'Chahine'].entries()) {
+    const pupil = (await newAdult('Note', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    records.push(pupil);
+  }
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  await as('school_runtime', a, teacherAccount.user);
+  const QUIZ = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, duration_minutes, max_points, max_attempts, selection,
+    results_visibility, key_visibility) VALUES ($1, $2, $3, 'quiz', $4, now() + interval '2 days', 30, $5, $6, $7, $8, $9) RETURNING id`;
+  const QUESTION = 'INSERT INTO school.activity_question (tenant_id, activity_id, kind, prompt, points, choices) VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id';
+  const choices = (...correct) => JSON.stringify(['a', 'b', 'c'].map((id, i) => ({ id, text: 'Choix ' + id, correct: correct.includes(i) })));
+  const take = async (pupil, quiz, answers) => {
+    await as('school_runtime', a, pupil.user);
+    const id = (await first('SELECT school.start_attempt($1, $2) AS id', [quiz, uuid()])).id;
+    for (const [question, picked, text] of answers) await sql('SELECT school.save_answer($1, $2, $3::jsonb, $4)', [id, question, picked, text]);
+    await sql('SELECT school.submit_attempt($1, $2)', [id, uuid()]);
+    await as('school_runtime', a, teacherAccount.user);
+    return id;
+  };
+  const results = async (account) => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT title, status, points::text AS points FROM school.my_results() ORDER BY title')).rows;
+    await as('school_runtime', a, teacherAccount.user);
+    return rows.map(r => `${r.title}:${r.status}:${r.points}`);
+  };
+  // An immediate quiz: complete only once its open answer is corrected, then published at once, the pupil told without the mark.
+  const now = (await first(QUIZ, [a, klass, maths, 'Immédiat', 10, 1, 'latest', 'immediate', 'immediate'])).id;
+  const s1 = (await first(QUESTION, [a, now, 'single', 'Un demi ?', 4, choices(1)])).id;
+  const m1 = (await first(QUESTION, [a, now, 'multiple', 'Égaux ?', 3, choices(0, 2)])).id;
+  const o1 = (await first(QUESTION, [a, now, 'open', 'Expliquez', 3, '[]'])).id;
+  await sql('SELECT school.publish_activity($1)', [now]);
+  const attemptA = await take(pupils[0], now, [[s1, '["b"]', null], [m1, '["c", "a"]', null], [o1, '[]', 'Deux quarts.']]);
+  assert.deepEqual((await sql('SELECT status, points FROM school.activity_results($1) WHERE student_id = $2', [now, records[0]])).rows, [{ status: 'to_grade', points: null }]);
+  assert.deepEqual(await results(pupils[0]), []);
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects('SELECT school.correct_answer($1, $2, 2)', [attemptA, o1], '42501', 'lms_group_forbidden');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects('SELECT school.correct_answer($1, $2, 4)', [attemptA, o1], '23514', 'lms_points_out_of_range');
+  await rejects('SELECT school.correct_answer($1, $2, 2)', [attemptA, s1], '23514', 'lms_answer_invalid');
+  await sql("SELECT school.correct_answer($1, $2, 2.5, 'Bien vu')", [attemptA, o1]);
+  assert.deepEqual(await results(pupils[0]), ['Immédiat:graded:9.50']);
+  await as('school_runtime', a, pupils[0].user);
+  const told = await first("SELECT data FROM school.notification WHERE event = 'lms.result_published' ORDER BY created_at DESC LIMIT 1");
+  assert.deepEqual(told.data, { activity_id: now }, 'the activity only, never the mark');
+  // The key: one attempt allowed and used, shown at once with the points and the comment, the result being published.
+  const review = await first('SELECT * FROM school.my_review($1)', [attemptA]);
+  assert.equal(review.key_visible, true);
+  const open1 = review.questions.find(q => q.kind === 'open');
+  assert.deepEqual([open1.answer.points, open1.answer.comment], [2.5, 'Bien vu']);
+  assert.ok(JSON.stringify(review.questions).includes('"correct":true'));
+  assert.equal(await count('SELECT count(*) n FROM school.activity_mark'), 0, 'read through the functions only');
+  await as('school_runtime', a, teacherAccount.user);
+  // A quiz the teacher publishes, two attempts, the best: waiting until published; its key until the teacher publishes it.
+  const later = (await first(QUIZ, [a, klass, maths, 'Différé', 4, 2, 'best', 'on_teacher_publish', 'on_teacher_publish'])).id;
+  const s2 = (await first(QUESTION, [a, later, 'single', 'Un tiers ?', 4, choices(2)])).id;
+  await sql('SELECT school.publish_activity($1)', [later]);
+  const wrong = await take(pupils[1], later, [[s2, '["a"]', null]]);
+  await take(pupils[1], later, [[s2, '["c"]', null]]);
+  assert.deepEqual((await sql('SELECT status, points::text AS points FROM school.activity_results($1) WHERE student_id = $2', [later, records[1]])).rows,
+    [{ status: 'graded', points: '4.00' }]);
+  assert.deepEqual(await results(pupils[1]), []);
+  await as('school_runtime', a, pupils[1].user);
+  assert.equal((await first('SELECT key_visible FROM school.my_review($1)', [wrong])).key_visible, false);
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal((await first('SELECT school.publish_marks($1) AS n', [later])).n, 1);
+  await sql('SELECT school.publish_key($1)', [later]);
+  assert.deepEqual(await results(pupils[1]), ['Différé:graded:4.00']);
+  await as('school_runtime', a, pupils[1].user);
+  assert.equal((await first('SELECT key_visible FROM school.my_review($1)', [wrong])).key_visible, true);
+  // A re-correction: the key corrected in a new version, by the pedagogy manager with its reason; republished by the teacher with a reason, both versions kept.
+  await as('school_runtime', a, teacherAccount.user);
+  await sql('UPDATE school.activity_question SET choices = $2::jsonb WHERE id = $1', [s2, choices(1)]);
+  await sql('SELECT school.publish_activity($1)', [later]);
+  await rejects("SELECT school.regrade_activity($1, 'Clé erronée')", [later], '42501', 'permission_denied');
+  await as('school_runtime', a, manager.user);
+  await sql("SELECT school.regrade_activity($1, 'Clé erronée : la bonne réponse est b')", [later]);
+  await as('school_runtime', a, teacherAccount.user);
+  assert.deepEqual(await results(pupils[1]), ['Différé:graded:4.00'], 'the version published stays until the next');
+  await rejects('SELECT school.publish_marks($1)', [later], '23514', 'reason_required');
+  await sql("SELECT school.publish_marks($1, NULL, 'Clé corrigée')", [later]);
+  assert.deepEqual(await results(pupils[1]), ['Différé:graded:0.00'], 'neither attempt chose b');
+  assert.deepEqual((await sql('SELECT number, points::text AS points, reason FROM school.activity_mark_publication WHERE activity_id = $1 ORDER BY number', [later])).rows,
+    [{ number: 1, points: '4.00', reason: null }, { number: 2, points: '0.00', reason: 'Clé corrigée' }]);
+  // A homework shown after the deadline: graded, published by the background run once it passed; a missing work zero only when decided; an excused absence, no mark.
+  const homework = (await first(`INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, max_points, results_visibility)
+    VALUES ($1, $2, $3, 'homework', 'Exposé', now() + interval '2 days', 20, 'after_deadline') RETURNING id`, [a, klass, maths])).id;
+  await sql('SELECT school.publish_activity($1)', [homework]);
+  await as('school_runtime', a, pupils[2].user);
+  await sql('SELECT school.submit_homework($1, $2, $3::jsonb)', [homework, uuid(), JSON.stringify(['https://drive.google.com/file/d/expose'])]);
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects('SELECT school.grade_homework($1, $2, 15)', [homework, records[0]], '23514', 'lms_nothing_submitted');
+  await rejects('SELECT school.grade_homework($1, $2, 21)', [homework, records[2]], '23514', 'lms_points_out_of_range');
+  await sql("SELECT school.grade_homework($1, $2, 15, 'Clair')", [homework, records[2]]);
+  await rejects("SELECT school.decide_mark($1, $2, 'zero_missing', 'Non rendu')", [homework, records[0]], '23514', 'lms_deadline_not_passed');
+  assert.deepEqual(await results(pupils[2]), [], 'not before the deadline');
+  await as(null);
+  await sql('ALTER TABLE school.activity_version DISABLE TRIGGER USER');
+  await sql("UPDATE school.activity_version SET deadline_at = now() - interval '1 minute', closes_at = now() - interval '1 minute' WHERE activity_id = $1", [homework]);
+  await sql('ALTER TABLE school.activity_version ENABLE TRIGGER USER');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects("SELECT school.decide_mark($1, $2, 'zero_missing', '')", [homework, records[0]], '23514', 'reason_required');
+  await rejects("SELECT school.decide_mark($1, $2, 'zero_missing', 'Non rendu')", [homework, records[2]], '23514', 'lms_work_submitted');
+  await sql("SELECT school.decide_mark($1, $2, 'zero_missing', 'Non rendu sans justification')", [homework, records[0]]);
+  await sql("SELECT school.decide_mark($1, $2, 'excused', 'Hospitalisé')", [homework, records[1]]);
+  await as('school_runtime', null, null);
+  assert.ok((await first('SELECT platform.publish_due_marks(100) AS n')).n >= 1);
+  await as('school_runtime', a, teacherAccount.user);
+  assert.deepEqual((await sql('SELECT student_id, status, points::text AS points FROM school.activity_results($1) ORDER BY student_id', [homework])).rows,
+    records.map((id, i) => ({ student_id: id, ...[{ status: 'published', points: '0.00' }, { status: 'absent_excused', points: null }, { status: 'published', points: '15.00' }][i] }))
+      .sort((x, y) => x.student_id.localeCompare(y.student_id)));
+  assert.deepEqual(await results(pupils[2]), ['Exposé:graded:15.00']);
+  assert.deepEqual(await results(pupils[1]), ['Différé:graded:0.00', 'Exposé:absent_excused:null']);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

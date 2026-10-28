@@ -370,6 +370,11 @@ GRANT EXECUTE ON FUNCTION school.my_student(), school.start_attempt(uuid, uuid),
 GRANT SELECT ON school.homework_submission TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.links_error(jsonb), school.submit_homework(uuid, uuid, jsonb), school.flag_submission(uuid, text),
   school.my_submissions(uuid) TO school_runtime;
+-- Results (083): corrected, decided and published by their functions only; read by their teachers, the pupil their own published ones.
+GRANT SELECT ON school.activity_mark, school.activity_mark_publication TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.pupil_deadline(uuid, uuid, uuid), school.correct_answer(uuid, uuid, numeric, text), school.grade_homework(uuid, uuid, numeric, text),
+  school.decide_mark(uuid, uuid, text, text), school.publish_marks(uuid, uuid[], text), school.publish_key(uuid), school.regrade_activity(uuid, text),
+  platform.publish_due_marks(integer), school.activity_results(uuid), school.my_results(), school.key_visible(uuid, uuid, uuid), school.my_review(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -780,6 +785,27 @@ GRANT EXECUTE ON FUNCTION school.links_error(jsonb) TO platform_provisioner;
 ALTER FUNCTION school.submit_homework(uuid, uuid, jsonb) OWNER TO platform_provisioner;
 ALTER FUNCTION school.flag_submission(uuid, text) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_submissions(uuid) OWNER TO platform_provisioner;
+-- Results (083): each pupil's result kept from their work, published in versions, the pupil told.
+GRANT SELECT, INSERT ON school.activity_mark, school.activity_mark_publication TO platform_provisioner;
+GRANT UPDATE (status, points, max_points, coefficient, version_id, late, decision, decision_reason, manual_points, graded_number, feedback, published_status,
+  published_points, published_feedback, published_at, publications) ON school.activity_mark TO platform_provisioner;
+GRANT UPDATE (key_published_at) ON school.activity TO platform_provisioner;
+GRANT UPDATE (corrected_by, corrected_at, comment) ON school.quiz_answer TO platform_provisioner;
+ALTER FUNCTION school.pupil_deadline(uuid, uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.tell_result(uuid, uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.publish_mark(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.refresh_mark(uuid, uuid, uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.follow_work() OWNER TO platform_provisioner;
+ALTER FUNCTION school.correct_answer(uuid, uuid, numeric, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.grade_homework(uuid, uuid, numeric, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.decide_mark(uuid, uuid, text, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.publish_marks(uuid, uuid[], text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.publish_key(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.regrade_activity(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.publish_due_marks(integer) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_results() OWNER TO platform_provisioner;
+ALTER FUNCTION school.key_visible(uuid, uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_review(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

@@ -51,6 +51,7 @@ use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\ReferentialController;
 use App\Http\Controllers\RefundController;
+use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\RoleController;
@@ -665,6 +666,20 @@ Route::prefix('api')->group(function () {
                     // FR-LMS-02: the pupil's homework, handed in as links.
                     Route::get('my-activities/{activity}/submissions', [HomeworkSubmissionController::class, 'index']);
                     Route::post('my-activities/{activity}/submissions', [HomeworkSubmissionController::class, 'store']);
+                    // FR-LMS-04: the pupil's published results; an attempt read back.
+                    Route::get('my-results', [ResultController::class, 'mine']);
+                    Route::get('attempts/{attempt}/review', [ResultController::class, 'review']);
+                });
+                // FR-LMS-03, FR-LMS-04: correction and publication, by the teacher of the group's subject; re-correction by the manager.
+                Route::middleware('permission:lms.activity.manage')->group(function () {
+                    Route::get('activities/{activity}/results', [ResultController::class, 'index']);
+                    Route::get('attempts/{attempt}/correction', [ResultController::class, 'attempt']);
+                    Route::post('attempts/{attempt}/correction', [ResultController::class, 'correct']);
+                    Route::post('activities/{activity}/grades', [ResultController::class, 'grade']);
+                    Route::post('activities/{activity}/decisions', [ResultController::class, 'decide']);
+                    Route::post('activities/{activity}/results/publish', [ResultController::class, 'publish']);
+                    Route::post('activities/{activity}/key/publish', [ResultController::class, 'publishKey']);
+                    Route::post('activities/{activity}/regrade', [ResultController::class, 'regrade']);
                 });
                 Route::middleware('permission:lms.activity.manage')->group(function () {
                     Route::get('activities/{activity}/submissions', [HomeworkSubmissionController::class, 'forActivity']);
