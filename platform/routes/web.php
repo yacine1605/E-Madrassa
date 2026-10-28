@@ -24,6 +24,7 @@ use App\Http\Controllers\FinancePeriodController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuardianController;
+use App\Http\Controllers\HomeworkSubmissionController;
 use App\Http\Controllers\GroupMembershipController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadOptionController;
@@ -661,6 +662,13 @@ Route::prefix('api')->group(function () {
                     Route::get('attempts/{attempt}', [QuizAttemptController::class, 'show']);
                     Route::put('attempts/{attempt}/answers/{question}', [QuizAttemptController::class, 'answer']);
                     Route::post('attempts/{attempt}/submit', [QuizAttemptController::class, 'submit']);
+                    // FR-LMS-02: the pupil's homework, handed in as links.
+                    Route::get('my-activities/{activity}/submissions', [HomeworkSubmissionController::class, 'index']);
+                    Route::post('my-activities/{activity}/submissions', [HomeworkSubmissionController::class, 'store']);
+                });
+                Route::middleware('permission:lms.activity.manage')->group(function () {
+                    Route::get('activities/{activity}/submissions', [HomeworkSubmissionController::class, 'forActivity']);
+                    Route::post('homework-submissions/{submission}/flag', [HomeworkSubmissionController::class, 'flag']);
                 });
                 Route::get('activities/{activity}/attempts', [QuizAttemptController::class, 'forActivity'])->middleware('permission:lms.activity.manage');
                 // FR-LMS-01: a teacher's own resources, on a visible lesson of a course they teach.

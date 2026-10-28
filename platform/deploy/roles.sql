@@ -366,6 +366,10 @@ GRANT EXECUTE ON FUNCTION school.manages_activity(uuid, uuid), school.taught_key
 GRANT SELECT ON school.quiz_attempt, school.quiz_answer TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.my_student(), school.start_attempt(uuid, uuid), school.save_answer(uuid, uuid, jsonb, text), school.submit_attempt(uuid, uuid),
   school.my_attempts(uuid), school.my_attempt(uuid), platform.close_expired_attempts(integer) TO school_runtime;
+-- Homework submissions (082): versions of links handed in by the pupil, a link flagged by the teacher; written by functions only.
+GRANT SELECT ON school.homework_submission TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.links_error(jsonb), school.submit_homework(uuid, uuid, jsonb), school.flag_submission(uuid, text),
+  school.my_submissions(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -769,6 +773,13 @@ ALTER FUNCTION school.submit_attempt(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.close_expired_attempts(integer) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_attempts(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_attempt(uuid) OWNER TO platform_provisioner;
+-- Homework submissions (082): each version written by the submission, a flag by the teacher's function.
+GRANT SELECT, INSERT ON school.homework_submission TO platform_provisioner;
+GRANT UPDATE (status, flagged_at, flagged_by, flag_reason, replace_until) ON school.homework_submission TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.links_error(jsonb) TO platform_provisioner;
+ALTER FUNCTION school.submit_homework(uuid, uuid, jsonb) OWNER TO platform_provisioner;
+ALTER FUNCTION school.flag_submission(uuid, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_submissions(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

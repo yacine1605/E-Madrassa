@@ -79,6 +79,7 @@ final class DatabaseErrors
         'lms_question_choices_invalid', 'lms_question_correct_count', 'lms_points_mismatch', 'lms_deadline_past', 'lms_activity_dates_invalid',
         'lms_quiz_empty', 'lms_audience_not_member', 'lms_audience_exists', 'lms_extension_earlier', 'lms_activity_not_open', 'lms_deadline_passed',
         'lms_attempts_exhausted', 'lms_attempt_expired', 'lms_attempt_submitted', 'lms_answer_invalid', 'idempotency_key_required',
+        'lms_submission_not_current',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */

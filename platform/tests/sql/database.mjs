@@ -5607,6 +5607,86 @@ await check('a pupil\'s quiz attempt ends at min(start + duration, deadline) by 
   await rejects(START, [quiz, uuid()], '42501', 'lms_access_denied');
   await as('school_runtime', a, 1);
 });
+// Homework submissions (SQL 082, FR-LMS-02, lot 5 §5): links of the allow-list in versions, idempotent, late policy, extensions, a link replaced.
+await check('a pupil hands in links of the allow-list, each submission a version; again with its key, the same; late refused or marked; an inaccessible link replaced within the delay, keeping its punctuality (FR-LMS-02 AC, lot 5 §5)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.activity.manage', 'lms.assignment.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [await scopedAccount('student', 'personal', null, ['lms.activity.take']), await scopedAccount('student', 'personal', null, ['lms.activity.take'])];
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-DEV', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-D', program, 20);
+  const teacher = (await newStaff('Devoir', 'Hana')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const records = [];
+  for (const [i, name] of ['Farah', 'Ghani'].entries()) {
+    const pupil = (await newAdult('Remise', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    records.push(pupil);
+  }
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  await as('school_runtime', a, teacherAccount.user);
+  const HOMEWORK = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, late_policy, late_until)
+    VALUES ($1, $2, $3, 'homework', $4, now() + interval '2 days', $5, $6::timestamptz) RETURNING id`;
+  const strict = (await first(HOMEWORK, [a, klass, maths, 'Exposé', 'refuse', null])).id;
+  const lenient = (await first(HOMEWORK, [a, klass, maths, 'Projet', 'accept_until', new Date(Date.now() + 5 * 86400e3).toISOString()])).id;
+  for (const h of [strict, lenient]) await sql('SELECT school.publish_activity($1)', [h]);
+  const SUBMIT = 'SELECT school.submit_homework($1, $2, $3::jsonb) AS id';
+  const drive = 'https://drive.google.com/file/d/expose';
+  // Links of the allow-list only, 1 to 5, each once; never fetched.
+  await as('school_runtime', a, pupils[0].user);
+  for (const [links, e] of [['[]', 'lms_link_invalid'], [JSON.stringify(['http://drive.google.com/x']), 'lms_link_invalid'],
+    [JSON.stringify(['https://wetransfer.com/x']), 'lms_link_domain_blocked'], [JSON.stringify([drive, drive]), 'lms_link_invalid']])
+    await rejects(SUBMIT, [strict, uuid(), links], '23514', e);
+  const key = uuid();
+  const first1 = (await first(SUBMIT, [strict, key, JSON.stringify([drive])])).id;
+  // A cut and a retry: the same key, the same submission; another content under it refused.
+  assert.equal((await first(SUBMIT, [strict, key, JSON.stringify([drive])])).id, first1);
+  await rejects(SUBMIT, [strict, key, JSON.stringify(['https://github.com/eleve/expose'])], '23514', 'idempotency_key_reused');
+  // Replaced while open: the history kept, the last version to correct.
+  const second = (await first(SUBMIT, [strict, uuid(), JSON.stringify([drive, 'https://github.com/eleve/expose'])])).id;
+  assert.deepEqual((await sql('SELECT number, status, late FROM school.my_submissions($1)', [strict])).rows,
+    [{ number: 2, status: 'current', late: false }, { number: 1, status: 'replaced', late: false }]);
+  assert.equal(await count('SELECT count(*) n FROM school.homework_submission'), 0, 'read through the function only');
+  // The deadline passed: refused by the strict homework; late, and marked, by the lenient one until its end.
+  await as(null);
+  await sql('ALTER TABLE school.activity_version DISABLE TRIGGER USER');
+  await sql("UPDATE school.activity_version SET deadline_at = now() - interval '1 hour', closes_at = CASE WHEN late_policy = 'refuse' THEN now() - interval '1 hour' ELSE closes_at END WHERE activity_id IN ($1, $2)", [strict, lenient]);
+  await sql('ALTER TABLE school.activity_version ENABLE TRIGGER USER');
+  await as('school_runtime', a, pupils[1].user);
+  await rejects(SUBMIT, [strict, uuid(), JSON.stringify([drive])], '23514', 'lms_deadline_passed');
+  await sql(SUBMIT, [lenient, uuid(), JSON.stringify(['https://onedrive.live.com/projet'])]);
+  assert.deepEqual((await sql('SELECT late FROM school.my_submissions($1)', [lenient])).rows, [{ late: true }]);
+  // The teacher flags the on-time version as not opening; the pupil replaces it within the delay, on time still.
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects('SELECT school.flag_submission($1, $2)', [second, 'Lien privé'], '42501', 'lms_group_forbidden');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects('SELECT school.flag_submission($1, $2)', [first1, 'Lien privé'], '23514', 'lms_submission_not_current');
+  const until = (await first('SELECT school.flag_submission($1, $2) AS u', [second, 'Lien privé : accès refusé'])).u;
+  assert.ok(Math.abs(new Date(until) - Date.now() - 48 * 3600e3) < 60e3, '48 hours by default');
+  await as('school_runtime', a, pupils[0].user);
+  const third = (await first(SUBMIT, [strict, uuid(), JSON.stringify(['https://docs.google.com/document/d/expose'])])).id;
+  assert.deepEqual((await sql('SELECT number, status, late, flag_reason FROM school.my_submissions($1)', [strict])).rows.map(r => [r.number, r.status, r.late, r.flag_reason]),
+    [[3, 'current', false, null], [2, 'inaccessible', false, 'Lien privé : accès refusé'], [1, 'replaced', false, null]]);
+  // The delay over, no more.
+  await as(null);
+  await sql('ALTER TABLE school.homework_submission DISABLE TRIGGER USER');
+  await sql("UPDATE school.homework_submission SET status = 'inaccessible', flagged_at = now(), flag_reason = 'Vide', replace_until = now() - interval '1 minute' WHERE id = $1", [third]);
+  await sql('ALTER TABLE school.homework_submission ENABLE TRIGGER USER');
+  await as('school_runtime', a, pupils[0].user);
+  await rejects(SUBMIT, [strict, uuid(), JSON.stringify([drive])], '23514', 'lms_deadline_passed');
+  // The teacher reads every version; a pupil writes none directly.
+  await rejects('UPDATE school.homework_submission SET late = false WHERE id = $1', [third], '42501');
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.homework_submission WHERE activity_id = $1', [strict]), 3);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

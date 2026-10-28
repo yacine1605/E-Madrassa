@@ -287,6 +287,7 @@ return [
     'lms_attempt_expired' => 'انتهى وقت هذه المحاولة: سُلّمت بالأجوبة المسجلة.',
     'lms_attempt_submitted' => 'سُلّمت هذه المحاولة مسبقًا.',
     'lms_answer_invalid' => 'هذا الجواب لا يوافق السؤال.',
+    'lms_submission_not_current' => 'لا يُبلَّغ إلا عن آخر تسليم، الذي يُصحَّح.',
     'idempotency_key_required' => 'مفتاح عدم التكرار مطلوب.',
     'dashboard_range_invalid' => 'اختر فترة لا تتجاوز 13 شهرًا، نهايتها بعد بدايتها.',
     'timetable_scope_required' => 'اختر فوجًا أو أستاذًا أو قاعة.',

@@ -287,6 +287,7 @@ return [
     'lms_attempt_expired' => 'Le temps de cette tentative est écoulé : elle est remise avec les réponses enregistrées.',
     'lms_attempt_submitted' => 'Cette tentative est déjà remise.',
     'lms_answer_invalid' => 'Cette réponse ne correspond pas à la question.',
+    'lms_submission_not_current' => 'Seule la dernière remise, celle à corriger, peut être signalée.',
     'idempotency_key_required' => 'Une clé d’idempotence est requise.',
     'dashboard_range_invalid' => 'Choisissez une période de 13 mois au plus, la fin après le début.',
     'timetable_scope_required' => 'Choisissez un groupe, un enseignant ou une salle.',

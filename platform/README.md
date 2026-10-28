@@ -1580,6 +1580,28 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 101 (lot 5): homework handed in by links
+
+FR-LMS-02's submissions, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §5 sets them. SQL 082 (`database/schema/082_homework_submissions.sql`, migration `2026_10_28_000082`):
+
+- **A submission** is one to five HTTPS links of the school's allow-list (078), each once; never a file, never fetched. Each one is a version dated by the server, the acknowledgement the pupil keeps: while the homework is open, a new version replaces the links to be corrected, the previous ones stay in the history (one version to correct at a time).
+- **After a cut**, the same idempotency key gives back the same submission (FR-LMS-02 AC: a retry creates no new submission); another content under that key is refused.
+- **Late**: after the pupil's deadline (their own if extended), refused by default (`lms_deadline_passed`); accepted until the activity's date when it says so, and marked late.
+- **A link that does not open**: the teacher of the group's subject flags the version to correct with the reason; it is kept, marked inaccessible, and the pupil has the activity's delay (48 hours by default) to hand in another, even after the deadline. A version on time keeps its punctuality once replaced; a late one stays late. The delay over, nothing more is accepted; the teacher may still mark from the history (with the correction).
+- **The pupil** reads their own versions, the reason of a flag and until when to replace it; **the teacher** reads every pupil's. Nobody writes a submission but its functions. A timestamp proves a link was handed in then, not that what it shows has not changed since.
+
+Routes: `GET|POST /api/my-activities/{activity}/submissions`, `GET /api/activities/{activity}/submissions`, `POST /api/homework-submissions/{submission}/flag`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-02 AC | tests/sql, `HomeworkSubmissionTest`: the same key twice, one submission; another content under it refused |
+| FR-LMS-02, lot 5 §5 (liens) | tests/sql, `HomeworkSubmissionTest`: no link, `http`, another site, the same link twice refused |
+| Lot 5 §5 (versions) | tests/sql, `HomeworkSubmissionTest`: replaced while open, the history kept, the last version current |
+| Lot 5 §5 (retards) | tests/sql: after the deadline refused by the strict homework, marked late by the one accepting it until a date |
+| Lot 5 §5 (remplacement) | tests/sql, `HomeworkSubmissionTest`: a colleague flags nothing; the version flagged kept, its replacement within 48 hours on time still; the delay over, refused |
+
+Validation on 28 October 2026: **319 PHP integration tests (17,212 assertions)**; **276 embedded SQL checks and 307 native PostgreSQL 16 checks including concurrency**; migration 082 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+
 ## Increment 100 (lot 5): quiz attempts, timed by the server
 
 FR-LMS-03's attempts, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §4 sets them. SQL 081 (`database/schema/081_quiz_attempts.sql`, migration `2026_10_28_000081`):
@@ -1793,13 +1815,12 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions. In order:
 
-1. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
-2. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
-3. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-4. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-5. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
+2. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+3. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+4. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 
