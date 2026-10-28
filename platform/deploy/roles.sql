@@ -348,6 +348,20 @@ GRANT SELECT ON school.lesson_resource TO school_runtime;
 GRANT INSERT (tenant_id, lesson_id, title, url) ON school.lesson_resource TO school_runtime;
 GRANT UPDATE (archived_at, version) ON school.lesson_resource TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.lesson_course(uuid), school.lesson_visible(uuid), school.teaches_course(uuid), school.lesson_resources(uuid) TO school_runtime;
+-- Activities (080): a group's subject's quiz or homework, kept by its teachers of the day and the manager; a draft deleted, a
+-- published one archived. Its versions and audience written by the database, a pupil's own deadline excepted.
+GRANT SELECT ON school.activity, school.activity_question, school.activity_version, school.activity_audience TO school_runtime;
+GRANT INSERT (tenant_id, group_id, subject_id, kind, title, instructions, lesson_id, opens_at, deadline_at, duration_minutes, max_points, coefficient,
+  max_attempts, selection, late_policy, late_until, results_visibility, key_visibility, replacement_hours) ON school.activity TO school_runtime;
+GRANT UPDATE (kind, title, instructions, lesson_id, opens_at, deadline_at, duration_minutes, max_points, coefficient, max_attempts, selection, late_policy,
+  late_until, results_visibility, key_visibility, replacement_hours, version, archived_at) ON school.activity TO school_runtime;
+GRANT DELETE ON school.activity, school.activity_question TO school_runtime;
+GRANT INSERT (tenant_id, activity_id, position, kind, prompt, points, choices) ON school.activity_question TO school_runtime;
+GRANT UPDATE (position, kind, prompt, points, choices, version) ON school.activity_question TO school_runtime;
+GRANT UPDATE (deadline_at, extension_reason, version) ON school.activity_audience TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.manages_activity(uuid, uuid), school.taught_keys(), school.group_subject(uuid, uuid), school.question_error(text, jsonb),
+  school.activity_keys(uuid), school.activity_problems(uuid), school.publish_activity(uuid), school.add_to_audience(uuid, uuid, timestamptz, text),
+  school.activity_state(boolean, timestamptz, timestamptz, timestamptz, timestamptz), school.my_activities() TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -726,6 +740,18 @@ ALTER FUNCTION school.lesson_course(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.lesson_visible(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.teaches_course(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.lesson_resources(uuid) OWNER TO platform_provisioner;
+-- Activities (080): the publication freezes a version and the first audience; a pupil reads their own activities.
+GRANT SELECT ON school.activity, school.activity_question, school.activity_version, school.activity_audience TO platform_provisioner;
+GRANT INSERT ON school.activity_version, school.activity_audience TO platform_provisioner;
+GRANT UPDATE (status, published_version, opens_at) ON school.activity TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.manages_activity(uuid, uuid), school.activity_problems(uuid), school.question_error(text, jsonb),
+  school.activity_state(boolean, timestamptz, timestamptz, timestamptz, timestamptz), school.require(text) TO platform_provisioner;
+ALTER FUNCTION school.taught_keys() OWNER TO platform_provisioner;
+ALTER FUNCTION school.group_subject(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.activity_keys(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.publish_activity(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.add_to_audience(uuid, uuid, timestamptz, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_activities() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

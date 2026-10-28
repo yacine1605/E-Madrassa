@@ -1580,6 +1580,29 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 99 (lot 5): activities, their versions and their audience
+
+FR-LMS-02's and FR-LMS-03's common base, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §3 sets it. SQL 080 (`database/schema/080_activities.sql`, migration `2026_10_28_000080`); attempts, submissions, marks and the screens come next:
+
+- **An activity** is a quiz (timed, `duration_minutes`) or a homework (handed in by links), of a group's subject its programme teaches: a title, instructions (a document of 078's schema), a lesson of the course if any, an opening and a deadline, a total of points (exact decimals) and a coefficient (1 by default). A quiz's attempts (1 by default) and their selection (`latest`, `best`, `average`); a late policy (refused by default, or accepted until a date); the visibility of results (`on_teacher_publish` by default) and of the answer key (`after_deadline` by default); a homework's replacement delay (48 hours). The new permissions `lms.activity.manage` (teachers and the pedagogy manager) and `lms.activity.take` (pupils).
+- **Who writes it**: the pedagogy manager of the whole school, or the teacher assigned to the group's subject today (077); never a colleague, a teacher whose assignment ended or anyone for another group (`403 lms_group_forbidden`, said alike whether they may read the group or not). They alone read it.
+- **A quiz's questions**, in their order: a single choice (one correct answer), a multiple choice (at least one), each of 2 to 10 choices `{id, text, correct}`, or an open question; their points make the quiz's total.
+- **Publication** checks the dates (an opening before the deadline, a deadline to come the first time), a quiz's questions and points, a lesson pupils read, and freezes a new version with its questions and answers and the lesson's version of the day; an activity published is never deleted (a draft is), it is archived. Its group, subject and kind are fixed from its first publication. Its state comes from its last version's dates: scheduled, open, closed, archived.
+- **Its audience**: the group's pupils placed in it with access to courses at its first publication; a pupil joining later is added explicitly; one pupil gets a later deadline of their own with its reason (an extension), journaled.
+- **The pupil** reads their activities through `school.my_activities()`: those they are in the audience of, of a group they learn in today (a withdrawn access closes them at once), at their last version, with their own deadline and the state it gives; never a quiz's questions or answers (an attempt will show the questions). Another activity is refused alike whether it exists or not (`403 lms_access_denied`).
+
+Routes: `GET|POST /api/activities`, `GET|PUT|DELETE /api/activities/{activity}`, `POST /api/activities/{activity}/archive`, `POST /api/activities/{activity}/publish`, `POST /api/activities/{activity}/questions`, `POST /api/activities/{activity}/questions/order`, `PUT|DELETE /api/activity-questions/{question}`, `GET|POST /api/activities/{activity}/audience`, `POST /api/activity-audience/{entry}/extend`, `GET /api/my-activities`, `GET /api/my-activities/{activity}`. Moments are entered in Algiers' time.
+
+| Requirement | Evidence |
+|---|---|
+| Lot 5 §1, §7 | tests/sql, `ActivityTest`: a colleague not assigned writes nothing (`lms_group_forbidden`) and reads nothing; a subject outside the programme refused |
+| Lot 5 §3 (versions) | tests/sql, `ActivityTest`: published, then changed and published again, version 1 kept with its questions; never deleted, archived; group, subject and kind fixed |
+| FR-LMS-03 (questions) | tests/sql, `ActivityTest`: two correct answers for a single choice, unknown keys, questions on a homework refused; the points making the total |
+| Lot 5 §3 (audience) | tests/sql, `ActivityTest`: the pupils with access at the first publication, not one waiting; a pupil added later once they have access, once; an extension later than the deadline, with its reason |
+| FR-LMS-02, 03, lot 5 §1 | tests/sql, `ActivityTest`: the pupil reads their activity, open or scheduled, without its questions or answers; another refused; archived or access withdrawn, nothing |
+
+Validation on 28 October 2026: **317 PHP integration tests (17,083 assertions)**; **274 embedded SQL checks and 305 native PostgreSQL 16 checks including concurrency**; migration 080 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+
 ## Increment 98 (lot 5): the course's screens and the teachers' own resources
 
 FR-LMS-01 on screen, and its last rule. SQL 079 (`database/schema/079_lesson_resources.sql`, migration `2026_10_28_000079`):
@@ -1625,7 +1648,7 @@ The settings screen edits the new kind of setting, a list of domain names, one p
 
 ## Increment 96 (lot 5): teaching assignments and the pupils' own accounts
 
-Lot 5's base, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §1 describes it (its defaults stand until the school answers `questions.md` §4). SQL 077 (`database/schema/077_teaching_assignments.sql`, migration `2026_10_28_000077`), module `lms`:
+Lot 5's base, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §1 describes it. SQL 077 (`database/schema/077_teaching_assignments.sql`, migration `2026_10_28_000077`), module `lms`:
 
 - **A teaching assignment** names the teacher of a group's subject from a day until another (included), one teacher at a time, even for two requests at once (an exclusion constraint): a teacher is replaced by ending their assignment, then assigning the next from the day after. On its first day, the group's programme teaches the subject, and the teacher, still with the school, is qualified for it at the programme's level (FR-STF-02). It starts today or later and keeps its group, subject, teacher and first day; its end, yesterday at the earliest, is final; one not begun is removed, one begun is ended, never deleted.
 - **Who assigns**: the new permission `lms.assignment.manage` (the pedagogy and HR manager), for the whole school or on the group's site. Assignments are read with the groups (`group.group.read`); a teacher's personal grant now also reads the groups they are assigned to, now or later, with their pupils (as those they lead or teach, 033 and 063).
@@ -1748,15 +1771,14 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults stand until the school answers `questions.md` §4; each is a setting or an activity's choice, so that an answer changes a value, not the design. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01). In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience. In order:
 
-1. Activities (FR-LMS-02, 03): a quiz or a homework of an assigned teacher's group and subject, draft, scheduled, open, closed, archived; a version frozen at publication, the audience of the day, deadline, scale, coefficient; never published to a group the teacher does not teach (`LMS_GROUP_FORBIDDEN`).
-2. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
-3. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
-4. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
-5. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-6. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-7. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
+2. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
+3. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
+4. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+5. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+6. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

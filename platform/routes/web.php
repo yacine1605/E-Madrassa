@@ -3,6 +3,7 @@
 use App\Http\Controllers\AbsenceAlertController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountLinkController;
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ArrearsController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AvailabilityController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\LessonResourceController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\MyActivityController;
 use App\Http\Controllers\MyPayController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
@@ -631,6 +633,27 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:lms.course.read,lms.course.manage')->group(function () {
                     Route::get('courses', [CourseController::class, 'index']);
                     Route::get('courses/{course}/lessons', [CourseController::class, 'lessons']);
+                });
+                // FR-LMS-02, FR-LMS-03: activities, by the teacher of the group's subject or the pedagogy manager; the pupil's own.
+                Route::middleware('permission:lms.activity.manage')->group(function () {
+                    Route::get('activities', [ActivityController::class, 'index']);
+                    Route::post('activities', [ActivityController::class, 'store']);
+                    Route::get('activities/{activity}', [ActivityController::class, 'show']);
+                    Route::put('activities/{activity}', [ActivityController::class, 'update']);
+                    Route::delete('activities/{activity}', [ActivityController::class, 'destroy']);
+                    Route::post('activities/{activity}/archive', [ActivityController::class, 'archive']);
+                    Route::post('activities/{activity}/publish', [ActivityController::class, 'publish']);
+                    Route::post('activities/{activity}/questions', [ActivityController::class, 'storeQuestion']);
+                    Route::post('activities/{activity}/questions/order', [ActivityController::class, 'orderQuestions']);
+                    Route::put('activity-questions/{question}', [ActivityController::class, 'updateQuestion']);
+                    Route::delete('activity-questions/{question}', [ActivityController::class, 'destroyQuestion']);
+                    Route::get('activities/{activity}/audience', [ActivityController::class, 'audience']);
+                    Route::post('activities/{activity}/audience', [ActivityController::class, 'addToAudience']);
+                    Route::post('activity-audience/{entry}/extend', [ActivityController::class, 'extend']);
+                });
+                Route::middleware('permission:lms.activity.take')->group(function () {
+                    Route::get('my-activities', [MyActivityController::class, 'index']);
+                    Route::get('my-activities/{activity}', [MyActivityController::class, 'show']);
                 });
                 // FR-LMS-01: a teacher's own resources, on a visible lesson of a course they teach.
                 Route::middleware('permission:lms.resource.manage')->group(function () {

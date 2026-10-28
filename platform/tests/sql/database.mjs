@@ -5379,6 +5379,120 @@ await check('a teacher adds a link of the allow-list to a visible lesson of thei
   await sql('UPDATE school.lesson_resource SET archived_at = now() WHERE id = $1', [theirs.id]);
   assert.deepEqual(await listed(pupilAccount), []);
 });
+// Activities (SQL 080, FR-LMS-02, FR-LMS-03, lot 5 §3): a quiz or a homework of a group's subject, by its teacher of the day; versions, audience, extensions.
+await check('an activity is written and published only by the teacher of the group\'s subject or the manager, in frozen versions, for the group\'s pupils with access; a pupil reads their own, never a quiz\'s answers (FR-LMS-02, FR-LMS-03, lot 5 §3)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.activity.manage', 'lms.assignment.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [];
+  for (let i = 0; i < 3; i++) pupils.push(await scopedAccount('student', 'personal', null, ['lms.activity.take', 'lms.course.read']));
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-ACT', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-Q', program, 20);
+  const teacher = (await newStaff('Activite', 'Rania')).id;
+  const colleague = (await newStaff('Collegue', 'Omar')).id;
+  for (const [t, account] of [[teacher, teacherAccount], [colleague, colleagueAccount]]) {
+    await first(QUALIFY, [a, t, maths, grade, await dayAfter(today, -60), null]);
+    await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [t, account.user]);
+  }
+  const records = [], enrolments = [];
+  for (const [i, name] of ['Aya', 'Badr', 'Chaima'].entries()) {
+    const pupil = (await newAdult('Quiz', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    // The third one's enrolment waits: no access to courses yet.
+    if (i < 2) await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    records.push(pupil); enrolments.push(enrolment);
+  }
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  const ACTIVITY = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, duration_minutes, max_points)
+    VALUES ($1, $2, $3, $4, $5, now() + interval '2 days', $6, $7) RETURNING id`;
+  // Never by a colleague who does not teach the group's subject, nor for a subject outside its programme (lot 5 §7).
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects(ACTIVITY, [a, klass, maths, 'quiz', 'Fractions', 30, 10], '42501', 'lms_group_forbidden');
+  await as('school_runtime', a, manager.user);
+  await rejects(ACTIVITY, [a, klass, physics, 'quiz', 'Forces', 30, 10], '23514', 'lms_subject_outside_program');
+  await as('school_runtime', a, teacherAccount.user);
+  const quiz = (await first(ACTIVITY, [a, klass, maths, 'quiz', 'Fractions', 30, 10])).id;
+  const homework = (await first(ACTIVITY, [a, klass, maths, 'homework', 'Exposé', null, 20])).id;
+  const QUESTION = 'INSERT INTO school.activity_question (tenant_id, activity_id, kind, prompt, points, choices) VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id, position';
+  const choices = (...correct) => JSON.stringify(['a', 'b', 'c'].map((id, i) => ({ id, text: 'Réponse ' + id, correct: correct.includes(i) })));
+  await rejects(QUESTION, [a, quiz, 'single', 'Un demi ?', 4, choices(0, 1)], '23514', 'lms_question_correct_count');
+  await rejects(QUESTION, [a, quiz, 'single', 'Un demi ?', 4, JSON.stringify([{ id: 'a', text: 'x', correct: true, html: '<b>' }, { id: 'b', text: 'y', correct: false }])],
+    '23514', 'lms_question_choices_invalid');
+  await rejects(QUESTION, [a, homework, 'open', 'Rédigez', 4, '[]'], '23514', 'lms_questions_quiz_only');
+  const single = await first(QUESTION, [a, quiz, 'single', 'Un demi ?', 4, choices(1)]);
+  const multiple = await first(QUESTION, [a, quiz, 'multiple', 'Égaux à un demi ?', 3, choices(0, 2)]);
+  const open = await first(QUESTION, [a, quiz, 'open', 'Expliquez', 2, '[]']);
+  assert.deepEqual([single.position, multiple.position, open.position], [1, 2, 3]);
+  // The points make the quiz's total; then it is published, frozen, for the group's pupils with access.
+  await rejects('SELECT school.publish_activity($1)', [quiz], '23514', 'lms_points_mismatch');
+  await sql('UPDATE school.activity_question SET points = 3 WHERE id = $1', [open.id]);
+  assert.equal((await first('SELECT school.publish_activity($1) AS v', [quiz])).v, 1);
+  assert.deepEqual((await sql('SELECT student_id FROM school.activity_audience WHERE activity_id = $1 ORDER BY student_id', [quiz])).rows.map(r => r.student_id),
+    records.slice(0, 2).sort());
+  await rejects("UPDATE school.activity SET group_id = $2 WHERE id = $1", [quiz, scopeGroupA], '42501');
+  await rejects("UPDATE school.activity SET kind = 'homework', duration_minutes = NULL WHERE id = $1", [quiz], '23514', 'identity_immutable');
+  await rejects('DELETE FROM school.activity WHERE id = $1', [quiz], '23514', 'lms_activity_published');
+  // A change is a new version; the first one stays as it was, with its questions.
+  await sql("UPDATE school.activity_question SET prompt = 'Combien vaut un demi ?' WHERE id = $1", [single.id]);
+  await sql("UPDATE school.activity SET title = 'Les fractions' WHERE id = $1", [quiz]);
+  assert.equal((await first('SELECT school.publish_activity($1) AS v', [quiz])).v, 2);
+  assert.deepEqual((await sql("SELECT version, title, questions -> 0 ->> 'prompt' AS prompt FROM school.activity_version WHERE activity_id = $1 ORDER BY version", [quiz])).rows,
+    [{ version: 1, title: 'Fractions', prompt: 'Un demi ?' }, { version: 2, title: 'Les fractions', prompt: 'Combien vaut un demi ?' }]);
+  await rejects("UPDATE school.activity_version SET title = 'x' WHERE activity_id = $1", [quiz], '42501');
+  await rejects(`INSERT INTO school.activity_audience (tenant_id, activity_id, student_id, enrollment_id, group_id, subject_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [a, quiz, records[2], enrolments[2], klass, maths], '42501');
+  // The colleague reads nothing of it; the pupils read their own, open, without any question nor answer.
+  await as('school_runtime', a, colleagueAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.activity WHERE id = $1', [quiz]), 0);
+  const mine = async account => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT * FROM school.my_activities() ORDER BY title')).rows;
+    await as('school_runtime', a, teacherAccount.user);
+    return rows;
+  };
+  const seen = await mine(pupils[0]);
+  assert.deepEqual(seen.map(r => [r.title, r.version, r.state, r.extended]), [['Les fractions', 2, 'open', false]]);
+  assert.ok(!('questions' in seen[0]));
+  assert.equal((await mine(pupils[2])).length, 0, 'no access, not in the audience');
+  await as('school_runtime', a, pupils[0].user);
+  assert.equal(await count('SELECT count(*) n FROM school.activity_version'), 0);
+  await as('school_runtime', a, teacherAccount.user);
+  // A pupil added later, explicitly, once they have access; an individual extension, later and with its reason.
+  await rejects('SELECT school.add_to_audience($1, $2)', [quiz, records[2]], '23514', 'lms_audience_not_member');
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolments[2]]);
+  await as('school_runtime', a, teacherAccount.user);
+  await sql('SELECT school.add_to_audience($1, $2)', [quiz, records[2]]);
+  await rejects('SELECT school.add_to_audience($1, $2)', [quiz, records[2]], '23514', 'lms_audience_exists');
+  assert.equal((await mine(pupils[2])).length, 1);
+  const entry = (await first('SELECT id FROM school.activity_audience WHERE activity_id = $1 AND student_id = $2', [quiz, records[0]])).id;
+  await rejects("UPDATE school.activity_audience SET deadline_at = now() + interval '5 days' WHERE id = $1", [entry], '23514', 'reason_required');
+  await rejects("UPDATE school.activity_audience SET deadline_at = now() + interval '1 day', extension_reason = 'Malade' WHERE id = $1", [entry], '23514', 'lms_extension_earlier');
+  await sql("UPDATE school.activity_audience SET deadline_at = now() + interval '5 days', extension_reason = 'Certificat médical' WHERE id = $1", [entry]);
+  assert.deepEqual((await mine(pupils[0])).map(r => r.extended), [true]);
+  await as('school_runtime', a, colleagueAccount.user);
+  assert.equal((await sql("UPDATE school.activity_audience SET deadline_at = now() + interval '9 days', extension_reason = 'x x x' WHERE id = $1 RETURNING id", [entry])).rows.length, 0);
+  // Scheduled until it opens; a draft is deleted, never archived; archived, it leaves the pupils' view.
+  await as('school_runtime', a, teacherAccount.user);
+  await sql("UPDATE school.activity SET opens_at = now() + interval '1 day' WHERE id = $1", [homework]);
+  await sql('SELECT school.publish_activity($1)', [homework]);
+  assert.deepEqual((await mine(pupils[1])).map(r => [r.title, r.state]), [['Exposé', 'scheduled'], ['Les fractions', 'open']]);
+  const draft = (await first(ACTIVITY, [a, klass, maths, 'homework', 'Brouillon', null, 20])).id;
+  await rejects('UPDATE school.activity SET archived_at = now() WHERE id = $1', [draft], '23514', 'lms_activity_draft');
+  await sql('DELETE FROM school.activity WHERE id = $1', [draft]);
+  await sql('UPDATE school.activity SET archived_at = now() WHERE id = $1', [homework]);
+  assert.deepEqual((await mine(pupils[1])).map(r => r.title), ['Les fractions']);
+  // Access withdrawn: nothing at once.
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Dossier incomplet' WHERE id = $1", [enrolments[1]]);
+  assert.equal((await mine(pupils[1])).length, 0);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

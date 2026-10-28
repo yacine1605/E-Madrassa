@@ -75,7 +75,9 @@ final class DatabaseErrors
         'pupil_account_staff', 'pupil_account_linked',
         'lms_link_invalid', 'lms_link_domain_blocked', 'lms_content_invalid', 'lms_subject_outside_program', 'lms_chapter_archived', 'lms_lesson_archived',
         'lms_review_required', 'lms_review_self', 'lms_review_off', 'lms_publication_empty', 'lms_publish_past', 'lms_lesson_not_visible',
-        'lms_resource_withdrawn',
+        'lms_resource_withdrawn', 'lms_activity_published', 'lms_activity_archived', 'lms_activity_draft', 'lms_questions_quiz_only',
+        'lms_question_choices_invalid', 'lms_question_correct_count', 'lms_points_mismatch', 'lms_deadline_past', 'lms_activity_dates_invalid',
+        'lms_quiz_empty', 'lms_audience_not_member', 'lms_audience_exists', 'lms_extension_earlier',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
@@ -83,7 +85,8 @@ final class DatabaseErrors
         'class_session_group_free' => 'session_group_busy', 'teaching_assignment_once' => 'assignment_overlap'];
 
     /** The rules refusing what was sent rather than the state it meets: a link or a document (lot 5 §7, `422`). */
-    private const STATUS = ['lms_link_invalid' => 422, 'lms_link_domain_blocked' => 422, 'lms_content_invalid' => 422];
+    private const STATUS = ['lms_link_invalid' => 422, 'lms_link_domain_blocked' => 422, 'lms_content_invalid' => 422,
+        'lms_question_choices_invalid' => 422, 'lms_question_correct_count' => 422];
 
     public static function message(string $rule): string
     {
