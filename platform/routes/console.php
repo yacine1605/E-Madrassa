@@ -207,6 +207,14 @@ Artisan::command('platform:lead-reminders {--limit=500}', function () {
 
 Schedule::command('platform:lead-reminders')->everyMinute()->withoutOverlapping();
 
+// FR-LMS-03: the quiz attempts past their end, closed by the timer even when the pupil's browser is shut (SQL 081).
+Artisan::command('platform:close-attempts {--limit=500}', function () {
+    $closed = DB::selectOne('SELECT platform.close_expired_attempts(?) AS n', [(int) $this->option('limit')])->n;
+    $this->info("Quiz attempts closed: $closed.");
+})->purpose('Close the quiz attempts past their end, every minute (as school_runtime)');
+
+Schedule::command('platform:close-attempts')->everyMinute()->withoutOverlapping();
+
 // FR-FIN-06: the finance hears each morning of the instalments falling on the school's offsets (J-3, J, J+7 by default).
 Artisan::command('platform:finance-reminders {--day=}', function () {
     $sent = DB::selectOne('SELECT platform.notify_installments(?::date) AS n', [$this->option('day') ?: now()->timezone('Africa/Algiers')->toDateString()])->n;

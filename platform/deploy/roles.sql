@@ -362,6 +362,10 @@ GRANT UPDATE (deadline_at, extension_reason, version) ON school.activity_audienc
 GRANT EXECUTE ON FUNCTION school.manages_activity(uuid, uuid), school.taught_keys(), school.group_subject(uuid, uuid), school.question_error(text, jsonb),
   school.activity_keys(uuid), school.activity_problems(uuid), school.publish_activity(uuid), school.add_to_audience(uuid, uuid, timestamptz, text),
   school.activity_state(boolean, timestamptz, timestamptz, timestamptz, timestamptz), school.my_activities() TO school_runtime;
+-- Quiz attempts (081): started, answered, submitted by the pupil through functions, closed by the timer; read by their teachers.
+GRANT SELECT ON school.quiz_attempt, school.quiz_answer TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.my_student(), school.start_attempt(uuid, uuid), school.save_answer(uuid, uuid, jsonb, text), school.submit_attempt(uuid, uuid),
+  school.my_attempts(uuid), school.my_attempt(uuid), platform.close_expired_attempts(integer) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -752,6 +756,19 @@ ALTER FUNCTION school.activity_keys(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.publish_activity(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.add_to_audience(uuid, uuid, timestamptz, text) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_activities() OWNER TO platform_provisioner;
+-- Quiz attempts (081): the attempts and answers written by their functions alone, graded and closed by them.
+GRANT SELECT, INSERT ON school.quiz_attempt, school.quiz_answer TO platform_provisioner;
+GRANT UPDATE (status, submitted_at, submit_key, closed_by, auto_points, pending_questions) ON school.quiz_attempt TO platform_provisioner;
+GRANT UPDATE (choices, answer_text, saved_at, points) ON school.quiz_answer TO platform_provisioner;
+ALTER FUNCTION school.my_student() OWNER TO platform_provisioner;
+ALTER FUNCTION school.close_attempt(uuid, text, timestamptz) OWNER TO platform_provisioner;
+ALTER FUNCTION school.close_my_expired(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.start_attempt(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.save_answer(uuid, uuid, jsonb, text) OWNER TO platform_provisioner;
+ALTER FUNCTION school.submit_attempt(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION platform.close_expired_attempts(integer) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_attempts(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_attempt(uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

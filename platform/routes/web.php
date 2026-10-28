@@ -44,6 +44,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgressionController;
+use App\Http\Controllers\QuizAttemptController;
 use App\Http\Controllers\ProgramSubjectController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReceiptController;
@@ -654,7 +655,14 @@ Route::prefix('api')->group(function () {
                 Route::middleware('permission:lms.activity.take')->group(function () {
                     Route::get('my-activities', [MyActivityController::class, 'index']);
                     Route::get('my-activities/{activity}', [MyActivityController::class, 'show']);
+                    // FR-LMS-03: the pupil's quiz attempts, timed by the server.
+                    Route::get('my-activities/{activity}/attempts', [QuizAttemptController::class, 'index']);
+                    Route::post('my-activities/{activity}/attempts', [QuizAttemptController::class, 'start']);
+                    Route::get('attempts/{attempt}', [QuizAttemptController::class, 'show']);
+                    Route::put('attempts/{attempt}/answers/{question}', [QuizAttemptController::class, 'answer']);
+                    Route::post('attempts/{attempt}/submit', [QuizAttemptController::class, 'submit']);
                 });
+                Route::get('activities/{activity}/attempts', [QuizAttemptController::class, 'forActivity'])->middleware('permission:lms.activity.manage');
                 // FR-LMS-01: a teacher's own resources, on a visible lesson of a course they teach.
                 Route::middleware('permission:lms.resource.manage')->group(function () {
                     Route::post('lessons/{lesson}/resources', [LessonResourceController::class, 'store']);

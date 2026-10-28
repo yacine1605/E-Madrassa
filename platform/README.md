@@ -63,7 +63,7 @@ php artisan filament:assets                         # the console's styles and s
 
 The administrator opens the link, chooses a password (or, already known, simply accepts), then enables MFA, compulsory for privileged roles. `platform:membership` forces a membership's status, for development only.
 
-Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, the prospects' due reminders, `platform:lead-reminders`, and the messages to guardians, `platform:guardian-messages`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
+Two processes run beside the web server: `php artisan queue:work` (background jobs, queued emails) and `php artisan schedule:work` (the notification outbox, the prospects' due reminders, `platform:lead-reminders`, the messages to guardians, `platform:guardian-messages`, and the quiz attempts past their end, `platform:close-attempts`, every minute; daily, the purge of expired files and each school's retention policy, `platform:retention`).
 
 Web requests and jobs connect as `school_runtime`; the console as `platform_admin`; only migrations and these commands use the owner (`DB_OWNER_*`), which must not be set for the web server.
 
@@ -1580,6 +1580,28 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 100 (lot 5): quiz attempts, timed by the server
+
+FR-LMS-03's attempts, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §4 sets them. SQL 081 (`database/schema/081_quiz_attempts.sql`, migration `2026_10_28_000081`):
+
+- **Starting**: a pupil of the quiz's audience, in a group they learn in today, starts an attempt between its opening and their own deadline (`lms_activity_not_open`, `lms_deadline_passed`). The server records its start and its end, `min(start + duration, deadline)` (FR-LMS-03 AC); the browser's clock only shows the seconds left, which the server gives. An attempt in progress is resumed, never a second one (one at a time even for two requests at once); each attempt started counts against the quiz's maximum (`lms_attempts_exhausted`, the attempts kept for reading). A start carries an idempotency key: the same key gives back the same attempt, another pupil's key is refused.
+- **Answering**: each answer is saved as it comes, on a question of the attempt's version: chosen ids of its choices (one at most for a single choice) or an open answer's text; refused after the end (`lms_attempt_expired`), once submitted, or once the access is withdrawn. A pupil reading the attempt gets its questions without their correct answers, the answers saved and the seconds left: after a cut, the same attempt with its time.
+- **Submitting**: by the pupil, with an idempotency key (the same key gives back the attempt, another is refused once submitted); after its end, or never, it is closed by the timer at its end with the answers saved before: by any read of it, and by the scheduler's new run every minute, `php artisan platform:close-attempts`, even when the pupil's browser is shut.
+- **Grading**: a choice question all or nothing on the version's answers, never negative, nothing chosen is zero; an open question unanswered is zero, one answered waits for its teacher (the correction comes next). The attempt keeps its automatic points and the open answers waiting. Its points are not shown to the pupil yet: the results' visibility comes with the correction.
+- **The teacher** of the group's subject (and the pedagogy manager) reads the quiz's attempts, each pupil's state and points so far; nobody writes attempts or answers but their functions.
+
+Routes: `GET|POST /api/my-activities/{activity}/attempts`, `GET /api/attempts/{attempt}`, `PUT /api/attempts/{attempt}/answers/{question}`, `POST /api/attempts/{attempt}/submit`, `GET /api/activities/{activity}/attempts`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-03 AC | tests/sql, `QuizAttemptTest`: an attempt ends 30 (20) minutes after its start, before the deadline; the seconds left from the server; an answer after the end refused, the attempt closed by the timer at its end |
+| Lot 5 §4 (reprise, idempotence) | tests/sql, `QuizAttemptTest`: a second start resumes the same attempt; the same key the same attempt, another pupil's refused; submitted once, again with its key, another refused |
+| Lot 5 §4 (tentatives) | tests/sql, `QuizAttemptTest`: two attempts allowed, a third refused, the first two listed |
+| Lot 5 §4 (correction automatique) | tests/sql, `QuizAttemptTest`: a single choice right, a multiple choice half chosen zero, an open answer waiting; a multiple choice right in another order counted |
+| Lot 5 §1, §7 | tests/sql, `QuizAttemptTest`: the questions without their answers; no attempt read directly by a pupil, nor another pupil's; a deadline passed or an access withdrawn, no attempt |
+
+Validation on 28 October 2026: **318 PHP integration tests (17,168 assertions)**; **275 embedded SQL checks and 306 native PostgreSQL 16 checks including concurrency**; migration 081 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+
 ## Increment 99 (lot 5): activities, their versions and their audience
 
 FR-LMS-02's and FR-LMS-03's common base, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §3 sets it. SQL 080 (`database/schema/080_activities.sql`, migration `2026_10_28_000080`); attempts, submissions, marks and the screens come next:
@@ -1771,14 +1793,13 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts. In order:
 
-1. Quiz attempts (FR-LMS-03): the server's timer (`min(start + duration, deadline)`), answers saved as they go, the same attempt resumed with its time left, closed at expiry by a job, submissions idempotent, attempts counted, MCQs graded all or nothing.
-2. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
-3. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
-4. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-5. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-6. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Homework submissions (FR-LMS-02): HTTPS links of the allow-list, each version kept, idempotent; late refused by default, accepted until a date, or extended for one pupil with a reason; an inaccessible link replaced within 48 hours.
+2. Correction and publication (FR-LMS-03, 04): open questions corrected; a zero for a missing work only explicitly; excused absences; results and answer keys shown immediately, after the deadline or when the teacher publishes; every change of a published mark a new version; a re-correction with its reason.
+3. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
+4. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
+5. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

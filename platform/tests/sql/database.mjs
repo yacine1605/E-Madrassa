@@ -5493,6 +5493,120 @@ await check('an activity is written and published only by the teacher of the gro
   assert.equal((await mine(pupils[1])).length, 0);
   await as('school_runtime', a, 1);
 });
+// Quiz attempts (SQL 081, FR-LMS-03, lot 5 §4): the server's timer, answers saved as they go, idempotent start and submission, all-or-nothing grading.
+await check('a pupil\'s quiz attempt ends at min(start + duration, deadline) by the server, resumes after a cut, refuses late answers, is submitted once per key, closed by the timer, and graded all or nothing (FR-LMS-03 AC, lot 5 §4)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.activity.manage', 'lms.assignment.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [await scopedAccount('student', 'personal', null, ['lms.activity.take']), await scopedAccount('student', 'personal', null, ['lms.activity.take'])];
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-TENT', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-T', program, 20);
+  const teacher = (await newStaff('Minuteur', 'Selma')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const enrolments = [];
+  for (const [i, name] of ['Dina', 'Elias'].entries()) {
+    const pupil = (await newAdult('Tentative', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    enrolments.push(enrolment);
+  }
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  await as('school_runtime', a, teacherAccount.user);
+  const quiz = (await first(`INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, duration_minutes, max_points, max_attempts)
+    VALUES ($1, $2, $3, 'quiz', 'Chronométré', now() + interval '2 days', 30, 10, 2) RETURNING id`, [a, klass, maths])).id;
+  const QUESTION = 'INSERT INTO school.activity_question (tenant_id, activity_id, kind, prompt, points, choices) VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id';
+  const choices = (...correct) => JSON.stringify(['a', 'b', 'c'].map((id, i) => ({ id, text: 'Choix ' + id, correct: correct.includes(i) })));
+  const single = (await first(QUESTION, [a, quiz, 'single', 'Un demi ?', 4, choices(1)])).id;
+  const multiple = (await first(QUESTION, [a, quiz, 'multiple', 'Égaux ?', 3, choices(0, 2)])).id;
+  const open = (await first(QUESTION, [a, quiz, 'open', 'Expliquez', 3, '[]'])).id;
+  await sql('SELECT school.publish_activity($1)', [quiz]);
+  const START = 'SELECT school.start_attempt($1, $2) AS id';
+  const SAVE = 'SELECT school.save_answer($1, $2, $3::jsonb, $4) AS at';
+  const SUBMIT = 'SELECT school.submit_attempt($1, $2) AS id';
+  const keys = [uuid(), uuid(), uuid(), uuid()];
+  // Started once per key; a second start while it runs resumes it; another pupil's key is refused.
+  await as('school_runtime', a, pupils[0].user);
+  const first1 = (await first(START, [quiz, keys[0]])).id;
+  assert.equal((await first(START, [quiz, keys[0]])).id, first1);
+  assert.equal((await first(START, [quiz, keys[1]])).id, first1, 'resumed, not a new one');
+  assert.equal(await count('SELECT count(*) n FROM school.quiz_attempt WHERE id = $1', [first1]), 0, 'a pupil reads no attempt directly');
+  await as(null);
+  assert.deepEqual(await first('SELECT number, extract(epoch FROM ends_at - started_at)::int AS seconds FROM school.quiz_attempt WHERE id = $1', [first1]),
+    { number: 1, seconds: 1800 });
+  await as('school_runtime', a, pupils[1].user);
+  await rejects(START, [quiz, keys[0]], '23514', 'idempotency_key_reused');
+  await rejects(SAVE, [first1, single, '["b"]', null], '42501', 'lms_access_denied');
+  // Answers saved as they go, each checked against the version's questions.
+  await as('school_runtime', a, pupils[0].user);
+  for (const [question, picked, text] of [[single, '["a", "b"]', null], [single, '["z"]', null], [single, '["b"]', 'texte'], [open, '["a"]', null], [uuid(), '[]', null]])
+    await rejects(SAVE, [first1, question, picked, text], '23514', 'lms_answer_invalid');
+  await sql(SAVE, [first1, single, '["a"]', null]);
+  await sql(SAVE, [first1, single, '["b"]', null]);
+  await sql(SAVE, [first1, multiple, '["a"]', null]);
+  await sql(SAVE, [first1, open, '[]', 'Parce que deux quarts font un demi.']);
+  // After a cut, the same attempt, its time left, its questions without their answers.
+  const taking = await first('SELECT * FROM school.my_attempt($1)', [first1]);
+  assert.ok(taking.seconds_left > 1700 && taking.seconds_left <= 1800, String(taking.seconds_left));
+  assert.equal(taking.questions.length, 3);
+  assert.ok(!JSON.stringify(taking.questions).includes('correct'));
+  assert.equal(taking.answers.length, 3);
+  // Submitted once: again with the same key the same attempt, with another refused; graded all or nothing.
+  await sql(SUBMIT, [first1, keys[2]]);
+  assert.equal((await first(SUBMIT, [first1, keys[2]])).id, first1);
+  await rejects(SUBMIT, [first1, keys[3]], '23514', 'idempotency_key_reused');
+  await rejects(SAVE, [first1, open, '[]', 'Trop tard'], '23514', 'lms_attempt_submitted');
+  assert.equal((await first('SELECT count(*)::int AS n FROM school.my_attempt($1) WHERE questions IS NULL', [first1])).n, 1, 'no question once submitted');
+  await as(null);
+  assert.deepEqual(await first('SELECT status, closed_by, auto_points::text AS auto, pending_questions AS pending FROM school.quiz_attempt WHERE id = $1', [first1]),
+    { status: 'submitted', closed_by: 'pupil', auto: '4.00', pending: 1 });
+  // The second attempt runs out: an answer after its end refused, the background run closes it at its end.
+  await as('school_runtime', a, pupils[0].user);
+  const second = (await first(START, [quiz, uuid()])).id;
+  await sql(SAVE, [second, multiple, '["c", "a"]', null]);
+  await as(null);
+  await sql('ALTER TABLE school.quiz_attempt DISABLE TRIGGER USER');
+  await sql("UPDATE school.quiz_attempt SET started_at = now() - interval '31 minutes', ends_at = now() - interval '1 minute' WHERE id = $1", [second]);
+  await sql('ALTER TABLE school.quiz_attempt ENABLE TRIGGER USER');
+  await as('school_runtime', a, pupils[0].user);
+  await rejects(SAVE, [second, single, '["b"]', null], '23514', 'lms_attempt_expired');
+  await as('school_runtime', null, null);
+  assert.equal((await first('SELECT platform.close_expired_attempts(100) AS n')).n, 1);
+  await as(null);
+  const closed = await first(`SELECT status, closed_by, submitted_at = ends_at AS at_end, auto_points::text AS auto, pending_questions AS pending
+    FROM school.quiz_attempt WHERE id = $1`, [second]);
+  assert.deepEqual(closed, { status: 'submitted', closed_by: 'timer', at_end: true, auto: '3.00', pending: 0 });
+  // Each attempt started counts: no third.
+  await as('school_runtime', a, pupils[0].user);
+  await rejects(START, [quiz, uuid()], '23514', 'lms_attempts_exhausted');
+  assert.deepEqual((await sql('SELECT number, status, closed_by FROM school.my_attempts($1)', [quiz])).rows,
+    [{ number: 1, status: 'submitted', closed_by: 'pupil' }, { number: 2, status: 'submitted', closed_by: 'timer' }]);
+  // The teacher reads the attempts and their points; the pupil none directly.
+  assert.equal(await count('SELECT count(*) n FROM school.quiz_attempt'), 0);
+  await as('school_runtime', a, teacherAccount.user);
+  assert.equal(await count('SELECT count(*) n FROM school.quiz_attempt WHERE activity_id = $1', [quiz]), 2);
+  assert.equal(await count('SELECT count(*) n FROM school.quiz_answer WHERE attempt_id = $1 AND points IS NULL', [first1]), 1, 'the open answer waits');
+  // A deadline passed, or an access withdrawn: no attempt.
+  await as(null);
+  await sql('ALTER TABLE school.activity_version DISABLE TRIGGER USER');
+  await sql("UPDATE school.activity_version SET deadline_at = now() - interval '1 minute', closes_at = now() - interval '1 minute' WHERE activity_id = $1", [quiz]);
+  await sql('ALTER TABLE school.activity_version ENABLE TRIGGER USER');
+  await as('school_runtime', a, pupils[1].user);
+  await rejects(START, [quiz, uuid()], '23514', 'lms_deadline_passed');
+  await as(null);
+  await sql('ALTER TABLE school.activity_version DISABLE TRIGGER USER');
+  await sql("UPDATE school.activity_version SET deadline_at = now() + interval '2 days', closes_at = now() + interval '2 days' WHERE activity_id = $1", [quiz]);
+  await sql('ALTER TABLE school.activity_version ENABLE TRIGGER USER');
+  await as('school_runtime', a, 1);
+  await sql("UPDATE school.enrollment SET status = 'suspended', status_reason = 'Dossier incomplet' WHERE id = $1", [enrolments[1]]);
+  await as('school_runtime', a, pupils[1].user);
+  await rejects(START, [quiz, uuid()], '42501', 'lms_access_denied');
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

@@ -77,7 +77,8 @@ final class DatabaseErrors
         'lms_review_required', 'lms_review_self', 'lms_review_off', 'lms_publication_empty', 'lms_publish_past', 'lms_lesson_not_visible',
         'lms_resource_withdrawn', 'lms_activity_published', 'lms_activity_archived', 'lms_activity_draft', 'lms_questions_quiz_only',
         'lms_question_choices_invalid', 'lms_question_correct_count', 'lms_points_mismatch', 'lms_deadline_past', 'lms_activity_dates_invalid',
-        'lms_quiz_empty', 'lms_audience_not_member', 'lms_audience_exists', 'lms_extension_earlier',
+        'lms_quiz_empty', 'lms_audience_not_member', 'lms_audience_exists', 'lms_extension_earlier', 'lms_activity_not_open', 'lms_deadline_passed',
+        'lms_attempts_exhausted', 'lms_attempt_expired', 'lms_attempt_submitted', 'lms_answer_invalid', 'idempotency_key_required',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
@@ -86,7 +87,7 @@ final class DatabaseErrors
 
     /** The rules refusing what was sent rather than the state it meets: a link or a document (lot 5 §7, `422`). */
     private const STATUS = ['lms_link_invalid' => 422, 'lms_link_domain_blocked' => 422, 'lms_content_invalid' => 422,
-        'lms_question_choices_invalid' => 422, 'lms_question_correct_count' => 422];
+        'lms_question_choices_invalid' => 422, 'lms_question_correct_count' => 422, 'lms_answer_invalid' => 422];
 
     public static function message(string $rule): string
     {
@@ -133,8 +134,8 @@ final class DatabaseErrors
             return [403, 'permission_denied', __('errors.permission_denied')];
         }
         // Lot 5 §7: a group or a subject the teacher does not teach, said without telling more of it.
-        if ($state === '42501' && preg_match('/ERROR:\s+lms_group_forbidden\b/', $detail)) {
-            return [403, 'lms_group_forbidden', __('errors.lms_group_forbidden')];
+        foreach (['lms_group_forbidden', 'lms_access_denied'] as $rule) {
+            if ($state === '42501' && preg_match('/ERROR:\s+'.$rule.'\b/', $detail)) return [403, $rule, __('errors.'.$rule)];
         }
         if ($state === '42501') return [403, 'forbidden', __('errors.forbidden')];
         return null;
