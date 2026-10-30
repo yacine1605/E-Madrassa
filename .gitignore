@@ -1,6 +1,7 @@
 /backups/
 /*.env
 !/*.env.example
+ai-service/.env
 # Installed tooling and caches, never committed.
 node_modules/
 .test-tools/pdf-tools/
