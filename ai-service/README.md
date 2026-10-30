@@ -63,3 +63,4 @@ python -c "from quiz_service import generate_school_quiz; quiz = generate_school
 In the Filament panel, navigate to **Pédagogie** > **Générateur de quiz IA** (`/admin/ai-quiz-generator`).
 Configure:
 - `AI_QUIZ_URL=http://127.0.0.1:8001` (or `http://host.docker.internal:8001` when Filament is in Docker).
+
