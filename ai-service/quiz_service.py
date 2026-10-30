@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
-load_dotenv()  # reads .env in the working directory
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(env_path, override=True)  # reads .env in the script directory or parent
 
 # ── Pydantic schemas (strict so the UI never breaks during the demo) ────────
 
@@ -61,13 +62,22 @@ def generate_school_quiz(
     """
     Build a LangChain chain that forces Groq / Llama 3.3 70B to return
     a ``GeneratedQuiz`` Pydantic object via ``.with_structured_output()``.
+    Falls back gracefully to an available model on the account if
+    llama-3.3-70b-versatile is not accessible on the current API key tier.
     """
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-    )
+    # Always reload dotenv so updating .env is picked up immediately
+    load_dotenv(env_path, override=True)
+    api_key = os.getenv("GROQ_API_KEY")
 
-    structured_llm = llm.with_structured_output(GeneratedQuiz)
+    if not api_key or api_key == "gsk_your_groq_api_key_here":
+        raise ValueError("GROQ_API_KEY is not set. Please set your key in ai-service/.env")
+
+    # Priority model list (llama-3.3-70b-versatile first, then fallback)
+    preferred_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    candidate_models = [preferred_model]
+    for fallback in ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", (
@@ -82,14 +92,32 @@ def generate_school_quiz(
         )),
     ])
 
-    chain = prompt | structured_llm
+    last_error = None
+    for model_name in candidate_models:
+        try:
+            llm = ChatGroq(
+                model=model_name,
+                temperature=0.2,
+                api_key=api_key,
+            )
+            structured_llm = llm.with_structured_output(GeneratedQuiz)
+            chain = prompt | structured_llm
 
-    return chain.invoke({
-        "subject": subject,
-        "grade_level": grade_level,
-        "topic": topic,
-        "num_questions": num_questions,
-    })
+            return chain.invoke({
+                "subject": subject,
+                "grade_level": grade_level,
+                "topic": topic,
+                "num_questions": num_questions,
+            })
+        except Exception as e:
+            err_str = str(e).lower()
+            if "model_not_found" in err_str or "does not exist" in err_str:
+                last_error = e
+                continue
+            raise e
+
+    if last_error:
+        raise last_error
 
 
 # ── FastAPI application ─────────────────────────────────────────────────────
