@@ -1,6 +1,10 @@
 /backups/
-/*.env
-!/*.env.example
+# Environment files hold local settings and secrets: never committed, in any folder.
+.env
+*.env
+.env.*
+!*.env.example
+!.env.example
 # Installed tooling and caches, never committed.
 node_modules/
 .test-tools/pdf-tools/
