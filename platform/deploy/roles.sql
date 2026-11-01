@@ -382,6 +382,8 @@ GRANT INSERT (tenant_id, program_id, node_id, scale_max, step, rounding, pass_ra
 GRANT UPDATE (valid_to, version) ON school.grading_rule TO school_runtime;
 GRANT EXECUTE ON FUNCTION school.grading_rule_for(uuid, uuid, date), school.rule_values(uuid), school.round_mark(numeric, numeric, text), school.on_scale(numeric, uuid),
   school.gradebook(uuid, uuid, date, date), school.gradebook_averages(uuid, uuid, date, date), school.my_averages(date, date), school.my_marks() TO school_runtime;
+-- The activities' screens (085): the groups' subjects the caller may write an activity for today.
+GRANT EXECUTE ON FUNCTION school.activity_targets() TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -824,6 +826,7 @@ ALTER FUNCTION school.gradebook(uuid, uuid, date, date) OWNER TO platform_provis
 ALTER FUNCTION school.gradebook_averages(uuid, uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_averages(date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_marks() OWNER TO platform_provisioner;
+ALTER FUNCTION school.activity_targets() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

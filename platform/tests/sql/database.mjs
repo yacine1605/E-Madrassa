@@ -5905,6 +5905,15 @@ await check('a grading rule per programme or level, never rewritten, shows a mar
   await as('school_runtime', a, pupils[0].user);
   assert.deepEqual((await sql('SELECT mark::text AS mark, scale_max::text AS scale, passed FROM school.my_marks() ORDER BY mark')).rows,
     [{ mark: '6.00', scale: '10.00', passed: true }, { mark: '7.50', scale: '10.00', passed: true }]);
+  // The activities' screens (SQL 085): what each may write an activity for, named even for a teacher who reads no group.
+  const targets = async account => {
+    await as('school_runtime', a, account.user);
+    return (await sql('SELECT group_id, subject_id, group_code FROM school.activity_targets()')).rows;
+  };
+  assert.deepEqual(await targets(teacherAccount), [{ group_id: klass, subject_id: maths, group_code: 'LMS-B1' }]);
+  assert.deepEqual(await targets(colleagueAccount), []);
+  assert.deepEqual(await targets(pupils[0]), []);
+  assert.ok((await targets(manager)).some(r => r.group_id === klass && r.subject_id === maths), 'the manager, every open group');
   await as('school_runtime', a, 1);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).

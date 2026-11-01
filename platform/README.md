@@ -1580,6 +1580,24 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 104 (lot 5): the teacher's screens
+
+FR-LMS-02 to FR-LMS-04 on screen for the teacher and the pedagogy manager, in the school's panel under « Pédagogie ». The screens call the API's controllers and write nothing of their own; who may act is the database's (a teacher acts on the groups' subjects they teach today, `lms_group_forbidden` otherwise). SQL 085 (`database/schema/085_activity_targets.sql`, migration `2026_11_01_000085`) adds `school.activity_targets()`: the groups' subjects the caller may write an activity for today, named even for a teacher whose scope does not reach the groups' rows.
+
+- **Activités** (`/school/activities`): the activities of the groups' subjects the reader teaches (every one for the manager), their deadline, state and audience, filtered by group, archived ones on demand. A new quiz or homework: its group and subject, title, instructions (the lessons' editor, no file), opening and deadline in Algiers' time, points and coefficient; a quiz's duration, attempts and selection; a homework's late policy and replacement delay; when its results and its key are shown.
+- **The activity's sheet** (`/school/activity-sheet?activity=`): what stops its publication, its settings and a quiz's questions with the correct choices; edited, published (again: a new frozen version), archived, or deleted while never published. Its pupils: their work (the last submission and whether it is late or flagged, or the attempts and the answers left to correct), state, points, decision, what is published and their own deadline. A homework marked with its feedback, a quiz's open answers corrected attempt by attempt with a comment, a zero for a missing work or an excused absence decided with its reason, a result published (with the reason of a change once published) or all of them, a deadline extended for one pupil, a link flagged; the key published when the activity leaves it to the teacher; a quiz re-corrected by the manager alone, with its reason.
+- **Questions** (`/school/activity-questions?activity=`): single choice, multiple choice or open, their points against the quiz's total, added, changed, moved and removed on the working copy; each choice keeps its identifier.
+- **Carnet de notes** (`/school/gradebook`): a group's subject over a period (the school year by default), each pupil's marks on their rule's scale, marked while not published, and the average of the published marks; exported as CSV, Excel or PDF by whoever may launch exports.
+- **Règles de notation** (`/school/grading-rules`): the rules in force or to come, ended ones on demand; created for a programme or a level, ended, or removed before they begin, by the pedagogy manager; read by the teachers. Without a rule, the default is said.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-02, FR-LMS-03 (écrans enseignant) | `ActivityScreensTest`: a quiz and a homework written from « Activités », the quiz's questions added and reordered, both published from their sheet; refused to the pupil |
+| FR-LMS-03, FR-LMS-04 (correction et publication) | `ActivityScreensTest`: the open answer corrected (« 3,5 »), the homework marked, one result and all of them published |
+| FR-LMS-04 (carnet, export, règles) | `ActivityScreensTest`: the rule created on screen, the gradebook's average (8 on 10, half point), exported by the manager; tests/sql: `school.activity_targets()` for the teacher, the manager, another teacher and a pupil |
+
+Validation on 1 November 2026: **322 PHP integration tests (18,078 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 085 rolled back alone on the database the suite had filled, then applied again; browser acceptance of 308 screens in Chromium without a problem (the three new menu screens among them). The CI could not start (the GitHub account's billing).
+
 ## Increment 103 (lot 5): grading rules, averages and the gradebook
 
 FR-LMS-04's marks, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §6 sets them. SQL 084 (`database/schema/084_grading_rules.sql`, migration `2026_10_28_000084`):
@@ -1863,9 +1881,9 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens. In order:
 
-1. The activities' screens for the teacher and the pupil (the gradebook and the grading rules among them), and their notifications (no mark in a message).
+1. The pupil's screens: their activities, a quiz taken against the server's timer, a homework handed in by links, their results, marks and averages, the key when due; the notifications that tell them (no mark in a message).
 2. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
