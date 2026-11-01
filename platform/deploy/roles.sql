@@ -827,6 +827,10 @@ ALTER FUNCTION school.gradebook_averages(uuid, uuid, date, date) OWNER TO platfo
 ALTER FUNCTION school.my_averages(date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_marks() OWNER TO platform_provisioner;
 ALTER FUNCTION school.activity_targets() OWNER TO platform_provisioner;
+-- The pupil told of an activity given and of a link flagged (086), from the triggers alone.
+ALTER FUNCTION school.tell_pupil(uuid, uuid, text, jsonb) OWNER TO platform_provisioner;
+ALTER FUNCTION school.tell_activity_published() OWNER TO platform_provisioner;
+ALTER FUNCTION school.tell_submission_flagged() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

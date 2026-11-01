@@ -1580,6 +1580,24 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 105 (lot 5): the pupil's screens and notifications
+
+FR-LMS-02 to FR-LMS-04 for the pupil signed in, under « Pédagogie ». The screens read only through the pupil's own functions; nothing of another pupil, nothing not published.
+
+- **Mes activités** (`/school/my-activities`): their averages over the school year, subject by subject, from their published marks only (« Aucune note publiée » otherwise); the activities of the groups they learn in today, open ones first, their own deadline (marked when extended), state, and their result once published, on its activity's scale.
+- **The activity** (`/school/my-activity?activity=`): their result, pass mark and the teacher's feedback once published; the dates and settings; the instructions, drawn from their document as the lessons are. A homework is handed in as one to five links, one per line, each submission a version at the server's time, the history kept; a refused link says why; a link the teacher flagged is shown with the reason and the time to replace it, and may be replaced until then even after the deadline. A quiz is started (its duration said first) or resumed, and each attempt opened.
+- **The attempt** (`/school/quiz-attempt?attempt=`): the time left as the server counts it, counted down on the page and read again every 30 seconds and at zero; each answer saved as soon as it is given (an open answer when the field is left), with the server's time, refused after the end; submitted once. Once closed, the pupil's answers, the key when it is due, and the points and comments once the result is published.
+- **Notifications**: SQL 086 (`database/schema/086_pupil_notifications.sql`, migration `2026_11_01_000086`) tells the pupil of an activity given to them (`lms.activity_published`, at its first publication or when they are added to it; in the application, by e-mail if they choose) and of a link of theirs that does not open, with the time it may be replaced until (`lms.submission_flagged`, by e-mail too by default), as the results already were (`lms.result_published`). The message names the activity, never a mark nor the teacher's reason; « Voir l'activité » opens it.
+
+| Requirement | Evidence |
+|---|---|
+| Lot 5 §8.3 (consulter) | `PupilScreensTest`: the pupil's activities listed, the teacher refused them; tests/sql (082): told of both homeworks |
+| Lot 5 §8.4 (passer un quiz) | `PupilScreensTest`: started from the activity, each answer saved as given, submitted from the attempt; the correct choices never on the page |
+| Lot 5 §8.5 (remettre un devoir) | `PupilScreensTest`: a link of another site refused with its reason, then handed in and shown; flagged, the pupil told with the time to replace it; tests/sql: the notification's content |
+| Lot 5 §8.6, §6 (notes publiées) | `PupilScreensTest`: nothing before publication; told without the mark; 9.5/10 shown as 19/20 on the default scale, the average, the key and the teacher's comment |
+
+Validation on 1 November 2026: **323 PHP integration tests (18,351 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migrations 084 to 086 rolled back on the database the suite had filled, their functions and events checked gone, then applied again; browser acceptance of 308 screens in Chromium without a problem (the pupil's screens are covered by `PupilScreensTest`, the acceptance's accounts being staff). The CI could not start (the GitHub account's billing).
+
 ## Increment 104 (lot 5): the teacher's screens
 
 FR-LMS-02 to FR-LMS-04 on screen for the teacher and the pedagogy manager, in the school's panel under « Pédagogie ». The screens call the API's controllers and write nothing of their own; who may act is the database's (a teacher acts on the groups' subjects they teach today, `lms_group_forbidden` otherwise). SQL 085 (`database/schema/085_activity_targets.sql`, migration `2026_11_01_000085`) adds `school.activity_targets()`: the groups' subjects the caller may write an activity for today, named even for a teacher whose scope does not reach the groups' rows.
@@ -1596,7 +1614,7 @@ FR-LMS-02 to FR-LMS-04 on screen for the teacher and the pedagogy manager, in th
 | FR-LMS-03, FR-LMS-04 (correction et publication) | `ActivityScreensTest`: the open answer corrected (« 3,5 »), the homework marked, one result and all of them published |
 | FR-LMS-04 (carnet, export, règles) | `ActivityScreensTest`: the rule created on screen, the gradebook's average (8 on 10, half point), exported by the manager; tests/sql: `school.activity_targets()` for the teacher, the manager, another teacher and a pupil |
 
-Validation on 1 November 2026: **322 PHP integration tests (18,078 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 085 rolled back alone on the database the suite had filled, then applied again; browser acceptance of 308 screens in Chromium without a problem (the three new menu screens among them). The CI could not start (the GitHub account's billing).
+Validation on 1 November 2026: **322 PHP integration tests (18,078 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 085 rolled back and applied again on the database the suite had filled (checked with increment 105: the first check had run on another database); browser acceptance of 308 screens in Chromium without a problem (the three new menu screens among them). The CI could not start (the GitHub account's billing).
 
 ## Increment 103 (lot 5): grading rules, averages and the gradebook
 
@@ -1619,7 +1637,7 @@ Routes: `GET|POST /api/grading-rules`, `POST /api/grading-rules/{rule}/end`, `DE
 | FR-LMS-04 AC (règle changée pour une période ultérieure) | tests/sql: the current rule ended, the next on 20; the past average unchanged on 10, the later one on 20 |
 | FR-LMS-04 (carnet et export) | tests/sql: refused to another teacher; `GradingTest`: the teacher's gradebook, refused to the pupil; exported by the manager, a row per mark, not by a teacher without `export.job.create` |
 
-Validation on 1 November 2026: **321 PHP integration tests (17,426 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 084 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+Validation on 1 November 2026: **321 PHP integration tests (17,426 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 084 rolled back and applied again on the database the suite had filled (checked with increment 105: the first check had run on another database). No new screen. The CI could not start (the GitHub account's billing).
 
 ## Increment 102 (lot 5): correction and the results' publication
 
@@ -1881,10 +1899,9 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens, increment 105 the pupil's screens and notifications. What remains:
 
-1. The pupil's screens: their activities, a quiz taken against the server's timer, a homework handed in by links, their results, marks and averages, the key when due; the notifications that tell them (no mark in a message).
-2. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

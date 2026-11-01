@@ -5674,6 +5674,12 @@ await check('a pupil hands in links of the allow-list, each submission a version
   const third = (await first(SUBMIT, [strict, uuid(), JSON.stringify(['https://docs.google.com/document/d/expose'])])).id;
   assert.deepEqual((await sql('SELECT number, status, late, flag_reason FROM school.my_submissions($1)', [strict])).rows.map(r => [r.number, r.status, r.late, r.flag_reason]),
     [[3, 'current', false, null], [2, 'inaccessible', false, 'Lien privé : accès refusé'], [1, 'replaced', false, null]]);
+  // The pupil was told of both homeworks, then of the flag with its replacement time: the activity named, neither a mark nor the reason (SQL 086, lot 5 §8.5).
+  const told = (await sql("SELECT event, data FROM school.notification WHERE event LIKE 'lms.%'")).rows
+    .map(r => [r.event, r.data.activity_id, Object.keys(r.data).sort().join()]).sort((x, y) => (x[0] + x[1]).localeCompare(y[0] + y[1]));
+  assert.deepEqual(told, [['lms.activity_published', lenient, 'activity_id'], ['lms.activity_published', strict, 'activity_id'],
+    ['lms.submission_flagged', strict, 'activity_id,replace_until']].sort((x, y) => (x[0] + x[1]).localeCompare(y[0] + y[1])));
+  assert.ok(Math.abs(new Date((await first("SELECT data->>'replace_until' AS u FROM school.notification WHERE event = 'lms.submission_flagged'")).u) - new Date(until)) < 1000);
   // The delay over, no more.
   await as(null);
   await sql('ALTER TABLE school.homework_submission DISABLE TRIGGER USER');

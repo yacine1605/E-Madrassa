@@ -102,13 +102,4 @@ final class Gradebook extends SchoolingPage
             : Formats::number((float) $value, 2).' / '.Formats::number((float) $mark['scale_max'], 2).($mark['published_mark'] === null ? ' '.__('pedagogy.unpublished_mark') : '');
         return $mark['title'].' : '.$shown;
     }
-
-    /** The school year in Algeria: from the 1st of September to the 31st of August. */
-    private function yearStart(): string
-    {
-        $today = now('Africa/Algiers');
-        return ($today->month >= 9 ? $today->year : $today->year - 1).'-09-01';
-    }
-
-    private function yearEnd(): string { return ((int) substr($this->yearStart(), 0, 4) + 1).'-08-31'; }
 }

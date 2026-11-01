@@ -66,6 +66,10 @@ final class Notifications extends SchoolPage implements HasTable
                 Action::make('absences')->label(__('attendance.see_absence_alerts'))->visible(fn (array $record) => isset($record['data']['alert']))
                     ->url(AbsenceAlerts::getUrl()),
                 Action::make('arrears')->label(__('finance.see_arrears'))->visible(fn (array $record) => isset($record['data']['arrears']))->url(Arrears::getUrl()),
+                // Lot 5: an activity given, a result published, a link to replace; the pupil's activity opens, the mark only there.
+                Action::make('activity')->label(__('pedagogy.see_activity'))
+                    ->visible(fn (array $record) => isset($record['data']['activity_id']) && MyActivity::canAccess())
+                    ->url(fn (array $record) => MyActivity::getUrl(['activity' => $record['data']['activity_id']])),
                 Action::make('read')->label(__('services.mark_read'))->visible(fn (array $record) => !$record['read_at'] && SchoolScreen::writable(null))
                     ->action(fn (array $record) => SchoolScreen::change(null,
                         fn () => SchoolScreen::call([], NotificationController::class, 'read', parameters: ['notification' => $record['id']]))),

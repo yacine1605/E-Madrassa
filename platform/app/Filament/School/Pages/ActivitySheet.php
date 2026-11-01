@@ -334,5 +334,7 @@ final class ActivitySheet extends SchoolingPage
         SchoolScreen::change(null, $change, $done);
         $this->sheetRow = null;
         $this->pupilRows = null;
+        $this->cacheSchema('detailsInfolist', null);
+        $this->cacheSchema('questionsInfolist', null);
     }
 }

@@ -155,6 +155,15 @@ abstract class SchoolingPage extends SchoolPage implements HasTable
         return TextInput::make('code')->label(__('school.code'))->required()->regex('/^[A-Z0-9_-]{1,30}$/')->helperText(__('schooling.code_help'));
     }
 
+    /** The school year in Algeria: from the 1st of September to the 31st of August. */
+    protected function yearStart(): string
+    {
+        $today = now('Africa/Algiers');
+        return ($today->month >= 9 ? $today->year : $today->year - 1).'-09-01';
+    }
+
+    protected function yearEnd(): string { return ((int) substr($this->yearStart(), 0, 4) + 1).'-08-31'; }
+
     /** « mars 2025 », « مارس 2025 »: the month of a day. */
     protected function month(?string $day): string
     {
