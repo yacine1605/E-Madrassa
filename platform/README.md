@@ -1580,6 +1580,29 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 103 (lot 5): grading rules, averages and the gradebook
+
+FR-LMS-04's marks, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §6 sets them. SQL 084 (`database/schema/084_grading_rules.sql`, migration `2026_10_28_000084`):
+
+- **A grading rule** belongs to a programme or to a level of the referential, never to the whole school: the scale's maximum (10, 20, 100…), the step a mark is shown to (0.25, 0.5 or 1), the rounding (`half_up` by default, `down` or `up`) and the pass mark (50 % by default), from a day until another. Kept by the new permission `lms.grading.manage` (pedagogy manager) for the whole school. Its versions never change and never overlap (`grading_rule_overlap`); one starts today or later (`grading_rule_past`) and ends yesterday at the earliest, its end final; one begun is ended, never deleted. A programme's own rule prevails over its level's, the nearest level over its ancestors'. Without a rule: 20 points, a quarter point, `half_up`, half the scale.
+- **An activity keeps the rule of its first publication**, the one in force that day for its group's programme: a rule changed later rewrites no past result (AC).
+- **A mark is shown** from its raw ratio `points / maximum`, converted to the scale then rounded to the step, never stored rounded.
+- **A period's weighted average** takes the published marks of the activities whose deadline falls in it, `sum(ratio × coefficient) / sum(coefficients)`, converted and rounded once on the rule in force at the period's end. Missing, excused, to be graded or graded but not published: left out; the pass mark never makes a missing mark a zero.
+- **A group's gradebook** in a subject over a period, for the teacher of it today or the pedagogy manager: each pupil of the activities' audience, each activity's state, raw points and maximum, coefficient, mark on its rule's scale, what is published, and the pupil's average. **Its export** (`gradebook`, CSV, Excel or PDF, a simple list of marks, no official report card) carries the published points and marks only, under `export.job.create`.
+- **The pupil** reads their own published marks on their scales and their averages, subject by subject, through `school.my_marks()` and `school.my_averages()`.
+
+Routes: `GET|POST /api/grading-rules`, `POST /api/grading-rules/{rule}/end`, `DELETE /api/grading-rules/{rule}`, `GET /api/groups/{group}/gradebook?subject_id=&from=&to=`, `GET /api/my-averages?from=&to=`; the export through `POST /api/exports` with `kind=gradebook`.
+
+| Requirement | Evidence |
+|---|---|
+| Lot 5 §6 (règle par programme ou niveau, versions sans chevauchement) | tests/sql, `GradingTest`: refused to the teacher, in the past or over another version's days; a programme's rule before its level's; ended, final, a rule begun not deleted |
+| Lot 5 §6 (note affichée, arrondi unique) | tests/sql, `GradingTest`: 15/20 on 10 to the half point is 7.5; half up, down and up to the step |
+| FR-LMS-04 AC (moyenne des notes publiées) | tests/sql, `GradingTest`: (0.75 × 1 + 0.6 × 2) / 3 = 6.5 on 10, a mark not published and a missing work left out, no average without a published mark |
+| FR-LMS-04 AC (règle changée pour une période ultérieure) | tests/sql: the current rule ended, the next on 20; the past average unchanged on 10, the later one on 20 |
+| FR-LMS-04 (carnet et export) | tests/sql: refused to another teacher; `GradingTest`: the teacher's gradebook, refused to the pupil; exported by the manager, a row per mark, not by a teacher without `export.job.create` |
+
+Validation on 1 November 2026: **321 PHP integration tests (17,426 assertions)**; **278 embedded SQL checks and 309 native PostgreSQL 16 checks including concurrency**; migration 084 rolled back alone on the database the suite had filled, then applied again. No new screen. The CI could not start (the GitHub account's billing).
+
 ## Increment 102 (lot 5): correction and the results' publication
 
 FR-LMS-03's correction and FR-LMS-04's results, as `SPECIFICATION_LOT5_PEDAGOGIE.md` §4 to §6 set them. SQL 083 (`database/schema/083_results.sql`, migration `2026_10_28_000083`):
@@ -1840,11 +1863,10 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication. In order:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook. In order:
 
-1. Marks and averages (FR-LMS-04): the scale, step, rounding and pass mark per programme or level, versioned without overlap; averages from published marks only, weighted, rounded once; a group's gradebook and its export.
-2. The activities' screens for the teacher and the pupil, and their notifications (no mark in a message).
-3. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+1. The activities' screens for the teacher and the pupil (the gradebook and the grading rules among them), and their notifications (no mark in a message).
+2. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
 
 ## Next increments of lot 2
 

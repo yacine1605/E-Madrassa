@@ -80,12 +80,13 @@ final class DatabaseErrors
         'lms_quiz_empty', 'lms_audience_not_member', 'lms_audience_exists', 'lms_extension_earlier', 'lms_activity_not_open', 'lms_deadline_passed',
         'lms_attempts_exhausted', 'lms_attempt_expired', 'lms_attempt_submitted', 'lms_answer_invalid', 'idempotency_key_required',
         'lms_submission_not_current', 'lms_points_out_of_range', 'lms_attempt_in_progress', 'lms_nothing_submitted', 'lms_deadline_not_passed',
-        'lms_work_submitted',
+        'lms_work_submitted', 'grading_rule_begun', 'grading_rule_past', 'grading_rule_ended', 'grading_rule_end_past', 'grading_rule_end_before_start',
     ];
 
-    /** The exclusion constraints whose refusal says which conflict (SQL 062, 077). */
+    /** The exclusion constraints whose refusal says which conflict (SQL 062, 077, 084). */
     private const EXCLUSIONS = ['class_session_teacher_free' => 'session_teacher_busy', 'class_session_room_free' => 'session_room_busy',
-        'class_session_group_free' => 'session_group_busy', 'teaching_assignment_once' => 'assignment_overlap'];
+        'class_session_group_free' => 'session_group_busy', 'teaching_assignment_once' => 'assignment_overlap',
+        'grading_rule_program_once' => 'grading_rule_overlap', 'grading_rule_node_once' => 'grading_rule_overlap'];
 
     /** The rules refusing what was sent rather than the state it meets: a link or a document (lot 5 §7, `422`). */
     private const STATUS = ['lms_link_invalid' => 422, 'lms_link_domain_blocked' => 422, 'lms_content_invalid' => 422,

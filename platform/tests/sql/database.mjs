@@ -5820,6 +5820,93 @@ await check('a result is computed from the work and the corrections, published a
   assert.deepEqual(await results(pupils[1]), ['Différé:graded:0.00', 'Exposé:absent_excused:null']);
   await as('school_runtime', a, 1);
 });
+// Grading rules and averages (SQL 084, FR-LMS-04, lot 5 §6): versions by programme or level, a mark shown on its activity's rule, averages of published marks only.
+await check('a grading rule per programme or level, never rewritten, shows a mark from its raw ratio rounded once; a weighted average takes the published marks only; a rule for a later period leaves the past as it was (FR-LMS-04 AC, lot 5 §6)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.activity.manage', 'lms.assignment.manage', 'lms.grading.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [await scopedAccount('student', 'personal', null, ['lms.activity.take']), await scopedAccount('student', 'personal', null, ['lms.activity.take'])];
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-BAR', 90000, 'active', planned.year);
+  const sibling = await programme('LMS-BAR2', 90000, 'active', planned.year);
+  await line(program, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-B1', program, 20);
+  const teacher = (await newStaff('Bareme', 'Ines')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const records = [];
+  for (const [i, name] of ['Djamel', 'Esma'].entries()) {
+    const pupil = (await newAdult('Bareme', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    records.push(pupil);
+  }
+  // Rules: by the grading's manager only, today or later, never two over the same days; a programme's prevails over its level's.
+  const RULE = 'INSERT INTO school.grading_rule (tenant_id, program_id, node_id, scale_max, step, pass_ratio, valid_from, valid_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id';
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects(RULE, [a, program, null, 10, 0.5, 0.5, today, null], '42501');
+  await as('school_runtime', a, manager.user);
+  await rejects(RULE, [a, program, null, 10, 0.5, 0.5, yesterday, null], '23514', 'grading_rule_past');
+  await rejects(RULE, [a, program, grade, 10, 0.5, 0.5, today, null], '23514');
+  const own = (await first(RULE, [a, program, null, 10, 0.5, 0.5, today, null])).id;
+  await rejects(RULE, [a, program, null, 20, 1, 0.5, await dayAfter(today, 5), null], '23P01');
+  const level = (await first(RULE, [a, null, grade, 100, 1, 0.6, today, null])).id;
+  await rejects('UPDATE school.grading_rule SET scale_max = 20 WHERE id = $1', [own], '42501');
+  const ruleFor = async (p, day) => (await first('SELECT school.grading_rule_for($1, $2, $3::date) AS id', [a, p, day])).id;
+  assert.deepEqual([await ruleFor(program, today), await ruleFor(sibling, today), await ruleFor(program, yesterday)], [own, level, null]);
+  for (const [value, step, method, shown] of [[7.125, 0.25, 'half_up', '7.25'], [7.125, 0.25, 'down', '7.00'], [7.1, 0.5, 'up', '7.50'], [14.4, 1, 'half_up', '14.00']])
+    assert.equal((await first('SELECT school.round_mark($1, $2, $3)::text AS v', [value, step, method])).v, shown);
+  // Two homeworks of the programme: 15/20 coefficient 1, 6/10 coefficient 2; a third graded but not published; a fourth missing.
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  await as('school_runtime', a, teacherAccount.user);
+  const HOMEWORK = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, max_points, coefficient)
+    VALUES ($1, $2, $3, 'homework', $4, now() + interval '1 day', $5, $6) RETURNING id`;
+  const works = [];
+  for (const [title, max, coef] of [['H1', 20, 1], ['H2', 10, 2], ['H3', 20, 1], ['H4', 20, 1]]) {
+    const id = (await first(HOMEWORK, [a, klass, maths, title, max, coef])).id;
+    await sql('SELECT school.publish_activity($1)', [id]);
+    works.push(id);
+  }
+  assert.equal((await first('SELECT grading_rule_id FROM school.activity_version WHERE activity_id = $1', [works[0]])).grading_rule_id, own, 'the rule of its first publication');
+  await as('school_runtime', a, pupils[0].user);
+  for (const id of works.slice(0, 3)) await sql('SELECT school.submit_homework($1, $2, $3::jsonb)', [id, uuid(), JSON.stringify(['https://drive.google.com/file/d/' + id])]);
+  await as('school_runtime', a, teacherAccount.user);
+  for (const [id, points] of [[works[0], 15], [works[1], 6], [works[2], 2]]) await sql('SELECT school.grade_homework($1, $2, $3)', [id, records[0], points]);
+  for (const id of works.slice(0, 2)) await sql('SELECT school.publish_marks($1)', [id]);
+  const period = [await dayAfter(today, -30), today];
+  const lateTo = await dayAfter(today, 1);
+  // (0.75 × 1 + 0.6 × 2) / 3 = 0.65, on 10 rounded to the half point: 6.5; the mark not published and the missing one left out.
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects('SELECT * FROM school.gradebook($1, $2, $3::date, $4::date)', [klass, maths, period[0], lateTo], '42501', 'lms_group_forbidden');
+  await as('school_runtime', a, teacherAccount.user);
+  const book = (await sql('SELECT title, status, mark::text AS mark, published_mark::text AS shown FROM school.gradebook($1, $2, $3::date, $4::date) WHERE student_id = $5 ORDER BY title',
+    [klass, maths, period[0], lateTo, records[0]])).rows;
+  assert.deepEqual(book.map(r => [r.title, r.status, r.mark, r.shown]),
+    [['H1', 'published', '7.50', '7.50'], ['H2', 'published', '6.00', '6.00'], ['H3', 'graded', '1.00', null], ['H4', 'not_submitted', null, null]]);
+  const averages = async (account, to) => {
+    await as('school_runtime', a, account.user);
+    const rows = (await sql('SELECT marks, ratio::text AS ratio, average::text AS average, scale_max::text AS scale, passed FROM school.my_averages($1::date, $2::date)', [period[0], to])).rows;
+    await as('school_runtime', a, teacherAccount.user);
+    return rows;
+  };
+  assert.deepEqual(await averages(pupils[0], lateTo), [{ marks: 2, ratio: '0.650000', average: '6.50', scale: '10.00', passed: true }]);
+  assert.deepEqual(await averages(pupils[1], lateTo), [], 'no mark published, no average');
+  assert.deepEqual((await sql('SELECT student_id, average::text AS average FROM school.gradebook_averages($1, $2, $3::date, $4::date)', [klass, maths, period[0], lateTo])).rows,
+    [{ student_id: records[0], average: '6.50' }]);
+  // A rule for a later period: the current one ended, a new one after; the past average unchanged, the later one on the new scale.
+  await as('school_runtime', a, manager.user);
+  await sql('UPDATE school.grading_rule SET valid_to = $2 WHERE id = $1', [own, await dayAfter(today, 1)]);
+  await rejects('UPDATE school.grading_rule SET valid_to = $2 WHERE id = $1', [own, await dayAfter(today, 9)], '23514', 'grading_rule_ended');
+  await sql(RULE, [a, program, null, 20, 1, 0.5, await dayAfter(today, 2), null]);
+  assert.deepEqual((await averages(pupils[0], lateTo)).map(r => r.average), ['6.50']);
+  assert.deepEqual((await averages(pupils[0], await dayAfter(today, 30))).map(r => [r.average, r.scale]), [['13.00', '20.00']]);
+  await as('school_runtime', a, pupils[0].user);
+  assert.deepEqual((await sql('SELECT mark::text AS mark, scale_max::text AS scale, passed FROM school.my_marks() ORDER BY mark')).rows,
+    [{ mark: '6.00', scale: '10.00', passed: true }, { mark: '7.50', scale: '10.00', passed: true }]);
+  await as('school_runtime', a, 1);
+});
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
 await sql('UPDATE school.study_group SET main_room_id = NULL WHERE tenant_id = $1 AND main_room_id IS NOT NULL', [a]);
 await sql('UPDATE school.room SET archived_at = now() WHERE tenant_id = $1 AND archived_at IS NULL', [a]);

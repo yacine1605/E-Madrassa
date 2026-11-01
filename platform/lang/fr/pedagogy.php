@@ -83,4 +83,9 @@ return [
     'image_untitled' => 'sans titre',
     'no_lesson' => 'Aucune leçon publiée',
     'no_lesson_help' => 'Les leçons apparaissent ici dès leur publication.',
+    // FR-LMS-04: the marks and the gradebook.
+    'gradebook' => 'Carnet de notes',
+    'gradebook_columns' => ['matricule' => 'Matricule', 'pupil' => 'Élève', 'activity' => 'Activité', 'deadline' => 'Échéance', 'status' => 'État',
+        'points' => 'Points', 'max_points' => 'Sur', 'coefficient' => 'Coefficient', 'mark' => 'Note', 'average' => 'Moyenne'],
+    'mark_states' => ['not_submitted' => 'Non remis', 'absent_excused' => 'Absent excusé', 'to_grade' => 'À corriger', 'graded' => 'Corrigé', 'published' => 'Publié'],
 ];

@@ -83,4 +83,9 @@ return [
     'image_untitled' => 'بلا عنوان',
     'no_lesson' => 'لا يوجد درس منشور',
     'no_lesson_help' => 'تظهر الدروس هنا فور نشرها.',
+    // FR-LMS-04: the marks and the gradebook.
+    'gradebook' => 'كشف النقاط',
+    'gradebook_columns' => ['matricule' => 'رقم التسجيل', 'pupil' => 'التلميذ', 'activity' => 'النشاط', 'deadline' => 'الأجل', 'status' => 'الحالة',
+        'points' => 'النقاط', 'max_points' => 'من', 'coefficient' => 'المعامل', 'mark' => 'العلامة', 'average' => 'المعدل'],
+    'mark_states' => ['not_submitted' => 'لم يُسلَّم', 'absent_excused' => 'غياب مبرر', 'to_grade' => 'للتصحيح', 'graded' => 'مُصحَّح', 'published' => 'منشور'],
 ];

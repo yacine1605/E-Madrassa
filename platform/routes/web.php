@@ -23,6 +23,7 @@ use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FinancePeriodController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\GradingController;
 use App\Http\Controllers\GuardianController;
 use App\Http\Controllers\HomeworkSubmissionController;
 use App\Http\Controllers\GroupMembershipController;
@@ -686,6 +687,15 @@ Route::prefix('api')->group(function () {
                     Route::post('homework-submissions/{submission}/flag', [HomeworkSubmissionController::class, 'flag']);
                 });
                 Route::get('activities/{activity}/attempts', [QuizAttemptController::class, 'forActivity'])->middleware('permission:lms.activity.manage');
+                // FR-LMS-04: the grading rules of a programme or a level, kept by the pedagogy manager; a group's gradebook; the pupil's averages.
+                Route::get('grading-rules', [GradingController::class, 'index'])->middleware('permission:lms.grading.manage,lms.activity.manage');
+                Route::middleware('permission:lms.grading.manage')->group(function () {
+                    Route::post('grading-rules', [GradingController::class, 'store']);
+                    Route::post('grading-rules/{rule}/end', [GradingController::class, 'end']);
+                    Route::delete('grading-rules/{rule}', [GradingController::class, 'destroy']);
+                });
+                Route::get('groups/{group}/gradebook', [GradingController::class, 'gradebook'])->middleware('permission:lms.activity.manage');
+                Route::get('my-averages', [GradingController::class, 'mine'])->middleware('permission:lms.activity.take');
                 // FR-LMS-01: a teacher's own resources, on a visible lesson of a course they teach.
                 Route::middleware('permission:lms.resource.manage')->group(function () {
                     Route::post('lessons/{lesson}/resources', [LessonResourceController::class, 'store']);

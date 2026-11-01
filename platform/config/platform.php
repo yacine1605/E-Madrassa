@@ -73,6 +73,8 @@ return [
         // FR-TDB-03: the dashboards, as their screens show them, for whoever reads them.
         'finance_dashboard' => App\Exports\FinanceDashboardExport::class,
         'operations_dashboard' => App\Exports\OperationsDashboardExport::class,
+        // FR-LMS-04: a group's gradebook in a subject, for its teacher or the pedagogy manager.
+        'gradebook' => App\Exports\GradebookExport::class,
     ],
     'export_background_rows' => 2000,
 

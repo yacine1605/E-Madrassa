@@ -375,6 +375,13 @@ GRANT SELECT ON school.activity_mark, school.activity_mark_publication TO school
 GRANT EXECUTE ON FUNCTION school.pupil_deadline(uuid, uuid, uuid), school.correct_answer(uuid, uuid, numeric, text), school.grade_homework(uuid, uuid, numeric, text),
   school.decide_mark(uuid, uuid, text, text), school.publish_marks(uuid, uuid[], text), school.publish_key(uuid), school.regrade_activity(uuid, text),
   platform.publish_due_marks(integer), school.activity_results(uuid), school.my_results(), school.key_visible(uuid, uuid, uuid), school.my_review(uuid) TO school_runtime;
+-- Grading rules (084): versions by programme or level, started today or later, ended yesterday at the earliest; read by every member.
+-- The gradebook and the averages through functions, for the teacher of the group's subject or the pupil's own published marks.
+GRANT SELECT, DELETE ON school.grading_rule TO school_runtime;
+GRANT INSERT (tenant_id, program_id, node_id, scale_max, step, rounding, pass_ratio, valid_from, valid_to) ON school.grading_rule TO school_runtime;
+GRANT UPDATE (valid_to, version) ON school.grading_rule TO school_runtime;
+GRANT EXECUTE ON FUNCTION school.grading_rule_for(uuid, uuid, date), school.rule_values(uuid), school.round_mark(numeric, numeric, text), school.on_scale(numeric, uuid),
+  school.gradebook(uuid, uuid, date, date), school.gradebook_averages(uuid, uuid, date, date), school.my_averages(date, date), school.my_marks() TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -806,6 +813,17 @@ ALTER FUNCTION platform.publish_due_marks(integer) OWNER TO platform_provisioner
 ALTER FUNCTION school.my_results() OWNER TO platform_provisioner;
 ALTER FUNCTION school.key_visible(uuid, uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION school.my_review(uuid) OWNER TO platform_provisioner;
+-- Grading rules (084): the rule an activity keeps, the averages over the published marks of whoever may read them.
+GRANT SELECT ON school.grading_rule TO platform_provisioner;
+GRANT EXECUTE ON FUNCTION school.round_mark(numeric, numeric, text), school.on_scale(numeric, uuid) TO platform_provisioner;
+ALTER FUNCTION school.grading_rule_for(uuid, uuid, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.rule_values(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.keep_grading_rule() OWNER TO platform_provisioner;
+ALTER FUNCTION school.average_of(uuid, uuid, uuid, uuid, date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.gradebook(uuid, uuid, date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.gradebook_averages(uuid, uuid, date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_averages(date, date) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_marks() OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;
