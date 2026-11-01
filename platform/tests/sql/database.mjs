@@ -5816,6 +5816,13 @@ await check('a result is computed from the work and the corrections, published a
   await rejects("SELECT school.decide_mark($1, $2, 'zero_missing', 'Non rendu')", [homework, records[2]], '23514', 'lms_work_submitted');
   await sql("SELECT school.decide_mark($1, $2, 'zero_missing', 'Non rendu sans justification')", [homework, records[0]]);
   await sql("SELECT school.decide_mark($1, $2, 'excused', 'Hospitalisé')", [homework, records[1]]);
+  // BR-09 (SQL 087): the decision's reason journaled with the mark's change, its old and new state, by its author.
+  await as(null);
+  const journaled = (await sql(`SELECT action, actor_id, before->>'status' AS was, after->>'status' AS is FROM school.audit_log
+    WHERE object_type = 'activity_mark' AND reason = 'Non rendu sans justification' ORDER BY action`)).rows;
+  assert.equal(journaled[0].action, 'INSERT');
+  assert.ok(journaled.every(r => Number(r.actor_id) === Number(teacherAccount.user)));
+  assert.ok(journaled.some(r => r.action === 'UPDATE' && r.was === 'not_submitted' && r.is === 'graded'));
   await as('school_runtime', null, null);
   assert.ok((await first('SELECT platform.publish_due_marks(100) AS n')).n >= 1);
   await as('school_runtime', a, teacherAccount.user);

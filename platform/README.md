@@ -1580,6 +1580,18 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 106 (lot 5): the walkthrough and the exit review
+
+`LotFiveWalkthroughTest` runs the seven paths of `SPECIFICATION_LOT5_PEDAGOGIE.md` §8 end to end through the API, as the pedagogy manager, an assigned teacher and three pupils, one of them without access: a course written, previewed and published, a teacher's resource, HTTP and HTML refused; activities published for the teacher's group, another group refused even by a direct request, administered by the manager; what each pupil sees, nothing without access, an activity not yet open; a quiz cut off, resumed with its time left, submitted once, its end at `min(start + duration, deadline)`; a homework's versions, a resend creating nothing, a link flagged with its replacement time, lateness refused or marked; the choices corrected automatically, the open answer by the teacher, nothing shown before publication nor to a classmate, a question changed after an attempt in a new version; averages of the published marks only, a missing work missing until a zero is decided with its reason, an excused absence left out, a rule for a later period changing nothing past; access withdrawn closing the work and keeping the published results.
+
+The walk found one gap, fixed by SQL 087 (`database/schema/087_decision_reason.sql`, migration `2026_11_01_000087`): a teacher's decision (a zero for a missing work, an excused absence) kept its reason on the mark but not in the journal (BR-09). `school.decide_mark` now journals it with the mark's insertion and recomputation, their old and new state, as the re-correction's already was.
+
+The dependency audit found two medium advisories published since lot 4's review: Livewire (an authorization bypass in `#[Authorize]`, an attribute the platform does not use) and `symfony/mime` (header injection through parameter names). Both updated at patch level (Livewire 4.4.8, Symfony 7.4.22 and its dependencies); the audit is clean.
+
+`REVUE_LOT5.md` (at the repository's root) is the exit review: each path and expected answer with its checks, the requirements' state, the defaults the school is to confirm. FR-LMS-05 (SHOULD) remains, without holding the exit.
+
+Validation on 1 November 2026: see `REVUE_LOT5.md`.
+
 ## Increment 105 (lot 5): the pupil's screens and notifications
 
 FR-LMS-02 to FR-LMS-04 for the pupil signed in, under « Pédagogie ». The screens read only through the pupil's own functions; nothing of another pupil, nothing not published.
@@ -1899,9 +1911,11 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 ## Next increments of lot 5
 
-Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens, increment 105 the pupil's screens and notifications. What remains:
+Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens, increment 105 the pupil's screens and notifications.
 
-1. Lot 5's walkthrough of the specification's seven paths (§8), and its exit review.
+Lot 5's exit review was held on 1 November 2026 (increment 106): the seven paths of the specification's §8, its expected answers (§7) and the journal's trace (BR-09) green; lot 5 can exit. `REVUE_LOT5.md` (at the repository's root) records each criterion with its checks and the choices the school is to confirm. What remains, without holding the exit:
+
+1. FR-LMS-05 (SHOULD): a lesson's progression, opened, declared complete, mastery verified.
 
 ## Next increments of lot 2
 
