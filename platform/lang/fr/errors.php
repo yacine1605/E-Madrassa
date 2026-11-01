@@ -299,6 +299,7 @@ return [
     'grading_rule_end_past' => 'Une règle de notation se termine hier au plus tôt.',
     'grading_rule_end_before_start' => 'La fin de la règle de notation précède son début.',
     'grading_rule_overlap' => 'Une autre règle de notation couvre déjà ce programme ou ce niveau sur cette période : terminez-la d’abord.',
+    'lms_lesson_outside_course' => 'Cette leçon n’appartient pas au cours de ce groupe dans cette matière.',
     'idempotency_key_required' => 'Une clé d’idempotence est requise.',
     'dashboard_range_invalid' => 'Choisissez une période de 13 mois au plus, la fin après le début.',
     'timetable_scope_required' => 'Choisissez un groupe, un enseignant ou une salle.',

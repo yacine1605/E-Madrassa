@@ -184,7 +184,7 @@ final class LotFiveWalkthroughTest extends TestCase
             $this->signIn($pupil['account'])->assertOk();
             return $this->getJson('/api/my-averages?from='.now()->subMonth()->toDateString().'&to='.$to)->assertOk()->json('data.averages.0.average');
         };
-        $soon = now()->addDay()->toDateString();
+        $soon = now('Africa/Algiers')->addDay()->toDateString();
         $this->assertSame('9.00', $average($malek, $soon), 'the quiz alone: 9/10; the homework graded but not published');
         $this->signIn($karim)->assertOk();
         $this->postJson("/api/activities/{$lenient['id']}/results/publish")->assertOk()->assertJsonPath('data.published', 2);
@@ -202,7 +202,7 @@ final class LotFiveWalkthroughTest extends TestCase
         $this->assertSame('3.50', $average($sami, $soon));
         $this->signIn($s['manager'])->assertOk();
         $this->postJson("/api/grading-rules/{$rule['id']}/end", ['valid_to' => $soon, 'version' => $rule['version']])->assertOk();
-        $this->postJson('/api/grading-rules', ['program_id' => $s['program'], 'scale_max' => '20', 'step' => '1', 'valid_from' => now()->addDays(2)->toDateString()])->assertCreated();
+        $this->postJson('/api/grading-rules', ['program_id' => $s['program'], 'scale_max' => '20', 'step' => '1', 'valid_from' => now('Africa/Algiers')->addDays(2)->toDateString()])->assertCreated();
         $this->assertSame('7.50', $average($malek, $soon), 'the past unchanged');
         $this->assertSame('15.00', $average($malek, now()->addMonth()->toDateString()), 'a later period on the new scale');
 

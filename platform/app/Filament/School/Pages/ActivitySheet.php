@@ -132,7 +132,7 @@ final class ActivitySheet extends SchoolingPage
         return [
             Action::make('edit')->label(__('school.edit'))->visible($writes)->modalWidth('3xl')
                 ->fillForm(fn () => $this->activityForm($this->sheet()))
-                ->schema(fn () => $this->activityFields(false, $this->sheet()['kind']))
+                ->schema(fn () => $this->activityFields(false, $this->sheet()['kind'], $this->sheet()['group_id'].':'.$this->sheet()['subject_id']))
                 ->action(fn (array $data) => $this->changed(fn () => SchoolScreen::call(static::$permissions, ActivityController::class, 'update',
                     [...$this->sentActivity($data, $this->sheet()['kind']), 'version' => $this->sheet()['version']], ['activity' => $this->activity]))),
             Action::make('publish')->label(fn () => __($this->published() ? 'pedagogy.publish_again' : 'pedagogy.publish'))->color('success')->visible($writes)

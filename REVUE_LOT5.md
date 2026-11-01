@@ -56,7 +56,7 @@ Auteur, date, objet, ancienne et nouvelle valeur, motif des dérogations, versio
 | FR-LMS-02 Devoirs maison | conforme |
 | FR-LMS-03 Quiz | conforme |
 | FR-LMS-04 Notes et moyennes simples | conforme |
-| FR-LMS-05 Progression (SHOULD) | **à faire** : ouverture, achèvement déclaré, maîtrise vérifiée. Exigence souhaitable, non requise par les parcours du §8 ; elle n'empêche pas la sortie. |
+| FR-LMS-05 Progression (SHOULD) | à faire à la revue ; **conforme depuis l'incrément 107** (2 novembre 2026) : ouverture, achèvement déclaré et maîtrise vérifiée par un résultat publié, distincts (`ProgressTest`, tests/sql) |
 
 ## Choix à confirmer par l'établissement
 
@@ -70,11 +70,12 @@ Les valeurs par défaut de la spécification sont en place ; chacune est un rég
 - **Accès aux cours** : l'inscription validée suffit (OD-05, `enrollment.access.require_payment` = `none`).
 - **Export du carnet de notes** : par qui peut lancer des exports (`export.job.create`), que le rôle enseignant n'a pas ; l'accorder à l'enseignant lui permet d'exporter ses seuls groupes.
 - **Notifications de l'élève** : activité donnée, dans l'application seulement (e-mail sur choix de l'élève) ; lien à remplacer et résultat publié, aussi par e-mail.
+- **Progression (incrément 107)** : une leçon est « ouverte » quand l'élève la déplie dans le cours ; la maîtrise suit le dernier résultat publié d'une activité rattachée à la leçon (vérifiée au seuil de réussite de sa règle), jamais l'ouverture ni la déclaration.
 - **Période du carnet et des moyennes de l'élève** : l'année scolaire, du 1er septembre au 31 août, modifiable à l'écran du carnet.
 
 ## Conclusion
 
-Les sept parcours, les réponses attendues et la trace du journal sont verts : **le lot 5 peut sortir**. Seule reste FR-LMS-05, souhaitable.
+Les sept parcours, les réponses attendues et la trace du journal sont verts : **le lot 5 peut sortir**. FR-LMS-05, souhaitable et seule restante à la revue, a été livrée ensuite (incrément 107) : toutes les exigences du lot 5 sont conformes.
 
 ## Rejouer les contrôles
 

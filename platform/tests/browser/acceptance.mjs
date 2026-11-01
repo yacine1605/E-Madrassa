@@ -24,7 +24,7 @@ let viewports;
 let shotsOf;
 const schoolPages = ['home', 'students', 'guardians', 'programs', 'groups', 'enrollments', 'staff', 'accounts', 'roles', 'assignments', 'credentials', 'reference-types',
   'reference-nodes', 'subjects', 'years', 'periods', 'custom-fields', 'sites', 'rooms', 'room-options', 'leads', 'lead-options', 'settings', 'deliveries', 'support-access', 'journal', 'tasks', 'notifications', 'imports', 'exports', 'adjustment-approvals', 'payment-validations', 'refund-approvals', 'arrears', 'finance-periods', 'expenses', 'expense-categories', 'expense-payments', 'expense-corrections',
-  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes', 'timetable-versions', 'teacher-attendance', 'delivered-hours', 'roll-call', 'absence-alerts', 'finance-dashboard', 'operations-dashboard', 'teaching-assignments', 'courses', 'activities', 'gradebook', 'grading-rules'];
+  'payroll', 'my-pay', 'school-calendar', 'time-slots', 'planning', 'session-changes', 'timetable-versions', 'teacher-attendance', 'delivered-hours', 'roll-call', 'absence-alerts', 'finance-dashboard', 'operations-dashboard', 'teaching-assignments', 'courses', 'activities', 'gradebook', 'grading-rules', 'progress'];
 const consolePages = ['supervision', 'tenants', 'tenants/create'];
 const publicPages = ['school/login', 'school/recovery', 'school/activation', 'console/login'];
 // A catalog key shown as it is: a translation missing from lang/fr or lang/ar.

@@ -384,6 +384,10 @@ GRANT EXECUTE ON FUNCTION school.grading_rule_for(uuid, uuid, date), school.rule
   school.gradebook(uuid, uuid, date, date), school.gradebook_averages(uuid, uuid, date, date), school.my_averages(date, date), school.my_marks() TO school_runtime;
 -- The activities' screens (085): the groups' subjects the caller may write an activity for today.
 GRANT EXECUTE ON FUNCTION school.activity_targets() TO school_runtime;
+-- Progression (088): the pupil opens and declares their own lessons, reads their progression; the teacher reads their group's.
+-- The table itself is read and written through these functions only.
+GRANT EXECUTE ON FUNCTION school.open_lesson(uuid), school.declare_lesson(uuid, boolean), school.my_progress(uuid),
+  school.course_progress(uuid, uuid), school.activity_lessons(uuid, uuid), school.my_lesson_course(uuid) TO school_runtime;
 -- Staff (031): a record with or without an account (P7), on a site; its number given or made once; archived after
 -- leaving, never deleted (BR-02). The dates of a departure and the number made are the database's.
 GRANT SELECT ON school.staff TO school_runtime;
@@ -831,6 +835,16 @@ ALTER FUNCTION school.activity_targets() OWNER TO platform_provisioner;
 ALTER FUNCTION school.tell_pupil(uuid, uuid, text, jsonb) OWNER TO platform_provisioner;
 ALTER FUNCTION school.tell_activity_published() OWNER TO platform_provisioner;
 ALTER FUNCTION school.tell_submission_flagged() OWNER TO platform_provisioner;
+-- Progression (088): written by the pupil's functions, read by theirs and the teacher's.
+GRANT SELECT, INSERT, UPDATE ON school.lesson_progress TO platform_provisioner;
+ALTER FUNCTION school.guard_activity_lesson() OWNER TO platform_provisioner;
+ALTER FUNCTION school.activity_lessons(uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_lesson_course(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.open_lesson(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.declare_lesson(uuid, boolean) OWNER TO platform_provisioner;
+ALTER FUNCTION school.lesson_mastery(uuid, uuid, uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.my_progress(uuid) OWNER TO platform_provisioner;
+ALTER FUNCTION school.course_progress(uuid, uuid) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.finance_pending(uuid, date, date) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.create_tenant(uuid, text, text, text, text, date, date, integer, integer, text, text, bigint, text) OWNER TO platform_provisioner;
 ALTER FUNCTION platform.set_tenant_status(uuid, text, text) OWNER TO platform_provisioner;

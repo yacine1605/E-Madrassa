@@ -48,6 +48,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgressionController;
 use App\Http\Controllers\QuizAttemptController;
 use App\Http\Controllers\ProgramSubjectController;
+use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\ReferentialController;
@@ -638,6 +639,13 @@ Route::prefix('api')->group(function () {
                     Route::get('courses', [CourseController::class, 'index']);
                     Route::get('courses/{course}/lessons', [CourseController::class, 'lessons']);
                 });
+                // FR-LMS-05: the pupil's progression, opened and declared by them; their group's for the teacher.
+                Route::middleware('permission:lms.course.read')->group(function () {
+                    Route::get('courses/{course}/my-progress', [ProgressController::class, 'mine']);
+                    Route::post('lessons/{lesson}/opened', [ProgressController::class, 'opened']);
+                    Route::post('lessons/{lesson}/completion', [ProgressController::class, 'complete']);
+                });
+                Route::get('groups/{group}/progress', [ProgressController::class, 'group'])->middleware('permission:lms.activity.manage');
                 // FR-LMS-02, FR-LMS-03: activities, by the teacher of the group's subject or the pedagogy manager; the pupil's own.
                 Route::middleware('permission:lms.activity.manage')->group(function () {
                     Route::get('activities', [ActivityController::class, 'index']);

@@ -11,6 +11,7 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -34,17 +35,31 @@ trait WritesActivities
     /** Neither archived nor read-only: the database checks who teaches the group. */
     protected function writesActivities(): bool { return SchoolScreen::writable(null); }
 
-    /** The fields of an activity; its group, subject and kind only when it is created. */
-    protected function activityFields(bool $create, ?string $kind = null): array
+    /** @return array<string, string> the lessons published of a group's course in a subject, « group:subject », that an activity may be on */
+    protected function lessonOptions(?string $target): array
+    {
+        if ($target === null || !str_contains($target, ':')) return [];
+        try {
+            return collect(DB::select('SELECT * FROM school.activity_lessons(?, ?)', explode(':', $target, 2)))
+                ->mapWithKeys(fn ($row) => [$row->lesson_id => $row->chapter_title.' · '.$row->title])->all();
+        } catch (QueryException) {
+            return [];
+        }
+    }
+
+    /** The fields of an activity; its group, subject and kind only when it is created, its lesson among its group's course's. */
+    protected function activityFields(bool $create, ?string $kind = null, ?string $target = null): array
     {
         $quiz = fn (Get $get) => ($create ? $get('kind') : $kind) === 'quiz';
         $moment = fn (string $name) => DateTimePicker::make($name)->label(__('pedagogy.'.$name))->seconds(false)->timezone('Africa/Algiers');
         return [
             ...($create ? [
-                Select::make('target')->label(__('pedagogy.target'))->required()->searchable()->options(fn () => $this->targetOptions())->helperText(__('pedagogy.target_help')),
+                Select::make('target')->label(__('pedagogy.target'))->required()->searchable()->options(fn () => $this->targetOptions())->helperText(__('pedagogy.target_help'))->live(),
                 Radio::make('kind')->label(__('pedagogy.kind'))->required()->inline()->default('homework')->options(__('pedagogy.kinds'))->live(),
             ] : []),
             TextInput::make('title')->label(__('pedagogy.title'))->required()->maxLength(200),
+            Select::make('lesson_id')->label(__('pedagogy.lesson'))->searchable()->helperText(__('pedagogy.activity_lesson_help'))
+                ->options(fn (Get $get) => $this->lessonOptions($create ? $get('target') : $target)),
             RichEditor::make('instructions')->label(__('pedagogy.instructions'))->json()->fileAttachments(false)->saveRelationshipsUsing(null)
                 ->helperText(__('pedagogy.content_help'))->toolbarButtons([['bold', 'italic', 'underline', 'link'], ['bulletList', 'orderedList'], ['undo', 'redo']]),
             $moment('opens_at')->helperText(__('pedagogy.opens_at_help')),
@@ -98,6 +113,6 @@ trait WritesActivities
     protected function activityForm(array $activity): array
     {
         return collect($activity)->only(['title', 'instructions', 'opens_at', 'deadline_at', 'duration_minutes', 'max_points', 'coefficient', 'max_attempts',
-            'selection', 'late_policy', 'late_until', 'replacement_hours', 'results_visibility', 'key_visibility'])->all();
+            'selection', 'late_policy', 'late_until', 'replacement_hours', 'results_visibility', 'key_visibility', 'lesson_id'])->all();
     }
 }

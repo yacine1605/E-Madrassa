@@ -270,4 +270,18 @@ return [
     'time_left' => 'Temps restant',
     'time_left_help' => 'Compté par le serveur : à la fin, la tentative est remise avec les réponses enregistrées.',
     'see_activity' => 'Voir l’activité',
+    // FR-LMS-05: the progression.
+    'activity_lesson_help' => 'Facultatif : une leçon publiée du cours de ce groupe. Un résultat publié de l’activité vérifie la maîtrise de la leçon par l’élève.',
+    'progress' => 'Progression',
+    'progress_help' => 'Pour chaque leçon publiée du cours, parmi les élèves du groupe : qui l’a ouverte, qui l’a déclarée terminée, et dont la maîtrise est vérifiée par un résultat publié d’une activité portant sur elle. Ouvrir ou déclarer une leçon ne vérifie jamais une maîtrise.',
+    'progress_states' => ['opened' => 'Ouverte', 'declared' => 'Déclarée terminée', 'verified' => 'Maîtrise vérifiée', 'not_verified' => 'Maîtrise non vérifiée'],
+    'pupils_progress' => 'Élève par élève',
+    'pupils_progress_help' => 'La maîtrise suit le dernier résultat publié d’une activité sur cette leçon : vérifiée s’il atteint le seuil de réussite, non vérifiée sinon.',
+    'opened_on' => 'ouverte le :at',
+    'not_opened' => 'pas encore ouverte',
+    'declared_on' => 'déclarée terminée le :at',
+    'mastery_states' => ['verified' => 'maîtrise vérifiée', 'not_verified' => 'maîtrise non vérifiée', 'none' => 'maîtrise pas encore évaluée'],
+    'declare_done' => 'J’ai terminé cette leçon',
+    'declare_undone' => 'Je n’ai pas terminé',
+    'declare_help' => 'Votre déclaration aide votre enseignant ; seule une activité corrigée et publiée vérifie votre maîtrise.',
 ];

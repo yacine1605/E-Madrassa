@@ -1580,6 +1580,26 @@ Routes: `GET /api/dashboards/operations?from=&to=`, `GET /api/dashboards/operati
 
 Validation on 17 October 2026: **303 PHP integration tests (15,687 assertions)**; **267 embedded SQL checks and 298 native PostgreSQL 16 checks including concurrency**; migration 070 rolled back alone on the database the suite had filled, then applied again, and every migration reset and applied again on that database (the rollbacks of 061 and 070 now leave the read-only schools' triggers aside); dependency audit without an advisory; deployment end to end and backup and restore checked; browser acceptance of 284 screens in Chromium, Firefox and WebKit without a problem. The GitHub workflow, blocked by the account's billing, was run locally, job by job (its platform jobs).
 
+## Increment 107 (lot 5): the pupils' progression
+
+FR-LMS-05 (SHOULD), the last of lot 5: three facts about a pupil and a lesson, kept apart as the SRS asks (« une consultation n'est pas une preuve de compréhension »). SQL 088 (`database/schema/088_lesson_progress.sql`, migration `2026_11_02_000088`):
+
+- **Opened**: noted by the server, the first and the last time (once a day at most), when the pupil unfolds the lesson in the course; a pupil's lessons start folded. Only for a lesson they may read now; a member of staff opens nothing (`lms_access_denied`).
+- **Declared complete**: the pupil's own button on the lesson, « J'ai terminé cette leçon », withdrawn the same way. It helps the teacher; it verifies nothing.
+- **Mastery verified**: never stored nor declared. Computed when read from the last published result of an activity on the lesson: `verified` when it reaches the pass mark of the activity's grading rule, `not_verified` below it, nothing without a published result. A result graded but not published changes nothing.
+- **An activity's lesson**: chosen in the activity's form among the lessons published of its group's course in its subject; the database refuses any other (`lms_lesson_outside_course`), so that evidence counts for that lesson only.
+- **The pupil** reads their own progression on each lesson of the course. **The teacher** of the group's subject (the pedagogy manager for any) reads « Progression » (`/school/progress`): each lesson, how many of the group's pupils with access opened it, declared it, had their mastery verified or not; and pupil by pupil.
+
+Routes: `GET /api/courses/{course}/my-progress`, `POST /api/lessons/{lesson}/opened`, `POST /api/lessons/{lesson}/completion`, `GET /api/groups/{group}/progress?subject_id=`.
+
+| Requirement | Evidence |
+|---|---|
+| FR-LMS-05 (ouverture, achèvement déclaré, maîtrise vérifiée) | tests/sql, `ProgressTest`: opened twice, one row; declared then withdrawn; neither a mastery; 8/20 published not verified, 15/20 graded unchanged until published, then verified |
+| FR-LMS-05 (lecture) | tests/sql, `ProgressTest`: the pupil's own, the teacher's group, refused to another teacher and to a pupil; a member of staff opens nothing |
+| Lot 5 §1 (leçon d'une activité) | tests/sql: a lesson of another programme's course refused; `ProgressTest`: the lesson chosen on the activity's screen |
+
+Validation on 2 November 2026: **325 PHP integration tests (18,674 assertions)**; **279 embedded SQL checks and 310 native PostgreSQL 16 checks including concurrency**; migration 088 rolled back on the database the suite had filled, its table and trigger checked gone, then applied again; browser acceptance of 312 screens in Chromium without a problem. The run also fixed three tests that read the date in two timezones and failed between midnight and 1 a.m. in Algiers (the 084 check, `GradingTest`, `LotFiveWalkthroughTest`). The CI could not start (the GitHub account's billing).
+
 ## Increment 106 (lot 5): the walkthrough and the exit review
 
 `LotFiveWalkthroughTest` runs the seven paths of `SPECIFICATION_LOT5_PEDAGOGIE.md` §8 end to end through the API, as the pedagogy manager, an assigned teacher and three pupils, one of them without access: a course written, previewed and published, a teacher's resource, HTTP and HTML refused; activities published for the teacher's group, another group refused even by a direct request, administered by the manager; what each pupil sees, nothing without access, an activity not yet open; a quiz cut off, resumed with its time left, submitted once, its end at `min(start + duration, deadline)`; a homework's versions, a resend creating nothing, a link flagged with its replacement time, lateness refused or marked; the choices corrected automatically, the open answer by the teacher, nothing shown before publication nor to a classmate, a question changed after an attempt in a new version; averages of the published marks only, a missing work missing until a zero is decided with its reason, an excused absence left out, a rule for a later period changing nothing past; access withdrawn closing the work and keeping the published results.
@@ -1913,9 +1933,7 @@ Lot 4 is complete but for FR-PLN-04's pupils and parents reading their own timet
 
 Lot 5 follows `SPECIFICATION_LOT5_PEDAGOGIE.md` (at the repository's root): pupils signed in, links on the school's allow-list and no upload, a scale per programme or level, the lessons' review off by default. Its defaults are each a setting or an activity's choice. Increment 96 laid its base (assignments, the pupils' accounts and their access), increments 97 and 98 the course (FR-LMS-01), increment 99 the activities, their versions and audience, increment 100 the quiz attempts, increment 101 the homework's submissions, increment 102 the correction and the results' publication, increment 103 the grading rules, the averages and the gradebook, increment 104 the teacher's screens, increment 105 the pupil's screens and notifications.
 
-Lot 5's exit review was held on 1 November 2026 (increment 106): the seven paths of the specification's §8, its expected answers (§7) and the journal's trace (BR-09) green; lot 5 can exit. `REVUE_LOT5.md` (at the repository's root) records each criterion with its checks and the choices the school is to confirm. What remains, without holding the exit:
-
-1. FR-LMS-05 (SHOULD): a lesson's progression, opened, declared complete, mastery verified.
+Lot 5's exit review was held on 1 November 2026 (increment 106): the seven paths of the specification's §8, its expected answers (§7) and the journal's trace (BR-09) green; lot 5 can exit. `REVUE_LOT5.md` (at the repository's root) records each criterion with its checks and the choices the school is to confirm. FR-LMS-05 (SHOULD), the only requirement left at the review, came with increment 107: every requirement of lot 5 is met.
 
 ## Next increments of lot 2
 

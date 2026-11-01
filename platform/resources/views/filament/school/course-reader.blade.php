@@ -3,9 +3,15 @@
     @forelse ($this->chapters() as $chapter)
         <x-filament::section :heading="$chapter['title']">
             @foreach ($chapter['lessons'] as $lesson)
-                @php($duration = $this->duration($lesson))
-                <x-filament::section :heading="$lesson['title']" :description="$duration" collapsible>
-                    <div class="fi-prose">
+                @php($learns = $this->learns())
+                @php($description = $this->lessonLine($lesson))
+                @php($opening = $this->opening($lesson))
+                {{-- A pupil opens a lesson by unfolding it: the server notes it then, never a proof of understanding (FR-LMS-05). --}}
+                <x-filament::section :heading="$lesson['title']" :description="$description" collapsible :collapsed="$learns">
+                    <div class="fi-prose" @if ($opening) x-intersect.once="{{ $opening }}" @endif>
+                        @if ($learns)
+                            <p>{{ ($this->declareAction)(['lesson' => $lesson['lesson_id'], 'done' => !$this->declared($lesson)]) }}</p>
+                        @endif
                         @if ($lesson['objectives'])
                             <p><strong>{{ __('pedagogy.objectives') }}</strong> : {{ $lesson['objectives'] }}</p>
                         @endif

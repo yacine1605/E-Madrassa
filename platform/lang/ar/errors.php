@@ -299,6 +299,7 @@ return [
     'grading_rule_end_past' => 'تنتهي قاعدة التنقيط أمس على الأقرب.',
     'grading_rule_end_before_start' => 'نهاية قاعدة التنقيط تسبق بدايتها.',
     'grading_rule_overlap' => 'قاعدة تنقيط أخرى تغطي هذا البرنامج أو هذا المستوى في هذه الفترة: أنهِها أولًا.',
+    'lms_lesson_outside_course' => 'هذا الدرس لا ينتمي إلى مقرر هذا الفوج في هذه المادة.',
     'idempotency_key_required' => 'مفتاح عدم التكرار مطلوب.',
     'dashboard_range_invalid' => 'اختر فترة لا تتجاوز 13 شهرًا، نهايتها بعد بدايتها.',
     'timetable_scope_required' => 'اختر فوجًا أو أستاذًا أو قاعة.',

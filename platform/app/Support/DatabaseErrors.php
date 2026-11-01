@@ -81,6 +81,7 @@ final class DatabaseErrors
         'lms_attempts_exhausted', 'lms_attempt_expired', 'lms_attempt_submitted', 'lms_answer_invalid', 'idempotency_key_required',
         'lms_submission_not_current', 'lms_points_out_of_range', 'lms_attempt_in_progress', 'lms_nothing_submitted', 'lms_deadline_not_passed',
         'lms_work_submitted', 'grading_rule_begun', 'grading_rule_past', 'grading_rule_ended', 'grading_rule_end_past', 'grading_rule_end_before_start',
+        'lms_lesson_outside_course',
     ];
 
     /** The exclusion constraints whose refusal says which conflict (SQL 062, 077, 084). */

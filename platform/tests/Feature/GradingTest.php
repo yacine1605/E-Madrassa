@@ -19,7 +19,8 @@ final class GradingTest extends TestCase
     public function test_grading_rules_scale_the_marks_and_averages_take_the_published_ones_only(): void
     {
         $s = $this->setting('complete');
-        $today = now('Africa/Algiers')->toDateString();
+        // A rule without a start begins on the database's day, which the application's clock shares (UTC).
+        $today = now()->toDateString();
         $tomorrow = now('Africa/Algiers')->addDay()->toDateString();
         // Rules: the manager's, today or later, never two over the same days.
         $rule = $this->postJson('/api/grading-rules', ['program_id' => $s['program'], 'scale_max' => '10', 'step' => '0.5'])->assertCreated()
@@ -102,7 +103,7 @@ final class GradingTest extends TestCase
             ->assertJsonPath('data.valid_to', $tomorrow);
         $this->postJson("/api/grading-rules/{$rule['id']}/end", ['valid_to' => now()->addDays(9)->toDateString(), 'version' => $rule['version'] + 1])
             ->assertConflict()->assertJsonPath('code', 'grading_rule_ended');
-        $later = $this->postJson('/api/grading-rules', ['program_id' => $s['program'], 'scale_max' => '20', 'valid_from' => now()->addDays(2)->toDateString()])
+        $later = $this->postJson('/api/grading-rules', ['program_id' => $s['program'], 'scale_max' => '20', 'valid_from' => now('Africa/Algiers')->addDays(2)->toDateString()])
             ->assertCreated()->json('data');
         $this->deleteJson("/api/grading-rules/{$later['id']}", ['version' => $later['version']])->assertNoContent();
     }

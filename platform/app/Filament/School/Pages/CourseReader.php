@@ -2,8 +2,10 @@
 
 namespace App\Filament\School\Pages;
 
+use App\Exceptions\Refusal;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\LessonResourceController;
+use App\Http\Controllers\ProgressController;
 use App\Support\Formats;
 use App\Support\Locales;
 use App\Support\Permissions;
@@ -11,14 +13,18 @@ use App\Support\SchoolScreen;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 
 /**
  * FR-LMS-01, a course as its pupils read it (`?course=`): its chapters and their lessons published
  * now, each at its last version, with the teachers' resources. A teacher of the course's subject
  * adds a link of the allow-list to a lesson, and withdraws their own; the manager withdraws any.
- * Out of the reader's reach, the course is refused alike whether it exists or not.
+ * Out of the reader's reach, the course is refused alike whether it exists or not. A pupil's lessons
+ * start folded: unfolding one notes it opened; they declare it complete, or no longer, and read
+ * whether a published result verified their mastery (FR-LMS-05).
  */
 final class CourseReader extends SchoolPage
 {
@@ -31,6 +37,8 @@ final class CourseReader extends SchoolPage
     protected string $view = 'filament.school.course-reader';
     #[Locked] public string $course = '';
     private ?array $courseRow = null;
+    private ?array $progressRows = null;
+    private ?bool $learns = null;
 
     public function mount(): void
     {
@@ -71,6 +79,61 @@ final class CourseReader extends SchoolPage
         return $lesson['duration_minutes'] ? __('pedagogy.minutes', ['minutes' => Formats::number((int) $lesson['duration_minutes'])]) : null;
     }
 
+    /** A pupil reads the course as theirs: their progression is kept and shown (FR-LMS-05). */
+    public function learns(): bool
+    {
+        return $this->learns ??= app(Permissions::class)->can('lms.activity.take') && SchoolScreen::writable(null);
+    }
+
+    /** @return array<string, array> the pupil's progression, by lesson */
+    private function progress(): array
+    {
+        return $this->progressRows ??= $this->learns()
+            ? collect(SchoolScreen::call(static::$permissions, ProgressController::class, 'mine', parameters: ['course' => $this->course])['data'])->keyBy('lesson_id')->all()
+            : [];
+    }
+
+    public function declared(array $lesson): bool { return ($this->progress()[$lesson['lesson_id']]['completed_at'] ?? null) !== null; }
+
+    /** Its length, and for a pupil what they did of it: opened, declared complete, mastery verified or not. */
+    public function lessonLine(array $lesson): ?string
+    {
+        $progress = $this->progress()[$lesson['lesson_id']] ?? null;
+        $states = $progress === null ? [] : [
+            $progress['first_opened_at'] ? __('pedagogy.opened_on', ['at' => Formats::date($progress['first_opened_at'])]) : __('pedagogy.not_opened'),
+            $progress['completed_at'] ? __('pedagogy.declared_on', ['at' => Formats::date($progress['completed_at'])]) : null,
+            __('pedagogy.mastery_states.'.($progress['mastery'] ?? 'none')),
+        ];
+        return implode(' · ', array_filter([$this->duration($lesson), ...$states])) ?: null;
+    }
+
+    /** What the page tells the server once the pupil unfolds the lesson. */
+    public function opening(array $lesson): ?string
+    {
+        return $this->learns() ? "\$wire.opened('".$lesson['lesson_id']."')" : null;
+    }
+
+    /** The pupil unfolded a lesson: noted by the server, quietly; nothing to draw again. */
+    #[Renderless]
+    public function opened(string $lesson): void
+    {
+        if (!$this->learns() || !Str::isUuid($lesson)) return;
+        try {
+            SchoolScreen::call(static::$permissions, ProgressController::class, 'opened', parameters: ['lesson' => $lesson]);
+        } catch (Refusal|QueryException) {
+            // A lesson withdrawn meanwhile, or access lost: nothing to note.
+        }
+    }
+
+    public function declareAction(): Action
+    {
+        return Action::make('declare')->size('sm')->color(fn (array $arguments) => ($arguments['done'] ?? true) ? 'success' : 'gray')
+            ->label(fn (array $arguments) => __(($arguments['done'] ?? true) ? 'pedagogy.declare_done' : 'pedagogy.declare_undone'))
+            ->tooltip(__('pedagogy.declare_help'))
+            ->action(fn (array $arguments) => $this->changed(fn () => SchoolScreen::call(static::$permissions, ProgressController::class, 'complete',
+                ['done' => (bool) $arguments['done']], ['lesson' => (string) $arguments['lesson']])));
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -100,5 +163,6 @@ final class CourseReader extends SchoolPage
     {
         SchoolScreen::change(null, $change);
         $this->courseRow = null;
+        $this->progressRows = null;
     }
 }

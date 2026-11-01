@@ -5875,7 +5875,7 @@ await check('a grading rule per programme or level, never rewritten, shows a mar
   await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
   await as('school_runtime', a, teacherAccount.user);
   const HOMEWORK = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, max_points, coefficient)
-    VALUES ($1, $2, $3, 'homework', $4, now() + interval '1 day', $5, $6) RETURNING id`;
+    VALUES ($1, $2, $3, 'homework', $4, now() + interval '2 hours', $5, $6) RETURNING id`;
   const works = [];
   for (const [title, max, coef] of [['H1', 20, 1], ['H2', 10, 2], ['H3', 20, 1], ['H4', 20, 1]]) {
     const id = (await first(HOMEWORK, [a, klass, maths, title, max, coef])).id;
@@ -5927,6 +5927,92 @@ await check('a grading rule per programme or level, never rewritten, shows a mar
   assert.deepEqual(await targets(colleagueAccount), []);
   assert.deepEqual(await targets(pupils[0]), []);
   assert.ok((await targets(manager)).some(r => r.group_id === klass && r.subject_id === maths), 'the manager, every open group');
+  await as('school_runtime', a, 1);
+});
+// Progression (SQL 088, FR-LMS-05): opened, declared complete and mastery verified kept apart; mastery only from a published result on the lesson.
+await check('a pupil opens and declares their lessons; mastery is verified only by the last published result of an activity on the lesson reaching its pass mark; the teacher reads their group\'s (FR-LMS-05)', async () => {
+  const manager = await scopedAccount('internal', 'tenant', null, ['lms.course.manage', 'lms.activity.manage', 'lms.assignment.manage', 'group.group.read', 'lms.course.read']);
+  const teacherAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const colleagueAccount = await scopedAccount('internal', 'personal', null, ['lms.activity.manage', 'group.group.read', 'lms.course.read']);
+  const pupils = [await scopedAccount('student', 'personal', null, ['lms.course.read', 'lms.activity.take']), await scopedAccount('student', 'personal', null, ['lms.course.read', 'lms.activity.take'])];
+  await as('school_runtime', a, 1);
+  const program = await programme('LMS-PRG', 90000, 'active', planned.year);
+  const sibling = await programme('LMS-PRG2', 90000, 'active', planned.year);
+  for (const p of [program, sibling]) await line(p, maths, { weekly: 3, from: await dayAfter(today, -30) });
+  const klass = await planGroup('LMS-P1', program, 20);
+  const teacher = (await newStaff('Progres', 'Rania')).id;
+  await first(QUALIFY, [a, teacher, maths, grade, await dayAfter(today, -60), null]);
+  await sql('UPDATE school.staff SET user_id = $2 WHERE id = $1', [teacher, teacherAccount.user]);
+  const records = [];
+  for (const [i, name] of ['Hichem', 'Imane'].entries()) {
+    const pupil = (await newAdult('Progres', name)).id;
+    await sql('UPDATE school.student SET user_id = $2 WHERE id = $1', [pupil, pupils[i].user]);
+    const enrolment = await enroll(pupil, program);
+    await joinGroup(enrolment, klass);
+    await sql("UPDATE school.enrollment SET status = 'validated' WHERE id = $1", [enrolment]);
+    records.push(pupil);
+  }
+  await as('school_runtime', a, manager.user);
+  await sql('INSERT INTO school.teaching_assignment (tenant_id, group_id, subject_id, staff_id) VALUES ($1, $2, $3, $4)', [a, klass, maths, teacher]);
+  const lessonsOf = async p => {
+    const course = (await first('INSERT INTO school.course (tenant_id, program_id, subject_id) VALUES ($1, $2, $3) RETURNING id', [a, p, maths])).id;
+    const chapter = (await first("INSERT INTO school.course_chapter (tenant_id, course_id, title) VALUES ($1, $2, 'Nombres') RETURNING id", [a, course])).id;
+    const ids = [];
+    for (const title of ['Fractions', 'Décimaux', 'Pourcentages']) ids.push((await first('INSERT INTO school.lesson (tenant_id, chapter_id, title) VALUES ($1, $2, $3) RETURNING id', [a, chapter, title])).id);
+    return { course, ids };
+  };
+  const { course, ids: [fractions, decimals, draft] } = await lessonsOf(program);
+  const { ids: [elsewhere] } = await lessonsOf(sibling);
+  for (const l of [fractions, decimals, elsewhere]) await sql("SELECT school.publish_lessons('lesson', $1)", [l]);
+  // An activity's lesson is one of its group's course; the teacher lists those published.
+  await as('school_runtime', a, teacherAccount.user);
+  assert.deepEqual((await sql('SELECT lesson_id FROM school.activity_lessons($1, $2)', [klass, maths])).rows.map(r => r.lesson_id), [fractions, decimals]);
+  const HOMEWORK = `INSERT INTO school.activity (tenant_id, group_id, subject_id, kind, title, deadline_at, lesson_id)
+    VALUES ($1, $2, $3, 'homework', $4, now() + interval '1 day', $5) RETURNING id`;
+  await rejects(HOMEWORK, [a, klass, maths, 'Ailleurs', elsewhere], '23514', 'lms_lesson_outside_course');
+  const work = (await first(HOMEWORK, [a, klass, maths, 'Exercices', fractions])).id;
+  await sql('SELECT school.publish_activity($1)', [work]);
+  await as('school_runtime', a, colleagueAccount.user);
+  await rejects('SELECT * FROM school.activity_lessons($1, $2)', [klass, maths], '42501', 'lms_group_forbidden');
+  await rejects('SELECT * FROM school.course_progress($1, $2)', [klass, maths], '42501', 'lms_group_forbidden');
+  // The pupil opens one lesson twice (one row), declares another complete; a draft and a staff member's opening refused.
+  await as('school_runtime', a, pupils[0].user);
+  for (let i = 0; i < 2; i++) await sql('SELECT school.open_lesson($1)', [fractions]);
+  await sql('SELECT school.declare_lesson($1, true)', [decimals]);
+  await rejects('SELECT school.open_lesson($1)', [draft], '42501', 'lms_access_denied');
+  await rejects('SELECT count(*) FROM school.lesson_progress', [], '42501');
+  const mine = async () => (await sql('SELECT lesson_id, first_opened_at IS NOT NULL AS opened, completed_at IS NOT NULL AS declared, mastery FROM school.my_progress($1)', [course])).rows;
+  assert.deepEqual(await mine(), [{ lesson_id: fractions, opened: true, declared: false, mastery: null }, { lesson_id: decimals, opened: true, declared: true, mastery: null }],
+    'declaring is no mastery');
+  await sql('SELECT school.declare_lesson($1, false)', [decimals]);
+  assert.equal((await mine())[1].declared, false, 'withdrawn by the pupil');
+  await as('school_runtime', a, teacherAccount.user);
+  await rejects('SELECT school.open_lesson($1)', [fractions], '42501', 'lms_access_denied');
+  // Mastery: 8/20 published, below the default half: not verified; 15/20 graded but not published: unchanged; published again: verified.
+  await as('school_runtime', a, pupils[0].user);
+  await sql('SELECT school.submit_homework($1, $2, $3::jsonb)', [work, uuid(), JSON.stringify(['https://drive.google.com/file/d/exercices'])]);
+  await as('school_runtime', a, teacherAccount.user);
+  await sql('SELECT school.grade_homework($1, $2, 8)', [work, records[0]]);
+  await sql('SELECT school.publish_marks($1)', [work]);
+  const mastery = async () => {
+    await as('school_runtime', a, pupils[0].user);
+    const row = (await mine())[0].mastery;
+    await as('school_runtime', a, teacherAccount.user);
+    return row;
+  };
+  assert.equal(await mastery(), 'not_verified');
+  await sql('SELECT school.grade_homework($1, $2, 15)', [work, records[0]]);
+  assert.equal(await mastery(), 'not_verified', 'a mark not published proves nothing');
+  await sql("SELECT school.publish_marks($1, NULL, 'Recorrigé après remise du brouillon')", [work]);
+  assert.equal(await mastery(), 'verified');
+  // The teacher reads the group's: both pupils, both lessons; the other pupil did nothing.
+  const group = (await sql('SELECT student_id, lesson_id, first_opened_at IS NOT NULL AS opened, completed_at IS NOT NULL AS declared, mastery FROM school.course_progress($1, $2)', [klass, maths])).rows;
+  assert.equal(group.length, 4);
+  assert.deepEqual(group.filter(r => r.student_id === records[0]).map(r => [r.lesson_id, r.opened, r.declared, r.mastery]).sort(),
+    [[fractions, true, false, 'verified'], [decimals, true, false, null]].sort());
+  assert.ok(group.filter(r => r.student_id === records[1]).every(r => !r.opened && !r.declared && r.mastery === null));
+  await as('school_runtime', a, pupils[1].user);
+  await rejects('SELECT * FROM school.course_progress($1, $2)', [klass, maths], '42501', 'lms_group_forbidden');
   await as('school_runtime', a, 1);
 });
 // The rooms above leave the school's sites free to be archived (FR-SLL-01).
