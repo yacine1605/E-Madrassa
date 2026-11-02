@@ -1045,6 +1045,8 @@ La [spécification détaillée du lot 5](SPECIFICATION_LOT5_PEDAGOGIE.md) compl�
 
 #### Module EDT — Optimisation de l'emploi du temps (Lot 6)
 
+La [spécification détaillée du lot 6](SPECIFICATION_LOT6_EMPLOI_DU_TEMPS.md) complète les exigences ci-dessous et précise le périmètre d'une génération, les contraintes et préférences, le contrat avec le moteur, les parcours, erreurs et critères d'acceptation ; ses décisions sont à confirmer.
+
 **FR-EDT-01 — Génération par contraintes.** MUST · Dépend de : FR-PLN-*, FR-STF-*. Moteur de programmation par contraintes (OR-Tools CP-SAT) exécuté en tâche de fond avec état d'avancement. **Contraintes obligatoires** : aucun chevauchement (enseignant, salle, groupe, élève y compris inter-formations) ; disponibilités et fermetures ; habilitations ; capacités et équipements des salles ; volumes horaires requis ; bornes horaires et pauses ; séances verrouillées. **Préférences pondérées (poids configurables)** : réduire les heures creuses, répartir matières et charge, limiter les changements de salle et de site.
 
 **FR-EDT-02 — Proposition, comparaison et publication.** MUST. Présenter la proposition, les préférences non satisfaites et le statut du solveur ; comparer des versions ; édition manuelle avec **recontrôle complet** des conflits ; validation et publication par un utilisateur habilité ; zéro violation obligatoire sur un planning publié.

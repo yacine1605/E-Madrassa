@@ -65,9 +65,9 @@ Périmètre : génération sous contraintes, propositions, comparaison, publicat
 - Formaliser l'intégration d'OR-Tools CP-SAT avec l'application PHP. L'analyse propose un service dans un conteneur distinct, piloté par les tâches de fond ; cette architecture doit être décrite avant réalisation.
 - Fournir ou valider une instance réaliste d'environ 500 élèves et 20 enseignants, avec une solution de référence : groupes, matières, volumes, disponibilités, salles, équipements et contraintes. Utiliser des données fictives ou anonymisées.
 
-### Spécification à rédiger
+### Spécification
 
-Définir le contrat entre l'application et le solveur, les statuts des tâches, les délais et les diagnostics. Distinguer strictement les contraintes obligatoires des préférences pondérées. Une proposition ne devient publiable qu'après contrôle des contraintes et validation par une personne habilitée.
+Le [document de spécification détaillée du lot 6](SPECIFICATION_LOT6_EMPLOI_DU_TEMPS.md) (2 novembre 2026) définit le contrat entre l'application et le solveur, les issues des générations, les délais et les diagnostics, et distingue strictement les contraintes obligatoires des préférences pondérées. Une proposition ne devient publiable qu'après contrôle des contraintes et validation par une personne habilitée, par la publication du lot 4. Il propose les poids par défaut, l'architecture, l'instance et la machine de référence ; ces choix sont listés à son §13, à confirmer avant la réalisation.
 
 ### Validation attendue
 
